@@ -393,3 +393,45 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | TaskExecutionCard (batch) | `inventory_batches` + `production_tasks` | RPC `fn_create_batches_from_task` |
 | TransferTab | `inventory_batches` + `stock_transfers` | RPC `fn_transfer_batch` |
 | UnpackTab | `inventory_batches` | RPC `fn_open_batch` + countdown timer |
+
+---
+
+## 🏗️ 2026-03-09 — Phase 3.6: BOM Hub Editor & Database Sync — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 3.6 BOM Hub CRUD + DB Sync + Cost Validation — LIVE
+
+### Migration 019: Nomenclature Cost & Notes
+
+| Изменение | Описание |
+|---|---|
+| `cost_per_unit NUMERIC DEFAULT 0` | Unit cost in THB for RAW items; for PF/SALE calculated from BOM |
+| `notes TEXT` | Free-text notes per nomenclature item |
+
+### DB Sync (Migrations Applied to Supabase)
+
+| Migration | Статус |
+|---|---|
+| 016 (KDS Scheduling) | ✅ Applied |
+| 017 (Inventory/Waste) | ✅ Applied (ENUMs + Tables + RPC + RLS + Realtime) |
+| 018 (Batches/Locations) | ✅ Applied (Tables + 4 RPCs + RLS + Realtime) |
+| 019 (Cost/Notes) | ✅ Applied (ALTER TABLE) |
+
+### BOM Hub Improvements
+
+| Feature | Описание |
+|---|---|
+| **Filter Bugfix** | Sales tab now STRICTLY shows `SALE-%` only. Boris Rule #8 added. |
+| **Add Item** | `+ Add Item` button opens modal with product_code, name, type, unit, cost_per_unit, notes |
+| **Edit Item** | `Edit` button next to selected item opens same modal in edit mode |
+| **Cost Badge** | Amber badge shows calculated BOM cost (SUM of ingredient.cost_per_unit × qty) |
+| **Editable BOM Table** | Qty, Yield%, Notes columns are all inline-editable |
+| **Per-line Cost** | Each BOM row shows `unitCost × qty` in amber |
+
+### Модифицированные файлы (Phase 3.6)
+
+| Файл | Тип | Назначение |
+|---|---|
+| `migrations/019_nomenclature_cost_notes.sql` | NEW | Add cost_per_unit + notes to nomenclature |
+| `src/components/RecipeBuilder.tsx` | REWRITTEN | Full CRUD: NomenclatureModal, CostBadge, editable Yield/Notes, filter bugfix |
+| `claude.md` | MODIFIED | Added Boris Rule #8 (BOM Hub filtering) |

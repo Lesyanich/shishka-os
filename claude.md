@@ -14,6 +14,7 @@ Transforming Shishka Healthy Kitchen into a tech-driven scale-up via "Shishka OS
 If you make a mistake and the user corrects you, you MUST update this `CLAUDE.md` file (or relevant reference files) to ensure you NEVER make this mistake again.
 
 ## 🛣️ Frontend Architecture Rules (Phase 5+)
+0. **BOM Hub Filtering (Boris Rule #8):** Nomenclature tabs MUST filter STRICTLY by product_code prefix: `SALE-%`, `PF-%`, `MOD-%`, `RAW-%`. NEVER use `.or()` with `type.eq.dish` or any other type field — items can have ambiguous types that leak across tabs. Always use `.ilike('product_code', 'PREFIX-%')` only.
 1. **Routing:** NEVER use `useState` for page switching in ERP. Always use `react-router-dom` with `BrowserRouter` — deep linking is critical for B2B SaaS.
 2. **recharts TypeScript:** The `Tooltip` `formatter` prop has strict generics. Never annotate params explicitly — use inferred types and cast with `as` where needed.
 3. **Supabase Joins:** When joining across FK relationships (e.g. `capex_transactions.category_code → fin_categories.code`), prefer 2 separate queries + JS join over implicit `.select('table(col)')` — more predictable across Supabase versions.
