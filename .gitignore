@@ -1,0 +1,58 @@
+# Dependencies & Environment
+node_modules/
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build output
+dist/
+dist-ssr/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.sw?
+*.suo
+
+# Claude Code / AI agent configs
+.claude/
+.agent/
+.cursorrules
+
+# Credentials & Tokens (NEVER commit)
+credentials.json
+gcp-oauth.keys.json
+token.json
+
+# Media & Docs (heavy files excluded from code repo)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.pdf
+*.docx
+*.xlsx
+*.csv
+*.mp4
+
+# Non-code folders (Google Drive content, not source code)
+01_Source_Data/
+04_Financial_Control/
+Bills/
+Cooking lessons /
+Graphics & Branding/
+Industry trends/
+Menu design/
+Photo (Locations & Renovations)/
+POSsystem/
+Инструкции ИИ/
