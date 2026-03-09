@@ -6,7 +6,7 @@
 
 ---
 
-## Vision: The 6-Pillar ERP
+## Vision: The 7-Pillar ERP
 
 Shishka OS is a Unified ERP/KDS PWA (PC + mobile). One app, one Supabase as SSoT.
 Future: headless architecture → same DB powers client site + marketing tools.
@@ -16,9 +16,11 @@ Future: headless architecture → same DB powers client site + marketing tools.
 | 0 | CEO Control Center | `/` | ✅ Phase 1 COMPLETE (2026-03-08) |
 | 1 | Omni-Menu, BOM & Health Matrix | `/bom` | ✅ Phase 1 COMPLETE (2026-03-08) |
 | 2 | Smart Kitchen & KDS | `/kds` + `/cook` | ✅ Phase 2 COMPLETE (2026-03-09) |
-| 3 | Smart Waste & Procurement | `/waste` | 🔜 Phase 3 |
+| 3 | Smart Waste & Procurement | `/waste` | ✅ Phase 3 COMPLETE (2026-03-09) |
+| 3.5 | Batch Tracking & Logistics | `/logistics` | 🔨 Phase 3.5 IN PROGRESS |
 | 4 | Financial Engine (CapEx/OpEx/HR) | `/finance` | 🔜 Phase 4 |
 | 5 | Advanced Analytics & Food Cost | `/analytics` | 🔜 Phase 5 |
+| 6 | Executive Hub (Tasks/Purchases/Ideas) | `/tasks` | 🔜 Phase 6 |
 | — | SYRVE Seamless Sync | background | 🔮 Future |
 
 ---
@@ -37,9 +39,11 @@ admin-panel/src/
 │   ├── ControlCenter.tsx           # PILLAR 0: CEO Dashboard ✅
 │   ├── BOMHub.tsx                  # PILLAR 1: Menu + BOM Builder ✅
 │   ├── KDSBoard.tsx                # PILLAR 2: CEO Gantt scheduling ✅
-│   ├── CookStation.tsx             # PILLAR 2: Mobile-first cook UI ✅
-│   ├── WasteTracker.tsx            # PILLAR 3: Waste Log (Phase 3)
+│   ├── CookStation.tsx             # PILLAR 2: Mobile-first cook UI ✅ (modified: batch entry)
+│   ├── WasteTracker.tsx            # PILLAR 3: Waste Log ✅
+│   ├── LogisticsScanner.tsx        # PILLAR 3.5: Batch Transfer + Unpack ✅
 │   ├── FinancialEngine.tsx         # PILLAR 4: CapEx/OpEx/HR (Phase 4)
+│   ├── ExecutiveHub.tsx            # PILLAR 6: CEO Task Kanban (Phase 6)
 │   └── Analytics.tsx               # PILLAR 5: Food Cost + Menu Engineering (Phase 5)
 │
 ├── components/
@@ -62,13 +66,18 @@ admin-panel/src/
 │   │   ├── GanttTaskBar.tsx        # Positioned task bar (CSS %, status colors)
 │   │   ├── TimeHeader.tsx          # 24h time ruler
 │   │   ├── EquipmentFilter.tsx     # Category pill filter
-│   │   ├── TaskExecutionCard.tsx   # Cook card: Start/Timer/Complete + BOM view
+│   │   ├── TaskExecutionCard.tsx   # Cook card: Start/Timer/Batch Complete + barcode display ✅
 │   │   ├── DeviationBadge.tsx      # Variance badge (≤5% ok / 5-10% warn / >10% alert)
 │   │   └── BOMSnapshotPanel.tsx    # Modal: frozen BOM ingredients at task start
 │   │
-│   ├── waste/                      # Phase 3
-│   │   ├── WasteLogForm.tsx        # Log: item + qty + reason
-│   │   └── WasteTable.tsx
+│   ├── waste/                      # Phase 3 ✅ COMPLETE
+│   │   ├── ZeroDayStocktake.tsx    # Inline-edit inventory table + search + Save
+│   │   ├── WasteLogForm.tsx        # Waste log form + financial liability + recent logs
+│   │   └── PredictivePO.tsx        # Plan selector + Generate PO → shortage table
+│   │
+│   ├── logistics/                  # Phase 3.5 ✅ COMPLETE
+│   │   ├── TransferTab.tsx         # Barcode scan → Kitchen→Assembly transfer
+│   │   └── UnpackTab.tsx           # Barcode scan → open batch → countdown timer
 │   │
 │   ├── finance/                    # Phase 4
 │   │   ├── TransactionsTable.tsx   # capex_transactions full CRUD
@@ -87,7 +96,13 @@ admin-panel/src/
     ├── useBOMCoverage.ts            # nomenclature SALE% vs bom_structures coverage
     ├── useGanttTasks.ts             # Gantt tasks + conflict detection + Realtime ✅
     ├── useEquipmentCategories.ts    # Equipment list + category filter ✅
-    └── useCookTasks.ts              # Cook tasks + RPC start + complete + Realtime ✅
+    ├── useCookTasks.ts              # Cook tasks + RPC start + complete + Realtime ✅
+    ├── useInventory.ts              # Two-query: nomenclature + inventory_balances ✅
+    ├── useWasteLog.ts               # Waste logs + createWaste + auto-deduct ✅
+    ├── usePredictivePO.ts           # RPC fn_predictive_procurement ✅
+    ├── useBatches.ts                # Batches + createBatchesFromTask + openBatch ✅
+    ├── useLocations.ts              # Locations list ✅
+    └── useStockTransfer.ts          # Transfer batch by barcode ✅
 ```
 
 ---
@@ -150,25 +165,37 @@ admin-panel/src/
 
 ---
 
-## Pillar 3: Smart Waste (Phase 3 Roadmap)
+## Pillar 3: Smart Waste & Inventory — ✅ COMPLETE (2026-03-09)
 
-### New Table Needed
-```sql
-CREATE TABLE waste_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  nomenclature_id UUID REFERENCES nomenclature(id),
-  quantity NUMERIC NOT NULL,
-  unit TEXT,
-  reason TEXT CHECK IN ('defect', 'expired', 'spillage', 'overproduction', 'other'),
-  logged_by TEXT,
-  logged_at TIMESTAMPTZ DEFAULT now()
-);
-```
+### Migration 017
+- Custom ENUMs: `waste_reason` (expiration, spillage_damage, quality_reject, rd_testing), `financial_liability` (cafe, employee, supplier)
+- `inventory_balances` table: PK=nomenclature_id FK, quantity, last_counted_at — UPSERT on stocktake
+- `waste_logs` table: UUID PK, nomenclature_id FK, quantity, reason, financial_liability, comment, CHECK constraint (comment required when liability != cafe)
+- RPC `fn_predictive_procurement(UUID)`: Recursive CTE walks BOM tree to leaf RAW ingredients, compares vs inventory, returns shortage array sorted by shortage DESC
+- RLS: anon=full CRUD, authenticated=SELECT
+- Realtime: both tables in `supabase_realtime`
 
-### Par Level Calculation
-- Based on: average daily usage × lead time days
-- Input: historical production data from `production_tasks`
-- Output: minimum stock levels + auto-generated purchase order
+### Zero-Day Stocktake (`ZeroDayStocktake.tsx`)
+- Inline-edit inventory table with search filter and per-row Save button
+- UPSERT to `inventory_balances` with `last_counted_at=now()`
+- Shows item name, product_code, unit, editable quantity, last count date
+
+### Waste Logging with Financial Liability (`WasteLogForm.tsx`)
+- Form: item select, quantity, reason dropdown, financial liability toggle (color-coded: emerald/amber/rose)
+- Comment field required when liability is employee or supplier (validated in UI + DB CHECK constraint)
+- Recent write-offs table below form with liability badges
+
+### Predictive Procurement (`PredictivePO.tsx`)
+- Plan selector dropdown (fetches last 20 from `daily_plan`)
+- Generate PO button → calls RPC → recursive BOM walk → shortage table
+- Results: Ingredient | Needed | On Hand | To Purchase (shortage > 0 in rose, OK in emerald)
+
+### Data Flow
+| Widget | Tables | Query |
+|--------|--------|-------|
+| ZeroDayStocktake | `nomenclature` + `inventory_balances` | Two queries, JS join, UPSERT |
+| WasteLogForm | `waste_logs` + `nomenclature` + `inventory_balances` | INSERT + deduct balance |
+| PredictivePO | `daily_plan` + RPC `fn_predictive_procurement` | Recursive CTE → shortage array |
 
 ---
 
@@ -205,6 +232,47 @@ CREATE TABLE shifts (
 - Base: `bom_structures.quantity_per_unit × ingredient_cost`
 - Adjustment: waste factor from `waste_log`
 - Target: <30% food cost ratio
+
+---
+
+## Pillar 6: Executive Hub (Phase 6 Roadmap)
+
+**Route:** `/tasks` — Kanban Board for CEO and partners.
+
+### New Table
+```sql
+CREATE TABLE executive_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type TEXT NOT NULL CHECK (type IN ('todo', 'purchase', 'idea')),
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'backlog' CHECK (status IN ('backlog', 'in_progress', 'done')),
+  assignee_id UUID,
+  priority INTEGER DEFAULT 0,
+  due_date TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### Features
+- **Kanban Board** (`/tasks`): 3-column board (Backlog / In Progress / Done), filterable by type (todo/purchase/idea)
+- **Quick Capture Widget**: Compact "Add Task" form embedded in CEO Control Center (`/`) for rapid task entry without leaving the dashboard
+- **Purchase List**: Filtered view of `type='purchase'` tasks — CEO-driven procurement list separate from predictive PO
+- **Idea Backlog**: Strategic ideas (type='idea') with priority ranking for future sprint planning
+
+### Security (P0)
+- **Strict RLS:** Only users with `app.is_admin = 'true'` can SELECT/INSERT/UPDATE/DELETE on `executive_tasks`
+- Kitchen line staff (cooks, assemblers) must NOT have visibility into executive tasks
+- Separate from `production_tasks` (operational) — this table is for management only
+
+### Data Flow
+| Widget | Table | Query |
+|--------|-------|-------|
+| KanbanBoard | `executive_tasks` | `GROUP BY status, ORDER BY priority DESC` |
+| QuickCapture | `executive_tasks` | `INSERT` with type selector |
+| PurchaseList | `executive_tasks` | `WHERE type = 'purchase'` |
+| IdeaBacklog | `executive_tasks` | `WHERE type = 'idea' ORDER BY priority DESC` |
 
 ---
 
@@ -308,3 +376,5 @@ Add to `index.html`:
 |------|-------|-------|---------|
 | 2026-03-08 | Phase 1 | Claude Sonnet 4.6 | Control Center (5 widgets) + BOM Hub + AppShell + 4 hooks. Build: 0 errors. |
 | 2026-03-09 | Phase 2 | Claude Opus 4.6 | KDS Gantt (/kds) + Cook Station (/cook) + Migration 016 + RPC + Realtime + 3 hooks + 7 components. Build: 0 errors. |
+| 2026-03-09 | Phase 3 | Claude Opus 4.6 | Waste (/waste) + Migration 017 (ENUMs + inventory_balances + waste_logs + fn_predictive_procurement) + 3 hooks + 3 components + 1 page. Build: 0 errors. |
+| 2026-03-09 | Phase 3.5 | Claude Opus 4.6 | Batch Tracking (/logistics) + Migration 018 (locations + inventory_batches + stock_transfers + 4 RPCs) + Cook Station batch entry + 3 hooks + 2 components + 1 page. Build: 0 errors. |

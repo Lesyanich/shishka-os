@@ -1,9 +1,11 @@
 import { useCookTasks } from '../hooks/useCookTasks'
+import { useBatches } from '../hooks/useBatches'
 import { TaskExecutionCard } from '../components/kds/TaskExecutionCard'
 import { ChefHat } from 'lucide-react'
 
 export function CookStation() {
-  const { tasks, isLoading, error, startTask, completeTask } = useCookTasks()
+  const { tasks, isLoading, error, startTask } = useCookTasks()
+  const { createBatchesFromTask } = useBatches()
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending')
   const activeTasks = tasks.filter((t) => t.status === 'in_progress')
@@ -48,7 +50,7 @@ export function CookStation() {
               key={task.id}
               task={task}
               onStart={startTask}
-              onComplete={completeTask}
+              onCompleteBatches={createBatchesFromTask}
             />
           ))}
         </div>
@@ -65,7 +67,7 @@ export function CookStation() {
               key={task.id}
               task={task}
               onStart={startTask}
-              onComplete={completeTask}
+              onCompleteBatches={createBatchesFromTask}
             />
           ))}
         </div>

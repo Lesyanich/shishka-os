@@ -20,6 +20,7 @@ If you make a mistake and the user corrects you, you MUST update this `CLAUDE.md
 4. **Unused Imports:** TypeScript strict mode (`tsc -b`) catches unused imports as errors. Always verify imports before committing.
 5. **Graceful Degradation:** Every widget MUST handle 3 states: `isLoading` (skeleton), `error` (message), and empty data (placeholder). Never let a widget crash on null.
 6. **File Location:** STATE.md lives at `02_Obsidian_Vault/Handover/STATE.md`, NOT at root. HANDOVER.md is at `02_Obsidian_Vault/Handover/HANDOVER.md`.
+7. **Git Workflow:** Before starting any new major phase or feature, the agent MUST create a new git branch (e.g. `feature/phase-N-name`) for context isolation and to protect the `main` branch. Never commit directly to `main` during active development.
 
 ## 📂 Context Routing (Point, Don't Dump)
 - **Global Rules:** Read `gemini.md`
