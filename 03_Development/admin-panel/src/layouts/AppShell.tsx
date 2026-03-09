@@ -6,6 +6,7 @@ import {
   DollarSign,
   GitBranch,
   LayoutDashboard,
+  ScanLine,
   Timer,
   Trash2,
   UtensilsCrossed,
@@ -23,7 +24,8 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/bom', icon: GitBranch, label: 'BOM Hub', enabled: true },
   { path: '/kds', icon: ChefHat, label: 'Kitchen KDS', enabled: true },
   { path: '/cook', icon: Timer, label: 'Cook Station', enabled: true },
-  { path: '/waste', icon: Trash2, label: 'Waste', enabled: false },
+  { path: '/waste', icon: Trash2, label: 'Waste', enabled: true },
+  { path: '/logistics', icon: ScanLine, label: 'Logistics', enabled: true },
   { path: '/finance', icon: DollarSign, label: 'Finance', enabled: false },
   { path: '/analytics', icon: BarChart2, label: 'Analytics', enabled: false },
 ]
