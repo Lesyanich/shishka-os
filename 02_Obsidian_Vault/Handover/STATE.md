@@ -267,3 +267,129 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | TaskExecutionCard | `production_tasks` | RPC `fn_start_production_task` / UPDATE |
 | DeviationBadge | computed | `((actual/expected)-1)*100` |
 | BOMSnapshotPanel | `production_tasks.theoretical_bom_snapshot` | JSONB display |
+
+---
+
+## 📦 2026-03-09 — Phase 3: Smart Waste & Inventory — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 3 Waste + Inventory + Predictive Procurement — LIVE
+
+### Migration 017: Inventory, Waste & Predictive Procurement
+
+| Изменение | Описание |
+|---|---|
+| `waste_reason` ENUM | expiration, spillage_damage, quality_reject, rd_testing |
+| `financial_liability` ENUM | cafe, employee, supplier |
+| `inventory_balances` TABLE | PK=nomenclature_id, quantity, last_counted_at |
+| `waste_logs` TABLE | UUID PK, nomenclature_id FK, quantity, reason, financial_liability, comment, CHECK constraint |
+| `fn_predictive_procurement(UUID)` RPC | Recursive CTE: walks BOM tree → leaf RAW ingredients → compares vs inventory → returns shortage array |
+| RLS | anon=full CRUD, authenticated=SELECT |
+| Realtime | Both tables added to `supabase_realtime` publication |
+
+### Новые функции
+
+| Функция | Тип | Статус |
+|---|---|---|
+| `fn_predictive_procurement(UUID)` | RPC / JSONB | ✅ NEW — Recursive BOM walk, shortage calc |
+
+### Routing (обновлено)
+
+| Роут | Компонент | Статус |
+|---|---|---|
+| `/` | `ControlCenter.tsx` | ✅ LIVE |
+| `/bom` | `BOMHub.tsx` | ✅ LIVE |
+| `/kds` | `KDSBoard.tsx` | ✅ LIVE |
+| `/cook` | `CookStation.tsx` | ✅ LIVE |
+| `/waste` | `WasteTracker.tsx` | ✅ NEW — Waste + Inventory + Procurement |
+| `/finance` | — | 🔜 Phase 4 |
+| `/analytics` | — | 🔜 Phase 5 |
+| `/*` | `<Navigate to="/" />` | ✅ Fallback |
+
+### Новые файлы (Phase 3)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/017_inventory_waste.sql` | SQL | ENUMs + Tables + RPC + RLS + Realtime |
+| `src/hooks/useInventory.ts` | NEW | Two-query: nomenclature + inventory_balances, JS join, upsertBalance |
+| `src/hooks/useWasteLog.ts` | NEW | Two-query: waste_logs + nomenclature, createWaste + auto-deduct inventory |
+| `src/hooks/usePredictivePO.ts` | NEW | RPC call to fn_predictive_procurement, typed POItem[] |
+| `src/pages/WasteTracker.tsx` | NEW | Page orchestrating 3 waste components |
+| `src/components/waste/ZeroDayStocktake.tsx` | NEW | Inline-edit inventory table with search + per-row Save |
+| `src/components/waste/WasteLogForm.tsx` | NEW | Waste log form with financial liability toggle + recent logs table |
+| `src/components/waste/PredictivePO.tsx` | NEW | Plan selector + Generate PO → shortage table |
+
+### Виджет → Таблица (Data Flow — Phase 3)
+
+| Виджет | Supabase Table(s) | Запрос |
+|---|---|---|
+| ZeroDayStocktake | `nomenclature` + `inventory_balances` | Two queries, JS join, UPSERT on save |
+| WasteLogForm | `waste_logs` + `nomenclature` + `inventory_balances` | INSERT waste + deduct balance |
+| PredictivePO | `daily_plan` + `fn_predictive_procurement` RPC | RPC → recursive BOM walk → shortage array |
+
+---
+
+## 📦 2026-03-09 — Phase 3.5: Batch Tracking & Logistics — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 3.5 Batch Tracking + Locations + Barcodes — LIVE
+
+### Migration 018: Batches, Locations & Stock Transfers
+
+| Изменение | Описание |
+|---|---|
+| `location_type` ENUM | kitchen, assembly, storage, delivery |
+| `batch_status` ENUM | sealed, opened, depleted, wasted |
+| `locations` TABLE | UUID PK, name UNIQUE, type. Seeded: Kitchen, Assembly, Storage |
+| `inventory_batches` TABLE | UUID PK, nomenclature_id FK, barcode UNIQUE, weight, location_id FK, status, production_task_id FK |
+| `stock_transfers` TABLE | UUID PK, batch_id FK, from/to location FKs, CHECK(from≠to) |
+| `fn_generate_barcode()` | 8-char uppercase alphanumeric, collision-safe |
+| `fn_create_batches_from_task(UUID, JSONB)` RPC | Creates N batches + completes task + returns barcodes |
+| `fn_open_batch(UUID)` RPC | Opens batch, shrinks expires_at to +12h |
+| `fn_transfer_batch(TEXT, TEXT)` RPC | Moves batch by barcode, logs transfer |
+| RLS | anon=full CRUD, authenticated=SELECT |
+| Realtime | inventory_batches + stock_transfers |
+
+### Новые функции
+
+| Функция | Тип | Статус |
+|---|---|---|
+| `fn_generate_barcode()` | UTIL | ✅ NEW |
+| `fn_create_batches_from_task(UUID, JSONB)` | RPC / JSONB | ✅ NEW |
+| `fn_open_batch(UUID)` | RPC / JSONB | ✅ NEW |
+| `fn_transfer_batch(TEXT, TEXT)` | RPC / JSONB | ✅ NEW |
+
+### Routing (обновлено)
+
+| Роут | Компонент | Статус |
+|---|---|---|
+| `/` | `ControlCenter.tsx` | ✅ LIVE |
+| `/bom` | `BOMHub.tsx` | ✅ LIVE |
+| `/kds` | `KDSBoard.tsx` | ✅ LIVE |
+| `/cook` | `CookStation.tsx` | ✅ MODIFIED — Batch entry on Complete |
+| `/waste` | `WasteTracker.tsx` | ✅ LIVE |
+| `/logistics` | `LogisticsScanner.tsx` | ✅ NEW — Transfer + Unpack tabs |
+| `/finance` | — | 🔜 Phase 4 |
+| `/analytics` | — | 🔜 Phase 5 |
+| `/tasks` | — | 🔜 Phase 6 (Executive Hub) |
+| `/*` | `<Navigate to="/" />` | ✅ Fallback |
+
+### Новые файлы (Phase 3.5)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/018_batches_and_locations.sql` | SQL | ENUMs + 3 Tables + 4 RPCs + RLS + Realtime |
+| `src/hooks/useBatches.ts` | NEW | Batches + createBatchesFromTask + openBatch |
+| `src/hooks/useLocations.ts` | NEW | Locations list |
+| `src/hooks/useStockTransfer.ts` | NEW | transferBatch RPC |
+| `src/pages/LogisticsScanner.tsx` | NEW | Mobile-first Transfer + Unpack tabs |
+| `src/components/logistics/TransferTab.tsx` | NEW | Barcode scan → transfer |
+| `src/components/logistics/UnpackTab.tsx` | NEW | Barcode scan → open → countdown timer |
+
+### Виджет → Таблица (Data Flow — Phase 3.5)
+
+| Виджет | Supabase Table(s) | Запрос |
+|---|---|---|
+| TaskExecutionCard (batch) | `inventory_batches` + `production_tasks` | RPC `fn_create_batches_from_task` |
+| TransferTab | `inventory_batches` + `stock_transfers` | RPC `fn_transfer_batch` |
+| UnpackTab | `inventory_batches` | RPC `fn_open_batch` + countdown timer |
