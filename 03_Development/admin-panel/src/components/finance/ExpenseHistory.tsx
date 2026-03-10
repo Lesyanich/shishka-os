@@ -66,6 +66,7 @@ export function ExpenseHistory({
             <thead className="sticky top-0 bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-2">Date</th>
+                <th className="px-2 py-2">Category</th>
                 <th className="px-2 py-2">Supplier</th>
                 <th className="px-2 py-2">Details</th>
                 <th className="px-2 py-2">Comments</th>
@@ -89,6 +90,18 @@ export function ExpenseHistory({
                     >
                       {r.flow_type}
                     </span>
+                  </td>
+
+                  {/* Category + Sub-category */}
+                  <td className="px-2 py-2.5">
+                    <div className="text-slate-300">
+                      {r.category_name ?? '\u2014'}
+                    </div>
+                    {r.sub_category_name && (
+                      <div className="text-[10px] text-slate-500">
+                        {r.sub_category_name}
+                      </div>
+                    )}
                   </td>
 
                   {/* Supplier */}
