@@ -9,6 +9,7 @@ import {
   ScanLine,
   Timer,
   Trash2,
+  Truck,
   UtensilsCrossed,
 } from 'lucide-react'
 
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/cook', icon: Timer, label: 'Cook Station', enabled: true },
   { path: '/waste', icon: Trash2, label: 'Waste', enabled: true },
   { path: '/logistics', icon: ScanLine, label: 'Logistics', enabled: true },
+  { path: '/procurement', icon: Truck, label: 'Procurement', enabled: true },
   { path: '/finance', icon: DollarSign, label: 'Finance', enabled: false },
   { path: '/analytics', icon: BarChart2, label: 'Analytics', enabled: false },
 ]

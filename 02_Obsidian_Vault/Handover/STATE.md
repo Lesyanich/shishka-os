@@ -491,3 +491,58 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 |---|---|---|
 | `migrations/020_storefront_pricing.sql` | NEW | 12 columns + 4 indexes on nomenclature for storefront, nutrition, economics |
 | `src/components/RecipeBuilder.tsx` | REWRITTEN | 3-section NomenclatureModal, slug generator, MarginBadge, extended NomItem type, updated queries |
+
+---
+
+## 🏗️ 2026-03-10 — Phase 4: Procurement & Real-time Food Costing — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 4 Procurement Module — LIVE
+
+### Migration 021: Procurement
+
+| Объект | Тип | Описание |
+|---|---|---|
+| `suppliers` | TABLE | id (UUID PK), name, contact_info, is_deleted, created_at, updated_at |
+| `purchase_logs` | TABLE | id (UUID PK), nomenclature_id (FK), supplier_id (FK), quantity, price_per_unit, total_price, invoice_date, notes |
+| `fn_update_cost_on_purchase()` | TRIGGER FN | On INSERT into purchase_logs → updates nomenclature.cost_per_unit with latest price_per_unit (SSoT!) |
+| `trg_update_cost_on_purchase` | TRIGGER | AFTER INSERT on purchase_logs → fn_update_cost_on_purchase |
+| `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter for suppliers |
+| RLS (5 policies) | POLICY | Full CRUD for authenticated users on both tables |
+| Realtime | PUB | Both tables added to supabase_realtime |
+
+### DB Sync
+
+| Migration | Статус |
+|---|---|
+| 021 (Procurement) | ✅ Applied (3 parts: Tables+Indexes, Triggers, RLS+Realtime) |
+
+### Frontend Components
+
+| Component | Location | Description |
+|---|---|---|
+| `Procurement.tsx` | `src/pages/` | Page layout: 2-column grid with PurchaseForm + SupplierManager (left) and PurchaseHistory (right) |
+| `PurchaseForm.tsx` | `src/components/procurement/` | Supplier + item (RAW/PF) select, qty + total price inputs, auto-calc price_per_unit, cost delta comparison, submit button |
+| `SupplierManager.tsx` | `src/components/procurement/` | CRUD table for suppliers with modal (add/edit), soft-delete |
+| `PurchaseHistory.tsx` | `src/components/procurement/` | Last 50 purchase entries with item code, supplier, qty, price/unit, total, notes. Two-query join pattern. |
+
+### UX Features
+
+| Feature | Описание |
+|---|---|
+| **Auto Price-per-Unit** | price_per_unit = total_price / quantity, computed reactively |
+| **Cost Delta Indicator** | Shows % change vs current cost (green if cheaper, red if more expensive) |
+| **Trigger-based Cost Update** | On purchase log INSERT, DB trigger auto-updates nomenclature.cost_per_unit — zero manual work |
+| **Refresh on Submit** | After logging purchase, PurchaseHistory auto-refreshes via refreshKey pattern |
+
+### Модифицированные файлы (Phase 4)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/021_procurement.sql` | NEW | suppliers + purchase_logs tables, cost trigger, RLS, Realtime |
+| `src/pages/Procurement.tsx` | NEW | Procurement page with 2-column layout |
+| `src/components/procurement/PurchaseForm.tsx` | NEW | Invoice entry form with auto-calc |
+| `src/components/procurement/SupplierManager.tsx` | NEW | Supplier CRUD |
+| `src/components/procurement/PurchaseHistory.tsx` | NEW | Purchase history table (two-query join) |
+| `src/layouts/AppShell.tsx` | MODIFIED | Added Truck icon + /procurement nav item |
+| `src/App.tsx` | MODIFIED | Added /procurement route |
