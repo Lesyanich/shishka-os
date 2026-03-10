@@ -7,6 +7,7 @@ import { CookStation } from './pages/CookStation'
 import { WasteTracker } from './pages/WasteTracker'
 import { LogisticsScanner } from './pages/LogisticsScanner'
 import { Procurement } from './pages/Procurement'
+import { OrderManager } from './pages/OrderManager'
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/waste" element={<WasteTracker />} />
           <Route path="/logistics" element={<LogisticsScanner />} />
           <Route path="/procurement" element={<Procurement />} />
+          <Route path="/orders" element={<OrderManager />} />
           {/* Fallback: redirect unknown routes to Control Center */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

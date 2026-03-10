@@ -546,3 +546,76 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | `src/components/procurement/PurchaseHistory.tsx` | NEW | Purchase history table (two-query join) |
 | `src/layouts/AppShell.tsx` | MODIFIED | Added Truck icon + /procurement nav item |
 | `src/App.tsx` | MODIFIED | Added /procurement route |
+
+---
+
+## 🛒 2026-03-10 — Phase 5.1: Orders Pipeline & Webhook Receiver — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 5.1 Orders Pipeline + Kanban + Realtime — LIVE
+
+### Migration 022: Orders Pipeline
+
+| Объект | Тип | Описание |
+|---|---|---|
+| `order_source` | ENUM | 'website', 'syrve', 'manual' |
+| `order_status` | ENUM | 'new', 'preparing', 'ready', 'delivered', 'cancelled' |
+| `orders` | TABLE | id (UUID PK), source, status, customer_name, customer_phone, total_amount, notes, created_at, updated_at |
+| `order_items` | TABLE | id (UUID PK), order_id (FK CASCADE), nomenclature_id (FK RESTRICT), quantity (CHECK >0), price_at_purchase |
+| `production_tasks.order_id` | ALTER | FK to orders(id) ON DELETE SET NULL — links production tasks to source order |
+| `fn_process_new_order(UUID)` | RPC / JSONB | Loops SALE-items → BOM explosion → creates production_tasks linked via order_id. Graceful EXCEPTION: on failure returns error JSON, order stays 'new' |
+| `trg_orders_updated_at` | TRIGGER | BEFORE UPDATE → fn_set_updated_at() |
+| RLS (5 policies) | POLICY | Full read/write for authenticated users on both tables |
+| Realtime | PUB | Both orders + order_items added to supabase_realtime |
+
+### DB Sync
+
+| Migration | Статус |
+|---|---|
+| 022 (Orders Pipeline) | ✅ Applied (3 parts: ENUMs+Tables+Indexes, Triggers+RPC, RLS+Realtime) |
+
+### Frontend Components
+
+| Component | Location | Description |
+|---|---|---|
+| `OrderManager.tsx` | `src/pages/` | Page layout: LiveOrderBoard with page header |
+| `LiveOrderBoard.tsx` | `src/components/orders/` | 3-column Kanban (New → Preparing → Ready) with Supabase Realtime subscription, manual order creation modal, status transitions |
+| `OrderDetailsModal.tsx` | `src/components/orders/` | Order detail view: status badge, customer info grid, items table (two-query join), status transition buttons |
+
+### UX Features
+
+| Feature | Описание |
+|---|---|
+| **Realtime Kanban** | Supabase Realtime subscription on `orders` table — board auto-refreshes on INSERT/UPDATE |
+| **Manual Order Creation** | Modal: select SALE-items from nomenclature, set quantity, customer info, notes → creates order + order_items |
+| **BOM Explosion RPC** | When status changes to 'preparing', `fn_process_new_order` auto-creates production_tasks from BOM structure |
+| **Graceful Degradation** | If RPC fails, order stays 'new' — can be retried or processed manually |
+| **Status Transitions** | Enforced flow: new→[preparing,cancelled], preparing→[ready,cancelled], ready→[delivered] |
+| **Price Snapshot** | `price_at_purchase` in order_items freezes price at order time — immune to future price changes |
+
+### Routing (обновлено)
+
+| Роут | Компонент | Статус |
+|---|---|---|
+| `/` | `ControlCenter.tsx` | ✅ LIVE |
+| `/bom` | `BOMHub.tsx` | ✅ LIVE |
+| `/kds` | `KDSBoard.tsx` | ✅ LIVE |
+| `/cook` | `CookStation.tsx` | ✅ LIVE |
+| `/waste` | `WasteTracker.tsx` | ✅ LIVE |
+| `/logistics` | `LogisticsScanner.tsx` | ✅ LIVE |
+| `/procurement` | `Procurement.tsx` | ✅ LIVE |
+| `/orders` | `OrderManager.tsx` | ✅ NEW — Kanban + Realtime |
+| `/finance` | — | 🔜 Phase 6 |
+| `/analytics` | — | 🔜 Phase 7 |
+| `/*` | `<Navigate to="/" />` | ✅ Fallback |
+
+### Модифицированные файлы (Phase 5.1)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/022_orders_pipeline.sql` | NEW | ENUMs + orders/order_items tables + fn_process_new_order RPC + RLS + Realtime |
+| `src/pages/OrderManager.tsx` | NEW | Orders page layout |
+| `src/components/orders/LiveOrderBoard.tsx` | NEW | Kanban board with Realtime + manual order creation |
+| `src/components/orders/OrderDetailsModal.tsx` | NEW | Order detail modal with items table + status transitions |
+| `src/layouts/AppShell.tsx` | MODIFIED | Added Bell icon + /orders nav item |
+| `src/App.tsx` | MODIFIED | Added /orders route |
