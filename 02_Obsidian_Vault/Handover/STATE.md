@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-07T12:59 (ICT)  
+**Последнее обновление:** 2026-03-10T15:30 (ICT)  
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -619,3 +619,93 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | `src/components/orders/OrderDetailsModal.tsx` | NEW | Order detail modal with items table + status transitions |
 | `src/layouts/AppShell.tsx` | MODIFIED | Added Bell icon + /orders nav item |
 | `src/App.tsx` | MODIFIED | Added /orders route |
+
+---
+
+## 📋 2026-03-10 — Phase 5.2: Enterprise MRP Engine & Scenario Planning — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 5.2 MRP Engine + Master Planner — LIVE
+
+### Migration 023: MRP Engine & Scenario Planning
+
+| Объект | Тип | Описание |
+|---|---|---|
+| `plan_status` | ENUM | 'draft', 'active', 'completed' |
+| `production_plans` | TABLE | id (UUID PK), name, target_date, status (plan_status), mrp_result (JSONB cache), created_at, updated_at |
+| `plan_targets` | TABLE | id (UUID PK), plan_id (FK CASCADE), nomenclature_id (FK RESTRICT), target_qty (INTEGER CHECK >0), UNIQUE(plan_id, nomenclature_id) |
+| `fn_run_mrp(UUID)` | RPC / JSONB | MRP Engine: 2-level BOM explosion (SALE→PF/MOD→RAW + direct SALE→RAW), inventory deduction from inventory_batches (sealed/opened, not expired) + inventory_balances. Returns {prep_schedule, procurement_list} cached on plan.mrp_result |
+| `fn_approve_plan(UUID)` | RPC / JSONB | Converts prep_schedule into production_tasks (60min default duration), transitions plan draft→active |
+| `trg_production_plans_updated_at` | TRIGGER | BEFORE UPDATE → fn_set_updated_at() |
+| RLS (8 policies) | POLICY | Full CRUD for both tables |
+| Realtime | PUB | Both production_plans + plan_targets added to supabase_realtime |
+
+### MRP Algorithm Detail
+
+| Step | Описание |
+|---|---|
+| 1. Read targets | plan_targets: SALE items + desired quantities |
+| 2. Explode SALE→PF/MOD | bom_structures join, filter by product_code LIKE 'PF-%' OR 'MOD-%' |
+| 3. Deduct PF/MOD inventory | inventory_batches: sealed/opened, expires_at > target_date |
+| 4. Net PF/MOD→RAW | Explode remaining PF/MOD needs to RAW ingredients |
+| 5. Direct SALE→RAW | Also collect direct SALE→RAW BOM links |
+| 6. Deduct RAW inventory | inventory_balances: on-hand quantities |
+| 7. Return JSON | {prep_schedule (PF/MOD to make), procurement_list (RAW to buy with estimated costs)} |
+
+### DB Sync
+
+| Migration | Статус |
+|---|---|
+| 023 (MRP Engine) | ✅ Applied (3 parts: ENUM+Tables+Indexes, fn_run_mrp, fn_approve_plan+RLS+Realtime) |
+
+### Frontend Components
+
+| Component | Location | Description |
+|---|---|---|
+| `MasterPlanner.tsx` | `src/pages/` | 3-step wizard: Step 1 (Scenario Builder — create plan + add SALE targets), Step 2 (MRP Dashboard — To Prep PF/MOD + To Buy RAW with costs), Step 3 (Approve & Send to Kitchen) |
+
+### UX Features
+
+| Feature | Описание |
+|---|---|
+| **Scenario Builder** | Create named plans with target date, add SALE items with quantities from nomenclature dropdown |
+| **MRP Dashboard** | Two-column grid: "To Prep (PF/MOD)" with gross/on_hand/net quantities, "To Buy (RAW)" with estimated costs |
+| **Plan Approval** | One-click approve creates production_tasks in KDS, transitions plan to active |
+| **Inventory-Aware** | If stock exists (batches not expired, balances available), system deducts before suggesting prep/buy |
+| **Cached Results** | MRP results cached in mrp_result JSONB — re-calculate anytime, view last calculation timestamp |
+| **Plan Lifecycle** | Draft (editable) → Active (approved, tasks created) → Completed (future manual) |
+
+### Routing (обновлено)
+
+| Роут | Компонент | Статус |
+|---|---|---|
+| `/` | `ControlCenter.tsx` | ✅ LIVE |
+| `/bom` | `BOMHub.tsx` | ✅ LIVE |
+| `/kds` | `KDSBoard.tsx` | ✅ LIVE |
+| `/cook` | `CookStation.tsx` | ✅ LIVE |
+| `/waste` | `WasteTracker.tsx` | ✅ LIVE |
+| `/logistics` | `LogisticsScanner.tsx` | ✅ LIVE |
+| `/procurement` | `Procurement.tsx` | ✅ LIVE |
+| `/orders` | `OrderManager.tsx` | ✅ LIVE |
+| `/planner` | `MasterPlanner.tsx` | ✅ NEW — MRP Engine + Scenario Planning |
+| `/finance` | — | 🔜 Phase 6 |
+| `/analytics` | — | 🔜 Phase 7 |
+| `/*` | `<Navigate to="/" />` | ✅ Fallback |
+
+### Модифицированные файлы (Phase 5.2)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/023_mrp_engine.sql` | NEW | plan_status ENUM + production_plans/plan_targets tables + fn_run_mrp + fn_approve_plan + RLS + Realtime |
+| `src/pages/MasterPlanner.tsx` | NEW | 3-step MRP wizard with scenario management |
+| `src/layouts/AppShell.tsx` | MODIFIED | Added CalendarDays icon + /planner nav item |
+| `src/App.tsx` | MODIFIED | Added /planner route |
+
+### Bugs Fixed During Development
+
+| Bug | Причина | Исправление |
+|---|---|---|
+| `column bs.child_id does not exist` | bom_structures uses `ingredient_id` not `child_id` | Updated fn_run_mrp: `bs.child_id` → `bs.ingredient_id` |
+| `column n.unit does not exist` | nomenclature uses `base_unit` not `unit` | Updated fn_run_mrp + fn_approve_plan: `n.unit` → `n.base_unit`, JSON key `'unit'` → `'base_unit'` |
+| `expected_duration_min NOT NULL` | fn_approve_plan INSERT missing required column | Added `expected_duration_min = 60` to INSERT statement |
+| Nested button HTML warning | Delete button inside plan card button | Changed outer `<button>` to `<div role="button">` |

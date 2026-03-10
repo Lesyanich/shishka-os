@@ -8,6 +8,7 @@ import { WasteTracker } from './pages/WasteTracker'
 import { LogisticsScanner } from './pages/LogisticsScanner'
 import { Procurement } from './pages/Procurement'
 import { OrderManager } from './pages/OrderManager'
+import { MasterPlanner } from './pages/MasterPlanner'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/logistics" element={<LogisticsScanner />} />
           <Route path="/procurement" element={<Procurement />} />
           <Route path="/orders" element={<OrderManager />} />
+          <Route path="/planner" element={<MasterPlanner />} />
           {/* Fallback: redirect unknown routes to Control Center */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

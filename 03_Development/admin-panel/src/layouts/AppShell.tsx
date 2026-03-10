@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 import {
   BarChart2,
   Bell,
+  CalendarDays,
   ChefHat,
   DollarSign,
   GitBranch,
@@ -30,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/logistics', icon: ScanLine, label: 'Logistics', enabled: true },
   { path: '/procurement', icon: Truck, label: 'Procurement', enabled: true },
   { path: '/orders', icon: Bell, label: 'Orders', enabled: true },
+  { path: '/planner', icon: CalendarDays, label: 'Planner', enabled: true },
   { path: '/finance', icon: DollarSign, label: 'Finance', enabled: false },
   { path: '/analytics', icon: BarChart2, label: 'Analytics', enabled: false },
 ]
