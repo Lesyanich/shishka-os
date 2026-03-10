@@ -709,3 +709,121 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | `column n.unit does not exist` | nomenclature uses `base_unit` not `unit` | Updated fn_run_mrp + fn_approve_plan: `n.unit` → `n.base_unit`, JSON key `'unit'` → `'base_unit'` |
 | `expected_duration_min NOT NULL` | fn_approve_plan INSERT missing required column | Added `expected_duration_min = 60` to INSERT statement |
 | Nested button HTML warning | Delete button inside plan card button | Changed outer `<button>` to `<div role="button">` |
+
+---
+
+## 📚 2026-03-10 — Phase 5.3: Knowledge Base Refactoring & Obsidian Skills — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 5.3 Vault Cleanup + Obsidian Skills — LIVE
+
+### Changes
+
+| Действие | Описание |
+|---|---|
+| **Great Purge** | Archived 60+ legacy files to `02_Obsidian_Vault/_Archive/` (01_Menu, 03_Infrastructure, Blueprints, Logs, etc.) |
+| **Obsidian Skills (kepano)** | Installed 5 skills from `kepano/obsidian-skills`: obsidian-markdown, obsidian-bases, json-canvas, obsidian-cli, defuddle |
+| **Boris Rule #9** | Added Obsidian Protocol to CLAUDE.md — mandatory architecture notes after each major phase |
+| **First Architecture Note** | Created `02_Obsidian_Vault/Shishka OS Architecture.md` with Mermaid diagram, phases table, RPCs index |
+| **.gitignore Fix** | Changed `.claude/` → `.claude/*` with negations `!.claude/skills/` and `!.claude/.claude-plugin/` |
+
+---
+
+## 🧠 2026-03-10 — Phase 5.4: Agent Skills & Capabilities — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 5.4 Anthropic Skills + Custom Invoice Parser — LIVE
+
+### Changes
+
+| Действие | Описание |
+|---|---|
+| **Anthropic Skills** | Installed 3 skills from `anthropics/skills`: pdf, xlsx, skill-creator |
+| **shishka-invoice-parser** | Custom skill: 6-step SOP for parsing supplier invoices (PDF/image) → purchase_logs INSERT |
+| **Agent Skills Note** | Created `02_Obsidian_Vault/Agent Skills & Capabilities.md` — registry of all 9 skills |
+
+---
+
+## 💰 2026-03-10 — Phase 4.1: Financial Ledger, Multi-currency & Receipt Storage — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 4.1 Expense Ledger + Multi-currency + Receipts — LIVE
+
+### Migration 024: Expense Ledger
+
+| Объект | Тип | Описание |
+|---|---|---|
+| `expense_ledger` | TABLE | id (UUID PK), transaction_date, flow_type (OpEx/CapEx), category_code (FK→fin_categories), sub_category_code (FK→fin_sub_categories), supplier_id (FK→suppliers), details, amount_original, currency, exchange_rate, amount_thb (GENERATED), paid_by, payment_method, status, receipt URLs (3), timestamps |
+| `amount_thb` | GENERATED | `GENERATED ALWAYS AS (amount_original * exchange_rate) STORED` — never INSERT/UPDATE directly |
+| `receipts` bucket | STORAGE | Supabase Storage bucket, 5MB limit, JPEG/PNG/WebP/PDF, public read, authenticated upload/delete |
+| Storage RLS (3 policies) | POLICY | Public read, authenticated upload, authenticated delete |
+| Table RLS (4 policies) | POLICY | Full CRUD on expense_ledger |
+| Realtime | PUB | expense_ledger added to supabase_realtime |
+
+### DB Sync
+
+| Migration | Статус |
+|---|---|
+| 024 (Expense Ledger) | ✅ Applied (3 parts: Table+Indexes+Trigger, Storage Bucket+Policies, RLS+Realtime) |
+
+### Frontend Components
+
+| Component | Location | Description |
+|---|---|---|
+| `FinanceManager.tsx` | `src/pages/` | Page layout: KPI strip + 2-column grid (Expense Form + Chart/History) |
+| `ExpenseForm` (inline) | `src/pages/FinanceManager.tsx` | Multi-currency form: OpEx/CapEx toggle, category/sub-category selectors, supplier, amount/currency/exchange_rate, auto-calculated THB, paid_by, payment_method, status, 3 receipt uploaders |
+| `MonthlyChart` (inline) | `src/pages/FinanceManager.tsx` | Stacked BarChart (recharts): monthly amount_thb grouped by category |
+| `ExpenseHistory` (inline) | `src/pages/FinanceManager.tsx` | Scrollable table: last 50 expenses with date, type, category, details, amount, THB, status, receipt links |
+| `FileUploadButton` (inline) | `src/pages/FinanceManager.tsx` | Drag-drop style upload button for Supplier Receipt, Bank Slip, Tax Invoice |
+| `useExpenseLedger.ts` | `src/hooks/` | Two-query pattern: expense_ledger + fin_categories + fin_sub_categories + suppliers → JS join, monthly summaries, grandTotal |
+
+### UX Features
+
+| Feature | Описание |
+|---|---|
+| **Multi-currency** | Enter amount in any currency + exchange rate → auto-calculated THB (GENERATED column) |
+| **THB Auto-calc** | When currency ≠ THB, shows computed THB total with formula breakdown |
+| **OpEx / CapEx Toggle** | Visual toggle buttons with color coding (emerald/amber) |
+| **Category Cascade** | Sub-category dropdown filters based on selected category |
+| **3 Receipt Uploaders** | Supplier Receipt, Bank Slip, Tax Invoice → Supabase Storage `receipts` bucket |
+| **Receipt Links** | History table shows colored receipt icons linking to uploaded files |
+| **KPI Strip** | 3 cards: This Month total, All-time total, Transaction count |
+| **Month-over-Month Delta** | KPI card shows % change vs previous month (green/red) |
+| **Stacked Bar Chart** | Monthly expenses broken down by fin_category, color-coded |
+
+### Invoice Parser Update
+
+| Change | Описание |
+|---|---|
+| **Dual-target routing** | Food items → `purchase_logs`, Non-food → `expense_ledger` |
+| **Step 3 added** | Classify Items: Food vs Non-Food decision logic |
+| **Step 6 added** | Match Financial Category for expense_ledger items |
+| **Multi-currency support** | Invoice parser now captures currency + exchange rate for foreign invoices |
+
+### Routing (обновлено)
+
+| Роут | Компонент | Статус |
+|---|---|---|
+| `/` | `ControlCenter.tsx` | ✅ LIVE |
+| `/bom` | `BOMHub.tsx` | ✅ LIVE |
+| `/kds` | `KDSBoard.tsx` | ✅ LIVE |
+| `/cook` | `CookStation.tsx` | ✅ LIVE |
+| `/waste` | `WasteTracker.tsx` | ✅ LIVE |
+| `/logistics` | `LogisticsScanner.tsx` | ✅ LIVE |
+| `/procurement` | `Procurement.tsx` | ✅ LIVE |
+| `/orders` | `OrderManager.tsx` | ✅ LIVE |
+| `/planner` | `MasterPlanner.tsx` | ✅ LIVE |
+| `/finance` | `FinanceManager.tsx` | ✅ NEW — Expense Ledger + Multi-currency |
+| `/analytics` | — | 🔜 Next Phase |
+| `/*` | `<Navigate to="/" />` | ✅ Fallback |
+
+### Модифицированные файлы (Phase 4.1)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/024_expense_ledger.sql` | NEW | expense_ledger table + receipts storage bucket + RLS + Realtime |
+| `src/hooks/useExpenseLedger.ts` | NEW | Four-query hook: ledger + categories + sub-categories + suppliers, JS join, monthly summaries |
+| `src/pages/FinanceManager.tsx` | NEW | Finance page: KPI strip + ExpenseForm + MonthlyChart + ExpenseHistory + FileUploadButtons |
+| `src/layouts/AppShell.tsx` | MODIFIED | DollarSign → Wallet icon, enabled: true for /finance |
+| `src/App.tsx` | MODIFIED | Added /finance route + FinanceManager import |
+| `.claude/skills/shishka-invoice-parser/SKILL.md` | MODIFIED | Dual-target routing (purchase_logs + expense_ledger), added Steps 3, 6, multi-currency |

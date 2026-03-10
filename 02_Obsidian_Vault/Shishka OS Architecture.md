@@ -33,6 +33,7 @@ graph TD
         PROC[Procurement /procurement]
         ORD[Orders /orders]
         MRP[Master Planner /planner]
+        FIN[Finance /finance]
     end
 
     subgraph Backend ["Supabase (PostgreSQL 17.6)"]
@@ -45,6 +46,7 @@ graph TD
         SUP[suppliers + purchase_logs]
         ORDERS[orders + order_items]
         PLANS[production_plans + plan_targets]
+        EXP[expense_ledger + receipts]
     end
 
     CC --> PT & EQ & NOM
@@ -56,6 +58,7 @@ graph TD
     PROC --> SUP & NOM
     ORD --> ORDERS & NOM
     MRP --> PLANS & BS & INV & NOM
+    FIN --> EXP & SUP
 ```
 
 ## Lego Architecture (BOM)
@@ -84,6 +87,7 @@ The core data model follows a 4-tier Bill of Materials:
 | 5.2 | [[MRP Engine]] | ✅ LIVE | Scenario planning, inventory-aware |
 | 5.3 | [[Knowledge Base Refactoring]] | ✅ LIVE | Obsidian Skills, vault cleanup |
 | 5.4 | [[Agent Skills & Capabilities]] | ✅ LIVE | PDF, XLSX, skill-creator, invoice parser |
+| 4.1 | [[Financial Ledger]] | ✅ LIVE | Expense ledger, multi-currency, receipt storage |
 
 ## Key Database Functions (RPCs)
 
@@ -99,7 +103,7 @@ The core data model follows a 4-tier Bill of Materials:
 
 ## Migrations Index
 
-See [[STATE]] for full migration details (016-023).
+See [[STATE]] for full migration details (016-024).
 
 ## Related
 
