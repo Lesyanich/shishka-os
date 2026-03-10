@@ -435,3 +435,59 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | `migrations/019_nomenclature_cost_notes.sql` | NEW | Add cost_per_unit + notes to nomenclature |
 | `src/components/RecipeBuilder.tsx` | REWRITTEN | Full CRUD: NomenclatureModal, CostBadge, editable Yield/Notes, filter bugfix |
 | `claude.md` | MODIFIED | Added Boris Rule #8 (BOM Hub filtering) |
+
+---
+
+## 🏗️ 2026-03-09 — Phase 1.5: Storefront Extension & Pricing Engine — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 1.5 Storefront + Pricing + Nutrition — LIVE
+
+### Migration 020: Storefront & Pricing
+
+| Изменение | Описание |
+|---|---|
+| `price NUMERIC` | Selling price in THB |
+| `image_url TEXT` | Product image URL for storefront |
+| `slug TEXT UNIQUE` | URL-friendly identifier (auto-generated from name with Cyrillic transliteration) |
+| `is_available BOOLEAN DEFAULT true` | Whether item appears on storefront |
+| `display_order INTEGER DEFAULT 0` | Sort order on storefront |
+| `is_featured BOOLEAN DEFAULT false` | Featured item flag |
+| `calories INTEGER` | КБЖУ: Kilocalories per portion |
+| `protein NUMERIC` | КБЖУ: Protein (g) |
+| `carbs NUMERIC` | КБЖУ: Carbohydrates (g) |
+| `fat NUMERIC` | КБЖУ: Fat (g) |
+| `allergens TEXT[]` | Array of allergen labels (e.g. gluten, dairy, nuts) |
+| `markup_pct NUMERIC DEFAULT 0` | Markup percentage for pricing engine |
+
+### DB Sync (Migration Applied to Supabase)
+
+| Migration | Статус |
+|---|---|
+| 020 (Storefront/Pricing) | ✅ Applied (12 columns + 4 indexes + comments) |
+
+### NomenclatureModal — 3-Section Editor
+
+| Section | Fields |
+|---|---|
+| **Basic & Site** | Product Code, Name, Type, Unit, Slug (auto-gen), Image URL, Display Order, Available, Featured |
+| **Pricing Engine** | Cost per Unit (editable), Markup % → Recommended Price (reactive auto-calc), Final Price, Margin indicator (green ≥30%, red <30%), Notes |
+| **Nutrition (КБЖУ)** | Calories, Protein, Carbs, Fat, Allergens (comma-separated with tag pills), КБЖУ summary card |
+
+### UX Features
+
+| Feature | Описание |
+|---|---|
+| **Slug Auto-Generation** | Cyrillic→Latin transliteration + kebab-case from Name field. Editable to override. |
+| **Reactive Pricing Calculator** | Change Markup% → instantly see Recommended Price = Cost × (1+Markup/100) |
+| **Margin Indicator (Modal)** | (Price − Cost) / Price × 100. Green card if ≥30%, red card with warning if <30% |
+| **Margin Badge (Sidebar)** | Each item in left sidebar shows colored margin badge next to cost |
+| **КБЖУ Summary Card** | Visual card showing colored Kcal / Protein / Carbs / Fat per portion |
+| **Allergen Tag Pills** | Comma-separated input renders as rose-colored tag pills in real-time |
+
+### Модифицированные файлы (Phase 1.5)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/020_storefront_pricing.sql` | NEW | 12 columns + 4 indexes on nomenclature for storefront, nutrition, economics |
+| `src/components/RecipeBuilder.tsx` | REWRITTEN | 3-section NomenclatureModal, slug generator, MarginBadge, extended NomItem type, updated queries |
