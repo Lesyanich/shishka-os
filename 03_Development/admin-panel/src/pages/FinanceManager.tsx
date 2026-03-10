@@ -175,6 +175,8 @@ export function FinanceManager() {
           />
           <ExpenseHistory
             rows={rows}
+            categories={categories}
+            suppliers={suppliers}
             isLoading={isLoading}
             error={error}
             onRefetch={refetch}

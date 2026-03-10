@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-10T21:00 (ICT)  
+**Последнее обновление:** 2026-03-11T01:30 (ICT)  
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -1179,3 +1179,34 @@ Mass Assignment via Supabase REST API (PostgREST). When RLS allows UPDATE on a t
 - `SECURITY DEFINER` RPCs (fn_update_cost_on_purchase, fn_approve_receipt, fn_run_mrp, etc.) run as function owner (`postgres`) — full privileges retained
 - RLS policies remain unchanged (row-level access unaffected)
 - Verification: `SET ROLE anon; UPDATE nomenclature SET cost_per_unit = 0; → ERROR: permission denied`
+
+---
+
+## Phase 4.5: Advanced Ledger Analytics & Filtering (2026-03-11)
+
+### What Was Built
+
+The ExpenseHistory table was upgraded from a basic read-only list into an analytics-grade financial tool with:
+
+1. **Sortable Columns** — Date, Amount, Supplier headers are clickable. Toggles ASC/DESC with arrow icons. Default: Date DESC.
+2. **Composable Filter Panel** — Date range (From/To), Category dropdown, Supplier dropdown, Flow Type (OpEx/CapEx) pill toggles. All filters compose with AND logic. Clear button resets all.
+3. **Dynamic Subtotal Footer** — Sticky `<tfoot>` shows "Total" or "Filtered Total" with `N of M` badge when filters are active.
+4. **Expandable Spoke Rows** — Chevron toggle on each row. Click expands to show Hub→Spoke line items (purchase_logs, capex_transactions, opex_items) fetched lazily via `useSpokeData` hook with module-scope cache.
+
+### Files Changed
+
+| File | Action | Description |
+|---|---|---|
+| `src/hooks/useSpokeData.ts` | CREATE | Lazy-fetch hook for spoke tables by expense_id. Module-scope Map cache survives unmount/remount. 3 parallel queries + nomenclature JS join. |
+| `src/components/finance/ExpenseFilterPanel.tsx` | CREATE | Filter bar with date range, category, supplier, flow type pill toggles. Premium dark UI. |
+| `src/components/finance/SpokeDetail.tsx` | CREATE | Expandable row content: 3 color-coded mini-tables (emerald=food, amber=capex, cyan=opex). Read-only version of StagingArea's ItemSection. |
+| `src/components/finance/ExpenseHistory.tsx` | REWRITE | Integrated filters, sort, expandable rows, sticky subtotal footer. Props: +categories, +suppliers. Title: "Expense Ledger". |
+| `src/pages/FinanceManager.tsx` | MODIFY | Added `categories` and `suppliers` props to ExpenseHistory. |
+| `src/components/finance/index.ts` | MODIFY | Added ExpenseFilterPanel and SpokeDetail exports. |
+
+### Architecture Notes
+
+- **Module-scope cache**: `const spokeCache = new Map<string, SpokeData>()` declared outside `useSpokeData()` function. This is critical because SpokeDetail unmounts/remounts on expand/collapse — a `useRef` cache would be destroyed each cycle.
+- **Client-side filtering/sorting**: All expense rows already loaded by `useExpenseLedger`. Filters and sort computed via `useMemo` — no additional DB queries.
+- **Single-expand**: Only one row can be expanded at a time. Expanding another collapses the previous.
+- **CLAUDE.md Rule #3**: All spoke queries use separate Supabase calls + JS join (no implicit joins).
