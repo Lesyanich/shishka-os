@@ -1067,3 +1067,64 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | Edit modal Sub-category dropdown | ✅ Filters by selected category |
 | Edit modal Supplier dropdown | ✅ 19 suppliers loaded |
 | `npm run build` | ✅ 0 TypeScript errors |
+
+---
+
+## Phase 4.4 — AI Receipt Routing & Hub-Spoke Line Items
+
+**Date:** 2026-03-10
+**Branch:** `feature/phase-4.4-receipt-routing`
+**Commit:** (pending deployment)
+
+### Architecture: Hub & Spoke
+
+```
+expense_ledger (Hub)
+  ├── purchase_logs    (Spoke 1: food items)     — expense_id FK
+  ├── capex_transactions (Spoke 2: equipment)    — expense_id FK
+  └── opex_items       (Spoke 3: consumables)    — expense_id FK
+```
+
+### Migration 030: smart_receipt_routing.sql
+
+| Change | Table | Detail |
+|---|---|---|
+| ADD COLUMN | `expense_ledger` | `invoice_number TEXT` |
+| ADD COLUMN | `purchase_logs` | `expense_id UUID FK → expense_ledger (SET NULL)` |
+| ADD COLUMN | `capex_transactions` | `expense_id UUID FK → expense_ledger (SET NULL)` |
+| CREATE TABLE | `opex_items` | `id, expense_id (CASCADE), description, quantity, unit, unit_price, total_price` |
+| RLS FIX | `purchase_logs` | `purchase_logs_select` recreated as public (was: authenticated-only) |
+| RLS NEW | `capex_transactions` | Enabled RLS + select/insert/update policies |
+| RLS NEW | `opex_items` | Full CRUD policies (public) |
+| CREATE FUNCTION | `fn_approve_receipt(JSONB)` | Atomic RPC: inserts Hub + 3 Spokes in single TX |
+
+### Edge Function: parse-receipts
+
+| Property | Value |
+|---|---|
+| Runtime | Deno (Supabase Edge Functions) |
+| Model | OpenAI gpt-4o-mini (vision) |
+| Input | `{ image_urls: string[] }` |
+| Output | `{ supplier_name, invoice_number, total_amount, currency, transaction_date, food_items[], capex_items[], opex_items[] }` |
+| Deployment | Via Supabase Dashboard (no CLI setup) |
+| Source | `03_Development/supabase/functions/parse-receipts/index.ts` |
+
+### Frontend Changes (Phase 4.4)
+
+| File | Type | Purpose |
+|---|---|---|
+| `src/types/receipt.ts` | NEW | TypeScript interfaces: ParsedReceipt, FoodItem, CapexItem, OpexItem, ApprovePayload |
+| `src/components/finance/StagingArea.tsx` | NEW | AI receipt preview with editable 3-table layout, supplier dropdown, exchange rate, approve button |
+| `src/components/finance/MagicDropzone.tsx` | MODIFIED | Replaced mock AI (2s delay) with real Edge Function call via `supabase.functions.invoke()` |
+| `src/pages/FinanceManager.tsx` | MODIFIED | Added staging state machine (idle→staging→approve), lazy nomenclature fetch, StagingArea rendering |
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `tsc -b --noEmit` | ✅ 0 TypeScript errors |
+| `npm run build` | ✅ Built in 2.54s |
+| Migration 030 SQL | ✅ Written (pending Supabase deployment) |
+| Edge Function code | ✅ Written (pending Supabase deployment) |
+| StagingArea component | ✅ Renders inline, replaces ExpenseForm when AI result available |
+| Backward compatible | ✅ Manual ExpenseForm still works independently |

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { ImagePlus, Loader2, Sparkles, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import type { ParsedReceipt, ReceiptUrls } from '../../types/receipt'
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -12,7 +13,9 @@ interface DroppedFile {
 
 export interface MagicDropzoneProps {
   /** Called after upload — passes the first 3 URLs mapped to supplier/bank/tax slots */
-  onUrlsReady: (urls: { supplier?: string; bank?: string; tax?: string }) => void
+  onUrlsReady: (urls: ReceiptUrls) => void
+  /** Called when AI parse-receipts Edge Function returns structured data */
+  onAiResult?: (result: ParsedReceipt, urls: ReceiptUrls) => void
 }
 
 /* ────────────────────────── Compression ────────────────────────── */
@@ -88,7 +91,7 @@ async function uploadToStorage(file: File, index: number): Promise<string | null
 
 const ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 
-export function MagicDropzone({ onUrlsReady }: MagicDropzoneProps) {
+export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
   const [files, setFiles] = useState<DroppedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -130,37 +133,67 @@ export function MagicDropzone({ onUrlsReady }: MagicDropzoneProps) {
     [addFiles],
   )
 
-  /* ── "Analyze with AI" — mock flow ── */
+  /* ── "Analyze with AI" — real Edge Function flow ── */
   const handleAnalyze = async () => {
     if (files.length === 0) return
 
     setIsAnalyzing(true)
     setToast(null)
 
-    // Mock AI delay (2 seconds)
-    await new Promise((r) => setTimeout(r, 2000))
-    setToast('AI API not connected yet — uploading files directly')
-
-    // Compress + upload
     try {
+      // Step 1: Compress + upload to Storage (keep existing logic)
       const compressed = await Promise.all(files.map((f) => compressImage(f.file)))
-      const urls = await Promise.all(compressed.map((f, i) => uploadToStorage(f, i)))
+      const uploadedUrls = await Promise.all(
+        compressed.map((f, i) => uploadToStorage(f, i)),
+      )
 
-      const result: { supplier?: string; bank?: string; tax?: string } = {}
-      if (urls[0]) result.supplier = urls[0]
-      if (urls[1]) result.bank = urls[1]
-      if (urls[2]) result.tax = urls[2]
+      const receiptUrls: ReceiptUrls = {}
+      if (uploadedUrls[0]) receiptUrls.supplier = uploadedUrls[0]
+      if (uploadedUrls[1]) receiptUrls.bank = uploadedUrls[1]
+      if (uploadedUrls[2]) receiptUrls.tax = uploadedUrls[2]
 
-      onUrlsReady(result)
+      // Always pass URLs to parent for backward compat
+      onUrlsReady(receiptUrls)
 
-      // Clear files
-      for (const f of files) {
-        if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
+      // Step 2: If AI callback provided, call Edge Function
+      if (onAiResult) {
+        const imageUrls = uploadedUrls.filter(
+          (u): u is string => u !== null,
+        )
+
+        if (imageUrls.length === 0) {
+          setToast('No images uploaded — cannot analyze')
+          return
+        }
+
+        const { data, error } = await supabase.functions.invoke(
+          'parse-receipts',
+          { body: { image_urls: imageUrls } },
+        )
+
+        if (error) throw error
+        if (data?.error) throw new Error(data.error)
+
+        onAiResult(data as ParsedReceipt, receiptUrls)
+
+        // Clear files on success
+        for (const f of files) {
+          if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
+        }
+        setFiles([])
+      } else {
+        // No AI callback — legacy mock path
+        setToast('AI API not connected yet — files uploaded directly')
+        for (const f of files) {
+          if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
+        }
+        setFiles([])
       }
-      setFiles([])
     } catch (err) {
-      console.error('[MagicDropzone] upload failed', err)
-      setToast('Upload failed — check console')
+      console.error('[MagicDropzone] AI analysis failed', err)
+      setToast(
+        `AI analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      )
     } finally {
       setIsAnalyzing(false)
     }
