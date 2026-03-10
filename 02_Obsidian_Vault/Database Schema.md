@@ -332,6 +332,22 @@ erDiagram
 | `production_plans` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
 | `plan_targets` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
 
+## Column-Level Privilege Restrictions (Migration 031)
+
+> [!danger] Mass Assignment Protection
+> Column-level `REVOKE UPDATE` prevents REST API clients (anon/authenticated) from modifying sensitive columns. SECURITY DEFINER RPCs and triggers bypass these restrictions — they run as the function owner.
+
+| Table | Protected Columns | Reason | Managed By |
+|---|---|---|---|
+| `nomenclature` | `cost_per_unit` | Trigger-managed | `fn_update_cost_on_purchase()` trigger |
+| `inventory_batches` | `barcode`, `production_task_id` | Immutable after creation | `fn_generate_barcode()`, `fn_create_batches_from_task()` |
+| `production_plans` | `mrp_result` | RPC-computed | `fn_run_mrp()` |
+| `capex_transactions` | `transaction_id`, `amount_thb` | Immutable identifier + financial audit | `fn_approve_receipt()` |
+| `orders` | `total_amount` | Financial integrity | Set at creation |
+| `stock_transfers` | ALL columns | Immutable audit trail | INSERT-only |
+| `waste_logs` | `quantity`, `financial_liability` | Audit integrity | Corrections via new entries |
+| `purchase_logs` | ALL columns | Immutable audit trail | INSERT-only |
+
 ## Related
 
 - [[Shishka OS Architecture]] -- System overview and module map

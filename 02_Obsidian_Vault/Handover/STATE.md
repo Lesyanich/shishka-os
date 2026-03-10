@@ -1128,3 +1128,54 @@ expense_ledger (Hub)
 | Edge Function code | ✅ Written (pending Supabase deployment) |
 | StagingArea component | ✅ Renders inline, replaces ExpenseForm when AI result available |
 | Backward compatible | ✅ Manual ExpenseForm still works independently |
+
+---
+
+## Security Audit — Column-Level Privilege Hardening
+
+**Date:** 2026-03-10
+**Branch:** `feature/phase-4.4-receipt-routing`
+**Migration:** `031_security_audit_column_privileges.sql`
+
+### Threat Model
+
+Mass Assignment via Supabase REST API (PostgREST). When RLS allows UPDATE on a table with `USING (true)`, any client with the `anon` key can `PATCH` ANY column on ANY row — including trigger-managed costs, RPC-managed statuses, and immutable financial records.
+
+### Audit Findings
+
+| Severity | Table | Vulnerable Column | Risk | Fix |
+|---|---|---|---|---|
+| CRITICAL | `nomenclature` | `cost_per_unit` | Decouple cost from purchases, break margin calc | `REVOKE UPDATE` (trigger-managed) |
+| CRITICAL | `production_plans` | `mrp_result` | Inject fake MRP data, corrupt procurement | `REVOKE UPDATE` (RPC-managed) |
+| HIGH | `inventory_batches` | `barcode` | Break label-batch linkage | `REVOKE UPDATE` (immutable) |
+| HIGH | `inventory_batches` | `production_task_id` | Corrupt production audit trail | `REVOKE UPDATE` (immutable) |
+| HIGH | `capex_transactions` | `transaction_id` | Duplicate or lose audit trail | `REVOKE UPDATE` (immutable) |
+| HIGH | `capex_transactions` | `amount_thb` | Alter historical financial amounts | `REVOKE UPDATE` (audit field) |
+| HIGH | `orders` | `total_amount` | Create financial discrepancy | `REVOKE UPDATE` (set at creation) |
+| MEDIUM | `stock_transfers` | ALL | Rewrite logistics audit trail | `REVOKE UPDATE` (entire table) |
+| MEDIUM | `waste_logs` | `quantity`, `financial_liability` | Hide spoilage, shift blame | `REVOKE UPDATE` (audit fields) |
+| MEDIUM | `purchase_logs` | ALL | Alter purchase history | `REVOKE UPDATE` (entire table) |
+
+### Safe Tables (no action needed)
+
+| Table | Why Safe |
+|---|---|
+| `fin_categories` | SELECT-only RLS policy |
+| `fin_sub_categories` | SELECT-only RLS policy |
+| `suppliers` | SELECT-only RLS policy (migration 029) |
+| `order_items` | SELECT + INSERT only (no UPDATE RLS policy) |
+| `expense_ledger.amount_thb` | GENERATED ALWAYS — PostgreSQL rejects UPDATE intrinsically |
+
+### Known Remaining Risks (documented, not fixed)
+
+1. **`expense_ledger.amount_original` / `exchange_rate`** — admin panel's `ExpenseEditModal` uses direct `.update()` on these fields. Column-level REVOKE would break the edit modal. Recommend: migrate to RPC-based update in future phase.
+2. **`nomenclature.price`** — sale price is updateable via admin panel. Recommend: add audit log for price changes.
+3. **`inventory_balances.quantity`** — legitimately updated by admin panel for stocktake. Recommend: move to RPC-based stocktake.
+4. **No authentication** — admin panel uses `anon` key. Anyone with the Supabase URL + anon key can make API calls. Recommend: add Supabase Auth (Phase 7+).
+
+### How It Works
+
+- `REVOKE UPDATE (col) ON table FROM anon, authenticated` blocks REST API clients
+- `SECURITY DEFINER` RPCs (fn_update_cost_on_purchase, fn_approve_receipt, fn_run_mrp, etc.) run as function owner (`postgres`) — full privileges retained
+- RLS policies remain unchanged (row-level access unaffected)
+- Verification: `SET ROLE anon; UPDATE nomenclature SET cost_per_unit = 0; → ERROR: permission denied`
