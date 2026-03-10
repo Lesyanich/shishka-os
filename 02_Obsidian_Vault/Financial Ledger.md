@@ -4,8 +4,10 @@ tags:
   - finance
   - shishka-os
   - phase-4-1
+  - phase-4-2
   - expense-ledger
   - multi-currency
+  - magic-dropzone
 date: 2026-03-10
 status: active
 aliases:
@@ -15,8 +17,8 @@ aliases:
 
 # Financial Ledger
 
-> [!info] Phase 4.1
-> Universal financial journal for OpEx/CapEx with multi-currency support and receipt storage.
+> [!info] Phase 4.1 + 4.2
+> Universal financial journal for OpEx/CapEx with multi-currency support, receipt storage, Magic Dropzone, and AI-ready receipt analysis.
 
 ## Overview
 
@@ -27,10 +29,12 @@ The Financial Ledger module provides a unified expense tracking system that supp
 ```mermaid
 graph LR
     subgraph Frontend ["/finance"]
+        DZ[MagicDropzone]
         FORM[ExpenseForm]
         CHART[MonthlyChart]
         HIST[ExpenseHistory]
-        UP[FileUploadButtons]
+        LB[ReceiptLightbox]
+        KPI[KpiCard x3]
     end
 
     subgraph Supabase
@@ -41,11 +45,12 @@ graph LR
         STR[storage.receipts]
     end
 
+    DZ -->|compress + upload| STR
+    DZ -->|inject URLs| FORM
     FORM -->|INSERT| EL
-    FORM -->|upload| STR
-    UP -->|JPEG/PNG/PDF| STR
     CHART -->|SELECT + JS join| EL & FC
     HIST -->|SELECT + JS join| EL & FC & FSC & SUP
+    HIST -->|click receipt| LB
     EL -->|FK| FC & FSC & SUP
 ```
 
@@ -106,9 +111,57 @@ The [[Agent Skills & Capabilities|shishka-invoice-parser]] skill routes items to
 - **Food items** (RAW/PF nomenclature match) --> `purchase_logs`
 - **Non-food items** (services, utilities, equipment) --> `expense_ledger`
 
+## Phase 4.2: Historical Sync & Smart UI
+
+> [!success] Phase 4.2 LIVE
+> 62 historical expenses imported, monolithic page refactored to components, Magic Dropzone with client-side compression.
+
+### Migration 025: Historical Data Import
+
+- **UNIQUE constraint** on `suppliers.name` for idempotent upserts
+- **19 new suppliers** (construction, equipment, legal, IT, etc.)
+- **62 expense rows** (Oct 2025 - Mar 2026): CapEx 46 rows (1.4M THB), OpEx 16 rows (683K THB)
+- Multi-currency: THB, USD (5 rows, rates ~34.5-35.1), AED (1 row, rate 9.4184)
+- All INSERTs are idempotent via `WHERE NOT EXISTS` guard on transaction ID
+
+### Component Architecture
+
+| Component | Lines | Purpose |
+|---|---|---|
+| `helpers.ts` | 20 | Shared formatTHB, constants |
+| `KpiCard.tsx` | 42 | This Month / All-time / Transactions cards |
+| `MonthlyChart.tsx` | 101 | Stacked BarChart by category |
+| `ExpenseForm.tsx` | 270 | Multi-currency form + receiptUrls prop |
+| `ExpenseHistory.tsx` | 145 | Table with lightbox triggers |
+| `MagicDropzone.tsx` | 195 | Drag-and-drop + compression + mock AI |
+| `ReceiptLightbox.tsx` | 60 | Modal image/PDF viewer |
+| `FinanceManager.tsx` | 110 | Thin orchestrator (was 905 lines) |
+
+### Magic Dropzone Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant DZ as MagicDropzone
+    participant Canvas as Canvas API
+    participant Storage as Supabase Storage
+    participant Form as ExpenseForm
+
+    User->>DZ: Drop files (JPEG/PNG/PDF)
+    DZ->>DZ: Show thumbnail grid
+    User->>DZ: Click "Analyze with AI"
+    DZ->>DZ: 2s spinner (mock)
+    DZ->>DZ: Toast "AI API not connected yet"
+    DZ->>Canvas: compressImage (max 1024x1024, JPEG 80%)
+    Canvas-->>DZ: compressed File
+    DZ->>Storage: Upload to receipts bucket
+    Storage-->>DZ: Public URLs
+    DZ->>Form: onUrlsReady({supplier, bank, tax})
+```
+
 ## Related
 
 - [[Shishka OS Architecture]] -- System overview
 - [[Procurement Module]] -- Supplier management and purchase logs
 - [[Agent Skills & Capabilities]] -- Invoice parser skill
-- [[STATE]] -- Migration 024 details
+- [[STATE]] -- Migration 024-025 details

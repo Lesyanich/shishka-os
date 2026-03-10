@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-10T15:30 (ICT)  
+**Последнее обновление:** 2026-03-10T20:30 (ICT)  
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -827,3 +827,66 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | `src/layouts/AppShell.tsx` | MODIFIED | DollarSign → Wallet icon, enabled: true for /finance |
 | `src/App.tsx` | MODIFIED | Added /finance route + FinanceManager import |
 | `.claude/skills/shishka-invoice-parser/SKILL.md` | MODIFIED | Dual-target routing (purchase_logs + expense_ledger), added Steps 3, 6, multi-currency |
+
+---
+
+## 💰 2026-03-10 — Phase 4.2: Historical Sync & Smart UI Foundation — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 4.2 Historical Data Import + Smart UI Components — LIVE
+
+### Migration 025: Historical Expense Import
+
+| Объект | Тип | Описание |
+|---|---|---|
+| `uq_suppliers_name` | CONSTRAINT | UNIQUE constraint on `suppliers.name` for idempotent upserts |
+| 19 supplier INSERTs | DATA | New suppliers from CSV (landlord, construction firms, equipment vendors, etc.) with ON CONFLICT DO NOTHING |
+| 62 expense_ledger INSERTs | DATA | Historical expenses Oct 2025 — Mar 2026. Idempotent (WHERE NOT EXISTS on transaction ID in details). CapEx: 46 rows (1,417,350.67 THB), OpEx: 16 rows (683,406.00 THB). Multi-currency: THB, USD (5 rows), AED (1 row) |
+
+### DB Sync
+
+| Migration | Статус |
+|---|---|
+| 025 (Historical Import) | ✅ Applied (3 parts: UNIQUE constraint, 19 suppliers, 62 expenses) |
+
+### Frontend Architecture Refactor
+
+**Monolithic FinanceManager.tsx (905 lines) → Component extraction pattern:**
+
+| Component | Location | Description |
+|---|---|---|
+| `helpers.ts` | `src/components/finance/` | Shared formatTHB, CATEGORY_COLORS, CURRENCY_OPTIONS, PAYMENT_METHODS |
+| `KpiCard.tsx` | `src/components/finance/` | Extracted KPI card with delta indicator |
+| `MonthlyChart.tsx` | `src/components/finance/` | Extracted stacked BarChart (recharts) |
+| `ExpenseForm.tsx` | `src/components/finance/` | Modified: removed 3 FileUploadButtons, added `receiptUrls` prop for MagicDropzone integration |
+| `ExpenseHistory.tsx` | `src/components/finance/` | Modified: receipt links now trigger ReceiptLightbox instead of opening new tabs |
+| `MagicDropzone.tsx` | `src/components/finance/` | NEW: Full-width drag-and-drop zone, multi-file, thumbnail grid, client-side image compression (Canvas API, max 1024x1024, JPEG 80%), mock AI button (2s delay → toast "AI API not connected yet" → upload to Storage → inject URLs into form) |
+| `ReceiptLightbox.tsx` | `src/components/finance/` | NEW: Modal overlay for receipt images/PDFs, Escape to close, click-outside to close |
+| `index.ts` | `src/components/finance/` | Barrel export |
+| `FinanceManager.tsx` | `src/pages/` | REWRITTEN: Thin orchestrator (110 lines vs 905), imports all sub-components |
+
+### UX Features (New in Phase 4.2)
+
+| Feature | Описание |
+|---|---|
+| **Real Historical Data** | 62 expenses across 6 months — charts and KPIs show real business data |
+| **Magic Dropzone** | Drag-and-drop receipt upload with thumbnail previews and remove buttons |
+| **Client-side Compression** | Images >1024px auto-resized via Canvas API, JPEG 80% quality, PDFs pass through |
+| **Mock AI Stub** | "Analyze with AI" button → 2s spinner → "AI API not connected yet" toast → uploads to Storage |
+| **Receipt Lightbox** | Click receipt icon → full-screen modal viewer (image or PDF iframe), Escape/click-outside to close |
+| **Component Architecture** | Finance module now follows same pattern as other modules (components/ directory) |
+
+### Модифицированные файлы (Phase 4.2)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/025_import_expenses.sql` | NEW | Historical data import: UNIQUE constraint + 19 suppliers + 62 expenses |
+| `src/components/finance/helpers.ts` | NEW | Shared helpers: formatTHB, constants |
+| `src/components/finance/KpiCard.tsx` | NEW | Extracted KPI card component |
+| `src/components/finance/MonthlyChart.tsx` | NEW | Extracted chart component |
+| `src/components/finance/ExpenseForm.tsx` | NEW | Modified expense form with receiptUrls prop |
+| `src/components/finance/ExpenseHistory.tsx` | NEW | Modified history with lightbox trigger |
+| `src/components/finance/MagicDropzone.tsx` | NEW | Drag-and-drop + compression + mock AI |
+| `src/components/finance/ReceiptLightbox.tsx` | NEW | Modal image/PDF viewer |
+| `src/components/finance/index.ts` | NEW | Barrel export |
+| `src/pages/FinanceManager.tsx` | REWRITTEN | Thin orchestrator (905→110 lines) |

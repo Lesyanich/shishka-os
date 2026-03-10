@@ -88,6 +88,7 @@ The core data model follows a 4-tier Bill of Materials:
 | 5.3 | [[Knowledge Base Refactoring]] | ✅ LIVE | Obsidian Skills, vault cleanup |
 | 5.4 | [[Agent Skills & Capabilities]] | ✅ LIVE | PDF, XLSX, skill-creator, invoice parser |
 | 4.1 | [[Financial Ledger]] | ✅ LIVE | Expense ledger, multi-currency, receipt storage |
+| 4.2 | [[Financial Ledger]] | ✅ LIVE | Historical sync (62 rows), Magic Dropzone, Receipt Lightbox, component extraction |
 
 ## Key Database Functions (RPCs)
 
