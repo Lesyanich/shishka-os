@@ -37,6 +37,12 @@ When any migration **creates or alters** a table/function/trigger/enum, the agen
 3. Keep the **RPCs & Triggers** table up to date.
 4. This file is the single visual reference for the entire Supabase schema — it must always reflect the latest deployed state.
 
+## 🔒 SSoT Commit Gate (Boris Rule #11)
+**NEVER** run `git push` until `STATE.md` and `Database Schema.md` are both updated to reflect the changes being pushed. This is a hard gate — no exceptions. Checklist before every push:
+1. `02_Obsidian_Vault/Handover/STATE.md` — new section documenting what was changed (migrations, frontend files, data fixes)
+2. `02_Obsidian_Vault/Database Schema.md` — updated if any migration touched tables, policies, RPCs, or ENUMs
+3. Both files staged and included in the commit (or a separate `chore:` commit before push)
+
 ## 📂 Context Routing (Point, Don't Dump)
 - **Global Rules:** Read `gemini.md`
 - **Database State & Schema:** Read `02_Obsidian_Vault/Database Schema.md` (erDiagram) + `02_Obsidian_Vault/Handover/STATE.md`

@@ -41,6 +41,10 @@
 | `warnings` | Admin CRUD + anon SELECT |
 | `maintenance_logs` | SELECT (by tg_user_id) + Admin CRUD ✅ NEW |
 | `nomenclature_sync` | SELECT (by tg_user_id) + Admin CRUD ✅ NEW |
+| `fin_categories` | SELECT USING (true) — public read ✅ Migration 028 |
+| `fin_sub_categories` | SELECT USING (true) — public read ✅ Migration 028 |
+| `suppliers` | SELECT USING (true) — public read ✅ Migration 029 (was: authenticated only) |
+| `expense_ledger` | SELECT USING (true) — public read ✅ Migration 024 |
 
 ### Файлы миграций (03_Development/database/)
 
@@ -991,3 +995,75 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | `src/components/finance/ExpenseEditModal.tsx` | REWRITTEN | Added comments field, has_tax_invoice checkbox |
 | `src/components/finance/ExpenseForm.tsx` | MODIFIED | Added comments input, has_tax_invoice checkbox |
 | `src/components/finance/ReceiptLightbox.tsx` | REWRITTEN | Google Drive URL detection + iframe preview, "Open in new tab" button, error fallback |
+
+---
+
+## 💰 2026-03-10 — Phase 4.3c: Supplier Mapping + RLS Policy Fixes — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 4.3c RLS fixes + supplier mapping — LIVE
+
+### Root Cause Analysis
+
+| Проблема | Причина | Исправление |
+|---|---|---|
+| Category и Sub-category колонки пустые | `fin_categories` и `fin_sub_categories` имели включённый RLS, но **ни одной SELECT policy** → фронтенд получал пустые массивы | Migration 028: `CREATE POLICY ... FOR SELECT USING (true)` |
+| Supplier колонка пустая | `suppliers_select` policy имела `roles = {authenticated}`, а фронтенд использует `anon` key | Migration 029: `DROP + CREATE POLICY ... FOR SELECT USING (true)` |
+| Category/SubCategory dropdowns в ExpenseEditModal пустые | Та же причина что и колонки — hook получал 0 категорий | Исправлено migration 028 |
+| 2 water rows без supplier_id | Не были замаплены при импорте (водоснабжение) | Migration 027: маппинг на การประปาส่วนภูมิภาคสาขาภูเก็ต |
+
+### Migration 027: Supplier Mapping Fix
+
+| Объект | Тип | Описание |
+|---|---|---|
+| 2 expense_ledger rows | UPDATE | Mapped 'Water meter installation' and 'Water supply (Dec 2025)' to การประปาส่วนภูมิภาคสาขาภูเก็ต (Provincial Waterworks Authority, Phuket) |
+
+### Migration 028: RLS SELECT Policies for fin_categories & fin_sub_categories
+
+| Объект | Тип | Описание |
+|---|---|---|
+| `fin_categories_select` | POLICY | `FOR SELECT USING (true)` — public read access (reference data, no sensitive info) |
+| `fin_sub_categories_select` | POLICY | `FOR SELECT USING (true)` — public read access |
+
+### Migration 029: Fix suppliers SELECT Policy (anon access)
+
+| Объект | Тип | Описание |
+|---|---|---|
+| `suppliers_select` | POLICY DROP + CREATE | Old: restricted to `{authenticated}` role. New: `FOR SELECT USING (true)` — both anon + authenticated can read |
+
+### DB Sync
+
+| Migration | Статус |
+|---|---|
+| 027 (Supplier Mapping) | ✅ Applied |
+| 028 (fin_categories RLS) | ✅ Applied |
+| 029 (suppliers RLS) | ✅ Applied |
+
+### RLS Политики (обновлено)
+
+| Таблица | SELECT Policy | Роли |
+|---|---|---|
+| `fin_categories` | `fin_categories_select` | {public} — anon + authenticated |
+| `fin_sub_categories` | `fin_sub_categories_select` | {public} — anon + authenticated |
+| `suppliers` | `suppliers_select` | {public} — anon + authenticated (было: {authenticated} only) |
+| `expense_ledger` | `expense_ledger_select` | {public} — anon + authenticated |
+
+### Frontend Changes (Phase 4.3c)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/027_supplier_mapping_fix.sql` | NEW | Map 2 water rows to PWA Phuket supplier |
+| `migrations/028_rls_fin_categories_select.sql` | NEW | SELECT policies for fin_categories + fin_sub_categories |
+| `migrations/029_rls_suppliers_select_fix.sql` | NEW | Recreate suppliers_select with public access |
+| `src/components/finance/ExpenseHistory.tsx` | MODIFIED | Added Category + Sub-category column between Date and Supplier |
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| Category column populated | ✅ All 62 rows show category + sub-category |
+| Supplier column populated | ✅ 59/62 rows (3 rows have #N/A in CSV — no supplier) |
+| Edit modal Category dropdown | ✅ 18 categories loaded |
+| Edit modal Sub-category dropdown | ✅ Filters by selected category |
+| Edit modal Supplier dropdown | ✅ 19 suppliers loaded |
+| `npm run build` | ✅ 0 TypeScript errors |

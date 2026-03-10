@@ -129,6 +129,7 @@ erDiagram
     fin_categories {
         INTEGER code PK
         TEXT name
+        TEXT type "Asset or Expense"
     }
 
     fin_sub_categories {
@@ -274,6 +275,29 @@ erDiagram
 | Bucket | Public | Max Size | MIME Types | Purpose |
 |---|---|---|---|---|
 | `receipts` | Yes (read) | 5 MB | JPEG, PNG, WebP, PDF | Expense receipt storage (supplier/, bank/, tax/) |
+
+## RLS Policies (Row Level Security)
+
+> [!warning] Admin Panel Access
+> The admin panel uses the Supabase **anon** key. All tables that the frontend reads MUST have `SELECT USING (true)` policies (not restricted to `{authenticated}`).
+
+| Table | Policy Name | Command | Roles | Condition | Migration |
+|---|---|---|---|---|---|
+| `fin_categories` | `fin_categories_select` | SELECT | {public} | `USING (true)` | 028 |
+| `fin_sub_categories` | `fin_sub_categories_select` | SELECT | {public} | `USING (true)` | 028 |
+| `suppliers` | `suppliers_select` | SELECT | {public} | `USING (true)` | 029 (recreated from {authenticated}) |
+| `expense_ledger` | `expense_ledger_select` | SELECT | {public} | `USING (true)` | 024 |
+| `nomenclature` | anon full CRUD | SELECT/INSERT/UPDATE/DELETE | {anon} | `USING (true)` | 014 |
+| `bom_structures` | anon full CRUD | SELECT/INSERT/UPDATE/DELETE | {anon} | `USING (true)` | 014 |
+| `inventory_balances` | anon full CRUD | ALL | {anon, authenticated} | `USING (true)` | 017 |
+| `waste_logs` | anon full CRUD | ALL | {anon, authenticated} | `USING (true)` | 017 |
+| `inventory_batches` | anon full CRUD | ALL | {anon, authenticated} | `USING (true)` | 018 |
+| `stock_transfers` | anon full CRUD | ALL | {anon, authenticated} | `USING (true)` | 018 |
+| `purchase_logs` | authenticated CRUD | ALL | {authenticated} | `USING (true)` | 021 |
+| `orders` | authenticated CRUD | ALL | {authenticated} | `USING (true)` | 022 |
+| `order_items` | authenticated CRUD | ALL | {authenticated} | `USING (true)` | 022 |
+| `production_plans` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
+| `plan_targets` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
 
 ## Related
 
