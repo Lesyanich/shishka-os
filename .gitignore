@@ -24,8 +24,10 @@ pnpm-debug.log*
 *.sw?
 *.suo
 
-# Claude Code / AI agent configs
-.claude/
+# Claude Code / AI agent configs (skills are tracked)
+.claude/*
+!.claude/skills/
+!.claude/.claude-plugin/
 .agent/
 .cursorrules
 

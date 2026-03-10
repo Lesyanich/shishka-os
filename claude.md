@@ -23,9 +23,17 @@ If you make a mistake and the user corrects you, you MUST update this `CLAUDE.md
 6. **File Location:** STATE.md lives at `02_Obsidian_Vault/Handover/STATE.md`, NOT at root. HANDOVER.md is at `02_Obsidian_Vault/Handover/HANDOVER.md`.
 7. **Git Workflow:** Before starting any new major phase or feature, the agent MUST create a new git branch (e.g. `feature/phase-N-name`) for context isolation and to protect the `main` branch. Never commit directly to `main` during active development.
 
+## 📓 Obsidian Protocol (Boris Rule #9)
+**Obsidian Skills** installed in `.claude/skills/` (kepano/obsidian-skills). At the end of every major development phase, the agent MUST:
+1. Create or update an **architecture note** (`.md` file) in `02_Obsidian_Vault/` root using Obsidian Flavored Markdown (wikilinks, frontmatter tags, callouts).
+2. The note MUST contain: YAML frontmatter with `tags` and `date`, a description of what the phase built, `[[backlinks]]` to related modules (e.g. `[[MRP Engine]]`, `[[Orders Pipeline]]`), and a Mermaid diagram or table if applicable.
+3. **Never** leave orphan notes — every new note must be linked from at least one existing note or from STATE.md.
+4. Legacy/obsolete content lives in `02_Obsidian_Vault/_Archive/` — never delete, always archive.
+
 ## 📂 Context Routing (Point, Don't Dump)
 - **Global Rules:** Read `gemini.md`
 - **Database State & Schema:** Read `02_Obsidian_Vault/Handover/STATE.md`
 - **Handover Reports:** Read `02_Obsidian_Vault/Handover/HANDOVER.md`
-- **Plans & Architecture:** Read files in `/docs/` and `/02_Obsidian_Vault/Blueprints/`
+- **Plans & Architecture:** Read files in `/docs/` and `/02_Obsidian_Vault/`
 - **Frontend Blueprint:** Read `docs/PLAN-ShishkaOS-Dashboard.md`
+- **Archived Legacy Docs:** `02_Obsidian_Vault/_Archive/`
