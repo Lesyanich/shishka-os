@@ -73,11 +73,37 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // Build vision message content with all images
-    const imageContent = image_urls.map((url: string) => ({
-      type: "image_url" as const,
-      image_url: { url, detail: "high" as const },
-    }))
+    // Download images and convert to base64 (OpenAI can't reliably fetch
+    // from Supabase Storage — timeouts are common). Base64 data URIs bypass
+    // this entirely and are more reliable.
+    const imageContent = await Promise.all(
+      image_urls.map(async (url: string) => {
+        try {
+          const imgResp = await fetch(url)
+          if (!imgResp.ok) throw new Error(`Failed to download ${url}: ${imgResp.status}`)
+          const buf = await imgResp.arrayBuffer()
+          const bytes = new Uint8Array(buf)
+          // Manual base64 encode (Deno-compatible)
+          let binary = ""
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+          const b64 = btoa(binary)
+          const contentType = imgResp.headers.get("content-type") || "image/jpeg"
+          const dataUri = `data:${contentType};base64,${b64}`
+          console.log(`[parse-receipts] Encoded ${url.split("/").pop()}: ${(b64.length / 1024).toFixed(0)}KB base64`)
+          return {
+            type: "image_url" as const,
+            image_url: { url: dataUri, detail: "high" as const },
+          }
+        } catch (err) {
+          console.error(`[parse-receipts] Image download failed: ${url}`, err)
+          // Fallback to direct URL if download fails
+          return {
+            type: "image_url" as const,
+            image_url: { url, detail: "high" as const },
+          }
+        }
+      }),
+    )
 
     // Call OpenAI gpt-4o-mini vision
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
