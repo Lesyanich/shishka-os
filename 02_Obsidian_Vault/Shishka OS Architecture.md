@@ -83,6 +83,7 @@ The core data model follows a 4-tier Bill of Materials:
 | 5.1 | [[Orders Pipeline]] | ✅ LIVE | Kanban, Realtime, BOM explosion |
 | 5.2 | [[MRP Engine]] | ✅ LIVE | Scenario planning, inventory-aware |
 | 5.3 | [[Knowledge Base Refactoring]] | ✅ LIVE | Obsidian Skills, vault cleanup |
+| 5.4 | [[Agent Skills & Capabilities]] | ✅ LIVE | PDF, XLSX, skill-creator, invoice parser |
 
 ## Key Database Functions (RPCs)
 
@@ -104,3 +105,4 @@ See [[STATE]] for full migration details (016-023).
 
 - [[STATE]] — Current deployment state
 - [[HANDOVER]] — Agent handover reports
+- [[Agent Skills & Capabilities]] — Installed skills registry
