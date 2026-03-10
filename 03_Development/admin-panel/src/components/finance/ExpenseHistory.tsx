@@ -1,4 +1,4 @@
-import { Loader2, Pencil, Receipt } from 'lucide-react'
+import { FileCheck, Loader2, Pencil, Receipt } from 'lucide-react'
 import type { ExpenseRow } from '../../hooks/useExpenseLedger'
 
 export interface ExpenseHistoryProps {
@@ -61,16 +61,17 @@ export function ExpenseHistory({
           No expenses yet. Add one using the form.
         </div>
       ) : (
-        <div className="max-h-[480px] overflow-y-auto">
+        <div className="max-h-[520px] overflow-y-auto">
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-2">Date</th>
                 <th className="px-2 py-2">Supplier</th>
                 <th className="px-2 py-2">Details</th>
+                <th className="px-2 py-2">Comments</th>
                 <th className="px-2 py-2 text-right">Amount</th>
-                <th className="px-2 py-2 text-center">Receipts</th>
-                <th className="px-3 py-2 text-center">Edit</th>
+                <th className="px-2 py-2 text-center">Docs</th>
+                <th className="w-10 px-2 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
@@ -109,9 +110,16 @@ export function ExpenseHistory({
                   </td>
 
                   {/* Details */}
-                  <td className="max-w-[200px] px-2 py-2.5">
+                  <td className="max-w-[160px] px-2 py-2.5">
                     <div className="truncate text-slate-300">
                       {r.details || '\u2014'}
+                    </div>
+                  </td>
+
+                  {/* Comments */}
+                  <td className="max-w-[140px] px-2 py-2.5">
+                    <div className="truncate text-slate-500">
+                      {r.comments || '\u2014'}
                     </div>
                   </td>
 
@@ -127,9 +135,9 @@ export function ExpenseHistory({
                     )}
                   </td>
 
-                  {/* Receipts */}
+                  {/* Docs: Receipts + Tax Invoice flag */}
                   <td className="px-2 py-2.5">
-                    <div className="flex justify-center gap-1">
+                    <div className="flex items-center justify-center gap-1">
                       {r.receipt_supplier_url && (
                         <button
                           type="button"
@@ -150,24 +158,19 @@ export function ExpenseHistory({
                           <Receipt className="h-3.5 w-3.5 text-sky-400" />
                         </button>
                       )}
-                      {r.tax_invoice_url && (
-                        <button
-                          type="button"
-                          onClick={() => onReceiptClick(r.tax_invoice_url!)}
-                          title="Tax invoice"
-                          className="hover:opacity-70"
-                        >
-                          <Receipt className="h-3.5 w-3.5 text-amber-400" />
-                        </button>
-                      )}
-                      {!r.receipt_supplier_url && !r.receipt_bank_url && !r.tax_invoice_url && (
+                      {r.has_tax_invoice ? (
+                        <span title="Tax invoice available">
+                          <FileCheck className="h-3.5 w-3.5 text-amber-400" />
+                        </span>
+                      ) : null}
+                      {!r.receipt_supplier_url && !r.receipt_bank_url && !r.has_tax_invoice && (
                         <span className="text-[10px] text-slate-600">{'\u2014'}</span>
                       )}
                     </div>
                   </td>
 
                   {/* Edit button */}
-                  <td className="px-3 py-2.5 text-center">
+                  <td className="px-2 py-2.5 text-center">
                     <button
                       type="button"
                       onClick={() => onEditClick(r)}

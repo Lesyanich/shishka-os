@@ -21,6 +21,8 @@ export interface ExpenseRow {
   receipt_supplier_url: string | null
   receipt_bank_url: string | null
   tax_invoice_url: string | null
+  comments: string | null
+  has_tax_invoice: boolean
   created_at: string
   // Joined
   category_name: string | null
@@ -66,6 +68,8 @@ export interface ExpenseUpdatePayload {
   receipt_supplier_url?: string | null
   receipt_bank_url?: string | null
   tax_invoice_url?: string | null
+  comments?: string | null
+  has_tax_invoice?: boolean
 }
 
 export interface UseExpenseLedgerResult {
@@ -144,6 +148,8 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
       receipt_supplier_url: r.receipt_supplier_url as string | null,
       receipt_bank_url: r.receipt_bank_url as string | null,
       tax_invoice_url: r.tax_invoice_url as string | null,
+      comments: (r.comments ?? null) as string | null,
+      has_tax_invoice: (r.has_tax_invoice ?? false) as boolean,
       created_at: r.created_at as string,
       category_name: r.category_code != null ? (catMap[r.category_code as number] ?? null) : null,
       sub_category_name: r.sub_category_code != null ? (subCatMap[r.sub_category_code as number] ?? null) : null,

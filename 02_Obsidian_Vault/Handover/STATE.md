@@ -943,3 +943,51 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | `src/pages/FinanceManager.tsx` | MODIFIED | Wired SmartTextInput, EditModal, updateExpense |
 | `02_Obsidian_Vault/Database Schema.md` | NEW | Full erDiagram + tables index + RPCs + ENUMs |
 | `CLAUDE.md` | MODIFIED | Added Boris Rule #10 (Database Documentation Protocol) |
+
+---
+
+## 💰 2026-03-10 — Phase 4.3b: Data Cleanup, Comments, Tax Invoice & Receipt Fixes — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 4.3b CEO data cleanup — LIVE
+
+### Migration 026: Data Cleanup — Details, Comments, Sub-categories, Tax Invoice Flag
+
+| Объект | Тип | Описание |
+|---|---|---|
+| `comments` column | ALTER TABLE | TEXT column on expense_ledger for transaction notes |
+| `has_tax_invoice` column | ALTER TABLE | BOOLEAN NOT NULL DEFAULT false on expense_ledger |
+| 18 fin_categories | INSERT | All REF categories with `type` column ('Asset'/'Expense'), ON CONFLICT DO NOTHING |
+| 29 fin_sub_categories | INSERT | All REF sub-categories, ON CONFLICT DO NOTHING |
+| Supplier merge | UPDATE | Merged duplicate PIMONPHAN PHA → Pimonphan pha, soft-deleted duplicate |
+| 62 row bulk cleanup | CTE UPDATE | Cleaned details (removed transaction IDs, "Bank transfer" noise), added comments, set sub_category_code, fixed wrong category_codes (8 rows) |
+| has_tax_invoice flag | UPDATE | Set true where tax_invoice_url exists (currently 0 rows — no invoices imported) |
+| Receipt URL fix | UPDATE | Prepended Supabase Storage base URL to plain filenames (8 supplier + 8 bank URLs) |
+
+### DB Sync
+
+| Migration | Статус |
+|---|---|
+| 026 (Data Cleanup) | ✅ Applied (6 parts: columns, categories, supplier merge, bulk update, tax flag, URL fix) |
+
+### Data Quality Results
+
+| Metric | Value |
+|---|---|
+| Total rows | 62 |
+| With sub_category_code | 61/62 (Visa row intentionally NULL) |
+| With comments | 48/62 |
+| Receipt URLs fixed | 8 supplier + 8 bank (now full https:// URLs) |
+| Category fixes | 8 rows (signboard→Fixtures, delivery→Logistics, cleaning→Maintenance, visa→Work Permits, etc.) |
+
+### Frontend Changes (Phase 4.3b)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `migrations/026_data_cleanup_comments_tax.sql` | NEW | Full data cleanup migration (272 lines) |
+| `src/components/finance/helpers.ts` | MODIFIED | Added 'AED' to CURRENCY_OPTIONS |
+| `src/hooks/useExpenseLedger.ts` | MODIFIED | Added `comments` and `has_tax_invoice` to ExpenseRow type + mapping |
+| `src/components/finance/ExpenseHistory.tsx` | REWRITTEN | Added Comments column, FileCheck icon for tax invoice, updated Docs column |
+| `src/components/finance/ExpenseEditModal.tsx` | REWRITTEN | Added comments field, has_tax_invoice checkbox |
+| `src/components/finance/ExpenseForm.tsx` | MODIFIED | Added comments input, has_tax_invoice checkbox |
+| `src/components/finance/ReceiptLightbox.tsx` | REWRITTEN | Google Drive URL detection + iframe preview, "Open in new tab" button, error fallback |

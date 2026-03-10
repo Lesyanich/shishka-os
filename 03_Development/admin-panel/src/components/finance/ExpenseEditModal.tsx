@@ -27,6 +27,8 @@ export function ExpenseEditModal({
   const [subCategoryCode, setSubCategoryCode] = useState<number | ''>('')
   const [supplierId, setSupplierId] = useState('')
   const [details, setDetails] = useState('')
+  const [comments, setComments] = useState('')
+  const [hasTaxInvoice, setHasTaxInvoice] = useState(false)
   const [amountOriginal, setAmountOriginal] = useState<number | ''>('')
   const [currency, setCurrency] = useState('THB')
   const [exchangeRate, setExchangeRate] = useState<number | ''>(1)
@@ -46,6 +48,8 @@ export function ExpenseEditModal({
     setSubCategoryCode(row.sub_category_code ?? '')
     setSupplierId(row.supplier_id ?? '')
     setDetails(row.details)
+    setComments(row.comments ?? '')
+    setHasTaxInvoice(row.has_tax_invoice)
     setAmountOriginal(row.amount_original)
     setCurrency(row.currency)
     setExchangeRate(row.exchange_rate)
@@ -92,6 +96,8 @@ export function ExpenseEditModal({
       sub_category_code: subCategoryCode !== '' ? subCategoryCode : null,
       supplier_id: supplierId || null,
       details: details.trim(),
+      comments: comments.trim() || null,
+      has_tax_invoice: hasTaxInvoice,
       amount_original: amountOriginal,
       currency,
       exchange_rate: currency === 'THB' ? 1 : (typeof exchangeRate === 'number' ? exchangeRate : 1),
@@ -238,7 +244,19 @@ export function ExpenseEditModal({
               type="text"
               value={details}
               onChange={(e) => setDetails(e.target.value)}
-              placeholder="Description of expense..."
+              placeholder="What was the payment for..."
+              className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          {/* Comments */}
+          <div>
+            <label className="mb-1 block text-xs text-slate-400">Comments</label>
+            <input
+              type="text"
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              placeholder="Additional notes (prepayment, invoice #, etc.)..."
               className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
             />
           </div>
@@ -341,6 +359,17 @@ export function ExpenseEditModal({
               </select>
             </div>
           </div>
+
+          {/* Tax Invoice checkbox */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={hasTaxInvoice}
+              onChange={(e) => setHasTaxInvoice(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-emerald-500 focus:ring-emerald-500"
+            />
+            <span className="text-xs text-slate-400">Has Tax Invoice</span>
+          </label>
         </div>
 
         {/* Footer */}

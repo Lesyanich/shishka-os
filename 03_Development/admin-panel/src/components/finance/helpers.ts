@@ -10,7 +10,7 @@ export const CATEGORY_COLORS = [
   '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16',
 ]
 
-export const CURRENCY_OPTIONS = ['THB', 'USD', 'EUR', 'RUB', 'GBP', 'CNY', 'JPY']
+export const CURRENCY_OPTIONS = ['THB', 'USD', 'EUR', 'RUB', 'GBP', 'CNY', 'JPY', 'AED']
 
 export const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },

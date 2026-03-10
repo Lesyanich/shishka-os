@@ -37,6 +37,8 @@ export function ExpenseForm({
   const [subCategoryCode, setSubCategoryCode] = useState<number | ''>('')
   const [supplierId, setSupplierId] = useState('')
   const [details, setDetails] = useState('')
+  const [comments, setComments] = useState('')
+  const [hasTaxInvoice, setHasTaxInvoice] = useState(false)
   const [amountOriginal, setAmountOriginal] = useState<number | ''>('')
   const [currency, setCurrency] = useState('THB')
   const [exchangeRate, setExchangeRate] = useState<number | ''>(1)
@@ -86,6 +88,8 @@ export function ExpenseForm({
         sub_category_code: subCategoryCode !== '' ? subCategoryCode : null,
         supplier_id: supplierId || null,
         details: details.trim(),
+        comments: comments.trim() || null,
+        has_tax_invoice: hasTaxInvoice,
         amount_original: amountOriginal,
         currency,
         exchange_rate: currency === 'THB' ? 1 : exchangeRate,
@@ -110,6 +114,8 @@ export function ExpenseForm({
       // Reset
       setAmountOriginal('')
       setDetails('')
+      setComments('')
+      setHasTaxInvoice(false)
       setCategoryCode('')
       setSubCategoryCode('')
       setSupplierId('')
@@ -311,9 +317,32 @@ export function ExpenseForm({
             type="text"
             value={details}
             onChange={(e) => setDetails(e.target.value)}
-            placeholder="Description of expense..."
+            placeholder="What was the payment for..."
             className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
           />
+        </div>
+
+        {/* Comments + Tax Invoice */}
+        <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+          <div>
+            <label className="mb-1 block text-xs text-slate-400">Comments</label>
+            <input
+              type="text"
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              placeholder="Notes (prepayment, invoice #, etc.)..."
+              className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+            />
+          </div>
+          <label className="flex h-9 items-center gap-1.5 cursor-pointer whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={hasTaxInvoice}
+              onChange={(e) => setHasTaxInvoice(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-800 text-emerald-500"
+            />
+            <span className="text-[10px] text-slate-400">Tax inv.</span>
+          </label>
         </div>
 
         {/* Paid by + Payment method + Status */}

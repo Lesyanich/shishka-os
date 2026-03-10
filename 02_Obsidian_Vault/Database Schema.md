@@ -175,11 +175,14 @@ erDiagram
         INTEGER category_code FK
         INTEGER sub_category_code FK
         UUID supplier_id FK
+        TEXT details
+        TEXT comments
         NUMERIC amount_original
         TEXT currency
         NUMERIC exchange_rate
         NUMERIC amount_thb "GENERATED"
         TEXT status
+        BOOLEAN has_tax_invoice
     }
 
     nomenclature ||--o{ bom_structures : "parent_id"
@@ -235,7 +238,7 @@ erDiagram
 | `order_items` | `id` UUID | quantity, price_at_purchase | order_id -> orders (CASCADE), nomenclature_id -> nomenclature | 022 |
 | `production_plans` | `id` UUID | name, target_date, status, mrp_result | -- | 023 |
 | `plan_targets` | `id` UUID | target_qty, UNIQUE(plan_id,nomenclature_id) | plan_id -> production_plans (CASCADE), nomenclature_id -> nomenclature | 023 |
-| `expense_ledger` | `id` UUID | amount_original, currency, exchange_rate, amount_thb (GENERATED) | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024 |
+| `expense_ledger` | `id` UUID | details, comments, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026 |
 
 ## Custom ENUM Types
 
