@@ -50,6 +50,24 @@ export interface MonthlySummary {
   by_category: Record<string, number>
 }
 
+export interface ExpenseUpdatePayload {
+  transaction_date?: string
+  flow_type?: 'OpEx' | 'CapEx'
+  category_code?: number | null
+  sub_category_code?: number | null
+  supplier_id?: string | null
+  details?: string
+  amount_original?: number
+  currency?: string
+  exchange_rate?: number
+  paid_by?: string
+  payment_method?: string
+  status?: string
+  receipt_supplier_url?: string | null
+  receipt_bank_url?: string | null
+  tax_invoice_url?: string | null
+}
+
 export interface UseExpenseLedgerResult {
   rows: ExpenseRow[]
   categories: FinCategory[]
@@ -60,6 +78,7 @@ export interface UseExpenseLedgerResult {
   isLoading: boolean
   error: string | null
   refetch: () => void
+  updateExpense: (id: string, payload: ExpenseUpdatePayload) => Promise<string | null>
 }
 
 /* ──────────────────────── Hook ──────────────────────── */
@@ -164,6 +183,25 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
 
   const grandTotal = rows.reduce((s, r) => s + r.amount_thb, 0)
 
+  /** Update a single expense row. Returns error message or null on success. */
+  const updateExpense = useCallback(
+    async (id: string, payload: ExpenseUpdatePayload): Promise<string | null> => {
+      const { error: updateErr } = await supabase
+        .from('expense_ledger')
+        .update(payload)
+        .eq('id', id)
+
+      if (updateErr) {
+        console.error('[useExpenseLedger] update error', updateErr)
+        return updateErr.message
+      }
+
+      await fetchData()
+      return null
+    },
+    [fetchData],
+  )
+
   return {
     rows,
     categories,
@@ -174,5 +212,6 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
     isLoading,
     error,
     refetch: fetchData,
+    updateExpense,
   }
 }

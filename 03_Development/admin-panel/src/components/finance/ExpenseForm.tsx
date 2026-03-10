@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DollarSign, Loader2, Wallet } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatTHB, CURRENCY_OPTIONS, PAYMENT_METHODS } from './helpers'
@@ -15,6 +15,8 @@ export interface ExpenseFormProps {
     bank?: string | null
     tax?: string | null
   }
+  /** Text injected from SmartTextInput — fills the Details field */
+  quickText?: string
   onCreated: () => void
 }
 
@@ -25,6 +27,7 @@ export function ExpenseForm({
   subCategories,
   suppliers,
   receiptUrls,
+  quickText,
   onCreated,
 }: ExpenseFormProps) {
   // Form state
@@ -40,6 +43,11 @@ export function ExpenseForm({
   const [paidBy, setPaidBy] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [status, setStatus] = useState<'pending' | 'paid' | 'cancelled'>('paid')
+
+  // Fill details from SmartTextInput
+  useEffect(() => {
+    if (quickText) setDetails(quickText)
+  }, [quickText])
 
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

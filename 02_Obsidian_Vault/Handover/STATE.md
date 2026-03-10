@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-10T20:30 (ICT)  
+**Последнее обновление:** 2026-03-10T21:00 (ICT)  
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -890,3 +890,56 @@ SELECT id, syrve_uuid, unit_id, last_service_date FROM equipment LIMIT 3;
 | `src/components/finance/ReceiptLightbox.tsx` | NEW | Modal image/PDF viewer |
 | `src/components/finance/index.ts` | NEW | Barrel export |
 | `src/pages/FinanceManager.tsx` | REWRITTEN | Thin orchestrator (905→110 lines) |
+
+---
+
+## 💰 2026-03-10 — Phase 4.3: Smart UI Refinement, CRUD & DB Map — ✅ LIVE
+
+**Агент:** Claude Opus 4.6 (Lead Frontend Architect)
+**Статус:** Phase 4.3 CEO-friendly UX + Edit + Smart Input + Obsidian DB Map — LIVE
+
+### ExpenseHistory Redesign (CEO-friendly)
+
+| Old Columns | New Columns |
+|---|---|
+| Date, Type, Category, Details, Amount, THB, Status, Receipts | Date (+ tiny OpEx/CapEx badge), **Supplier** (Kому), **Details** (За что), **Amount** (THB large, original currency small), Receipts, **Edit** |
+
+- **Type/Category** removed from table (visible only in Edit modal)
+- **Supplier** shown prominently as "who was paid"
+- **Amount** shows THB prominently with original currency below for multi-currency
+- **Status** shown only when not "paid" (saves space for the common case)
+- **Edit** button appears on hover (pencil icon) → opens ExpenseEditModal
+
+### ExpenseEditModal (CRUD Update)
+
+- Modal overlay with pre-filled form from selected row
+- All fields editable: date, type, category, sub-category, supplier, details, amount, currency, exchange rate, paid_by, payment, status
+- `updateExpense` function added to `useExpenseLedger` hook
+- Escape / click-outside to close
+
+### SmartTextInput (Conversational UI Stub)
+
+- Full-width input above the form: "Quick log: Paid 1500 to Makro for vegetables yesterday..."
+- **Enter** or **Send button** → text injected into ExpenseForm's Details field
+- **Mic icon** (UI stub) — ready for future Web Speech API
+- Future: NLP parser will extract amount, supplier, category from natural language
+
+### Database Schema Note (Boris Rule #10)
+
+- Created `02_Obsidian_Vault/Database Schema.md` with full Mermaid erDiagram
+- 22 tables, 7 ENUMs, 12 RPCs/triggers, 1 storage bucket documented
+- Added Boris Rule #10 to CLAUDE.md: "update Database Schema.md on every migration"
+
+### Модифицированные файлы (Phase 4.3)
+
+| Файл | Тип | Назначение |
+|---|---|---|
+| `src/components/finance/ExpenseHistory.tsx` | REWRITTEN | CEO-friendly columns: Date+Badge, Supplier, Details, Amount, Receipts, Edit |
+| `src/components/finance/ExpenseEditModal.tsx` | NEW | Modal form for editing expenses with pre-filled fields |
+| `src/components/finance/SmartTextInput.tsx` | NEW | Quick-log text input with mic stub + Enter → fills Details |
+| `src/components/finance/ExpenseForm.tsx` | MODIFIED | Added `quickText` prop, useEffect to fill details from SmartTextInput |
+| `src/components/finance/index.ts` | MODIFIED | Added exports for ExpenseEditModal, SmartTextInput |
+| `src/hooks/useExpenseLedger.ts` | MODIFIED | Added `ExpenseUpdatePayload` type + `updateExpense` function |
+| `src/pages/FinanceManager.tsx` | MODIFIED | Wired SmartTextInput, EditModal, updateExpense |
+| `02_Obsidian_Vault/Database Schema.md` | NEW | Full erDiagram + tables index + RPCs + ENUMs |
+| `CLAUDE.md` | MODIFIED | Added Boris Rule #10 (Database Documentation Protocol) |

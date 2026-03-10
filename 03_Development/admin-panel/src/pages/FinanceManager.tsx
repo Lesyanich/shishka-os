@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useExpenseLedger } from '../hooks/useExpenseLedger'
+import type { ExpenseRow } from '../hooks/useExpenseLedger'
 import { formatTHB } from '../components/finance/helpers'
 import { KpiCard } from '../components/finance/KpiCard'
 import { MonthlyChart } from '../components/finance/MonthlyChart'
 import { ExpenseForm } from '../components/finance/ExpenseForm'
 import { ExpenseHistory } from '../components/finance/ExpenseHistory'
+import { ExpenseEditModal } from '../components/finance/ExpenseEditModal'
 import { MagicDropzone } from '../components/finance/MagicDropzone'
+import { SmartTextInput } from '../components/finance/SmartTextInput'
 import { ReceiptLightbox } from '../components/finance/ReceiptLightbox'
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -23,6 +26,7 @@ export function FinanceManager() {
     isLoading,
     error,
     refetch,
+    updateExpense,
   } = useExpenseLedger()
 
   /* Receipt URLs injected from MagicDropzone */
@@ -35,8 +39,15 @@ export function FinanceManager() {
   /* Lightbox state */
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
+  /* Edit modal state */
+  const [editingRow, setEditingRow] = useState<ExpenseRow | null>(null)
+
+  /* Quick text from SmartTextInput — passed to ExpenseForm */
+  const [quickText, setQuickText] = useState<string | undefined>(undefined)
+
   const handleCreated = () => {
     setReceiptUrls({})
+    setQuickText(undefined)
     refetch()
   }
 
@@ -83,6 +94,9 @@ export function FinanceManager() {
         />
       </div>
 
+      {/* Smart Text Input — quick log line */}
+      <SmartTextInput onSubmitText={setQuickText} />
+
       {/* Magic Dropzone — full width */}
       <MagicDropzone onUrlsReady={setReceiptUrls} />
 
@@ -94,6 +108,7 @@ export function FinanceManager() {
             subCategories={subCategories}
             suppliers={suppliers}
             receiptUrls={receiptUrls}
+            quickText={quickText}
             onCreated={handleCreated}
           />
         </div>
@@ -109,9 +124,20 @@ export function FinanceManager() {
             error={error}
             onRefetch={refetch}
             onReceiptClick={setLightboxUrl}
+            onEditClick={setEditingRow}
           />
         </div>
       </div>
+
+      {/* Edit modal */}
+      <ExpenseEditModal
+        row={editingRow}
+        categories={categories}
+        subCategories={subCategories}
+        suppliers={suppliers}
+        onSave={updateExpense}
+        onClose={() => setEditingRow(null)}
+      />
 
       {/* Receipt Lightbox modal */}
       <ReceiptLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />

@@ -30,9 +30,16 @@ If you make a mistake and the user corrects you, you MUST update this `CLAUDE.md
 3. **Never** leave orphan notes — every new note must be linked from at least one existing note or from STATE.md.
 4. Legacy/obsolete content lives in `02_Obsidian_Vault/_Archive/` — never delete, always archive.
 
+## 📊 Database Documentation Protocol (Boris Rule #10)
+When any migration **creates or alters** a table/function/trigger/enum, the agent MUST update `02_Obsidian_Vault/Database Schema.md`:
+1. Keep the **Mermaid erDiagram** block in sync with all current tables and FK relationships.
+2. Keep the **Tables index** table up to date (Table | PK | Key Columns | FKs | Migration).
+3. Keep the **RPCs & Triggers** table up to date.
+4. This file is the single visual reference for the entire Supabase schema — it must always reflect the latest deployed state.
+
 ## 📂 Context Routing (Point, Don't Dump)
 - **Global Rules:** Read `gemini.md`
-- **Database State & Schema:** Read `02_Obsidian_Vault/Handover/STATE.md`
+- **Database State & Schema:** Read `02_Obsidian_Vault/Database Schema.md` (erDiagram) + `02_Obsidian_Vault/Handover/STATE.md`
 - **Handover Reports:** Read `02_Obsidian_Vault/Handover/HANDOVER.md`
 - **Plans & Architecture:** Read files in `/docs/` and `/02_Obsidian_Vault/`
 - **Frontend Blueprint:** Read `docs/PLAN-ShishkaOS-Dashboard.md`

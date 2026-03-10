@@ -104,10 +104,11 @@ The core data model follows a 4-tier Bill of Materials:
 
 ## Migrations Index
 
-See [[STATE]] for full migration details (016-024).
+See [[STATE]] for full migration details (016-025).
 
 ## Related
 
+- [[Database Schema]] — Full erDiagram and tables index
 - [[STATE]] — Current deployment state
 - [[HANDOVER]] — Agent handover reports
 - [[Agent Skills & Capabilities]] — Installed skills registry
