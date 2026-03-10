@@ -8,8 +8,6 @@
 // food / capex / opex.
 // ═══════════════════════════════════════════════════════════
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")
 
 const CORS_HEADERS = {
@@ -50,7 +48,7 @@ All monetary values must be numbers (not strings).
 Quantities must be positive numbers.
 If multiple receipt images are provided, they belong to the SAME transaction — combine all items into a single response.`
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS })

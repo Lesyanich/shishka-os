@@ -1,12 +1,16 @@
 import { useState, useMemo } from 'react'
 import {
+  AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Loader2,
+  Package,
   Plus,
+  ShoppingCart,
   Sparkles,
   Trash2,
+  Wrench,
   X,
 } from 'lucide-react'
 import { CURRENCY_OPTIONS, PAYMENT_METHODS, formatTHB } from './helpers'
@@ -40,10 +44,8 @@ function fuzzyMatchSupplier(
 ): string {
   if (!aiName) return ''
   const lower = aiName.toLowerCase()
-  // Exact match first
   const exact = suppliers.find((s) => s.name.toLowerCase() === lower)
   if (exact) return exact.id
-  // Partial match
   const partial = suppliers.find(
     (s) =>
       s.name.toLowerCase().includes(lower) ||
@@ -52,10 +54,12 @@ function fuzzyMatchSupplier(
   return partial?.id ?? ''
 }
 
+/* Shared field styles */
 const inputCls =
-  'h-8 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500'
+  'h-8 w-full rounded-lg border border-slate-700/60 bg-slate-800/80 px-2.5 text-xs text-slate-100 outline-none transition-all duration-200 focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20 placeholder:text-slate-600'
 const selectCls =
-  'h-8 w-full rounded-md border border-slate-700 bg-slate-800 px-1 text-xs text-slate-100 outline-none focus:border-emerald-500'
+  'h-8 w-full rounded-lg border border-slate-700/60 bg-slate-800/80 px-1.5 text-xs text-slate-100 outline-none transition-all duration-200 focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20'
+const labelCls = 'mb-1.5 block text-[11px] font-medium tracking-wide text-slate-400/80 uppercase'
 
 /* ────────────────────────── Component ────────────────────────── */
 
@@ -201,24 +205,31 @@ export function StagingArea({
     }
   }
 
+  const totalItems = foodItems.length + capexItems.length + opexItems.length
+
   return (
-    <section className="rounded-xl border border-indigo-500/40 bg-slate-900/50 shadow-sm">
-      {/* ── Header ── */}
-      <header className="border-b border-slate-800 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-indigo-400" />
-          <div>
-            <h2 className="text-sm font-semibold text-slate-100">
+    <section className="animate-fade-in-up overflow-hidden rounded-2xl border border-indigo-500/30 bg-gradient-to-b from-slate-900/90 to-slate-950/90 shadow-xl shadow-indigo-500/[0.04]">
+      {/* ═══ Header ═══ */}
+      <header className="relative border-b border-slate-800/60 px-5 py-4">
+        {/* Subtle gradient overlay */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-indigo-500/[0.04] via-transparent to-violet-500/[0.04]" />
+
+        <div className="relative flex items-center gap-3">
+          <div className="rounded-xl bg-indigo-500/10 p-2 shadow-sm shadow-indigo-500/10">
+            <Sparkles className="h-4.5 w-4.5 text-indigo-400" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold tracking-wide text-slate-100">
               AI Receipt Preview
             </h2>
-            <p className="text-xs text-slate-500">
-              Review and edit parsed data before saving
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              {totalItems} item{totalItems !== 1 ? 's' : ''} extracted &middot; Review before saving
             </p>
           </div>
           <button
             type="button"
             onClick={onCancel}
-            className="ml-auto rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+            className="rounded-lg p-1.5 text-slate-500 transition-all duration-200 hover:bg-slate-800 hover:text-slate-300"
             title="Cancel & return to manual form"
           >
             <X className="h-4 w-4" />
@@ -226,18 +237,19 @@ export function StagingArea({
         </div>
       </header>
 
-      <div className="space-y-4 px-4 py-4">
+      <div className="stagger-children space-y-5 px-5 py-5">
         {/* ── Error ── */}
         {error && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-            {error}
+          <div className="flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
+            <p className="text-xs leading-relaxed text-red-300/90">{error}</p>
           </div>
         )}
 
-        {/* ── Supplier + Date + Invoice ── */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* ═══ SECTION: Supplier + Date + Invoice ═══ */}
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Supplier</label>
+            <label className={labelCls}>Supplier</label>
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
@@ -251,13 +263,14 @@ export function StagingArea({
               ))}
             </select>
             {receipt.supplier_name && !supplierId && (
-              <p className="mt-0.5 text-[10px] text-amber-400">
+              <p className="mt-1 flex items-center gap-1 text-[10px] text-amber-400/80">
+                <span className="inline-block h-1 w-1 rounded-full bg-amber-400" />
                 AI detected: &quot;{receipt.supplier_name}&quot;
               </p>
             )}
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Date</label>
+            <label className={labelCls}>Date</label>
             <input
               type="date"
               value={txDate}
@@ -266,7 +279,7 @@ export function StagingArea({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Invoice #</label>
+            <label className={labelCls}>Invoice #</label>
             <input
               type="text"
               value={invoiceNumber}
@@ -277,20 +290,20 @@ export function StagingArea({
           </div>
         </div>
 
-        {/* ── Amount + Currency + Exchange Rate ── */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* ═══ SECTION: Amount + Currency + Exchange Rate ═══ */}
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Total Amount</label>
+            <label className={labelCls}>Total Amount</label>
             <input
               type="number"
               step="0.01"
               value={totalAmount}
               onChange={(e) => setTotalAmount(Number(e.target.value))}
-              className={inputCls}
+              className={`${inputCls} font-mono`}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Currency</label>
+            <label className={labelCls}>Currency</label>
             <select
               value={currency}
               onChange={(e) => {
@@ -305,8 +318,8 @@ export function StagingArea({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">
-              {currency === 'THB' ? 'Rate (1.00)' : 'Rate → THB'}
+            <label className={labelCls}>
+              {currency === 'THB' ? 'Rate (1.00)' : `Rate ${currency} \u2192 THB`}
             </label>
             <input
               type="number"
@@ -314,27 +327,27 @@ export function StagingArea({
               value={exchangeRate}
               onChange={(e) => setExchangeRate(Number(e.target.value))}
               disabled={currency === 'THB'}
-              className={`${inputCls} disabled:opacity-40`}
+              className={`${inputCls} font-mono disabled:opacity-30`}
             />
           </div>
         </div>
 
-        {/* ── Flow Type + Category + Sub-category ── */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* ═══ SECTION: Flow Type + Category + Sub-category ═══ */}
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Type</label>
+            <label className={labelCls}>Type</label>
             <div className="flex gap-2">
               {(['OpEx', 'CapEx'] as const).map((ft) => (
                 <button
                   key={ft}
                   type="button"
                   onClick={() => setFlowType(ft)}
-                  className={`h-8 flex-1 rounded-md border text-xs font-medium transition ${
+                  className={`h-8 flex-1 rounded-lg border text-xs font-medium tracking-wide transition-all duration-200 ${
                     flowType === ft
                       ? ft === 'OpEx'
-                        ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-200'
-                        : 'border-amber-500/60 bg-amber-500/15 text-amber-200'
-                      : 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        ? 'border-emerald-500/50 bg-emerald-500/[0.12] text-emerald-300 shadow-sm shadow-emerald-500/10'
+                        : 'border-amber-500/50 bg-amber-500/[0.12] text-amber-300 shadow-sm shadow-amber-500/10'
+                      : 'border-slate-700/60 bg-slate-800/60 text-slate-500 hover:border-slate-600 hover:text-slate-400'
                   }`}
                 >
                   {ft}
@@ -343,7 +356,7 @@ export function StagingArea({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Category</label>
+            <label className={labelCls}>Category</label>
             <select
               value={categoryCode}
               onChange={(e) => {
@@ -356,37 +369,37 @@ export function StagingArea({
               <option value="">Select...</option>
               {categories.map((c) => (
                 <option key={c.code} value={c.code}>
-                  {c.code} — {c.name}
+                  {c.code} &mdash; {c.name}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Sub-category</label>
+            <label className={labelCls}>Sub-category</label>
             <select
               value={subCategoryCode}
               onChange={(e) =>
                 setSubCategoryCode(e.target.value === '' ? '' : Number(e.target.value))
               }
               disabled={filteredSubCats.length === 0}
-              className={`${selectCls} disabled:opacity-40`}
+              className={`${selectCls} disabled:opacity-30`}
             >
               <option value="">
-                {filteredSubCats.length === 0 ? 'Pick category' : 'Select...'}
+                {filteredSubCats.length === 0 ? 'Pick category first' : 'Select...'}
               </option>
               {filteredSubCats.map((sc) => (
                 <option key={sc.sub_code} value={sc.sub_code}>
-                  {sc.sub_code} — {sc.name}
+                  {sc.sub_code} &mdash; {sc.name}
                 </option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* ── Details + Payment ── */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* ═══ SECTION: Details + Payment ═══ */}
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Details</label>
+            <label className={labelCls}>Details</label>
             <input
               type="text"
               value={details}
@@ -395,7 +408,7 @@ export function StagingArea({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Paid by</label>
+            <label className={labelCls}>Paid by</label>
             <input
               type="text"
               value={paidBy}
@@ -405,7 +418,7 @@ export function StagingArea({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Payment</label>
+            <label className={labelCls}>Payment</label>
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
@@ -418,18 +431,33 @@ export function StagingArea({
           </div>
         </div>
 
+        {/* Divider */}
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-700/50 to-transparent" />
+          <span className="text-[10px] font-medium tracking-widest text-slate-600 uppercase">
+            Line Items
+          </span>
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-700/50 to-transparent" />
+        </div>
+
         {/* ═══ Food Items (Spoke 1) ═══ */}
         <ItemSection
           title="Food Items"
+          icon={<ShoppingCart className="h-3.5 w-3.5" />}
           count={foodItems.length}
           total={foodTotal}
           open={foodOpen}
           onToggle={() => setFoodOpen(!foodOpen)}
           color="emerald"
+          headers={['Item', 'Qty', 'Unit', 'Price', 'Total', 'Nomenclature', '']}
+          colWidths={['', 'w-16', 'w-16', 'w-20', 'w-20', 'w-36', 'w-8']}
         >
           {foodItems.map((item, i) => (
-            <tr key={i} className="border-b border-slate-800/50">
-              <td className="px-1 py-1">
+            <tr
+              key={i}
+              className="group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20"
+            >
+              <td className="px-1.5 py-1.5">
                 <input
                   type="text"
                   value={item.name}
@@ -437,16 +465,16 @@ export function StagingArea({
                   className={inputCls}
                 />
               </td>
-              <td className="px-1 py-1 w-16">
+              <td className="w-16 px-1.5 py-1.5">
                 <input
                   type="number"
                   step="0.01"
                   value={item.quantity}
                   onChange={(e) => updateFood(i, { quantity: Number(e.target.value) })}
-                  className={inputCls}
+                  className={`${inputCls} font-mono`}
                 />
               </td>
-              <td className="px-1 py-1 w-16">
+              <td className="w-16 px-1.5 py-1.5">
                 <input
                   type="text"
                   value={item.unit}
@@ -454,43 +482,47 @@ export function StagingArea({
                   className={inputCls}
                 />
               </td>
-              <td className="px-1 py-1 w-20">
+              <td className="w-20 px-1.5 py-1.5">
                 <input
                   type="number"
                   step="0.01"
                   value={item.unit_price}
                   onChange={(e) => updateFood(i, { unit_price: Number(e.target.value) })}
-                  className={inputCls}
+                  className={`${inputCls} font-mono`}
                 />
               </td>
-              <td className="px-1 py-1 w-20">
+              <td className="w-20 px-1.5 py-1.5">
                 <input
                   type="number"
                   step="0.01"
                   value={item.total_price}
                   onChange={(e) => updateFood(i, { total_price: Number(e.target.value) })}
-                  className={inputCls}
+                  className={`${inputCls} font-mono`}
                 />
               </td>
-              <td className="px-1 py-1 w-36">
+              <td className="w-36 px-1.5 py-1.5">
                 <select
                   value={item.nomenclature_id || ''}
                   onChange={(e) => updateFood(i, { nomenclature_id: e.target.value })}
-                  className={`${selectCls} ${!item.nomenclature_id ? 'border-amber-500/60' : ''}`}
+                  className={`${selectCls} ${
+                    !item.nomenclature_id
+                      ? 'border-amber-500/40 ring-1 ring-amber-500/10'
+                      : 'border-emerald-500/30'
+                  }`}
                 >
                   <option value="">Map to item...</option>
                   {nomenclatureList.map((n) => (
                     <option key={n.id} value={n.id}>
-                      {n.product_code} — {n.name}
+                      {n.product_code} &mdash; {n.name}
                     </option>
                   ))}
                 </select>
               </td>
-              <td className="px-1 py-1 w-8">
+              <td className="w-8 px-1.5 py-1.5">
                 <button
                   type="button"
                   onClick={() => removeFood(i)}
-                  className="rounded p-1 text-slate-500 hover:text-red-400"
+                  className="rounded-lg p-1 text-slate-600 opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400 group-hover/row:opacity-100"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
@@ -498,11 +530,11 @@ export function StagingArea({
             </tr>
           ))}
           <tr>
-            <td colSpan={7} className="px-1 py-1">
+            <td colSpan={7} className="px-1.5 py-2">
               <button
                 type="button"
                 onClick={addFood}
-                className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium text-emerald-400/80 transition-all duration-200 hover:bg-emerald-500/10 hover:text-emerald-300"
               >
                 <Plus className="h-3 w-3" /> Add food item
               </button>
@@ -513,15 +545,21 @@ export function StagingArea({
         {/* ═══ CapEx Items (Spoke 2) ═══ */}
         <ItemSection
           title="CapEx Items"
+          icon={<Wrench className="h-3.5 w-3.5" />}
           count={capexItems.length}
           total={capexTotal}
           open={capexOpen}
           onToggle={() => setCapexOpen(!capexOpen)}
           color="amber"
+          headers={['Item', 'Qty', 'Price', 'Total', '']}
+          colWidths={['', 'w-16', 'w-20', 'w-20', 'w-8']}
         >
           {capexItems.map((item, i) => (
-            <tr key={i} className="border-b border-slate-800/50">
-              <td className="px-1 py-1">
+            <tr
+              key={i}
+              className="group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20"
+            >
+              <td className="px-1.5 py-1.5">
                 <input
                   type="text"
                   value={item.name}
@@ -529,38 +567,38 @@ export function StagingArea({
                   className={inputCls}
                 />
               </td>
-              <td className="px-1 py-1 w-16">
+              <td className="w-16 px-1.5 py-1.5">
                 <input
                   type="number"
                   step="1"
                   value={item.quantity}
                   onChange={(e) => updateCapex(i, { quantity: Number(e.target.value) })}
-                  className={inputCls}
+                  className={`${inputCls} font-mono`}
                 />
               </td>
-              <td className="px-1 py-1 w-20">
+              <td className="w-20 px-1.5 py-1.5">
                 <input
                   type="number"
                   step="0.01"
                   value={item.unit_price}
                   onChange={(e) => updateCapex(i, { unit_price: Number(e.target.value) })}
-                  className={inputCls}
+                  className={`${inputCls} font-mono`}
                 />
               </td>
-              <td className="px-1 py-1 w-20">
+              <td className="w-20 px-1.5 py-1.5">
                 <input
                   type="number"
                   step="0.01"
                   value={item.total_price}
                   onChange={(e) => updateCapex(i, { total_price: Number(e.target.value) })}
-                  className={inputCls}
+                  className={`${inputCls} font-mono`}
                 />
               </td>
-              <td className="px-1 py-1 w-8">
+              <td className="w-8 px-1.5 py-1.5">
                 <button
                   type="button"
                   onClick={() => removeCapex(i)}
-                  className="rounded p-1 text-slate-500 hover:text-red-400"
+                  className="rounded-lg p-1 text-slate-600 opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400 group-hover/row:opacity-100"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
@@ -568,11 +606,11 @@ export function StagingArea({
             </tr>
           ))}
           <tr>
-            <td colSpan={5} className="px-1 py-1">
+            <td colSpan={5} className="px-1.5 py-2">
               <button
                 type="button"
                 onClick={addCapex}
-                className="flex items-center gap-1 text-[10px] text-amber-400 hover:text-amber-300"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium text-amber-400/80 transition-all duration-200 hover:bg-amber-500/10 hover:text-amber-300"
               >
                 <Plus className="h-3 w-3" /> Add capex item
               </button>
@@ -583,15 +621,21 @@ export function StagingArea({
         {/* ═══ OpEx Items (Spoke 3) ═══ */}
         <ItemSection
           title="OpEx Items"
+          icon={<Package className="h-3.5 w-3.5" />}
           count={opexItems.length}
           total={opexTotal}
           open={opexOpen}
           onToggle={() => setOpexOpen(!opexOpen)}
           color="cyan"
+          headers={['Description', 'Qty', 'Unit', 'Price', 'Total', '']}
+          colWidths={['', 'w-16', 'w-16', 'w-20', 'w-20', 'w-8']}
         >
           {opexItems.map((item, i) => (
-            <tr key={i} className="border-b border-slate-800/50">
-              <td className="px-1 py-1">
+            <tr
+              key={i}
+              className="group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20"
+            >
+              <td className="px-1.5 py-1.5">
                 <input
                   type="text"
                   value={item.description}
@@ -599,16 +643,16 @@ export function StagingArea({
                   className={inputCls}
                 />
               </td>
-              <td className="px-1 py-1 w-16">
+              <td className="w-16 px-1.5 py-1.5">
                 <input
                   type="number"
                   step="0.01"
                   value={item.quantity}
                   onChange={(e) => updateOpex(i, { quantity: Number(e.target.value) })}
-                  className={inputCls}
+                  className={`${inputCls} font-mono`}
                 />
               </td>
-              <td className="px-1 py-1 w-16">
+              <td className="w-16 px-1.5 py-1.5">
                 <input
                   type="text"
                   value={item.unit}
@@ -616,29 +660,29 @@ export function StagingArea({
                   className={inputCls}
                 />
               </td>
-              <td className="px-1 py-1 w-20">
+              <td className="w-20 px-1.5 py-1.5">
                 <input
                   type="number"
                   step="0.01"
                   value={item.unit_price}
                   onChange={(e) => updateOpex(i, { unit_price: Number(e.target.value) })}
-                  className={inputCls}
+                  className={`${inputCls} font-mono`}
                 />
               </td>
-              <td className="px-1 py-1 w-20">
+              <td className="w-20 px-1.5 py-1.5">
                 <input
                   type="number"
                   step="0.01"
                   value={item.total_price}
                   onChange={(e) => updateOpex(i, { total_price: Number(e.target.value) })}
-                  className={inputCls}
+                  className={`${inputCls} font-mono`}
                 />
               </td>
-              <td className="px-1 py-1 w-8">
+              <td className="w-8 px-1.5 py-1.5">
                 <button
                   type="button"
                   onClick={() => removeOpex(i)}
-                  className="rounded p-1 text-slate-500 hover:text-red-400"
+                  className="rounded-lg p-1 text-slate-600 opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400 group-hover/row:opacity-100"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
@@ -646,11 +690,11 @@ export function StagingArea({
             </tr>
           ))}
           <tr>
-            <td colSpan={6} className="px-1 py-1">
+            <td colSpan={6} className="px-1.5 py-2">
               <button
                 type="button"
                 onClick={addOpex}
-                className="flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-300"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium text-cyan-400/80 transition-all duration-200 hover:bg-cyan-500/10 hover:text-cyan-300"
               >
                 <Plus className="h-3 w-3" /> Add opex item
               </button>
@@ -658,34 +702,68 @@ export function StagingArea({
           </tr>
         </ItemSection>
 
-        {/* ── Totals & Warnings ── */}
-        <div className="rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-400">Computed total</span>
-            <span className="font-semibold text-slate-100">
-              {formatTHB(computedTotal)} {currency}
+        {/* ═══ Summary Card ═══ */}
+        <div className="overflow-hidden rounded-xl border border-slate-700/40 bg-slate-800/30">
+          {/* Summary header */}
+          <div className="flex items-center justify-between border-b border-slate-700/30 px-4 py-3">
+            <span className="text-xs font-medium tracking-wide text-slate-400">
+              Computed Total
+            </span>
+            <span className="font-mono text-base font-semibold tracking-tight text-slate-100">
+              {formatTHB(computedTotal)}{' '}
+              <span className="text-xs font-normal text-slate-500">{currency}</span>
             </span>
           </div>
-          {mismatch && (
-            <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300">
-              Computed total ({formatTHB(computedTotal)}) differs from AI total (
-              {formatTHB(totalAmount)}) by{' '}
-              {Math.abs(((computedTotal - totalAmount) / totalAmount) * 100).toFixed(1)}%
-            </div>
-          )}
-          {!allFoodMapped && foodItems.length > 0 && (
-            <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300">
-              All food items must be mapped to a nomenclature before approval
+
+          {/* Breakdown */}
+          <div className="flex divide-x divide-slate-700/30 px-1">
+            {[
+              { label: 'Food', value: foodTotal, color: 'text-emerald-400' },
+              { label: 'CapEx', value: capexTotal, color: 'text-amber-400' },
+              { label: 'OpEx', value: opexTotal, color: 'text-cyan-400' },
+            ].map((item) => (
+              <div key={item.label} className="flex-1 px-3 py-2 text-center">
+                <p className="text-[10px] tracking-wider text-slate-500 uppercase">
+                  {item.label}
+                </p>
+                <p className={`font-mono text-xs font-medium ${item.color}`}>
+                  {formatTHB(item.value)}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Warnings */}
+          {(mismatch || (!allFoodMapped && foodItems.length > 0)) && (
+            <div className="space-y-2 border-t border-slate-700/30 px-4 py-3">
+              {mismatch && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
+                  <p className="text-[11px] leading-relaxed text-amber-300/80">
+                    Computed total ({formatTHB(computedTotal)}) differs from AI total (
+                    {formatTHB(totalAmount)}) by{' '}
+                    {Math.abs(((computedTotal - totalAmount) / totalAmount) * 100).toFixed(1)}%
+                  </p>
+                </div>
+              )}
+              {!allFoodMapped && foodItems.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
+                  <p className="text-[11px] leading-relaxed text-amber-300/80">
+                    All food items must be mapped to nomenclature before approval
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* ── Action Buttons ── */}
+        {/* ═══ Action Buttons ═══ */}
         <div className="flex gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="h-9 flex-1 rounded-md border border-slate-700 bg-slate-800 text-xs font-medium text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+            className="h-10 flex-1 rounded-xl border border-slate-700/50 bg-slate-800/50 text-xs font-medium tracking-wide text-slate-400 transition-all duration-200 hover:border-slate-600 hover:bg-slate-800 hover:text-slate-200"
           >
             Cancel
           </button>
@@ -693,14 +771,24 @@ export function StagingArea({
             type="button"
             onClick={handleApprove}
             disabled={!canApprove}
-            className="inline-flex h-9 flex-1 items-center justify-center rounded-md border border-indigo-500/60 bg-indigo-500/15 text-xs font-medium text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-50"
+            className={`group/approve relative h-10 flex-1 overflow-hidden rounded-xl border text-sm font-medium tracking-wide transition-all duration-300 disabled:opacity-40 ${
+              canApprove
+                ? 'border-indigo-500/40 bg-indigo-500/[0.12] text-indigo-200 shadow-sm shadow-indigo-500/10 hover:border-indigo-400/50 hover:bg-indigo-500/20 hover:shadow-md hover:shadow-indigo-500/15'
+                : 'border-slate-700/40 bg-slate-800/50 text-slate-500'
+            }`}
           >
-            {isApproving ? (
-              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+            {/* Shimmer on hover */}
+            {canApprove && (
+              <div className="absolute inset-0 translate-x-[-200%] bg-gradient-to-r from-transparent via-white/[0.03] to-transparent transition-transform duration-700 group-hover/approve:translate-x-[200%]" />
             )}
-            Approve &amp; Save
+            <span className="relative inline-flex items-center gap-2">
+              {isApproving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              {isApproving ? 'Saving...' : 'Approve & Save'}
+            </span>
           </button>
         </div>
       </div>
@@ -712,51 +800,91 @@ export function StagingArea({
 
 function ItemSection({
   title,
+  icon,
   count,
   total,
   open,
   onToggle,
   color,
+  headers,
+  colWidths,
   children,
 }: {
   title: string
+  icon: React.ReactNode
   count: number
   total: number
   open: boolean
   onToggle: () => void
   color: 'emerald' | 'amber' | 'cyan'
+  headers: string[]
+  colWidths: string[]
   children: React.ReactNode
 }) {
-  const badgeColor = {
-    emerald: 'bg-emerald-500/20 text-emerald-300',
-    amber: 'bg-amber-500/20 text-amber-300',
-    cyan: 'bg-cyan-500/20 text-cyan-300',
-  }[color]
+  const colorMap = {
+    emerald: {
+      badge: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20',
+      icon: 'text-emerald-400/70',
+      border: 'border-emerald-500/10',
+      header: 'from-emerald-500/[0.03]',
+    },
+    amber: {
+      badge: 'bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/20',
+      icon: 'text-amber-400/70',
+      border: 'border-amber-500/10',
+      header: 'from-amber-500/[0.03]',
+    },
+    cyan: {
+      badge: 'bg-cyan-500/15 text-cyan-400 ring-1 ring-cyan-500/20',
+      icon: 'text-cyan-400/70',
+      border: 'border-cyan-500/10',
+      header: 'from-cyan-500/[0.03]',
+    },
+  }
+
+  const c = colorMap[color]
 
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/30">
+    <div className={`overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/40 ${open ? c.border : ''}`}>
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+        className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors duration-200 hover:bg-slate-800/30 ${
+          open ? `bg-gradient-to-r ${c.header} to-transparent` : ''
+        }`}
       >
+        <span className={c.icon}>
+          {icon}
+        </span>
         {open ? (
-          <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+          <ChevronDown className="h-3 w-3 text-slate-500" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
+          <ChevronRight className="h-3 w-3 text-slate-500" />
         )}
-        <span className="text-xs font-medium text-slate-200">{title}</span>
-        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${badgeColor}`}>
+        <span className="text-xs font-medium tracking-wide text-slate-200">{title}</span>
+        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${c.badge}`}>
           {count}
         </span>
-        <span className="ml-auto text-[10px] text-slate-500">
+        <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-500">
           {formatTHB(total)}
         </span>
       </button>
 
       {open && (
-        <div className="overflow-x-auto border-t border-slate-800">
+        <div className="animate-expand overflow-x-auto border-t border-slate-800/40">
           <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-800/30">
+                {headers.map((h, i) => (
+                  <th
+                    key={i}
+                    className={`px-1.5 py-2 text-left text-[10px] font-medium tracking-wider text-slate-500/70 uppercase ${colWidths[i] || ''}`}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
             <tbody>{children}</tbody>
           </table>
         </div>

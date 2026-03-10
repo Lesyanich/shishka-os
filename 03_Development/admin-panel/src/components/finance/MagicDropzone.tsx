@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { ImagePlus, Loader2, Sparkles, Trash2 } from 'lucide-react'
+import { ImagePlus, Loader2, Sparkles, Trash2, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { ParsedReceipt, ReceiptUrls } from '../../types/receipt'
 
@@ -199,25 +199,91 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
     }
   }
 
+  const hasFiles = files.length > 0
+
   return (
     <div className="space-y-3">
-      {/* Drop zone */}
+      {/* ── Drop Zone ── */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed transition ${
-          isDragging
-            ? 'border-emerald-400 bg-emerald-500/10'
-            : 'border-slate-700 bg-slate-900/30 hover:border-slate-600 hover:bg-slate-900/50'
-        }`}
+        className="group relative cursor-pointer overflow-hidden"
       >
-        <ImagePlus className={`h-8 w-8 ${isDragging ? 'text-emerald-400' : 'text-slate-600'}`} />
-        <p className="text-xs text-slate-500">
-          Drop receipts here or <span className="text-emerald-400 underline">browse</span>
-        </p>
-        <p className="text-[10px] text-slate-600">JPEG, PNG, WebP, PDF (max 5 MB each)</p>
+        {/* Animated gradient border */}
+        <div
+          className={`absolute -inset-[1px] rounded-2xl transition-opacity duration-500 ${
+            isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'
+          } animate-border-flow`}
+          style={{ padding: '1px' }}
+        />
+
+        {/* Inner container */}
+        <div
+          className={`relative flex min-h-[140px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed transition-all duration-300 ${
+            isDragging
+              ? 'border-indigo-400/60 bg-indigo-500/[0.07] shadow-[inset_0_0_60px_rgba(99,102,241,0.06)]'
+              : 'border-slate-700/60 bg-slate-900/40 hover:border-slate-600/80 hover:bg-slate-900/60'
+          }`}
+        >
+          {/* Subtle grid pattern background */}
+          <div
+            className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.03]"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle, #94a3b8 1px, transparent 1px)',
+              backgroundSize: '24px 24px',
+            }}
+          />
+
+          {/* Scanning effect while analyzing */}
+          {isAnalyzing && (
+            <div className="scan-effect pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" />
+          )}
+
+          <div
+            className={`relative rounded-xl p-3 transition-all duration-300 ${
+              isDragging
+                ? 'bg-indigo-500/15 shadow-lg shadow-indigo-500/10'
+                : 'bg-slate-800/50 group-hover:bg-slate-800/80 group-hover:shadow-md group-hover:shadow-slate-900/50'
+            }`}
+          >
+            {isAnalyzing ? (
+              <Loader2 className="h-7 w-7 animate-spin text-indigo-400" />
+            ) : (
+              <Upload
+                className={`h-7 w-7 transition-colors duration-200 ${
+                  isDragging ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-400'
+                }`}
+              />
+            )}
+          </div>
+
+          {isAnalyzing ? (
+            <div className="relative text-center">
+              <p className="text-sm font-medium tracking-wide text-indigo-300">
+                Analyzing receipt...
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                AI is extracting line items and classifying them
+              </p>
+            </div>
+          ) : (
+            <div className="relative text-center">
+              <p className="text-sm text-slate-400">
+                Drop receipts here or{' '}
+                <span className="font-medium text-indigo-400 underline decoration-indigo-400/30 underline-offset-2 transition-colors group-hover:text-indigo-300 group-hover:decoration-indigo-300/50">
+                  browse
+                </span>
+              </p>
+              <p className="mt-1 text-[11px] tracking-wide text-slate-600">
+                JPEG &middot; PNG &middot; WebP &middot; PDF &middot; max 5 MB
+              </p>
+            </div>
+          )}
+        </div>
+
         <input
           ref={inputRef}
           type="file"
@@ -231,68 +297,78 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
         />
       </div>
 
-      {/* Thumbnail grid */}
-      {files.length > 0 && (
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+      {/* ── Thumbnail Grid ── */}
+      {hasFiles && (
+        <div className="stagger-children grid grid-cols-4 gap-2.5 sm:grid-cols-6">
           {files.map((df) => (
             <div
               key={df.id}
-              className="group relative aspect-square overflow-hidden rounded-lg border border-slate-700 bg-slate-800"
+              className="group/thumb relative aspect-square overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/70 shadow-sm transition-all duration-200 hover:border-slate-600 hover:shadow-md hover:shadow-slate-900/50"
             >
               {df.previewUrl ? (
                 <img
                   src={df.previewUrl}
                   alt={df.file.name}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover/thumb:scale-105"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-500">
-                  PDF
+                <div className="flex h-full w-full flex-col items-center justify-center gap-1">
+                  <ImagePlus className="h-5 w-5 text-slate-600" />
+                  <span className="text-[10px] font-medium tracking-wider text-slate-500">
+                    PDF
+                  </span>
                 </div>
               )}
+
+              {/* Remove button */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
                   removeFile(df.id)
                 }}
-                className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-rose-400 opacity-0 transition group-hover:opacity-100"
+                className="absolute right-1.5 top-1.5 rounded-lg bg-black/70 p-1 text-rose-400 opacity-0 backdrop-blur-sm transition-all duration-200 hover:bg-black/90 hover:text-rose-300 group-hover/thumb:opacity-100"
               >
                 <Trash2 className="h-3 w-3" />
               </button>
-              <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5 text-center">
-                <span className="block truncate text-[8px] text-slate-300">{df.file.name}</span>
+
+              {/* Filename bar */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-2 pb-1.5 pt-4">
+                <span className="block truncate text-[9px] font-medium tracking-wide text-slate-300">
+                  {df.file.name}
+                </span>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Analyze button + toast */}
-      {files.length > 0 && (
+      {/* ── Analyze Button ── */}
+      {hasFiles && !isAnalyzing && (
         <button
           type="button"
           onClick={handleAnalyze}
           disabled={isAnalyzing}
-          className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-violet-500/60 bg-violet-500/15 text-xs font-medium text-violet-200 hover:bg-violet-500/25 disabled:opacity-50"
+          className="animate-fade-in-up group/btn relative w-full overflow-hidden rounded-xl border border-indigo-500/40 bg-gradient-to-r from-indigo-500/[0.12] via-violet-500/[0.12] to-indigo-500/[0.12] px-4 py-2.5 text-sm font-medium tracking-wide text-indigo-200 shadow-sm transition-all duration-300 hover:border-indigo-400/60 hover:from-indigo-500/20 hover:via-violet-500/20 hover:to-indigo-500/20 hover:shadow-md hover:shadow-indigo-500/10 disabled:opacity-50"
         >
-          {isAnalyzing ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Analyzing receipt with AI...
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-3.5 w-3.5" />
-              Analyze with AI ({files.length} file{files.length !== 1 ? 's' : ''})
-            </>
-          )}
+          {/* Shimmer effect on hover */}
+          <div className="absolute inset-0 translate-x-[-200%] bg-gradient-to-r from-transparent via-white/[0.04] to-transparent transition-transform duration-700 group-hover/btn:translate-x-[200%]" />
+
+          <span className="relative inline-flex items-center gap-2">
+            <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover/btn:rotate-12" />
+            Analyze with AI
+            <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs tabular-nums text-indigo-300">
+              {files.length} file{files.length !== 1 ? 's' : ''}
+            </span>
+          </span>
         </button>
       )}
 
+      {/* ── Toast Messages ── */}
       {toast && (
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-          {toast}
+        <div className="animate-fade-in-up flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 shadow-sm">
+          <div className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+          <p className="text-xs leading-relaxed text-amber-300/90">{toast}</p>
         </div>
       )}
     </div>
