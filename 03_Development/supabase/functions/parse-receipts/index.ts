@@ -6,7 +6,7 @@
 // Stage 1: Google Cloud Vision (DOCUMENT_TEXT_DETECTION)
 //   — 75MP limit (no 2048×2048 crush), Thai+English hints
 //   — Accepts public imageUri (no download needed)
-// Stage 2: OpenAI gpt-4o-mini (text → structured JSON)
+// Stage 2: OpenAI gpt-4o (text → structured JSON)
 //   — 15× cheaper than gpt-4o Vision, faster (~5-15s)
 // ═══════════════════════════════════════════════════════════
 // DUAL MODE:
@@ -219,6 +219,9 @@ The OCR text may have imperfections. Apply these rules:
 4. Lines with ONLY numbers and no Thai text are usually subtotals or codes — skip them
 5. If you see "=== IMAGE N OF M ===" markers, the text comes from multiple photos of the SAME receipt — combine into one unified list
 
+## CRITICAL RECONSTRUCTION RULE
+The OCR text is a scrambled table. Names, quantities, and prices may be in completely separate blocks (e.g., all product names first, then all quantities, then all prices). Act as a master detective: count the items, count the prices, and align them logically. Do NOT use [UNREADABLE] just because the layout is messy — deduce the connections based on standard Makro/Lotus's/BigC receipt structures where each item row contains SKU, Thai name, qty, unit price, and total price. If you can see a Thai product name anywhere in the text, it IS a real item — find its corresponding numbers.
+
 ## ANCHORING RULE (CRITICAL — prevents repetition loops)
 For EACH item row, you MUST:
 1. FIRST identify the EXACT Thai text from the OCR output → put into original_name
@@ -319,7 +322,7 @@ transaction_date must come from the receipt text — NEVER use today's date.`
 
 // ── Core parsing logic — Two-Stage Pipeline ──
 // Stage 1: Google Cloud Vision OCR (image → text)
-// Stage 2: OpenAI gpt-4o-mini (text → structured JSON)
+// Stage 2: OpenAI gpt-4o (text → structured JSON)
 // deno-lint-ignore no-explicit-any
 async function parseReceiptImages(image_urls: string[]): Promise<{ parsed: any; ocrText: string }> {
   // ── STAGE 1: Google Cloud Vision OCR ──
@@ -327,8 +330,8 @@ async function parseReceiptImages(image_urls: string[]): Promise<{ parsed: any; 
   const ocrText = await ocrAllImages(image_urls)
   console.log(`[parse-receipts] STAGE 1 complete: ${ocrText.length} chars extracted`)
 
-  // ── STAGE 2: OpenAI gpt-4o-mini text structuring ──
-  console.log(`[parse-receipts] STAGE 2: Sending OCR text to gpt-4o-mini for structuring`)
+  // ── STAGE 2: OpenAI gpt-4o text structuring ──
+  console.log(`[parse-receipts] STAGE 2: Sending OCR text to gpt-4o for structuring`)
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -336,7 +339,7 @@ async function parseReceiptImages(image_urls: string[]): Promise<{ parsed: any; 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: SYSTEM_PROMPT_TEXT },
         {
@@ -365,7 +368,7 @@ async function parseReceiptImages(image_urls: string[]): Promise<{ parsed: any; 
   // ── Pipeline metadata ──
   parsed._pipeline = {
     stage1: "google-cloud-vision",
-    stage2: "gpt-4o-mini",
+    stage2: "gpt-4o",
     ocr_chars: ocrText.length,
   }
 
@@ -548,7 +551,7 @@ Deno.serve(async (req: Request) => {
           .update({
             status: "completed",
             result: parsed,
-            model: "gcv+gpt-4o-mini",
+            model: "gcv+gpt-4o",
             ocr_text: ocrText,
             completed_at: new Date().toISOString(),
             duration_ms: durationMs,
@@ -558,7 +561,7 @@ Deno.serve(async (req: Request) => {
         if (updateErr) {
           console.error(`[parse-receipts] ASYNC: failed to write result for job ${job_id}:`, updateErr)
         } else {
-          console.log(`[parse-receipts] ASYNC: job ${job_id} completed in ${durationMs}ms (pipeline: GCV+gpt-4o-mini, OCR: ${ocrText.length} chars)`)
+          console.log(`[parse-receipts] ASYNC: job ${job_id} completed in ${durationMs}ms (pipeline: GCV+gpt-4o, OCR: ${ocrText.length} chars)`)
         }
       } catch (parseErr) {
         // ── BULLETPROOF: always write failure to DB ──
