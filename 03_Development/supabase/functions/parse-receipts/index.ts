@@ -112,7 +112,7 @@ function validateReceiptSchema(parsed: any): { warnings: string[] } {
 // ═══════════════════════════════════════════════════════════
 
 async function callGoogleCloudVision(imageUrl: string): Promise<string> {
-  const endpoint = `https://vision.googleapis.com/v1/images:annotate?key=${GCV_API_KEY}`
+  const endpoint = `https://vision.googleapis.com/v1/images:annotate?key=${GCV_API_KEY}&fields=responses(fullTextAnnotation/text,error)`
 
   const requestBody = {
     requests: [
