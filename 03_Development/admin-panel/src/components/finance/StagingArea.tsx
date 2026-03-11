@@ -204,7 +204,7 @@ export function StagingArea({
   const addFood = () =>
     setFoodItems((prev) => [
       ...prev,
-      { name: '', quantity: 1, unit: 'kg', unit_price: 0, total_price: 0 },
+      { name: '', quantity: 1, unit: 'kg', unit_price: 0, total_price: 0, original_name: '' },
     ])
   const addCapex = () =>
     setCapexItems((prev) => [

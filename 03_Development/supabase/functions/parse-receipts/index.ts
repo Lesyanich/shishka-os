@@ -1,13 +1,29 @@
 // ═══════════════════════════════════════════════════════════
 // Edge Function: parse-receipts
-// Phase 4.7: OCR Resilience & Grid-based Extraction
+// Phase 4.14: Async Job Architecture + Anti-Loop
 // Runtime: Deno (Supabase Edge Functions)
 // ═══════════════════════════════════════════════════════════
-// Model: gpt-4o (upgraded from mini — Thai OCR requires full model)
-// Prompt: Grid-based line-by-line extraction for zero data loss
+// Model: gpt-4o (Thai OCR requires full model)
+// Mode: json_object + server-side schema validation
+// Anti-loop: temperature 0.2 + frequency_penalty 0.3 +
+//            original_name anchoring + dedup guard
+// ═══════════════════════════════════════════════════════════
+// DUAL MODE:
+//   Sync:  { image_urls: [...] } → returns ParsedReceipt (backward compat)
+//   Async: { job_id: "uuid", image_urls: [...] } → writes to receipt_jobs,
+//          returns { ok: true } immediately. Frontend listens via Realtime.
 // ═══════════════════════════════════════════════════════════
 
+import { Buffer } from "node:buffer"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")
+
+// Supabase admin client — auto-injected env vars in Edge Functions
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+)
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -15,31 +31,305 @@ const CORS_HEADERS = {
     "authorization, x-client-info, apikey, content-type",
 }
 
-const SYSTEM_PROMPT = `You are a highly precise receipt digitizer for Shishka Healthy Kitchen (restaurant in Thailand).
+// Phase 4.9: TypeScript safety net — strip footer items that leak through AI extraction
+const FOOTER_RE = /^(total|subtotal|grand\s*total|net|net\s*total|vat|tax|discount|change|cash|card|credit|debit|points|member|bag\s*fee|rounding|round|ส่วนลด|ภาษี|ภาษีมูลค่าเพิ่ม|เงินทอน|เงินสด|รวม|ยอดรวม|ยอดสุทธิ|สุทธิ|บัตร|แต้ม|คูปอง|ทอน|เศษสตางค์)$/i
 
-YOUR #1 RULE: Extract EVERY SINGLE LINE ITEM. The sum of extracted items MUST equal the receipt total. If it doesn't, you missed items — go back and re-read.
+const VALID_UNITS = new Set(["kg", "L", "pcs"])
+const VALID_CATEGORIES = new Set(["food", "capex", "opex", "uncategorized"])
 
-## GRID-BASED EXTRACTION METHOD
-Thai receipts (especially Makro, Lotus's, Big C) are printed in a grid format:
-- Column 1: Item code / SKU (6-13 digit number)
-- Column 2: Item name (Thai text)
-- Column 3: Quantity
-- Column 4: Unit price
-- Column 5: Total price
+// ── Phase 4.13b: Server-side schema validation ──
+// deno-lint-ignore no-explicit-any
+function validateReceiptSchema(parsed: any): { warnings: string[] } {
+  const warnings: string[] = []
 
-Scan the receipt grid LINE BY LINE from the first item row to the last item row (the row just before TOTAL/รวม/ยอดรวม). Do NOT stop early. Do NOT skip lines you find hard to read — make your best attempt.
+  if (typeof parsed.supplier_name !== "string") {
+    parsed.supplier_name = String(parsed.supplier_name ?? "Unknown")
+    warnings.push("supplier_name coerced to string")
+  }
+  if (parsed.invoice_number !== null && typeof parsed.invoice_number !== "string") {
+    parsed.invoice_number = parsed.invoice_number ? String(parsed.invoice_number) : null
+  }
+  if (typeof parsed.total_amount !== "number") {
+    parsed.total_amount = Number(parsed.total_amount) || 0
+    warnings.push("total_amount coerced to number")
+  }
+  if (typeof parsed.currency !== "string") {
+    parsed.currency = "THB"
+  }
+  if (typeof parsed.transaction_date !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(parsed.transaction_date)) {
+    warnings.push(`transaction_date invalid: "${parsed.transaction_date}"`)
+  }
 
-If there are TWO receipt images, they are the SAME receipt (front/back or top/bottom). Combine ALL items into one response.
+  if (!Array.isArray(parsed.line_items)) {
+    parsed.line_items = []
+    warnings.push("line_items was not an array — reset to []")
+  }
+
+  for (let i = 0; i < parsed.line_items.length; i++) {
+    const li = parsed.line_items[i]
+    if (typeof li.line_number !== "number") li.line_number = i + 1
+    if (li.supplier_sku !== null && typeof li.supplier_sku !== "string") {
+      li.supplier_sku = li.supplier_sku ? String(li.supplier_sku) : null
+    }
+    if (typeof li.original_name !== "string" || !li.original_name.trim()) {
+      li.original_name = li.translated_name || `[ITEM ${i + 1}]`
+      warnings.push(`line_items[${i}].original_name missing`)
+    }
+    if (typeof li.translated_name !== "string" || !li.translated_name.trim()) {
+      li.translated_name = li.original_name || `[ITEM ${i + 1}]`
+      warnings.push(`line_items[${i}].translated_name missing`)
+    }
+    if (typeof li.quantity !== "number") li.quantity = Number(li.quantity) || 1
+    if (typeof li.unit_price !== "number") li.unit_price = Number(li.unit_price) || 0
+    if (typeof li.total_price !== "number") li.total_price = Number(li.total_price) || 0
+    if (!VALID_UNITS.has(li.unit)) {
+      warnings.push(`line_items[${i}].unit "${li.unit}" → "pcs"`)
+      li.unit = "pcs"
+    }
+    if (!VALID_CATEGORIES.has(li.category)) {
+      warnings.push(`line_items[${i}].category "${li.category}" → "uncategorized"`)
+      li.category = "uncategorized"
+    }
+  }
+
+  if (!parsed.documents || typeof parsed.documents !== "object") {
+    parsed.documents = { tax_invoice_index: null, supplier_receipt_index: null, bank_slip_index: null }
+    warnings.push("documents object missing — defaulted")
+  } else {
+    for (const key of ["tax_invoice_index", "supplier_receipt_index", "bank_slip_index"]) {
+      if (parsed.documents[key] !== null && typeof parsed.documents[key] !== "number") {
+        parsed.documents[key] = null
+      }
+    }
+  }
+
+  return { warnings }
+}
+
+// ── Core parsing logic — shared between sync and async modes ──
+// deno-lint-ignore no-explicit-any
+async function parseReceiptImages(image_urls: string[]): Promise<any> {
+  // Download images and convert to base64
+  const imageContent = await Promise.all(
+    image_urls.map(async (url: string) => {
+      try {
+        const imgResp = await fetch(url)
+        if (!imgResp.ok) throw new Error(`Failed to download ${url}: ${imgResp.status}`)
+        const buf = await imgResp.arrayBuffer()
+        const bytes = new Uint8Array(buf)
+        const b64 = Buffer.from(bytes).toString('base64')
+        const contentType = imgResp.headers.get("content-type") || "image/jpeg"
+        const dataUri = `data:${contentType};base64,${b64}`
+        console.log(`[parse-receipts] Encoded ${url.split("/").pop()}: ${(b64.length / 1024).toFixed(0)}KB base64`)
+        return {
+          type: "image_url" as const,
+          image_url: { url: dataUri, detail: "high" as const },
+        }
+      } catch (err) {
+        console.error(`[parse-receipts] Image download failed: ${url}`, err)
+        return {
+          type: "image_url" as const,
+          image_url: { url, detail: "high" as const },
+        }
+      }
+    }),
+  )
+
+  // Call OpenAI gpt-4o
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Digitize this receipt. First identify the 3 zones (Header, Item Grid, Footer). For EACH product row: read the Thai text first (original_name), then translate (translated_name). STOP at the Footer. Return structured JSON.",
+            },
+            ...imageContent,
+          ],
+        },
+      ],
+      max_tokens: 16384,
+      temperature: 0.2,
+      frequency_penalty: 0.3,
+      response_format: { type: "json_object" },
+    }),
+  })
+
+  if (!response.ok) {
+    const errBody = await response.text()
+    throw new Error(`OpenAI API error ${response.status}: ${errBody}`)
+  }
+
+  const data = await response.json()
+  const content = data.choices?.[0]?.message?.content
+  if (!content) throw new Error("No content in OpenAI response")
+
+  const parsed = JSON.parse(content)
+
+  // Schema validation
+  const { warnings } = validateReceiptSchema(parsed)
+  if (warnings.length > 0) {
+    console.warn(`[parse-receipts] Schema validation: ${warnings.join("; ")}`)
+    parsed._schema_warnings = warnings
+  }
+
+  // Strip footer items
+  const preFilterCount = parsed.line_items.length
+  parsed.line_items = parsed.line_items.filter(
+    (li: { translated_name?: string }) => {
+      const name = (li.translated_name || "").trim()
+      return name.length > 0 && !FOOTER_RE.test(name)
+    },
+  )
+  const stripped = preFilterCount - parsed.line_items.length
+  if (stripped > 0) {
+    console.log(`[parse-receipts] FOOTER_RE stripped ${stripped} non-product items`)
+  }
+
+  // Repetition loop detection
+  if (parsed.line_items.length > 3) {
+    const nameCounts = new Map<string, number>()
+    for (const li of parsed.line_items) {
+      const name = (li.original_name || "").trim()
+      nameCounts.set(name, (nameCounts.get(name) || 0) + 1)
+    }
+    const maxCount = Math.max(...nameCounts.values(), 0)
+    if (maxCount > parsed.line_items.length * 0.5) {
+      console.warn(
+        `[parse-receipts] REPETITION LOOP DETECTED: "${[...nameCounts.entries()].find(([, c]) => c === maxCount)?.[0]}" ` +
+        `repeated ${maxCount}/${parsed.line_items.length} times. Deduplicating.`
+      )
+      const seen = new Set<string>()
+      parsed.line_items = parsed.line_items.filter((li: { original_name?: string }) => {
+        const name = (li.original_name || "").trim()
+        if (seen.has(name)) return false
+        seen.add(name)
+        return true
+      })
+      parsed._repetition_loop = {
+        detected: true,
+        duplicates_removed: preFilterCount - stripped - parsed.line_items.length,
+        warning: "AI model entered a repetition loop. Duplicates were removed. Please verify items manually.",
+      }
+    }
+  }
+
+  // Ensure documents
+  parsed.documents = parsed.documents ?? {
+    tax_invoice_index: null,
+    supplier_receipt_index: null,
+    bank_slip_index: null,
+  }
+
+  // Sum validation
+  const lineSum = parsed.line_items.reduce(
+    (s: number, item: { total_price?: number }) => s + (item.total_price || 0),
+    0,
+  )
+  const declared = parsed.total_amount || 0
+  if (Math.abs(lineSum - declared) > 1) {
+    parsed._sum_mismatch = {
+      line_items_sum: Math.round(lineSum * 100) / 100,
+      declared_total: declared,
+      difference: Math.round((declared - lineSum) * 100) / 100,
+    }
+  }
+
+  // Backward compatibility: legacy 3-array format
+  parsed.food_items = parsed.line_items
+    .filter((li: { category?: string }) => li.category === "food")
+    .map((li: { translated_name?: string; original_name?: string; supplier_sku?: string; quantity?: number; unit?: string; unit_price?: number; total_price?: number }) => ({
+      name: li.translated_name || li.original_name || "",
+      quantity: li.quantity || 0,
+      unit: li.unit || "pcs",
+      unit_price: li.unit_price || 0,
+      total_price: li.total_price || 0,
+      supplier_sku: li.supplier_sku || null,
+      original_name: li.original_name || null,
+    }))
+
+  parsed.capex_items = parsed.line_items
+    .filter((li: { category?: string }) => li.category === "capex")
+    .map((li: { translated_name?: string; original_name?: string; quantity?: number; unit_price?: number; total_price?: number }) => ({
+      name: li.translated_name || li.original_name || "",
+      quantity: li.quantity || 0,
+      unit_price: li.unit_price || 0,
+      total_price: li.total_price || 0,
+    }))
+
+  parsed.opex_items = parsed.line_items
+    .filter((li: { category?: string }) => li.category === "opex" || li.category === "uncategorized")
+    .map((li: { translated_name?: string; original_name?: string; quantity?: number; unit?: string; unit_price?: number; total_price?: number }) => ({
+      description: li.translated_name || li.original_name || "",
+      quantity: li.quantity || 0,
+      unit: li.unit || "pcs",
+      unit_price: li.unit_price || 0,
+      total_price: li.total_price || 0,
+    }))
+
+  console.log(
+    `[parse-receipts] OK: ${parsed.supplier_name}, ` +
+      `lines=${parsed.line_items.length}, ` +
+      `food=${parsed.food_items.length}, capex=${parsed.capex_items.length}, ` +
+      `opex=${parsed.opex_items.length}, ` +
+      `sum=${lineSum}, declared=${declared}` +
+      (parsed._repetition_loop ? ` 🔁 LOOP: ${parsed._repetition_loop.duplicates_removed} dupes removed` : "") +
+      (parsed._sum_mismatch ? ` ⚠️ MISMATCH: ${parsed._sum_mismatch.difference}` : " ✅") +
+      (warnings.length > 0 ? ` 🔧 SCHEMA: ${warnings.length} coercions` : ""),
+  )
+
+  return parsed
+}
+
+// ── Phase 4.13: Streamlined prompt with anchoring ──
+const SYSTEM_PROMPT = `You are a receipt digitizer for Shishka Healthy Kitchen (restaurant in Thailand).
+
+YOUR #1 RULE: Extract ONLY real purchased products from the ITEM GRID zone. NEVER include receipt metadata (totals, taxes, discounts, change). NEVER invent products you cannot clearly read.
+
+## RECEIPT ANATOMY — 3 ZONES
+Every receipt has exactly 3 zones. Identify them BEFORE extracting:
+
+ZONE 1 — HEADER (metadata only):
+  Store name, address, Tax ID, date, receipt number
+  → Extract: supplier_name, transaction_date, invoice_number
+
+ZONE 2 — ITEM GRID (extract products ONLY from here):
+  SKU | Product Name (Thai) | Qty | Unit Price | Total Price
+  → Extract: each row as a line_item
+
+ZONE 3 — FOOTER (total only):
+  Starts at first line containing: รวม, ยอดรวม, Subtotal, Total, ส่วนลด, Discount, VAT, ภาษี, สุทธิ, Net
+  Everything at and below = NOT products.
+  → Extract: total_amount (final amount paid)
+
+## BLACKLIST — NEVER add as line_items
+Total, Subtotal, Grand Total, Net, VAT, Tax, Discount, Change, Cash, Card, Credit, Debit, Points, Member, Bag fee, Rounding,
+รวม, ยอดรวม, ยอดสุทธิ, สุทธิ, ภาษี, ภาษีมูลค่าเพิ่ม, ส่วนลด, เงินสด, เงินทอน, ทอน, บัตร, แต้ม, คูปอง, เศษสตางค์
+
+## ANCHORING RULE (CRITICAL — prevents repetition loops)
+For EACH item row, you MUST:
+1. FIRST read the EXACT Thai text from the receipt image → put into original_name
+2. THEN translate that Thai text into English → put into translated_name
+3. Each item's original_name MUST be UNIQUE — real receipts never have 2+ identical product names
+4. If you notice you are writing the same original_name twice → STOP, re-read the image carefully
+5. If you cannot read the text clearly → set translated_name to "[UNREADABLE]", do NOT copy a previous item
 
 ## MANDATORY SKU EXTRACTION
-For Makro receipts, EVERY line item has a 6-13 digit item code (usually printed before or above the item name, or in a barcode line). YOU MUST extract it into supplier_sku.
-- Look for patterns like: "8850999220000", "0102345", "SKU 12345"
-- If a barcode number is visible near the item, that IS the supplier_sku
-- Only set supplier_sku to null if you genuinely cannot find ANY numeric code for that line
+Makro items have a 6-13 digit item code. Extract into supplier_sku.
+If no SKU found → set supplier_sku to null.
 
-## TRANSLATION RULES (CRITICAL — CEO cannot read Thai)
-Translate ALL Thai names to English with MAXIMUM specificity:
-- น้ำมันดอกทานตะวัน → "Sunflower oil" (NOT "Vegetable oil" or "Cooking oil")
+## TRANSLATION RULES (CEO cannot read Thai)
+Translate Thai → English with MAXIMUM specificity:
+- น้ำมันดอกทานตะวัน → "Sunflower oil" (NOT "Vegetable oil")
 - น้ำมันรำข้าว → "Rice bran oil" (NOT "Vegetable oil")
 - น้ำมันปาล์ม → "Palm oil" (NOT "Vegetable oil")
 - น้ำมันมะกอก → "Olive oil" (NOT "Vegetable oil")
@@ -55,71 +345,63 @@ Translate ALL Thai names to English with MAXIMUM specificity:
 - น้ำตาลทราย → "Granulated sugar" (NOT "Sugar")
 - น้ำตาลมะพร้าว → "Coconut sugar" (NOT "Sugar")
 - เต้าหู้ → "Tofu"
-- วุ้นเส้น → "Glass noodles" or "Bean thread noodles"
+- วุ้นเส้น → "Glass noodles"
 - เส้นหมี่ → "Rice vermicelli"
 - กะเพรา → "Holy basil" (NOT "Basil")
 - โหระพา → "Sweet basil" (NOT "Basil")
-- Keep translated_name CLEAN — no weight, quantity, or packaging in the name
+- Keep translated_name CLEAN — no weight, quantity, or packaging info in the name
+Do NOT transliterate Thai to Latin characters. TRANSLATE the meaning.
+Brand names: describe the product (e.g., "Chicken eggs (ARO)").
 
-IMPORTANT: Do NOT transliterate Thai to Latin characters. TRANSLATE the meaning to English.
-If you encounter a brand name or product you're unsure about, describe what it is (e.g., "ARO brand chicken eggs" → "Chicken eggs (ARO)").
+## CATEGORY RULES
+- "food": raw ingredients, produce, proteins, grains, dairy, spices, sauces, oils, eggs, flour, sugar, noodles
+- "capex": equipment, machinery, furniture, hardware — assets with life > 1 year
+- "opex": cleaning, packaging, disposables, office supplies, plastic bags, delivery fees
+- "uncategorized": items you cannot confidently classify
+
+## UNIT NORMALIZATION (only 3 valid values)
+- "kg" (g÷1000, กก.=kg, กรัม÷1000)
+- "L" (ml÷1000, ลิตร=L, ซีซี÷1000)
+- "pcs" (ชิ้น, อัน, ลูก, ขวด, กล่อง, ถุง, แพ็ค)
+- "1 bag 500g" → quantity=0.5, unit="kg"
 
 ## OUTPUT SCHEMA
-Return ONLY valid JSON:
+Return ONLY valid JSON with this structure:
 {
-  "supplier_name": "string — store name in English",
-  "invoice_number": "string or null — receipt/invoice number",
+  "supplier_name": "string",
+  "invoice_number": "string or null",
   "total_amount": number,
   "currency": "THB",
-  "transaction_date": "YYYY-MM-DD from the receipt (NEVER use today's date)",
+  "transaction_date": "YYYY-MM-DD",
   "line_items": [
     {
       "line_number": 1,
-      "supplier_sku": "string or null — item code from receipt (MANDATORY for Makro)",
-      "original_name": "string — exact Thai text as printed",
-      "translated_name": "string — specific English translation",
+      "supplier_sku": "string or null",
+      "original_name": "exact Thai text from receipt",
+      "translated_name": "English translation",
       "quantity": number,
-      "unit": "kg|L|pcs",
+      "unit": "kg" | "L" | "pcs",
       "unit_price": number,
       "total_price": number,
-      "category": "food|capex|opex|uncategorized"
+      "category": "food" | "capex" | "opex" | "uncategorized"
     }
   ],
   "documents": {
-    "tax_invoice_index": "number or null (0-based)",
-    "supplier_receipt_index": "number or null",
-    "bank_slip_index": "number or null"
+    "tax_invoice_index": number or null,
+    "supplier_receipt_index": number or null,
+    "bank_slip_index": number or null
   }
 }
 
-## CATEGORY RULES
-- "food": raw ingredients, produce, proteins, grains, dairy, spices, sauces, oils, eggs, flour, sugar, noodles — anything used IN food production
-- "capex": equipment, machinery, furniture, hardware — assets with life > 1 year
-- "opex": cleaning, packaging, disposables, office supplies, plastic bags, delivery fees
-- "uncategorized": items you cannot confidently classify — NEVER delete them
-
-## UNIT NORMALIZATION (only 3 valid values)
-- "kg" (convert: g÷1000, กก.=kg, กรัม÷1000)
-- "L" (convert: ml÷1000, ลิตร=L, ซีซี÷1000)
-- "pcs" (ชิ้น, อัน, ลูก, ขวด, กล่อง, ถุง, แพ็ค — all become pcs)
-- "1 bag 500g" → quantity=0.5, unit="kg"
-- "2 boxes of 12 pcs" → quantity=24, unit="pcs"
-
 ## DOCUMENT CLASSIFICATION
-- tax_invoice_index: image with tax ID, VAT breakdown
+- tax_invoice_index: image with Tax ID, VAT breakdown
 - supplier_receipt_index: POS receipt or itemized receipt
 - bank_slip_index: bank transfer slip
-- In Thailand, one document is often BOTH receipt AND tax invoice — set SAME index for both
-- If a type is not present, set to null
+- One document can be BOTH receipt AND tax invoice — set SAME index
+- If a type is absent, set to null
 
-## FINAL VERIFICATION (YOU MUST DO THIS)
-1. Count your line_items
-2. Sum all total_price values
-3. Compare with total_amount
-4. If the difference > 2 THB, you MISSED items — go back to the receipt image and find them
-5. All monetary values must be numbers (not strings)
-6. Every line_item MUST have a translated_name (never empty)
-7. If multiple images are provided, they belong to the SAME transaction — combine into one response`
+If two images are provided, they are the SAME receipt (front/back). Combine all items.
+transaction_date must come from the receipt — NEVER use today's date.`
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -137,7 +419,8 @@ Deno.serve(async (req: Request) => {
     }
 
     // Parse request body
-    const { image_urls } = await req.json()
+    const body = await req.json()
+    const { image_urls, job_id } = body
 
     if (!image_urls || !Array.isArray(image_urls) || image_urls.length === 0) {
       return new Response(
@@ -146,155 +429,74 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // Download images and convert to base64 (OpenAI can't reliably fetch
-    // from Supabase Storage — timeouts are common). Base64 data URIs bypass
-    // this entirely and are more reliable.
-    const imageContent = await Promise.all(
-      image_urls.map(async (url: string) => {
-        try {
-          const imgResp = await fetch(url)
-          if (!imgResp.ok) throw new Error(`Failed to download ${url}: ${imgResp.status}`)
-          const buf = await imgResp.arrayBuffer()
-          const bytes = new Uint8Array(buf)
-          // Manual base64 encode (Deno-compatible)
-          let binary = ""
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-          const b64 = btoa(binary)
-          const contentType = imgResp.headers.get("content-type") || "image/jpeg"
-          const dataUri = `data:${contentType};base64,${b64}`
-          console.log(`[parse-receipts] Encoded ${url.split("/").pop()}: ${(b64.length / 1024).toFixed(0)}KB base64`)
-          return {
-            type: "image_url" as const,
-            image_url: { url: dataUri, detail: "high" as const },
-          }
-        } catch (err) {
-          console.error(`[parse-receipts] Image download failed: ${url}`, err)
-          // Fallback to direct URL if download fails
-          return {
-            type: "image_url" as const,
-            image_url: { url, detail: "high" as const },
-          }
-        }
-      }),
-    )
-
-    // Call OpenAI gpt-4o (upgraded from mini — Thai OCR requires full model)
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Digitize this receipt. Scan the grid line by line from top to bottom. Do NOT stop until you reach the TOTAL row. Extract EVERY item with its SKU code. Return structured JSON.",
-              },
-              ...imageContent,
-            ],
-          },
-        ],
-        max_tokens: 8192,
-        temperature: 0.05,
-        response_format: { type: "json_object" },
-      }),
-    })
-
-    if (!response.ok) {
-      const errBody = await response.text()
-      console.error("[parse-receipts] OpenAI API error:", response.status, errBody)
-      return new Response(
-        JSON.stringify({
-          error: `OpenAI API error: ${response.status}`,
-          details: errBody,
-        }),
-        { status: 502, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
-      )
-    }
-
-    const data = await response.json()
-
-    // Extract and parse the JSON content
-    const content = data.choices?.[0]?.message?.content
-    if (!content) {
-      return new Response(
-        JSON.stringify({ error: "No content in OpenAI response" }),
-        { status: 502, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
-      )
-    }
-
-    const parsed = JSON.parse(content)
-
-    // Ensure line_items array exists
-    parsed.line_items = parsed.line_items ?? []
-
-    // Ensure documents object exists
-    parsed.documents = parsed.documents ?? {
-      tax_invoice_index: null,
-      supplier_receipt_index: null,
-      bank_slip_index: null,
-    }
-
-    // ── Sum validation: line_items total vs declared total ──
-    const lineSum = parsed.line_items.reduce(
-      (s: number, item: { total_price?: number }) => s + (item.total_price || 0),
-      0,
-    )
-    const declared = parsed.total_amount || 0
-    if (Math.abs(lineSum - declared) > 1) {
-      parsed._sum_mismatch = {
-        line_items_sum: Math.round(lineSum * 100) / 100,
-        declared_total: declared,
-        difference: Math.round((declared - lineSum) * 100) / 100,
+    // ── Phase 4.14: Lazy Cleanup — clean stale jobs on every invocation ──
+    try {
+      const { data: cleaned } = await supabaseAdmin.rpc("fn_cleanup_stale_receipt_jobs")
+      if (cleaned && cleaned > 0) {
+        console.log(`[parse-receipts] Lazy cleanup: ${cleaned} stale jobs marked as failed`)
       }
+    } catch (cleanupErr) {
+      // Non-fatal — don't block parsing if cleanup fails
+      console.error("[parse-receipts] Lazy cleanup error (non-fatal):", cleanupErr)
     }
 
-    // ── Backward compatibility: populate legacy 3-array format from line_items ──
-    parsed.food_items = parsed.line_items
-      .filter((li: { category?: string }) => li.category === "food")
-      .map((li: { translated_name?: string; original_name?: string; supplier_sku?: string; quantity?: number; unit?: string; unit_price?: number; total_price?: number }) => ({
-        name: li.translated_name || li.original_name || "",
-        quantity: li.quantity || 0,
-        unit: li.unit || "pcs",
-        unit_price: li.unit_price || 0,
-        total_price: li.total_price || 0,
-        supplier_sku: li.supplier_sku || null,
-        original_name: li.original_name || null,
-      }))
+    // ── ASYNC MODE: job_id present → write results to receipt_jobs table ──
+    if (job_id) {
+      console.log(`[parse-receipts] ASYNC mode: job_id=${job_id}`)
+      const startMs = Date.now()
 
-    parsed.capex_items = parsed.line_items
-      .filter((li: { category?: string }) => li.category === "capex")
-      .map((li: { translated_name?: string; original_name?: string; quantity?: number; unit_price?: number; total_price?: number }) => ({
-        name: li.translated_name || li.original_name || "",
-        quantity: li.quantity || 0,
-        unit_price: li.unit_price || 0,
-        total_price: li.total_price || 0,
-      }))
+      // Mark job as processing
+      await supabaseAdmin
+        .from("receipt_jobs")
+        .update({ status: "processing" })
+        .eq("id", job_id)
 
-    parsed.opex_items = parsed.line_items
-      .filter((li: { category?: string }) => li.category === "opex" || li.category === "uncategorized")
-      .map((li: { translated_name?: string; original_name?: string; quantity?: number; unit?: string; unit_price?: number; total_price?: number }) => ({
-        description: li.translated_name || li.original_name || "",
-        quantity: li.quantity || 0,
-        unit: li.unit || "pcs",
-        unit_price: li.unit_price || 0,
-        total_price: li.total_price || 0,
-      }))
+      try {
+        const parsed = await parseReceiptImages(image_urls)
+        const durationMs = Date.now() - startMs
 
-    console.log(
-      `[parse-receipts] OK: ${parsed.supplier_name}, ` +
-        `lines=${parsed.line_items.length}, ` +
-        `food=${parsed.food_items.length}, capex=${parsed.capex_items.length}, ` +
-        `opex=${parsed.opex_items.length}, ` +
-        `sum=${lineSum}, declared=${declared}` +
-        (parsed._sum_mismatch ? ` ⚠️ MISMATCH: ${parsed._sum_mismatch.difference}` : " ✅"),
-    )
+        // Write completed result to DB — Realtime will notify the frontend
+        const { error: updateErr } = await supabaseAdmin
+          .from("receipt_jobs")
+          .update({
+            status: "completed",
+            result: parsed,
+            completed_at: new Date().toISOString(),
+            duration_ms: durationMs,
+          })
+          .eq("id", job_id)
+
+        if (updateErr) {
+          console.error(`[parse-receipts] ASYNC: failed to write result for job ${job_id}:`, updateErr)
+        } else {
+          console.log(`[parse-receipts] ASYNC: job ${job_id} completed in ${durationMs}ms`)
+        }
+      } catch (parseErr) {
+        // ── BULLETPROOF: always write failure to DB ──
+        const errorMsg = parseErr instanceof Error ? parseErr.message : String(parseErr)
+        console.error(`[parse-receipts] ASYNC: job ${job_id} failed:`, errorMsg)
+
+        await supabaseAdmin
+          .from("receipt_jobs")
+          .update({
+            status: "failed",
+            error: errorMsg,
+            completed_at: new Date().toISOString(),
+            duration_ms: Date.now() - startMs,
+          })
+          .eq("id", job_id)
+      }
+
+      // Return immediately — frontend doesn't read this response
+      return new Response(
+        JSON.stringify({ ok: true, job_id }),
+        { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+      )
+    }
+
+    // ── SYNC MODE: no job_id → return ParsedReceipt directly (backward compat) ──
+    console.log("[parse-receipts] SYNC mode (legacy)")
+    const parsed = await parseReceiptImages(image_urls)
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },

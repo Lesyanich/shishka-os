@@ -13,12 +13,12 @@ import { MagicDropzone } from '../components/finance/MagicDropzone'
 import { SmartTextInput } from '../components/finance/SmartTextInput'
 import { ReceiptLightbox } from '../components/finance/ReceiptLightbox'
 import { StagingArea } from '../components/finance/StagingArea'
-import type { ParsedReceipt, ReceiptUrls, ApprovePayload, FoodItem } from '../types/receipt'
+import type { ParsedReceipt, ReceiptUrls, ApprovePayload, FoodItem, ReceiptJob } from '../types/receipt'
 
 /* ═══════════════════════════════════════════════════════════════════
    FinanceManager — Thin Page Orchestrator
-   State machine: idle → analyzing → staging → (approve|cancel) → idle
-   Phase 4.6: Added smart mapping pipeline + image passthrough
+   State machine: idle → pending → staging → (approve|cancel) → idle
+   Phase 4.14: Async receipt processing via Realtime subscription
    ═══════════════════════════════════════════════════════════════════ */
 
 /** Fuzzy match supplier name from AI to existing suppliers */
@@ -66,6 +66,11 @@ export function FinanceManager() {
   /* Quick text from SmartTextInput — passed to ExpenseForm */
   const [quickText, setQuickText] = useState<string | undefined>(undefined)
 
+  /* ── Phase 4.14: Async job tracking ── */
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null)
+  const [pendingImageUrls, setPendingImageUrls] = useState<string[]>([])
+  const [jobError, setJobError] = useState<string | null>(null)
+
   /* ── Staging Area state (Phase 4.4 + 4.6: added imageUrls) ── */
   const [stagingData, setStagingData] = useState<{
     receipt: ParsedReceipt
@@ -89,18 +94,95 @@ export function FinanceManager() {
       .then(({ data }) => setNomenclature(data ?? []))
   }, [stagingData])
 
+  // Phase 4.14: Realtime subscription — listen for receipt_jobs completion
+  useEffect(() => {
+    if (!pendingJobId) return
+
+    const channel = supabase
+      .channel(`receipt-job-${pendingJobId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'receipt_jobs',
+          filter: `id=eq.${pendingJobId}`,
+        },
+        (payload) => {
+          const job = payload.new as ReceiptJob
+          if (job.status === 'completed' && job.result) {
+            handleAiResult(job.result, pendingImageUrls)
+            setPendingJobId(null)
+            setPendingImageUrls([])
+            setJobError(null)
+          } else if (job.status === 'failed') {
+            setJobError(job.error || 'AI parsing failed')
+            setPendingJobId(null)
+            setPendingImageUrls([])
+          }
+        },
+      )
+      .subscribe()
+
+    // Fallback poll: check once after 90s in case Realtime missed the event
+    const fallbackTimer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('receipt_jobs')
+        .select('*')
+        .eq('id', pendingJobId)
+        .single()
+
+      if (data?.status === 'completed' && data.result) {
+        handleAiResult(data.result as ParsedReceipt, data.image_urls as string[])
+        setPendingJobId(null)
+        setPendingImageUrls([])
+        setJobError(null)
+      } else if (data?.status === 'failed') {
+        setJobError(data.error || 'AI parsing failed (timeout)')
+        setPendingJobId(null)
+        setPendingImageUrls([])
+      }
+    }, 90_000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearTimeout(fallbackTimer)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJobId])
+
   const handleCreated = () => {
     setReceiptUrls({})
     setQuickText(undefined)
     refetch()
   }
 
-  /* ── AI result handler — Phase 4.6: mapping pipeline + reclassification ── */
+  /* ── AI result handler — Phase 4.14: receives ParsedReceipt + imageUrls ── */
   const handleAiResult = async (
     receipt: ParsedReceipt,
-    urls: ReceiptUrls,
     imageUrls: string[],
   ) => {
+    // Build receiptUrls from AI document classification
+    const urls: ReceiptUrls = {}
+    const docs = receipt.documents
+    if (docs) {
+      if (docs.supplier_receipt_index != null && imageUrls[docs.supplier_receipt_index]) {
+        urls.supplier = imageUrls[docs.supplier_receipt_index]
+      }
+      if (docs.bank_slip_index != null && imageUrls[docs.bank_slip_index]) {
+        urls.bank = imageUrls[docs.bank_slip_index]
+      }
+      if (docs.tax_invoice_index != null && imageUrls[docs.tax_invoice_index]) {
+        urls.tax = imageUrls[docs.tax_invoice_index]
+      }
+    } else {
+      // Fallback: positional mapping (backward compat)
+      if (imageUrls[0]) urls.supplier = imageUrls[0]
+      if (imageUrls[1]) urls.bank = imageUrls[1]
+      if (imageUrls[2]) urls.tax = imageUrls[2]
+    }
+    setReceiptUrls(urls)
+
     // Phase 4.6: If new line_items[] format, run mapping engine + reclassify
     if (receipt.line_items && receipt.line_items.length > 0) {
       // Resolve supplier_id for mapping lookup
@@ -219,8 +301,33 @@ export function FinanceManager() {
       {/* Smart Text Input — quick log line */}
       <SmartTextInput onSubmitText={setQuickText} />
 
-      {/* Magic Dropzone — full width */}
-      <MagicDropzone onUrlsReady={setReceiptUrls} onAiResult={handleAiResult} />
+      {/* Magic Dropzone — full width (Phase 4.14: async) */}
+      <MagicDropzone
+        onUrlsReady={setReceiptUrls}
+        onJobCreated={(jobId, imageUrls) => {
+          setPendingJobId(jobId)
+          setPendingImageUrls(imageUrls)
+          setJobError(null)
+        }}
+        isPending={!!pendingJobId}
+      />
+
+      {/* Phase 4.14: Job error toast */}
+      {jobError && (
+        <div className="flex items-start gap-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3 shadow-sm">
+          <div className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+          <p className="text-xs leading-relaxed text-rose-300/90">
+            AI parsing failed: {jobError}
+          </p>
+          <button
+            type="button"
+            onClick={() => setJobError(null)}
+            className="ml-auto text-xs text-slate-500 hover:text-slate-300"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Main grid: Form OR StagingArea (left) | Chart + History (right) */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)]">

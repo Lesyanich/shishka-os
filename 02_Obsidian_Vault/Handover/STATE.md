@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-11T07:00 (ICT)
+**Последнее обновление:** 2026-03-11T14:00 (ICT)
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -22,6 +22,7 @@
 | `fin_sub_categories`| `sub_code` INT| 28 | ✅ NEW | Sub-categories for fine-grained tracking |
 | `capex_assets` | `id` UUID | 72 | ✅ NEW | Linked to `equipment` via UUID FK |
 | `capex_transactions`| `id` UUID | 62 | ✅ NEW | Purchase and repair transactions mapped |
+| `receipt_jobs` | `id` UUID | 0 | ✅ NEW | Async AI receipt parsing queue. Migration 036. Realtime-enabled. |
 
 ### Функции (Supabase public schema)
 
@@ -1426,3 +1427,336 @@ Save:    existing mapping → match_count++ (UPDATE)  |  new → INSERT (match_c
 
 ### Deploy Steps (CEO)
 1. Deploy Edge Function: `supabase functions deploy parse-receipts` (new prompt + gpt-4o model)
+
+---
+
+## Phase 4.8: High-Res OCR & Honest Extraction (2026-03-11)
+
+### Root Cause Analysis
+CEO identified why AI was hallucinating receipt data:
+1. **Image compression** (MAX_DIM=1024, JPEG 80%) made Thai text unreadable
+2. **Sum-matching pressure** in prompt forced AI to fabricate prices to match receipt total
+3. **5 MB limit** too small for modern smartphone photos (8-12 MB)
+
+### Fix 1: Disable Image Compression (MagicDropzone.tsx)
+
+| Change | Detail |
+|---|---|
+| `compressImage()` | Removed entirely — originals sent to Storage for max OCR accuracy |
+| File size limit | 5 MB → **15 MB** with client-side validation + toast on reject |
+| ACCEPT array | Removed `application/pdf` (gpt-4o Chat Completions `image_url` doesn't support PDF) |
+| UI text | Updated: "JPEG · PNG · WebP · max 15 MB" |
+| Supabase bucket | `receipts` bucket `file_size_limit` must be updated to 15728640 bytes |
+
+### Fix 2: Honest Extraction Prompt (parse-receipts/index.ts)
+
+| Change | Detail |
+|---|---|
+| YOUR #1 RULE | "Sum MUST equal total" → "Extract what you can clearly read. Do NOT invent or guess prices" |
+| FINAL VERIFICATION §4 | "Go back and find missing items" → "Note the difference, but do NOT fabricate items" |
+| `_sum_mismatch` flag | **Kept** — useful for user awareness, not AI pressure |
+
+### Fix 3: Manual Fallback (StagingArea.tsx)
+
+| Change | Detail |
+|---|---|
+| `addFood()` | Added `original_name: ''` field for Phase 4.6 compatibility |
+| Add Row buttons | Verified existing (lines 675-681 food, 845-851 opex) — functional since Phase 4.4 |
+| `__NEW__` option | Verified existing in nomenclature dropdown — auto-creates nomenclature on approve |
+
+### Build: `tsc -b && vite build` = 0 errors
+
+### Deploy Steps (CEO)
+1. Run SQL: `UPDATE storage.buckets SET file_size_limit = 15728640 WHERE id = 'receipts';`
+2. Deploy Edge Function: `supabase functions deploy parse-receipts`
+3. Delete erroneous test transaction (see SQL script in conversation)
+
+---
+
+## Phase 4.9: Receipt Anatomy & Anti-Hallucination Guardrails (2026-03-11)
+
+### Root Cause Analysis
+Phase 4.8 removed image compression (15MB originals). gpt-4o now sees the text, but:
+1. **Footer became items**: AI read "Total: 4222", "VAT", "Discount" from receipt footer and added them as line_items
+2. **Hallucinations**: AI invented "Partition 100 gram" and "Fresh lime juice" — products not on the receipt
+3. **No structure understanding**: AI treated receipt as flat text, no Header/Items/Footer zones
+
+### Fix 1: Complete SYSTEM_PROMPT Rewrite (parse-receipts/index.ts)
+
+| Section | What it does |
+|---|---|
+| **3-Zone Receipt Anatomy** | Teaches AI that receipts have Header (metadata) → Item Grid (products) → Footer (totals/taxes). Extract ONLY from Zone 2. |
+| **Explicit Blacklist** | 30+ terms in English & Thai that are NEVER products: Total, VAT, Discount, Change, รวม, ภาษี, ส่วนลด, เงินทอน... |
+| **Valid Line Item Test** | 3 mandatory checks: (1) physical good, (2) has product name, (3) has unit_price > 0. Fails any → skip. |
+| **Anti-hallucination** | "NEVER invent products. If unreadable → [UNREADABLE]. NEVER guess." |
+| **User prompt** | Changed from "Do NOT stop until TOTAL" → "Identify 3 zones first, extract ONLY from Item Grid, STOP at Footer" |
+| **max_tokens** | 8192 → 4096 (less room for verbosity/invention) |
+
+### Fix 2: TypeScript FOOTER_RE Guardrail (server-side safety net)
+
+```typescript
+const FOOTER_RE = /^(total|subtotal|grand\s*total|...|รวม|ยอดรวม|ภาษี|ส่วนลด|...)$/i
+parsed.line_items = parsed.line_items.filter(li => !FOOTER_RE.test(li.translated_name))
+```
+
+Even if AI ignores prompt rules, FOOTER_RE strips leaked footer items before sending to frontend.
+
+### Build: `tsc -b && vite build` = 0 errors
+
+### Deploy Steps (CEO)
+1. Deploy Edge Function: `supabase functions deploy parse-receipts`
+2. Test with same Makro receipt — verify no Total/VAT/Discount in items
+
+---
+
+## Phase 4.10: Edge Function OOM Fix & Payload Optimization (2026-03-11)
+
+### Root Cause Analysis
+Phase 4.8 disabled compression (15MB originals). Two 8MB photos caused Edge Function OOM:
+- **256 MB RAM limit** for Supabase Edge Functions
+- O(n²) base64 encoding loop consumed ~50MB per image in string garbage
+- Total peak: 200+ MB → OOM crash at 256 MB
+- **OpenAI downscales to 2048px anyway** → sending 15MB had ZERO benefit
+
+### Fix 1: Smart Compression Restored (MagicDropzone.tsx)
+
+| Parameter | Phase 4.7 | Phase 4.8 | Phase 4.10 |
+|---|---|---|---|
+| MAX_DIM | 1024 px | Disabled | **2048 px** |
+| JPEG_QUALITY | 0.80 | Disabled | **0.92** |
+| Output size | ~170 KB | 8-15 MB | **500KB-1.5MB** |
+| Thai text | Unreadable | Perfect | **Perfect** |
+| Edge Function | OK | OOM crash | **OK** |
+
+2048px matches OpenAI's internal limit — zero quality loss vs raw originals.
+
+### Fix 2: Chunked Base64 Encoding (parse-receipts/index.ts)
+
+| Before | After |
+|---|---|
+| `for (i=0; i<bytes.length; i++) binary += String.fromCharCode(bytes[i])` | `for (i=0; i<bytes.length; i+=8192) binary += String.fromCharCode(...bytes.subarray(i, i+8192))` |
+| O(n²) — 50MB garbage per 8MB image | O(n) — ~1MB per image |
+
+### Fix 3: Error Handling (MagicDropzone.tsx)
+
+| Before | After |
+|---|---|
+| `if (error) throw error` → generic "non-2xx status code" | Extract actual error from `error.context.json()` → shows real message in toast |
+
+### Fix 4: File Size Limit Reverted
+
+| Change | Detail |
+|---|---|
+| MAX_FILE_SIZE | 15 MB → **5 MB** (post-compression: 500KB-1.5MB) |
+| UI text | "max 15 MB" → "max 5 MB" |
+
+### Build: `tsc -b && vite build` = 0 errors
+
+### Deploy Steps (CEO)
+1. Deploy Edge Function: `supabase functions deploy parse-receipts`
+2. Revert bucket limit: `UPDATE storage.buckets SET file_size_limit = 5242880 WHERE id = 'receipts';`
+
+## Phase 4.11: Deno Performance Bottleneck & Timeout Fix (2026-03-11)
+
+### Root Cause Analysis
+Phase 4.10's chunked base64 loop (`String.fromCharCode(...bytes.subarray(i, i + 8192))`) STILL caused Edge Function timeout:
+- **Spread operator**: 8,192 arguments on V8 call stack per iteration → ~1 million argument pushes for 1MB image
+- **String concatenation**: 128 intermediate strings for 1MB payload
+- **`btoa()` full pass**: Another complete scan of the 1MB binary string
+- **Total CPU per image**: ~1.2s → 2 images = ~2.4s → exceeds Deno's **2-second CPU time limit**
+
+Frontend showed "Unexpected end of JSON input" because:
+- Edge Function timeout → 504 with HTML/empty body
+- `error.context?.json()` threw on non-JSON body → parse error leaked as toast text
+
+### Fix 1: Deno Native Base64 (parse-receipts/index.ts)
+
+| Before (Phase 4.10) | After (Phase 4.11) |
+|---|---|
+| 8-line chunked JS loop + `btoa()` (~1.2s CPU per 1MB) | `encodeBase64(bytes)` from `jsr:@std/encoding/base64` (<10ms per 1MB) |
+| `String.fromCharCode` spread + string concat | C++/Rust optimized, accepts `Uint8Array` directly |
+
+### Fix 2: Robust Error Handling (MagicDropzone.tsx)
+
+| Before | After |
+|---|---|
+| `await error.context?.json()` → throws on HTML/empty body | `await resp.text()` + manual `JSON.parse()` → never throws |
+| "Unexpected end of JSON input" leaked to user | `Server error (504)` or actual error message shown |
+
+### Build: `tsc -b && vite build` = 0 errors
+
+### Hotfix: JSR Import Boot Failure (post-deploy)
+
+**Symptom:** "AI analysis failed: Edge Function error" — function failed to boot.
+
+**Root cause:** `jsr:@std/encoding/base64` — unpinned JSR specifier + no `deno.json` = CDN resolution failure at boot time. Known Supabase issue (GitHub #36109, #35601).
+
+| Before | After |
+|---|---|
+| `jsr:@std/encoding/base64` (CDN-dependent, boot failure) | `node:buffer` (built-in, zero CDN dependency) |
+| `encodeBase64(bytes)` | `Buffer.from(bytes).toString('base64')` |
+| Error handler: only checks `body.error` | Also checks `body.message`, `body.msg` |
+
+## Phase 4.12: JSON Truncation Fix — max_tokens (2026-03-11)
+
+**Symptom:** "Unterminated string in JSON at position 12331" — long Makro receipt (30+ items) truncated mid-JSON.
+
+**Root cause:** Phase 4.9 reduced `max_tokens` from 8192 to 4096. A 30+ item receipt with SKUs, Thai names, English translations = ~8,000-10,000 tokens. Model hit 4096 limit → output cut mid-string → invalid JSON.
+
+| Parameter | Phase 4.9 | Phase 4.12 | gpt-4o Max |
+|---|---|---|---|
+| `max_tokens` | 4096 | **16384** | 16384 |
+
+**Note:** `--no-verify-jwt` flag is REQUIRED on every deploy (admin-panel has no auth session).
+
+### Deploy Steps (CEO)
+1. `supabase functions deploy parse-receipts --no-verify-jwt`
+
+## Phase 4.13: Anti-Loop Architecture + Structured Outputs (2026-03-11)
+
+**Symptom:** gpt-4o generated 41 identical "Granulated sugar 1 kg, 24, 24" rows instead of extracting ~40 unique items from a Makro receipt. Computed total 1.2K vs real 4.2K (70.4% mismatch). Classic LLM repetition loop (autoregressive degeneration).
+
+**Root causes:**
+1. `temperature: 0.05` — near-zero temperature causes fixed-point attractor in long sequential generation
+2. `response_format: { type: "json_object" }` — provides zero structural constraints, no schema enforcement
+3. Prompt overload (~160 lines) dilutes visual attention over long generation
+
+### Changes Applied
+
+| Parameter | Phase 4.12 | Phase 4.13 | Rationale |
+|---|---|---|---|
+| `temperature` | 0.05 | **0.2** | Enough diversity to break repetition loops while preventing hallucinations |
+| `response_format` | `json_object` | **`json_schema` (Structured Outputs)** | Constrained decoding guarantees field types at every token |
+| Prompt lines | ~160 | **~100** | OUTPUT SCHEMA section removed (now enforced by API) |
+| Anchoring | Weak | **Strong** | original_name extraction instruction forces re-attention to image per item |
+
+### Anti-Loop Architecture (3 layers of defense)
+
+1. **Temperature 0.2** — sampling diversity breaks repetition attractors
+2. **original_name anchoring** — prompt forces model to read Thai text first, then translate. Unique Thai characters per item prevent copy-paste loops
+3. **Server-side dedup guard** — if >50% of items share same `original_name`, auto-deduplicates and flags `_repetition_loop` in response
+
+### JSON Schema (Structured Outputs)
+Full schema defined as `RECEIPT_SCHEMA` constant. OpenAI constrains every generated token to conform to the schema at decode time. Fields: `supplier_name`, `invoice_number`, `total_amount`, `currency`, `transaction_date`, `line_items[]`, `documents{}`.
+
+### File Modified
+- `03_Development/supabase/functions/parse-receipts/index.ts` — complete rewrite of prompt + API call + added dedup guard
+
+### Deploy Steps (CEO)
+1. `supabase functions deploy parse-receipts --no-verify-jwt`
+2. Re-test with the same Makro receipt image — expect unique items, no repetition
+
+## Phase 4.13b: Structured Outputs Reverted — HTTP 546 Hotfix (2026-03-11)
+
+**Symptom:** Phase 4.13 deployment crashed with HTTP 546: "Function failed due to not having enough compute resources."
+
+**Root cause:** OpenAI `json_schema` (Structured Outputs) compiles a Context-Free Grammar (CFG) on first/cold calls. This adds **10-60s latency** before generation even starts. Combined with gpt-4o vision processing (30-60s), total latency exceeded Supabase's **150s request idle timeout** → HTTP 546.
+
+**Diagnosis:** NOT a CPU (200ms limit) or memory (256MB limit) issue. The function uses ~15ms CPU and ~8MB RAM. The bottleneck is pure wall-clock latency waiting for OpenAI.
+
+### Changes Applied
+
+| Parameter | Phase 4.13 | Phase 4.13b | Rationale |
+|---|---|---|---|
+| `response_format` | `json_schema` (strict) | **`json_object`** | Eliminates 10-60s CFG compilation penalty |
+| `frequency_penalty` | (none) | **0.3** | Penalizes repeated tokens — additional anti-loop layer |
+| Schema validation | API-level (OpenAI) | **Server-side `validateReceiptSchema()`** | Coerces types, defaults missing fields, validates enums |
+| `temperature` | 0.2 | 0.2 (unchanged) | Still effective for anti-loop |
+| Anchoring prompt | Active | Active (unchanged) | original_name Thai text extraction |
+| Dedup guard | Active | Active (unchanged) | >50% same name = loop |
+
+### New: `validateReceiptSchema()` function
+Server-side validation that replaces OpenAI's constrained decoding:
+- Validates all required fields exist (coerces if missing)
+- Validates `unit` enum: kg|L|pcs (defaults to "pcs")
+- Validates `category` enum: food|capex|opex|uncategorized (defaults to "uncategorized")
+- Coerces numeric fields from strings
+- Logs warnings as `_schema_warnings` in response
+
+### Boris Rule #13 added to CLAUDE.md
+Long-running AI tasks (>30s) must not rely on synchronous HTTP. Architectural standard for Phase 4.14+ is Async Webhook/Polling pattern with Supabase Realtime.
+
+### Files Modified
+- `03_Development/supabase/functions/parse-receipts/index.ts` — reverted json_schema, added frequency_penalty + validateReceiptSchema
+- `CLAUDE.md` — Boris Rule #13
+
+### Deploy Steps (CEO)
+1. `supabase functions deploy parse-receipts --no-verify-jwt`
+2. Re-test with same Makro receipt — should complete in ~40-70s (no CFG overhead)
+
+## Phase 4.14: Async Receipt Processing (2026-03-11)
+
+**Problem:** Synchronous `supabase.functions.invoke('parse-receipts')` blocks the frontend for 30-90s. OpenAI gpt-4o vision processing + schema validation can exceed Supabase's 150s request idle timeout (per Boris Rule #13).
+
+**Solution:** Async architecture using `receipt_jobs` table + Supabase Realtime `postgres_changes` subscription.
+
+### Architecture
+
+```
+MagicDropzone → INSERT receipt_jobs → invoke('parse-receipts', {job_id}) [fire-and-forget]
+                                        ↓
+                               Edge Function processes async
+                               UPDATE receipt_jobs SET result=...
+                                        ↓
+FinanceManager ← Realtime subscription (postgres_changes, filter: id=eq.{job_id})
+```
+
+### New Table: `receipt_jobs`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | UUID PK | Auto-generated |
+| `status` | TEXT | pending → processing → completed\|failed |
+| `image_urls` | JSONB | Array of Storage public URLs |
+| `result` | JSONB | ParsedReceipt (null until completed) |
+| `error` | TEXT | Error message (null unless failed) |
+| `created_at` | TIMESTAMPTZ | Job creation time |
+| `completed_at` | TIMESTAMPTZ | Completion/failure time |
+| `duration_ms` | INTEGER | OpenAI call duration |
+| `model` | TEXT | Model used (default: gpt-4o) |
+
+RLS: Public SELECT + INSERT (admin-panel has no auth). Edge Function uses service_role for UPDATE.
+Realtime: Published via `supabase_realtime`.
+
+### New RPC: `fn_cleanup_stale_receipt_jobs()`
+Lazy cleanup: marks zombie jobs (stuck in processing > 5 min) as failed. Called by Edge Function at the start of every invocation. Replaces pg_cron — no extra permissions needed.
+
+### Edge Function: Dual Mode
+- **Sync mode** (no `job_id`): backward-compatible, returns ParsedReceipt directly
+- **Async mode** (`job_id` present): marks processing → calls OpenAI → writes result to `receipt_jobs` → returns `{ok: true}`
+- Lazy cleanup RPC called at start of every invocation
+- Bulletproof try/catch/finally: status is ALWAYS updated even on crash
+
+### Frontend Changes
+
+**MagicDropzone.tsx:**
+- Replaced sync `onAiResult` with async `onJobCreated(jobId, imageUrls)`
+- Fire-and-forget Edge Function invocation (no blocking)
+- AbortError/DOMException caught silently (non-fatal)
+- `beforeunload` listener while job is pending
+- UX: "AI is reading your receipt..." pulsing animation
+
+**FinanceManager.tsx:**
+- `pendingJobId` state + Realtime subscription
+- Subscribes to `postgres_changes` filtered by job ID
+- On `completed`: runs mapping pipeline → opens StagingArea
+- On `failed`: shows error toast with dismiss button
+- Fallback poll after 90s in case Realtime disconnects
+
+### Resilience Layers
+1. **Edge Function try/catch/finally** — status always updated
+2. **fn_cleanup_stale_receipt_jobs()** — DB self-heals zombie jobs after 5 min
+3. **Frontend AbortError handling** — graceful degradation on navigation
+4. **Fallback polling** — catches Realtime subscription misses
+
+### Files Created/Modified
+- `03_Development/supabase/migrations/036_receipt_jobs.sql` — NEW
+- `03_Development/supabase/functions/parse-receipts/index.ts` — dual mode + lazy cleanup
+- `03_Development/admin-panel/src/types/receipt.ts` — ReceiptJob type
+- `03_Development/admin-panel/src/components/finance/MagicDropzone.tsx` — async fire-and-forget
+- `03_Development/admin-panel/src/pages/FinanceManager.tsx` — Realtime subscription
+
+### Deploy Steps
+1. Apply migration: `supabase db push` or SQL Editor → run `036_receipt_jobs.sql`
+2. Deploy Edge Function: `supabase functions deploy parse-receipts --no-verify-jwt`
+3. Verify: Upload receipt → MagicDropzone returns immediately → StagingArea auto-opens when job completes

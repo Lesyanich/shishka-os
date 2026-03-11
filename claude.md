@@ -46,6 +46,9 @@ When any migration **creates or alters** a table/function/trigger/enum, the agen
 ## 📅 Data Integrity: Transaction Dates (Boris Rule #12)
 **NEVER** overwrite historical `transaction_date` values. Dates come STRICTLY from source documents (receipt, invoice). `CURRENT_DATE` is only acceptable as an absolute last-resort fallback in the RPC when the frontend fails to provide a date. Migrations must NEVER set `transaction_date = CURRENT_DATE` to "fix" sorting — this violates ERP audit standards.
 
+## ⏱️ Edge Function + LLM Latency (Boris Rule #13)
+Long-running AI tasks (>30s), such as Vision OCR for long receipts, **MUST NOT** rely on synchronous HTTP responses. Supabase Edge Functions have a **150s request idle timeout** and **200ms CPU limit** — gpt-4o vision tasks routinely take 30-90s. While we temporarily use `json_object` mode to avoid the 150s timeout (OpenAI `json_schema` Structured Outputs add 10-60s CFG compilation on cold calls), the **architectural standard for Phase 4.14+** is the **Async Webhook/Polling pattern** using Supabase Realtime (insert job row → Edge Function writes result → frontend subscribes via Realtime).
+
 ## 📂 Context Routing (Point, Don't Dump)
 - **Global Rules:** Read `gemini.md`
 - **Database State & Schema:** Read `02_Obsidian_Vault/Database Schema.md` (erDiagram) + `02_Obsidian_Vault/Handover/STATE.md`

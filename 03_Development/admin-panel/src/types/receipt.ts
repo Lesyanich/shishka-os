@@ -100,6 +100,19 @@ export interface SupplierItemMapping {
   match_count: number
 }
 
+/** Phase 4.14: Async receipt parsing job (receipt_jobs table) */
+export interface ReceiptJob {
+  id: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  image_urls: string[]
+  result: ParsedReceipt | null
+  error: string | null
+  created_at: string
+  completed_at: string | null
+  duration_ms: number | null
+  model: string
+}
+
 /** Payload sent to fn_approve_receipt RPC */
 export interface ApprovePayload {
   transaction_date: string

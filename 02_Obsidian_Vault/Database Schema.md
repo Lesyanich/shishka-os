@@ -224,6 +224,18 @@ erDiagram
         TIMESTAMPTZ updated_at
     }
 
+    receipt_jobs {
+        UUID id PK
+        TEXT status "pending processing completed failed"
+        JSONB image_urls
+        JSONB result "ParsedReceipt JSON"
+        TEXT error
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ completed_at
+        INTEGER duration_ms
+        TEXT model "default gpt-4o"
+    }
+
     nomenclature ||--o{ bom_structures : "parent_id"
     nomenclature ||--o{ bom_structures : "ingredient_id"
     nomenclature ||--o{ inventory_balances : "nomenclature_id"
@@ -288,6 +300,7 @@ erDiagram
 | `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030 |
 | `opex_items` | `id` UUID | description, quantity, unit, unit_price, total_price | expense_id -> expense_ledger (CASCADE) | 030 |
 | `supplier_item_mapping` | `id` UUID | supplier_sku, original_name, match_count | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE) | 035 |
+| `receipt_jobs` | `id` UUID | status, image_urls (JSONB), result (JSONB), error, duration_ms, model | -- (standalone, pre-approval) | 036 |
 
 ## Custom ENUM Types
 
@@ -317,6 +330,7 @@ erDiagram
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
 | `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter | 021 |
 | `fn_approve_receipt(JSONB)` | RPC | Atomic receipt approval: Hub (expense_ledger) + Spokes (purchase_logs, capex_transactions, opex_items) | 030 |
+| `fn_cleanup_stale_receipt_jobs()` | RPC | Lazy cleanup: marks zombie receipt_jobs (processing >5min) as failed | 036 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
 
 ## Storage Buckets
@@ -350,6 +364,7 @@ erDiagram
 | `production_plans` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
 | `plan_targets` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
 | `supplier_item_mapping` | `sim_select` / `sim_insert` / `sim_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 035 |
+| `receipt_jobs` | `receipt_jobs_select` / `receipt_jobs_insert` | SELECT/INSERT | {public} | `USING (true)` / `WITH CHECK (true)` | 036 |
 
 ## Column-Level Privilege Restrictions (Migration 031)
 

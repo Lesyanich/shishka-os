@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ImagePlus, Loader2, Sparkles, Trash2, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import type { ParsedReceipt, ReceiptUrls } from '../../types/receipt'
+import type { ReceiptUrls } from '../../types/receipt'
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -14,19 +14,22 @@ interface DroppedFile {
 export interface MagicDropzoneProps {
   /** Called after upload — passes the first 3 URLs mapped to supplier/bank/tax slots */
   onUrlsReady: (urls: ReceiptUrls) => void
-  /** Called when AI parse-receipts Edge Function returns structured data + all image URLs */
-  onAiResult?: (result: ParsedReceipt, urls: ReceiptUrls, imageUrls: string[]) => void
+  /** Phase 4.14: Called when async job is created — parent subscribes via Realtime */
+  onJobCreated?: (jobId: string, imageUrls: string[]) => void
+  /** Whether an async job is currently being processed (controls pulsing UX) */
+  isPending?: boolean
 }
 
-/* ────────────────────────── Compression ────────────────────────── */
+/* ────────────────────────── Smart Compression ────────────────────────── */
 
-const MAX_DIM = 1024
-const JPEG_QUALITY = 0.8
+// Phase 4.10: 2048px matches OpenAI's internal limit — zero quality loss.
+// JPEG 92% preserves Thai text while keeping files under 1.5 MB.
+// Old 1024px/80% made Thai text unreadable. Raw 15MB caused Edge Function OOM.
+const MAX_DIM = 2048
+const JPEG_QUALITY = 0.92
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB (post-compression: 500KB-1.5MB)
 
 async function compressImage(file: File): Promise<File> {
-  // PDFs pass through
-  if (file.type === 'application/pdf') return file
-
   return new Promise((resolve, reject) => {
     const img = new Image()
     const url = URL.createObjectURL(file)
@@ -89,17 +92,34 @@ async function uploadToStorage(file: File, index: number): Promise<string | null
 
 /* ────────────────────────── Component ────────────────────────── */
 
-const ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+const ACCEPT = ['image/jpeg', 'image/png', 'image/webp']
 
-export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
+export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDropzoneProps) {
   const [files, setFiles] = useState<DroppedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Phase 4.14: beforeunload guard while async job is active
+  useEffect(() => {
+    if (!isPending) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isPending])
+
   const addFiles = useCallback((incoming: FileList | File[]) => {
-    const arr = Array.from(incoming).filter((f) => ACCEPT.includes(f.type))
+    const arr = Array.from(incoming).filter((f) => {
+      if (!ACCEPT.includes(f.type)) return false
+      if (f.size > MAX_FILE_SIZE) {
+        setToast(`File "${f.name}" exceeds 5 MB limit (${(f.size / 1024 / 1024).toFixed(1)} MB)`)
+        return false
+      }
+      return true
+    })
     const newDropped: DroppedFile[] = arr.map((f) => ({
       file: f,
       previewUrl: f.type.startsWith('image/') ? URL.createObjectURL(f) : '',
@@ -133,15 +153,15 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
     [addFiles],
   )
 
-  /* ── "Analyze with AI" — real Edge Function flow ── */
+  /* ── Phase 4.14: "Analyze with AI" — async fire-and-forget ── */
   const handleAnalyze = async () => {
     if (files.length === 0) return
 
-    setIsAnalyzing(true)
+    setIsUploading(true)
     setToast(null)
 
     try {
-      // Step 1: Compress + upload to Storage
+      // Step 1: Smart compress (2048px/JPEG 92%) + upload to Storage
       const compressed = await Promise.all(files.map((f) => compressImage(f.file)))
       const uploadedUrls = await Promise.all(
         compressed.map((f, i) => uploadToStorage(f, i)),
@@ -153,49 +173,43 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
         return
       }
 
-      // Step 2: If AI callback provided, call Edge Function + classify documents
-      if (onAiResult) {
-        const { data, error } = await supabase.functions.invoke(
-          'parse-receipts',
-          { body: { image_urls: imageUrls } },
-        )
+      if (onJobCreated) {
+        // Step 2: INSERT receipt_jobs row → get job ID
+        const { data: job, error: insertErr } = await supabase
+          .from('receipt_jobs')
+          .insert({ image_urls: imageUrls })
+          .select('id')
+          .single()
 
-        if (error) throw error
-        if (data?.error) throw new Error(data.error)
-
-        const parsed = data as ParsedReceipt
-
-        // Step 3: Build receiptUrls from AI document classification
-        const receiptUrls: ReceiptUrls = {}
-        const docs = parsed.documents
-
-        if (docs) {
-          if (docs.supplier_receipt_index != null && imageUrls[docs.supplier_receipt_index]) {
-            receiptUrls.supplier = imageUrls[docs.supplier_receipt_index]
-          }
-          if (docs.bank_slip_index != null && imageUrls[docs.bank_slip_index]) {
-            receiptUrls.bank = imageUrls[docs.bank_slip_index]
-          }
-          if (docs.tax_invoice_index != null && imageUrls[docs.tax_invoice_index]) {
-            receiptUrls.tax = imageUrls[docs.tax_invoice_index]
-          }
-        } else {
-          // Fallback: positional mapping (backward compat)
-          if (imageUrls[0]) receiptUrls.supplier = imageUrls[0]
-          if (imageUrls[1]) receiptUrls.bank = imageUrls[1]
-          if (imageUrls[2]) receiptUrls.tax = imageUrls[2]
+        if (insertErr || !job) {
+          throw new Error(insertErr?.message || 'Failed to create receipt job')
         }
 
-        onUrlsReady(receiptUrls)
-        onAiResult(parsed, receiptUrls, imageUrls)
+        // Step 3: Fire Edge Function — don't await the result.
+        // The Edge Function writes to receipt_jobs; frontend listens via Realtime.
+        supabase.functions.invoke('parse-receipts', {
+          body: { job_id: job.id, image_urls: imageUrls },
+        }).catch((err) => {
+          // Phase 4.14 Resilience: catch AbortError / network failures silently.
+          // The Edge Function may still complete — DB has the job row.
+          // Zombie cleanup RPC handles truly dead jobs after 5 min.
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            console.warn('[MagicDropzone] Edge Function fetch aborted (user navigated away)')
+          } else {
+            console.error('[MagicDropzone] Edge Function invocation error (non-fatal)', err)
+          }
+        })
 
-        // Clear files on success
+        // Step 4: Notify parent — Realtime subscription starts in FinanceManager
+        onJobCreated(job.id, imageUrls)
+
+        // Clear files — the job is in-flight
         for (const f of files) {
           if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
         }
         setFiles([])
       } else {
-        // No AI callback — legacy positional path
+        // No async callback — legacy positional path (upload-only, no AI)
         const receiptUrls: ReceiptUrls = {}
         if (imageUrls[0]) receiptUrls.supplier = imageUrls[0]
         if (imageUrls[1]) receiptUrls.bank = imageUrls[1]
@@ -209,12 +223,12 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
         setFiles([])
       }
     } catch (err) {
-      console.error('[MagicDropzone] AI analysis failed', err)
+      console.error('[MagicDropzone] upload/job creation failed', err)
       setToast(
-        `AI analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        `Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
       )
     } finally {
-      setIsAnalyzing(false)
+      setIsUploading(false)
     }
   }
 
@@ -256,8 +270,8 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
             }}
           />
 
-          {/* Scanning effect while analyzing */}
-          {isAnalyzing && (
+          {/* Scanning effect while uploading or AI pending */}
+          {(isUploading || isPending) && (
             <div className="scan-effect pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" />
           )}
 
@@ -268,7 +282,7 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
                 : 'bg-slate-800/50 group-hover:bg-slate-800/80 group-hover:shadow-md group-hover:shadow-slate-900/50'
             }`}
           >
-            {isAnalyzing ? (
+            {isUploading || isPending ? (
               <Loader2 className="h-7 w-7 animate-spin text-indigo-400" />
             ) : (
               <Upload
@@ -279,13 +293,22 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
             )}
           </div>
 
-          {isAnalyzing ? (
+          {isPending ? (
             <div className="relative text-center">
-              <p className="text-sm font-medium tracking-wide text-indigo-300">
-                Analyzing receipt...
+              <p className="text-sm font-medium tracking-wide text-indigo-300 animate-pulse">
+                AI is reading your receipt...
               </p>
               <p className="mt-0.5 text-xs text-slate-500">
-                AI is extracting line items and classifying them
+                Extracting line items — this takes 30-60 seconds
+              </p>
+            </div>
+          ) : isUploading ? (
+            <div className="relative text-center">
+              <p className="text-sm font-medium tracking-wide text-indigo-300">
+                Uploading images...
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Compressing and sending to storage
               </p>
             </div>
           ) : (
@@ -297,7 +320,7 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
                 </span>
               </p>
               <p className="mt-1 text-[11px] tracking-wide text-slate-600">
-                JPEG &middot; PNG &middot; WebP &middot; PDF &middot; max 5 MB
+                JPEG &middot; PNG &middot; WebP &middot; max 5 MB
               </p>
             </div>
           )}
@@ -333,9 +356,6 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-1">
                   <ImagePlus className="h-5 w-5 text-slate-600" />
-                  <span className="text-[10px] font-medium tracking-wider text-slate-500">
-                    PDF
-                  </span>
                 </div>
               )}
 
@@ -363,11 +383,11 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
       )}
 
       {/* ── Analyze Button ── */}
-      {hasFiles && !isAnalyzing && (
+      {hasFiles && !isUploading && !isPending && (
         <button
           type="button"
           onClick={handleAnalyze}
-          disabled={isAnalyzing}
+          disabled={isUploading || isPending}
           className="animate-fade-in-up group/btn relative w-full overflow-hidden rounded-xl border border-indigo-500/40 bg-gradient-to-r from-indigo-500/[0.12] via-violet-500/[0.12] to-indigo-500/[0.12] px-4 py-2.5 text-sm font-medium tracking-wide text-indigo-200 shadow-sm transition-all duration-300 hover:border-indigo-400/60 hover:from-indigo-500/20 hover:via-violet-500/20 hover:to-indigo-500/20 hover:shadow-md hover:shadow-indigo-500/10 disabled:opacity-50"
         >
           {/* Shimmer effect on hover */}
