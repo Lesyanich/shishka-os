@@ -114,6 +114,8 @@ erDiagram
         TEXT name
         TEXT contact_info
         BOOLEAN is_deleted
+        INTEGER category_code FK
+        INTEGER sub_category_code
     }
 
     purchase_logs {
@@ -231,6 +233,7 @@ erDiagram
 
     suppliers ||--o{ purchase_logs : "supplier_id"
     suppliers ||--o{ expense_ledger : "supplier_id"
+    fin_categories ||--o{ suppliers : "category_code"
 
     fin_categories ||--o{ fin_sub_categories : "category_code"
     fin_categories ||--o{ expense_ledger : "category_code"
@@ -262,7 +265,7 @@ erDiagram
 | `locations` | `id` UUID | name (UNIQUE), type | -- | 018 |
 | `inventory_batches` | `id` UUID | barcode (UNIQUE), status, expires_at | nomenclature_id -> nomenclature, location_id -> locations, production_task_id -> production_tasks | 018 |
 | `stock_transfers` | `id` UUID | from_location, to_location | batch_id -> inventory_batches, from/to -> locations | 018 |
-| `suppliers` | `id` UUID | name (UNIQUE), is_deleted | -- | 021, 025 |
+| `suppliers` | `id` UUID | name (UNIQUE), is_deleted, category_code, sub_category_code | category_code -> fin_categories | 021, 025, 032 |
 | `purchase_logs` | `id` UUID | quantity, price_per_unit, invoice_date, expense_id | nomenclature_id -> nomenclature, supplier_id -> suppliers, expense_id -> expense_ledger | 021, 030 |
 | `orders` | `id` UUID | source, status, customer_name, total_amount | -- | 022 |
 | `order_items` | `id` UUID | quantity, price_at_purchase | order_id -> orders (CASCADE), nomenclature_id -> nomenclature | 022 |

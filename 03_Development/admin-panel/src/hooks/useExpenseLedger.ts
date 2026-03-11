@@ -100,6 +100,10 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
     setError(null)
 
     // Separate queries + JS join — per CLAUDE.md rule #3
+    // This pattern is equivalent to LEFT JOIN: rows with NULL category_code
+    // are still returned — they just get category_name = null in JS mapping.
+    // NEVER use `.select('*, fin_categories(name)')` which acts as INNER JOIN
+    // and would silently hide rows where the FK is NULL.
     const [ledgerRes, catRes, subCatRes, supRes] = await Promise.all([
       supabase
         .from('expense_ledger')

@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-11T01:30 (ICT)  
+**Последнее обновление:** 2026-03-11T02:30 (ICT)  
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -1210,3 +1210,40 @@ The ExpenseHistory table was upgraded from a basic read-only list into an analyt
 - **Client-side filtering/sorting**: All expense rows already loaded by `useExpenseLedger`. Filters and sort computed via `useMemo` — no additional DB queries.
 - **Single-expand**: Only one row can be expanded at a time. Expanding another collapses the previous.
 - **CLAUDE.md Rule #3**: All spoke queries use separate Supabase calls + JS join (no implicit joins).
+
+---
+
+## Phase 4.5b: Ledger Visibility Fix — Supplier Default Categories (2026-03-11)
+
+### Root Cause
+
+CEO rule: "1 RECEIPT = 1 ROW in expense_ledger — ALWAYS visible". The Makro test receipt was inserted with `category_code = NULL` because `fn_approve_receipt` took `category_code` directly from the payload, and StagingArea defaulted it to empty.
+
+### Migration 032: fix_ledger_visibility.sql
+
+| Part | Change | Description |
+|---|---|---|
+| 1 | ALTER TABLE `suppliers` | Added `category_code` (FK→fin_categories) and `sub_category_code` columns |
+| 2 | UPDATE `suppliers` | Set default categories for all 19+ known suppliers (Makro→4100 Food, construction→1100, equipment→1200, etc.) |
+| 3 | UPDATE `expense_ledger` | Backfill NULL category_code from supplier defaults; fallback to 2000 (Operating Expenses) |
+| 4 | CREATE OR REPLACE `fn_approve_receipt` | 3-tier category resolution: payload → supplier default → 2000 fallback. Category can NEVER be NULL again. |
+
+### Category Resolution Chain (fn_approve_receipt)
+
+```
+payload.category_code  →  suppliers.category_code  →  2000 (Operating Expenses)
+     (user picks)            (supplier default)          (ultimate fallback)
+```
+
+### Frontend Verification
+
+| Check | Result |
+|---|---|
+| `useExpenseLedger.ts` uses `.select('*')` + JS join | ✅ Equivalent to LEFT JOIN — rows with NULL FK still returned |
+| ExpenseHistory renders `category_name ?? '—'` | ✅ NULL-safe rendering |
+| ExpenseFilterPanel default = no filters | ✅ All rows pass through |
+| `tsc -b && npm run build` | ✅ 0 errors |
+
+### Boris Rule: NEVER use implicit Supabase joins for nullable FKs
+
+Added comment in `useExpenseLedger.ts`: NEVER use `.select('*, fin_categories(name)')` pattern — it acts as INNER JOIN and silently hides rows where FK is NULL. Always use separate queries + JS join (CLAUDE.md Rule #3).
