@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-11T03:00 (ICT)
+**Последнее обновление:** 2026-03-11T04:00 (ICT)
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -1276,5 +1276,50 @@ payload.supplier_id  →  ILIKE name lookup  →  AUTO-CREATE new supplier  → 
 |---|---|
 | `ExpenseFilterPanel.tsx` | Added `searchText` field to `ExpenseFilters` interface + search input with 🔍 icon and clear button |
 | `ExpenseHistory.tsx` | Text search filters across: supplier_name, details, comments, category_name, sub_category_name |
+
+### Build: `tsc -b && vite build` = ✅ 0 errors
+
+## Phase 4.5d: "Zero Data Loss" Architecture & Document Classification (2026-03-11)
+
+### CEO Requirements
+"The system adapts to the receipt, not the other way around." Three critical problems fixed:
+1. Lost food items when no nomenclature match existed
+2. Fake date overwrite (CURRENT_DATE) violating ERP standards
+3. Positional document classification instead of AI-based
+
+### Migration 034: zero_data_loss.sql
+
+| Part | Change | Description |
+|---|---|---|
+| A | DELETE test Makro receipt | Removes broken 179 THB test data (spokes + hub) |
+| B | CREATE OR REPLACE `fn_approve_receipt` v4 | Auto-create nomenclature: `RAW-AUTO-{hash}` for unmapped food items. Returns `auto_created` count. |
+
+### fn_approve_receipt v4 — Resolution Chains
+
+```
+Supplier:  payload.supplier_id → ILIKE name lookup → AUTO-CREATE new supplier
+Category:  payload.category_code → supplier.category_code → 2000 fallback
+Nomenclature: payload.nomenclature_id → AUTO-CREATE RAW-AUTO-{8hex} (type='good', base_unit from item)
+```
+
+### Edge Function: parse-receipts
+
+| Feature | Description |
+|---|---|
+| Document Classification | New `documents` field: `{tax_invoice_index, supplier_receipt_index, bank_slip_index}` |
+| Thai Receipt Reality | Same index allowed for both tax_invoice and supplier_receipt (common "Receipt / Tax Invoice") |
+| Unit Normalization | Food items normalized to kg/L/pcs. Never bag/box/pack. "1 bag 500g" → qty=0.5, unit=kg |
+| Max tokens | 2000 → 3000 |
+
+### Frontend Changes
+
+| File | Change |
+|---|---|
+| `receipt.ts` | Added `DocumentClassification` interface, `documents?` on `ParsedReceipt`, `nomenclature_id?: string \| null` |
+| `MagicDropzone.tsx` | AI-based URL mapping (not positional). Neutral `img/` storage prefix. `onUrlsReady` called AFTER classification |
+| `StagingArea.tsx` | "➕ Create new" option in nomenclature dropdown (violet border). Doc classification banner. `has_tax_invoice` auto-detect. Payload transforms `__NEW__` → null |
+
+### Boris Rule #12 (CLAUDE.md)
+"NEVER overwrite historical transaction_date. Dates come strictly from source documents."
 
 ### Build: `tsc -b && vite build` = ✅ 0 errors

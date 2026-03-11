@@ -3,16 +3,25 @@
 // Phase 4.4: AI Receipt Clustering & Smart Line-Item Routing
 // ═══════════════════════════════════════════════════════════
 
+/** AI-classified document positions from the uploaded images array */
+export interface DocumentClassification {
+  tax_invoice_index: number | null
+  supplier_receipt_index: number | null
+  bank_slip_index: number | null
+}
+
 /** Parsed receipt data returned by the parse-receipts Edge Function */
 export interface ParsedReceipt {
   supplier_name: string
   invoice_number: string | null
   total_amount: number
   currency: string
-  transaction_date: string // YYYY-MM-DD
+  transaction_date: string // YYYY-MM-DD — strictly from document, never today
   food_items: FoodItem[]
   capex_items: CapexItem[]
   opex_items: OpexItem[]
+  /** AI classification of which uploaded image is which document type */
+  documents?: DocumentClassification
 }
 
 /** Food ingredient line item → inserts into purchase_logs */
@@ -22,8 +31,8 @@ export interface FoodItem {
   unit: string
   unit_price: number
   total_price: number
-  /** Assigned by user in StagingArea dropdown — required before approve */
-  nomenclature_id?: string
+  /** Assigned by user in StagingArea dropdown, or '__NEW__' for auto-create, or null */
+  nomenclature_id?: string | null
 }
 
 /** Capital equipment line item → inserts into capex_transactions */

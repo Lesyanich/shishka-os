@@ -25,22 +25,42 @@ Return ONLY valid JSON with this exact schema:
   "invoice_number": "string or null — receipt or invoice number if visible",
   "total_amount": number,
   "currency": "THB" or "USD" or "EUR" etc.,
-  "transaction_date": "YYYY-MM-DD — date from the receipt",
+  "transaction_date": "YYYY-MM-DD — date from the receipt (STRICTLY from the document, never today's date)",
   "food_items": [
-    { "name": "string", "quantity": number, "unit": "kg|pcs|g|liters|pack", "unit_price": number, "total_price": number }
+    { "name": "string", "quantity": number, "unit": "kg|L|pcs", "unit_price": number, "total_price": number }
   ],
   "capex_items": [
     { "name": "string", "quantity": number, "unit_price": number, "total_price": number }
   ],
   "opex_items": [
-    { "description": "string", "quantity": number, "unit": "pcs|pack|roll|bottle", "unit_price": number, "total_price": number }
-  ]
+    { "description": "string", "quantity": number, "unit": "pcs|roll|bottle", "unit_price": number, "total_price": number }
+  ],
+  "documents": {
+    "tax_invoice_index": number or null,
+    "supplier_receipt_index": number or null,
+    "bank_slip_index": number or null
+  }
 }
 
-Classification rules:
+Item classification rules:
 - food_items: raw ingredients, produce, proteins, grains, dairy, spices, sauces, oils — anything that goes INTO food production
 - capex_items: equipment, machinery, furniture, construction materials, IT hardware, appliances — assets with useful life > 1 year
 - opex_items: cleaning supplies, packaging materials, disposable containers, office supplies, services, delivery fees — consumables used up quickly
+
+Unit normalization (CRITICAL for BOM integrity):
+- Always normalize food_items unit to standard metric: kg, L, or pcs
+- If receipt says "1 bag of 500g", extract quantity as 0.5 and unit as "kg"
+- If receipt says "2 boxes of 12 pcs", extract quantity as 24 and unit as "pcs"
+- Convert grams to kg (divide by 1000), milliliters to L (divide by 1000)
+- NEVER use bag, box, pack, bundle, can, bottle as food_items unit — always convert to kg, L, or pcs
+
+Document classification (0-based image indices):
+- tax_invoice_index: image that is a tax invoice (has tax ID number, VAT breakdown, official government format)
+- supplier_receipt_index: image that is a supplier receipt or POS receipt (itemized list from store/supplier)
+- bank_slip_index: image that is a bank transfer slip or payment proof
+- If only one image, classify it and set the matching index to 0, others to null
+- IMPORTANT: In Thailand, a single document often serves as BOTH receipt and tax invoice (printed "Receipt / Tax Invoice"). If so, set the SAME image index for both supplier_receipt_index AND tax_invoice_index
+- If a document type is not present, set its index to null
 
 If a category has no items, return an empty array [].
 If you cannot determine a field, use null.
@@ -127,7 +147,7 @@ Deno.serve(async (req: Request) => {
             ],
           },
         ],
-        max_tokens: 2000,
+        max_tokens: 3000,
         temperature: 0.1,
         response_format: { type: "json_object" },
       }),
@@ -158,15 +178,23 @@ Deno.serve(async (req: Request) => {
 
     const parsed = JSON.parse(content)
 
-    // Ensure arrays exist (defensive)
+    // Ensure arrays and objects exist (defensive)
     parsed.food_items = parsed.food_items ?? []
     parsed.capex_items = parsed.capex_items ?? []
     parsed.opex_items = parsed.opex_items ?? []
+    parsed.documents = parsed.documents ?? {
+      tax_invoice_index: null,
+      supplier_receipt_index: null,
+      bank_slip_index: null,
+    }
 
     console.log(
       `[parse-receipts] OK: ${parsed.supplier_name}, ` +
         `food=${parsed.food_items.length}, capex=${parsed.capex_items.length}, ` +
-        `opex=${parsed.opex_items.length}`,
+        `opex=${parsed.opex_items.length}, ` +
+        `docs: tax=${parsed.documents.tax_invoice_index}, ` +
+        `supplier=${parsed.documents.supplier_receipt_index}, ` +
+        `bank=${parsed.documents.bank_slip_index}`,
     )
 
     return new Response(JSON.stringify(parsed), {

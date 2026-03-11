@@ -43,6 +43,9 @@ When any migration **creates or alters** a table/function/trigger/enum, the agen
 2. `02_Obsidian_Vault/Database Schema.md` — updated if any migration touched tables, policies, RPCs, or ENUMs
 3. Both files staged and included in the commit (or a separate `chore:` commit before push)
 
+## 📅 Data Integrity: Transaction Dates (Boris Rule #12)
+**NEVER** overwrite historical `transaction_date` values. Dates come STRICTLY from source documents (receipt, invoice). `CURRENT_DATE` is only acceptable as an absolute last-resort fallback in the RPC when the frontend fails to provide a date. Migrations must NEVER set `transaction_date = CURRENT_DATE` to "fix" sorting — this violates ERP audit standards.
+
 ## 📂 Context Routing (Point, Don't Dump)
 - **Global Rules:** Read `gemini.md`
 - **Database State & Schema:** Read `02_Obsidian_Vault/Database Schema.md` (erDiagram) + `02_Obsidian_Vault/Handover/STATE.md`

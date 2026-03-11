@@ -188,11 +188,15 @@ export function StagingArea({
         paid_by: paidBy.trim(),
         payment_method: paymentMethod,
         status: 'paid',
-        has_tax_invoice: false,
+        has_tax_invoice: !!receiptUrls.tax,
         receipt_supplier_url: receiptUrls.supplier ?? null,
         receipt_bank_url: receiptUrls.bank ?? null,
         tax_invoice_url: receiptUrls.tax ?? null,
-        food_items: foodItems,
+        // Transform __NEW__ sentinel → null so RPC auto-creates nomenclature
+        food_items: foodItems.map((f) => ({
+          ...f,
+          nomenclature_id: f.nomenclature_id === '__NEW__' ? null : f.nomenclature_id,
+        })),
         capex_items: capexItems,
         opex_items: opexItems,
       }
@@ -431,6 +435,35 @@ export function StagingArea({
           </div>
         </div>
 
+        {/* Document classification banner */}
+        {receipt.documents && (
+          <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-slate-700/40 bg-slate-800/30 px-4 py-2.5">
+            <Sparkles className="h-3.5 w-3.5 text-indigo-400/70" />
+            <span className="text-[11px] font-medium text-slate-500">Documents:</span>
+            {receipt.documents.supplier_receipt_index != null && (
+              <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300 ring-1 ring-emerald-500/20">
+                Image {receipt.documents.supplier_receipt_index + 1} = Supplier Receipt
+              </span>
+            )}
+            {receipt.documents.tax_invoice_index != null && (
+              <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300 ring-1 ring-amber-500/20">
+                Image {receipt.documents.tax_invoice_index + 1} = Tax Invoice
+              </span>
+            )}
+            {receipt.documents.bank_slip_index != null && (
+              <span className="rounded-md bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300 ring-1 ring-cyan-500/20">
+                Image {receipt.documents.bank_slip_index + 1} = Bank Slip
+              </span>
+            )}
+            {receipt.documents.supplier_receipt_index === receipt.documents.tax_invoice_index &&
+              receipt.documents.supplier_receipt_index != null && (
+              <span className="text-[10px] italic text-slate-500">
+                (same document)
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Divider */}
         <div className="flex items-center gap-3">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-700/50 to-transparent" />
@@ -507,10 +540,17 @@ export function StagingArea({
                   className={`${selectCls} ${
                     !item.nomenclature_id
                       ? 'border-amber-500/40 ring-1 ring-amber-500/10'
-                      : 'border-emerald-500/30'
+                      : item.nomenclature_id === '__NEW__'
+                        ? 'border-violet-500/40 ring-1 ring-violet-500/10'
+                        : 'border-emerald-500/30'
                   }`}
                 >
                   <option value="">Map to item...</option>
+                  {item.name && (
+                    <option value="__NEW__">
+                      ➕ Create new: &quot;{item.name}&quot;
+                    </option>
+                  )}
                   {nomenclatureList.map((n) => (
                     <option key={n.id} value={n.id}>
                       {n.product_code} &mdash; {n.name}
@@ -750,7 +790,7 @@ export function StagingArea({
                 <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
                   <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
                   <p className="text-[11px] leading-relaxed text-amber-300/80">
-                    All food items must be mapped to nomenclature before approval
+                    All food items must be mapped to nomenclature or marked &quot;Create new&quot; before approval
                   </p>
                 </div>
               )}

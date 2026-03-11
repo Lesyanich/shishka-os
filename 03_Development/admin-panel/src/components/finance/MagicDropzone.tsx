@@ -70,16 +70,16 @@ async function compressImage(file: File): Promise<File> {
 /* ────────────────────────── Upload helper ────────────────────────── */
 
 async function uploadToStorage(file: File, index: number): Promise<string | null> {
-  const prefix = index === 0 ? 'supplier' : index === 1 ? 'bank' : 'tax'
+  // Neutral prefix — AI classification determines document type, not upload order
   const ext = file.name.split('.').pop() ?? 'jpg'
-  const filePath = `${prefix}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const filePath = `img/${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}.${ext}`
 
   const { error } = await supabase.storage
     .from('receipts')
     .upload(filePath, file, { upsert: false })
 
   if (error) {
-    console.error(`[MagicDropzone] upload error for ${prefix}`, error)
+    console.error(`[MagicDropzone] upload error for file ${index}`, error)
     return null
   }
 
@@ -141,31 +141,20 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
     setToast(null)
 
     try {
-      // Step 1: Compress + upload to Storage (keep existing logic)
+      // Step 1: Compress + upload to Storage
       const compressed = await Promise.all(files.map((f) => compressImage(f.file)))
       const uploadedUrls = await Promise.all(
         compressed.map((f, i) => uploadToStorage(f, i)),
       )
+      const imageUrls = uploadedUrls.filter((u): u is string => u !== null)
 
-      const receiptUrls: ReceiptUrls = {}
-      if (uploadedUrls[0]) receiptUrls.supplier = uploadedUrls[0]
-      if (uploadedUrls[1]) receiptUrls.bank = uploadedUrls[1]
-      if (uploadedUrls[2]) receiptUrls.tax = uploadedUrls[2]
+      if (imageUrls.length === 0) {
+        setToast('No images uploaded — cannot analyze')
+        return
+      }
 
-      // Always pass URLs to parent for backward compat
-      onUrlsReady(receiptUrls)
-
-      // Step 2: If AI callback provided, call Edge Function
+      // Step 2: If AI callback provided, call Edge Function + classify documents
       if (onAiResult) {
-        const imageUrls = uploadedUrls.filter(
-          (u): u is string => u !== null,
-        )
-
-        if (imageUrls.length === 0) {
-          setToast('No images uploaded — cannot analyze')
-          return
-        }
-
         const { data, error } = await supabase.functions.invoke(
           'parse-receipts',
           { body: { image_urls: imageUrls } },
@@ -174,7 +163,31 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
         if (error) throw error
         if (data?.error) throw new Error(data.error)
 
-        onAiResult(data as ParsedReceipt, receiptUrls)
+        const parsed = data as ParsedReceipt
+
+        // Step 3: Build receiptUrls from AI document classification
+        const receiptUrls: ReceiptUrls = {}
+        const docs = parsed.documents
+
+        if (docs) {
+          if (docs.supplier_receipt_index != null && imageUrls[docs.supplier_receipt_index]) {
+            receiptUrls.supplier = imageUrls[docs.supplier_receipt_index]
+          }
+          if (docs.bank_slip_index != null && imageUrls[docs.bank_slip_index]) {
+            receiptUrls.bank = imageUrls[docs.bank_slip_index]
+          }
+          if (docs.tax_invoice_index != null && imageUrls[docs.tax_invoice_index]) {
+            receiptUrls.tax = imageUrls[docs.tax_invoice_index]
+          }
+        } else {
+          // Fallback: positional mapping (backward compat)
+          if (imageUrls[0]) receiptUrls.supplier = imageUrls[0]
+          if (imageUrls[1]) receiptUrls.bank = imageUrls[1]
+          if (imageUrls[2]) receiptUrls.tax = imageUrls[2]
+        }
+
+        onUrlsReady(receiptUrls)
+        onAiResult(parsed, receiptUrls)
 
         // Clear files on success
         for (const f of files) {
@@ -182,7 +195,13 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
         }
         setFiles([])
       } else {
-        // No AI callback — legacy mock path
+        // No AI callback — legacy positional path
+        const receiptUrls: ReceiptUrls = {}
+        if (imageUrls[0]) receiptUrls.supplier = imageUrls[0]
+        if (imageUrls[1]) receiptUrls.bank = imageUrls[1]
+        if (imageUrls[2]) receiptUrls.tax = imageUrls[2]
+
+        onUrlsReady(receiptUrls)
         setToast('AI API not connected yet — files uploaded directly')
         for (const f of files) {
           if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
