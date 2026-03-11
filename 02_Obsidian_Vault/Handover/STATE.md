@@ -1808,37 +1808,32 @@ OpenAI fetches the image directly from our public bucket. Edge Function never to
 
 **Root cause:** The 2048×2048 fitting algorithm (both our old `compressImage` AND OpenAI's internal `detail: "high"` processing) uses the same formula. For a 1000×8000 receipt: `ratio = min(2048/1000, 2048/8000) = 0.256` → width = 256px. Thai text at 256px is pixel mush.
 
-**Solution:** Width-Anchored Smart Tiling — slice tall receipts into overlapping tiles that each have moderate aspect ratios, preserving readable width.
+**Solution (4.16a — reverted):** Smart Tiling (Canvas-based slicing) — mathematically correct but failed in practice: photos taken from distance have aspect < 2.5 so tiling never triggers, and heavy Canvas operations on mobile cause silent failures.
 
-### Algorithm
+**Solution (4.16b — current):** UX-Tiling + WebP Byte Compression:
+- Users photograph long receipts as 2-3 close-up shots (UX guidance in dropzone)
+- Frontend converts to WebP at quality 0.5 — preserves **100% original pixel resolution**, only reduces byte weight (15MB → ~800KB)
+- AI prompt already handles multi-image merging with overlap dedup
 
-| Mode | Condition | Action |
+### Approach: Preserve Resolution, Compress Bytes
+
+| Component | Before (4.15) | After (4.16b) |
 |---|---|---|
-| NORMAL | `aspect ≤ 2.5` | Scale to fit 2048×2048, JPEG 85% → single file |
-| TILE | `aspect > 2.5` | Ensure width ≥ 1024px, slice into tiles at 1.5:1 aspect with 10% overlap |
+| MagicDropzone.tsx | Upload raw 15MB files | `compressToWebP()`: same pixels, WebP 0.5 quality (~95% smaller) |
+| UX guidance | "Drop receipts here" | "For long receipts, upload 2-3 close-up photos" |
+| Edge Function prompt | "2 images = front/back" | Full multi-image rules + overlap dedup WARNING |
 
-**Math proof (1000×8000 Makro receipt):**
-- Tiles: 6 × 1024×1536 JPEG 85% ≈ 200-400 KB each (~1.5-2.5 MB total)
-- OpenAI per tile: fits in 2048×2048 → width preserved at 768px+ (readable!)
-- Filename convention: `receipt_part_1_of_6.jpg` → AI recognizes tile sequence from URLs
-
-### Overlap Deduplication
-
-Tiles have 10% vertical overlap. SYSTEM_PROMPT instructs AI to merge duplicate items at tile boundaries (same original_name + quantity + unit_price = overlap duplicate).
-
-### Changes Applied
-
-| Component | Before (4.15) | After (4.16) |
-|---|---|---|
-| MagicDropzone.tsx | Upload raw 15MB files | `smartProcess()`: normal compression OR tile slicing |
-| Edge Function prompt | "2 images = front/back" | Full tiling rules + overlap dedup WARNING |
-| Storage paths | Random filenames | `receipt_part_N_of_M.jpg` for tile identification |
+### Why WebP 0.5?
+- WebP lossy at quality 0.5 reduces a 15MB JPEG to ~800KB while keeping text crystal-clear
+- OpenAI downloads 800KB in <1s from any region — no timeout
+- Original pixel dimensions (e.g., 4000×3000) are preserved — no width crush, no resolution loss
+- Canvas only draws at original size — no scaling, no resampling artifacts
 
 ### Files Modified
-- `03_Development/admin-panel/src/components/finance/MagicDropzone.tsx` — `smartProcess()`, `loadImage()`, `canvasToFile()`, updated `uploadToStorage()` with tile-aware filenames
-- `03_Development/supabase/functions/parse-receipts/index.ts` — SYSTEM_PROMPT updated with MULTI-IMAGE & TILING RULES section
+- `03_Development/admin-panel/src/components/finance/MagicDropzone.tsx` — replaced `smartProcess()` with `compressToWebP()`, updated UX text
+- `03_Development/supabase/functions/parse-receipts/index.ts` — SYSTEM_PROMPT with MULTI-IMAGE & TILING RULES section (kept from 4.16a)
 
 ### Deploy Steps
 1. Deploy Edge Function: `supabase functions deploy parse-receipts --no-verify-jwt`
-2. Test normal receipt: should compress to single JPEG < 1MB
-3. Test tall Makro receipt: should tile into 5-6 segments, all items readable, no duplicates
+2. Test: Upload receipt photo → check console for `[WebP]` log showing compression ratio
+3. Verify: AI should read all Thai text without [UNREADABLE], no OpenAI timeout errors

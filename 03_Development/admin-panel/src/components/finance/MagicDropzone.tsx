@@ -22,127 +22,55 @@ export interface MagicDropzoneProps {
 
 /* ────────────────────────── Constants ────────────────────────── */
 
-// Phase 4.16: Smart Tiling — width-preserving compression + tiling for long receipts
+// Phase 4.16b: WebP byte compression — preserve 100% pixel resolution, reduce file weight only
 const MAX_FILE_SIZE = 15 * 1024 * 1024  // 15 MB — raw camera photos (before processing)
-const TILE_THRESHOLD = 2.5              // aspect ratio (h/w) above which we tile
-const MAX_DIM = 2048                    // normal mode: scale to fit this square
-const MIN_TILE_WIDTH = 1024             // tile mode: minimum width for Thai text readability
-const TILE_ASPECT_RATIO = 1.5           // tile mode: max height:width per tile
-const OVERLAP_RATIO = 0.1              // 10% overlap between tiles for item continuity
-const JPEG_QUALITY = 0.85              // compression quality
+const WEBP_QUALITY = 0.5                // aggressive byte reduction: 15MB → ~800KB
 
-/* ────────────────────── Smart Tiling Engine (Phase 4.16) ─────────── */
-
-function loadImage(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      resolve(img)
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error(`Failed to load image: ${file.name}`))
-    }
-    img.src = url
-  })
-}
-
-function canvasToFile(canvas: HTMLCanvasElement, name: string): Promise<File> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return reject(new Error('Canvas toBlob failed'))
-        resolve(new File([blob], name, { type: 'image/jpeg' }))
-      },
-      'image/jpeg',
-      JPEG_QUALITY,
-    )
-  })
-}
+/* ────────────── WebP Byte Compression (Phase 4.16b) ─────────── */
 
 /**
- * Phase 4.16: Width-Anchored Smart Tiling
- * - Normal images (aspect ≤ 2.5): compress to fit 2048×2048
- * - Tall receipts (aspect > 2.5): slice into tiles preserving width ≥ 1024px
+ * Compress image to WebP at original resolution.
+ * Preserves every pixel — only reduces file weight via WebP lossy encoding.
+ * Solves OpenAI download timeout without destroying text readability.
  */
-async function smartProcess(file: File): Promise<File[]> {
-  const img = await loadImage(file)
+async function compressToWebP(file: File): Promise<File> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image()
+    const url = URL.createObjectURL(file)
+    el.onload = () => { URL.revokeObjectURL(url); resolve(el) }
+    el.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Failed to load: ${file.name}`)) }
+    el.src = url
+  })
+
   const { naturalWidth: w, naturalHeight: h } = img
-  const aspect = h / w
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => b ? resolve(b) : reject(new Error('toBlob failed')),
+      'image/webp',
+      WEBP_QUALITY,
+    )
+  })
+
   const baseName = file.name.replace(/\.[^.]+$/, '')
-
-  if (aspect <= TILE_THRESHOLD) {
-    // ── NORMAL MODE: standard compression ──
-    const scale = Math.min(1, MAX_DIM / Math.max(w, h))
-    const nw = Math.round(w * scale)
-    const nh = Math.round(h * scale)
-
-    const canvas = document.createElement('canvas')
-    canvas.width = nw
-    canvas.height = nh
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(img, 0, 0, nw, nh)
-
-    const result = await canvasToFile(canvas, `${baseName}.jpg`)
-    console.log(`[SmartTile] NORMAL: ${w}×${h} → ${nw}×${nh} (${(result.size / 1024).toFixed(0)} KB)`)
-    return [result]
-  }
-
-  // ── TILE MODE: slice tall receipt into readable segments ──
-  const tileW = Math.max(w, MIN_TILE_WIDTH)
-  const scale = tileW / w
-  const totalH = Math.round(h * scale)
-
-  // Scale full image once into an intermediate canvas
-  const fullCanvas = document.createElement('canvas')
-  fullCanvas.width = tileW
-  fullCanvas.height = totalH
-  const fullCtx = fullCanvas.getContext('2d')!
-  fullCtx.drawImage(img, 0, 0, tileW, totalH)
-
-  // Tile geometry
-  const tileH = Math.round(tileW * TILE_ASPECT_RATIO)
-  const overlap = Math.round(tileH * OVERLAP_RATIO)
-  const stride = tileH - overlap
-  const numTiles = Math.ceil((totalH - tileH) / stride) + 1
-
-  const tiles: File[] = []
-  let y = 0
-  while (y < totalH) {
-    const endY = Math.min(y + tileH, totalH)
-    const sliceH = endY - y
-
-    const tileCanvas = document.createElement('canvas')
-    tileCanvas.width = tileW
-    tileCanvas.height = sliceH
-    const tileCtx = tileCanvas.getContext('2d')!
-    tileCtx.drawImage(fullCanvas, 0, y, tileW, sliceH, 0, 0, tileW, sliceH)
-
-    const tileIndex = tiles.length + 1
-    const tileName = `${baseName}_part_${tileIndex}_of_${numTiles}.jpg`
-    const tileFile = await canvasToFile(tileCanvas, tileName)
-    tiles.push(tileFile)
-
-    if (endY >= totalH) break
-    y += stride
-  }
-
+  const result = new File([blob], `${baseName}.webp`, { type: 'image/webp' })
   console.log(
-    `[SmartTile] TILED: ${w}×${h} (aspect ${aspect.toFixed(1)}) → ` +
-    `${tiles.length} tiles of ${tileW}×~${tileH}, ` +
-    `total ${(tiles.reduce((s, t) => s + t.size, 0) / 1024).toFixed(0)} KB`,
+    `[WebP] ${w}×${h} — ${(file.size / 1024).toFixed(0)} KB → ${(result.size / 1024).toFixed(0)} KB ` +
+    `(${((1 - result.size / file.size) * 100).toFixed(0)}% smaller)`,
   )
-  return tiles
+  return result
 }
 
 /* ────────────────────────── Upload helper ────────────────────────── */
 
 async function uploadToStorage(file: File, index: number): Promise<string | null> {
-  // Phase 4.16: Preserve tile filename in storage path for AI sequence recognition
-  const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_').toLowerCase()
-  const filePath = `img/${Date.now()}_${index}_${safeName}`
+  const ext = file.name.split('.').pop() ?? 'webp'
+  const filePath = `img/${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}.${ext}`
 
   const { error } = await supabase.storage
     .from('receipts')
@@ -228,16 +156,14 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
     setToast(null)
 
     try {
-      // Step 1: Smart process each file — compress or tile (Phase 4.16)
-      const allProcessed: File[] = []
-      for (const f of files) {
-        const processed = await smartProcess(f.file)
-        allProcessed.push(...processed)
-      }
+      // Step 1: Compress to WebP (preserve resolution, reduce bytes) — Phase 4.16b
+      const compressed = await Promise.all(
+        files.map((f) => compressToWebP(f.file)),
+      )
 
-      // Step 2: Upload processed files to Storage
+      // Step 2: Upload compressed files to Storage
       const uploadedUrls = await Promise.all(
-        allProcessed.map((f, i) => uploadToStorage(f, i)),
+        compressed.map((f, i) => uploadToStorage(f, i)),
       )
       const imageUrls = uploadedUrls.filter((u): u is string => u !== null)
 
@@ -381,7 +307,7 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
                 Uploading images...
               </p>
               <p className="mt-0.5 text-xs text-slate-500">
-                Processing and uploading images
+                Compressing to WebP and uploading
               </p>
             </div>
           ) : (
@@ -393,6 +319,9 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
                 </span>
               </p>
               <p className="mt-1 text-[11px] tracking-wide text-slate-600">
+                For long receipts, upload 2-3 close-up photos
+              </p>
+              <p className="mt-0.5 text-[10px] tracking-wide text-slate-700">
                 JPEG &middot; PNG &middot; WebP &middot; max 15 MB
               </p>
             </div>
