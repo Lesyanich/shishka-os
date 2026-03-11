@@ -62,6 +62,19 @@ Document classification (0-based image indices):
 - IMPORTANT: In Thailand, a single document often serves as BOTH receipt and tax invoice (printed "Receipt / Tax Invoice"). If so, set the SAME image index for both supplier_receipt_index AND tax_invoice_index
 - If a document type is not present, set its index to null
 
+Language (CRITICAL — CEO does not read Thai):
+- ALL item names, descriptions, and supplier_name MUST be translated to English
+- Thai text on receipts must be translated, not transliterated
+- Example: "พริกหวาน" → "Sweet pepper" (NOT "Phrik Wan")
+- Example: "น้ำมันพืช" → "Vegetable oil" (NOT "Nam Man Phuet")
+- Example: "มะเขือเทศเชอร์รี่" → "Cherry tomato"
+- Keep the name CLEAN — do NOT include weight/quantity in the name field (e.g. "Sweet pepper", NOT "Sweet pepper 100g")
+
+Unit values (STRICT — only these 3 strings are valid for food_items.unit):
+- "kg" (not "kilograms", not "kgs", not "กก", not "กก.")
+- "L" (not "liters", not "litres", not "liter", not "ลิตร")
+- "pcs" (not "pieces", not "piece", not "ชิ้น")
+
 If a category has no items, return an empty array [].
 If you cannot determine a field, use null.
 All monetary values must be numbers (not strings).
