@@ -230,10 +230,11 @@ erDiagram
         JSONB image_urls
         JSONB result "ParsedReceipt JSON"
         TEXT error
+        TEXT ocr_text "Raw GCV OCR text for debugging"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ completed_at
         INTEGER duration_ms
-        TEXT model "default gpt-4o"
+        TEXT model "gcv+gpt-4o-mini"
     }
 
     nomenclature ||--o{ bom_structures : "parent_id"
@@ -300,7 +301,7 @@ erDiagram
 | `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030 |
 | `opex_items` | `id` UUID | description, quantity, unit, unit_price, total_price | expense_id -> expense_ledger (CASCADE) | 030 |
 | `supplier_item_mapping` | `id` UUID | supplier_sku, original_name, match_count | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE) | 035 |
-| `receipt_jobs` | `id` UUID | status, image_urls (JSONB), result (JSONB), error, duration_ms, model | -- (standalone, pre-approval) | 036 |
+| `receipt_jobs` | `id` UUID | status, image_urls (JSONB), result (JSONB), error, ocr_text, duration_ms, model | -- (standalone, pre-approval) | 036, 037 |
 
 ## Custom ENUM Types
 

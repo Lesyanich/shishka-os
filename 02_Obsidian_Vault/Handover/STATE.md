@@ -1837,3 +1837,57 @@ OpenAI fetches the image directly from our public bucket. Edge Function never to
 1. Deploy Edge Function: `supabase functions deploy parse-receipts --no-verify-jwt`
 2. Test: Upload receipt photo → check console for `[WebP]` log showing compression ratio
 3. Verify: AI should read all Thai text without [UNREADABLE], no OpenAI timeout errors
+
+## Phase 4.17: Two-Stage OCR Pipeline — GCV + gpt-4o-mini (2026-03-11)
+
+**Problem:** Even with WebP byte compression (4.16b), OpenAI Vision API internally fits all images to a 2048×2048 square. For tall receipts (1000×8000), this crushes width to ~256px, making Thai text unreadable. This is a **fundamental hardware limitation** of OpenAI Vision — no client-side workaround exists.
+
+**Solution:** Complete architectural pivot — separate OCR from structuring:
+- **Stage 1:** Google Cloud Vision API (`DOCUMENT_TEXT_DETECTION`) — 75 megapixel limit (vs 2048×2048), Thai+English language hints, accepts public imageUri
+- **Stage 2:** OpenAI `gpt-4o-mini` — text-to-JSON structuring (no image understanding needed), 15× cheaper than gpt-4o
+
+### Architecture: Two-Stage Pipeline
+
+| Stage | Engine | Input | Output | Cost |
+|---|---|---|---|---|
+| 1 — OCR | Google Cloud Vision | Public image URL | Raw Thai text (reading order) | $0.0015/image |
+| 2 — Structure | OpenAI gpt-4o-mini | OCR text string | Structured JSON (ParsedReceipt) | ~$0.002/receipt |
+| **Total** | | | | **~$0.0035** (was ~$0.03) |
+
+### Migration 037: `receipt_jobs.ocr_text`
+```sql
+ALTER TABLE receipt_jobs ADD COLUMN IF NOT EXISTS ocr_text TEXT;
+```
+Stores raw GCV OCR output for debugging when LLM misinterprets text.
+
+### Edge Function Changes (`parse-receipts/index.ts`)
+- Added `GOOGLE_CLOUD_VISION_API_KEY` env var
+- Added `callGoogleCloudVision(imageUrl)` — REST API call to GCV `DOCUMENT_TEXT_DETECTION` with language hints `["th", "en"]`
+- Added `ocrAllImages(imageUrls)` — sequential OCR with `=== IMAGE N OF M ===` separators
+- Created `SYSTEM_PROMPT_TEXT` — text-only adaptation (removed image refs, added OCR artifact handling, kept all business rules)
+- Rewrote `parseReceiptImages()` → returns `{ parsed, ocrText }` for DB storage
+- Model set to `"gcv+gpt-4o-mini"` in receipt_jobs
+- All post-processing preserved: schema validation, footer stripping, repetition detection, sum validation, legacy 3-array format
+
+### What Stayed Unchanged
+- Frontend (MagicDropzone, FinanceManager, StagingArea) — zero changes
+- compressToWebP — still useful (smaller files = faster GCV fetch)
+- Async job pipeline — same INSERT → invoke → Realtime flow
+- Output schema (ParsedReceipt) — identical JSON shape
+- fn_approve_receipt RPC — untouched
+
+### Performance
+| Metric | Before (gpt-4o Vision) | After (GCV + gpt-4o-mini) |
+|---|---|---|
+| Total time | 30-60s | ~10-20s |
+| Cost/receipt | ~$0.03 | ~$0.0035 |
+| Edge Function timeout risk | High (60s limit) | Low |
+
+### Secrets Required
+- `GOOGLE_CLOUD_VISION_API_KEY` — set in Supabase Secrets
+- `OPENAI_API_KEY` — existing (now used for gpt-4o-mini only)
+
+### Deploy Steps
+1. Migration 037 applied via `supabase db push`
+2. Edge Function deployed: `supabase functions deploy parse-receipts --no-verify-jwt`
+3. Test: Upload tall Makro receipt → verify all items readable, check `receipt_jobs.ocr_text` and `model = "gcv+gpt-4o-mini"`
