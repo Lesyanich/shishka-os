@@ -1,12 +1,13 @@
 // ═══════════════════════════════════════════════════════════
 // Edge Function: parse-receipts
-// Phase 4.14: Async Job Architecture + Anti-Loop
+// Phase 4.15: Zero-Footprint Vision Pipeline
 // Runtime: Deno (Supabase Edge Functions)
 // ═══════════════════════════════════════════════════════════
 // Model: gpt-4o (Thai OCR requires full model)
 // Mode: json_object + server-side schema validation
 // Anti-loop: temperature 0.2 + frequency_penalty 0.3 +
 //            original_name anchoring + dedup guard
+// Image delivery: direct public URL (no download/Base64)
 // ═══════════════════════════════════════════════════════════
 // DUAL MODE:
 //   Sync:  { image_urls: [...] } → returns ParsedReceipt (backward compat)
@@ -14,7 +15,6 @@
 //          returns { ok: true } immediately. Frontend listens via Realtime.
 // ═══════════════════════════════════════════════════════════
 
-import { Buffer } from "node:buffer"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")
@@ -107,33 +107,15 @@ function validateReceiptSchema(parsed: any): { warnings: string[] } {
 }
 
 // ── Core parsing logic — shared between sync and async modes ──
+// Phase 4.15: Zero-Footprint — pass public URLs directly to OpenAI (no download/Base64)
 // deno-lint-ignore no-explicit-any
 async function parseReceiptImages(image_urls: string[]): Promise<any> {
-  // Download images and convert to base64
-  const imageContent = await Promise.all(
-    image_urls.map(async (url: string) => {
-      try {
-        const imgResp = await fetch(url)
-        if (!imgResp.ok) throw new Error(`Failed to download ${url}: ${imgResp.status}`)
-        const buf = await imgResp.arrayBuffer()
-        const bytes = new Uint8Array(buf)
-        const b64 = Buffer.from(bytes).toString('base64')
-        const contentType = imgResp.headers.get("content-type") || "image/jpeg"
-        const dataUri = `data:${contentType};base64,${b64}`
-        console.log(`[parse-receipts] Encoded ${url.split("/").pop()}: ${(b64.length / 1024).toFixed(0)}KB base64`)
-        return {
-          type: "image_url" as const,
-          image_url: { url: dataUri, detail: "high" as const },
-        }
-      } catch (err) {
-        console.error(`[parse-receipts] Image download failed: ${url}`, err)
-        return {
-          type: "image_url" as const,
-          image_url: { url, detail: "high" as const },
-        }
-      }
-    }),
-  )
+  // Build image_url content blocks — OpenAI fetches images directly from our public bucket
+  const imageContent = image_urls.map((url: string) => ({
+    type: "image_url" as const,
+    image_url: { url, detail: "high" as const },
+  }))
+  console.log(`[parse-receipts] Sending ${imageContent.length} image URL(s) to OpenAI (zero-footprint)`)
 
   // Call OpenAI gpt-4o
   const response = await fetch("https://api.openai.com/v1/chat/completions", {

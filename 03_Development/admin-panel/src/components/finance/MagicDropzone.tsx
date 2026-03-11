@@ -20,55 +20,12 @@ export interface MagicDropzoneProps {
   isPending?: boolean
 }
 
-/* ────────────────────────── Smart Compression ────────────────────────── */
+/* ────────────────────────── Constants ────────────────────────── */
 
-// Phase 4.10: 2048px matches OpenAI's internal limit — zero quality loss.
-// JPEG 92% preserves Thai text while keeping files under 1.5 MB.
-// Old 1024px/80% made Thai text unreadable. Raw 15MB caused Edge Function OOM.
-const MAX_DIM = 2048
-const JPEG_QUALITY = 0.92
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB (post-compression: 500KB-1.5MB)
-
-async function compressImage(file: File): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-
-      let { width, height } = img
-      if (width > MAX_DIM || height > MAX_DIM) {
-        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height)
-        width = Math.round(width * ratio)
-        height = Math.round(height * ratio)
-      }
-
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return reject(new Error('Canvas not supported'))
-      ctx.drawImage(img, 0, 0, width, height)
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return reject(new Error('Compression failed'))
-          const compressed = new File([blob], file.name.replace(/\.\w+$/, '.jpg'), {
-            type: 'image/jpeg',
-          })
-          resolve(compressed)
-        },
-        'image/jpeg',
-        JPEG_QUALITY,
-      )
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('Failed to load image'))
-    }
-    img.src = url
-  })
-}
+// Phase 4.15: No frontend compression — OpenAI fetches full-res images directly
+// from our public Supabase Storage bucket via image_url. This preserves Thai text
+// on long Makro receipts that were previously crushed to unreadable 256px width.
+const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15 MB — raw high-res photos
 
 /* ────────────────────────── Upload helper ────────────────────────── */
 
@@ -115,7 +72,7 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
     const arr = Array.from(incoming).filter((f) => {
       if (!ACCEPT.includes(f.type)) return false
       if (f.size > MAX_FILE_SIZE) {
-        setToast(`File "${f.name}" exceeds 5 MB limit (${(f.size / 1024 / 1024).toFixed(1)} MB)`)
+        setToast(`File "${f.name}" exceeds 15 MB limit (${(f.size / 1024 / 1024).toFixed(1)} MB)`)
         return false
       }
       return true
@@ -161,10 +118,9 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
     setToast(null)
 
     try {
-      // Step 1: Smart compress (2048px/JPEG 92%) + upload to Storage
-      const compressed = await Promise.all(files.map((f) => compressImage(f.file)))
+      // Step 1: Upload raw files directly to Storage (no compression — Phase 4.15)
       const uploadedUrls = await Promise.all(
-        compressed.map((f, i) => uploadToStorage(f, i)),
+        files.map((f, i) => uploadToStorage(f.file, i)),
       )
       const imageUrls = uploadedUrls.filter((u): u is string => u !== null)
 
@@ -308,7 +264,7 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
                 Uploading images...
               </p>
               <p className="mt-0.5 text-xs text-slate-500">
-                Compressing and sending to storage
+                Sending full-resolution photos to storage
               </p>
             </div>
           ) : (
@@ -320,7 +276,7 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
                 </span>
               </p>
               <p className="mt-1 text-[11px] tracking-wide text-slate-600">
-                JPEG &middot; PNG &middot; WebP &middot; max 5 MB
+                JPEG &middot; PNG &middot; WebP &middot; max 15 MB
               </p>
             </div>
           )}

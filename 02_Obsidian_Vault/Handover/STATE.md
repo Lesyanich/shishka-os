@@ -1760,3 +1760,44 @@ Lazy cleanup: marks zombie jobs (stuck in processing > 5 min) as failed. Called 
 1. Apply migration: `supabase db push` or SQL Editor → run `036_receipt_jobs.sql`
 2. Deploy Edge Function: `supabase functions deploy parse-receipts --no-verify-jwt`
 3. Verify: Upload receipt → MagicDropzone returns immediately → StagingArea auto-opens when job completes
+
+## Phase 4.15: Zero-Footprint Vision Pipeline (2026-03-11)
+
+**Problem:** Frontend `compressImage()` resizes long Makro receipts (8000px tall) to 2048px max, crushing width to ~256px — Thai text becomes unreadable, OpenAI returns `[UNREADABLE]` for items. Meanwhile, the Edge Function downloads images and converts to Base64, consuming CPU/RAM and causing OOM/timeout risks.
+
+**Root cause:** OpenAI Vision API natively supports `image_url` with public URLs. Our images are in a public Supabase Storage bucket. The entire download→Base64 pipeline was unnecessary overhead.
+
+### Changes Applied
+
+| Component | Before (4.14) | After (4.15) | Impact |
+|---|---|---|---|
+| Edge Function | Download images → `Buffer.from(bytes).toString('base64')` → `data:image/jpeg;base64,...` | Pass public URL directly: `{ type: "image_url", image_url: { url } }` | Eliminates OOM/timeout risk, zero CPU/RAM for image handling |
+| Frontend | `compressImage()` (Canvas API, 2048px/JPEG 92%) | Raw file upload — no compression | Full-res photos preserved, Thai text readable |
+| File size limit | 5 MB | **15 MB** | Accepts high-res camera photos |
+| `node:buffer` import | Required for Base64 encoding | **Removed** | Cleaner dependencies |
+
+### Architecture: Zero-Footprint Pipeline
+
+```
+MagicDropzone                     Supabase Storage              Edge Function              OpenAI
+     │                                  │                            │                       │
+     ├─ Upload RAW photo (15MB) ───────►│ Public URL                 │                       │
+     │                                  │                            │                       │
+     ├─ INSERT receipt_jobs ────────────│────────────────────────────►│                       │
+     ├─ invoke('parse-receipts') ──────►│                            │                       │
+     │                                  │                            ├─ Pass URL ────────────►│
+     │                                  │                            │  (no download)         │ Fetch image
+     │                                  │◄───────────────────────────│────────────────────────┤ directly
+     │                                  │                            │                       │
+```
+
+OpenAI fetches the image directly from our public bucket. Edge Function never touches the image bytes.
+
+### Files Modified
+- `03_Development/supabase/functions/parse-receipts/index.ts` — removed `Buffer` import, removed download/Base64 logic, pass URLs directly
+- `03_Development/admin-panel/src/components/finance/MagicDropzone.tsx` — removed `compressImage()`, upload raw files, 15MB limit
+
+### Deploy Steps
+1. Deploy Edge Function: `supabase functions deploy parse-receipts --no-verify-jwt`
+2. Update Storage bucket size limit if needed: Dashboard → Storage → receipts → Settings → max file size → 15MB
+3. Test: Upload a full-res Makro receipt photo → all Thai text should be readable
