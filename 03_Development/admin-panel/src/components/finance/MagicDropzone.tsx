@@ -22,17 +22,127 @@ export interface MagicDropzoneProps {
 
 /* ────────────────────────── Constants ────────────────────────── */
 
-// Phase 4.15: No frontend compression — OpenAI fetches full-res images directly
-// from our public Supabase Storage bucket via image_url. This preserves Thai text
-// on long Makro receipts that were previously crushed to unreadable 256px width.
-const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15 MB — raw high-res photos
+// Phase 4.16: Smart Tiling — width-preserving compression + tiling for long receipts
+const MAX_FILE_SIZE = 15 * 1024 * 1024  // 15 MB — raw camera photos (before processing)
+const TILE_THRESHOLD = 2.5              // aspect ratio (h/w) above which we tile
+const MAX_DIM = 2048                    // normal mode: scale to fit this square
+const MIN_TILE_WIDTH = 1024             // tile mode: minimum width for Thai text readability
+const TILE_ASPECT_RATIO = 1.5           // tile mode: max height:width per tile
+const OVERLAP_RATIO = 0.1              // 10% overlap between tiles for item continuity
+const JPEG_QUALITY = 0.85              // compression quality
+
+/* ────────────────────── Smart Tiling Engine (Phase 4.16) ─────────── */
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(img)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error(`Failed to load image: ${file.name}`))
+    }
+    img.src = url
+  })
+}
+
+function canvasToFile(canvas: HTMLCanvasElement, name: string): Promise<File> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error('Canvas toBlob failed'))
+        resolve(new File([blob], name, { type: 'image/jpeg' }))
+      },
+      'image/jpeg',
+      JPEG_QUALITY,
+    )
+  })
+}
+
+/**
+ * Phase 4.16: Width-Anchored Smart Tiling
+ * - Normal images (aspect ≤ 2.5): compress to fit 2048×2048
+ * - Tall receipts (aspect > 2.5): slice into tiles preserving width ≥ 1024px
+ */
+async function smartProcess(file: File): Promise<File[]> {
+  const img = await loadImage(file)
+  const { naturalWidth: w, naturalHeight: h } = img
+  const aspect = h / w
+  const baseName = file.name.replace(/\.[^.]+$/, '')
+
+  if (aspect <= TILE_THRESHOLD) {
+    // ── NORMAL MODE: standard compression ──
+    const scale = Math.min(1, MAX_DIM / Math.max(w, h))
+    const nw = Math.round(w * scale)
+    const nh = Math.round(h * scale)
+
+    const canvas = document.createElement('canvas')
+    canvas.width = nw
+    canvas.height = nh
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(img, 0, 0, nw, nh)
+
+    const result = await canvasToFile(canvas, `${baseName}.jpg`)
+    console.log(`[SmartTile] NORMAL: ${w}×${h} → ${nw}×${nh} (${(result.size / 1024).toFixed(0)} KB)`)
+    return [result]
+  }
+
+  // ── TILE MODE: slice tall receipt into readable segments ──
+  const tileW = Math.max(w, MIN_TILE_WIDTH)
+  const scale = tileW / w
+  const totalH = Math.round(h * scale)
+
+  // Scale full image once into an intermediate canvas
+  const fullCanvas = document.createElement('canvas')
+  fullCanvas.width = tileW
+  fullCanvas.height = totalH
+  const fullCtx = fullCanvas.getContext('2d')!
+  fullCtx.drawImage(img, 0, 0, tileW, totalH)
+
+  // Tile geometry
+  const tileH = Math.round(tileW * TILE_ASPECT_RATIO)
+  const overlap = Math.round(tileH * OVERLAP_RATIO)
+  const stride = tileH - overlap
+  const numTiles = Math.ceil((totalH - tileH) / stride) + 1
+
+  const tiles: File[] = []
+  let y = 0
+  while (y < totalH) {
+    const endY = Math.min(y + tileH, totalH)
+    const sliceH = endY - y
+
+    const tileCanvas = document.createElement('canvas')
+    tileCanvas.width = tileW
+    tileCanvas.height = sliceH
+    const tileCtx = tileCanvas.getContext('2d')!
+    tileCtx.drawImage(fullCanvas, 0, y, tileW, sliceH, 0, 0, tileW, sliceH)
+
+    const tileIndex = tiles.length + 1
+    const tileName = `${baseName}_part_${tileIndex}_of_${numTiles}.jpg`
+    const tileFile = await canvasToFile(tileCanvas, tileName)
+    tiles.push(tileFile)
+
+    if (endY >= totalH) break
+    y += stride
+  }
+
+  console.log(
+    `[SmartTile] TILED: ${w}×${h} (aspect ${aspect.toFixed(1)}) → ` +
+    `${tiles.length} tiles of ${tileW}×~${tileH}, ` +
+    `total ${(tiles.reduce((s, t) => s + t.size, 0) / 1024).toFixed(0)} KB`,
+  )
+  return tiles
+}
 
 /* ────────────────────────── Upload helper ────────────────────────── */
 
 async function uploadToStorage(file: File, index: number): Promise<string | null> {
-  // Neutral prefix — AI classification determines document type, not upload order
-  const ext = file.name.split('.').pop() ?? 'jpg'
-  const filePath = `img/${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+  // Phase 4.16: Preserve tile filename in storage path for AI sequence recognition
+  const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_').toLowerCase()
+  const filePath = `img/${Date.now()}_${index}_${safeName}`
 
   const { error } = await supabase.storage
     .from('receipts')
@@ -118,9 +228,16 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
     setToast(null)
 
     try {
-      // Step 1: Upload raw files directly to Storage (no compression — Phase 4.15)
+      // Step 1: Smart process each file — compress or tile (Phase 4.16)
+      const allProcessed: File[] = []
+      for (const f of files) {
+        const processed = await smartProcess(f.file)
+        allProcessed.push(...processed)
+      }
+
+      // Step 2: Upload processed files to Storage
       const uploadedUrls = await Promise.all(
-        files.map((f, i) => uploadToStorage(f.file, i)),
+        allProcessed.map((f, i) => uploadToStorage(f, i)),
       )
       const imageUrls = uploadedUrls.filter((u): u is string => u !== null)
 
@@ -264,7 +381,7 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
                 Uploading images...
               </p>
               <p className="mt-0.5 text-xs text-slate-500">
-                Sending full-resolution photos to storage
+                Processing and uploading images
               </p>
             </div>
           ) : (

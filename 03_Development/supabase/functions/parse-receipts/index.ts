@@ -382,7 +382,19 @@ Return ONLY valid JSON with this structure:
 - One document can be BOTH receipt AND tax invoice — set SAME index
 - If a type is absent, set to null
 
-If two images are provided, they are the SAME receipt (front/back). Combine all items.
+## MULTI-IMAGE & TILING RULES
+- If exactly 2 images are provided, they are likely the SAME receipt (front/back). Combine all items into one list.
+- If image URLs contain "_part_N_of_M" patterns, these are consecutive TILES of a single long receipt sliced top-to-bottom.
+
+WARNING: Tiled images have ~10% vertical overlap between consecutive tiles.
+You MUST track item continuity across tile boundaries. If you see an item at the very
+bottom of tile N and the EXACT same item (same name, same quantity, same price) at the
+very top of tile N+1, it is the SAME physical row due to image overlap. MERGE them —
+do NOT list the item twice. When in doubt, compare original_name + quantity + unit_price:
+if all three match across a tile boundary, it is a duplicate from the overlap zone.
+
+For tiled receipts: supplier_receipt_index = 0 (the first tile always contains the store header).
+
 transaction_date must come from the receipt — NEVER use today's date.`
 
 Deno.serve(async (req: Request) => {
