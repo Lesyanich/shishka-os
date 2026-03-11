@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-11T06:00 (ICT)
+**Последнее обновление:** 2026-03-11T07:00 (ICT)
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -1385,3 +1385,44 @@ Save:    existing mapping → match_count++ (UPDATE)  |  new → INSERT (match_c
 ### Deploy Steps (CEO)
 1. Apply migration 035 in Supabase SQL Editor
 2. Deploy Edge Function: `supabase functions deploy parse-receipts`
+
+## Phase 4.7: OCR Resilience & UX Hotfixes (2026-03-11)
+
+### CEO Problems Found (Phase 4.6 Testing with Real Makro Receipt)
+1. **Massive Data Loss (again!)**: AI recognized only 1,061 THB out of 4,222 THB — model stops reading long receipt
+2. **No SKUs & Bad Translations**: AI ignored SKU extraction instructions and used generic translations ("Vegetable oil")
+3. **Supplier Category Bug**: Makro showed empty "-" in category field — no auto-fill from supplier defaults
+4. **Uncategorized Trap**: [UNCAT] items dumped into OpEx with no way to move them to Food
+
+### Fix 1: Edge Function — OCR Prompt Overhaul
+
+| Change | Description |
+|---|---|
+| Model | `gpt-4o-mini` → `gpt-4o` (mini can't handle Thai OCR on long receipts) |
+| Prompt | Complete rewrite to "Grid-based Extraction" method |
+| SKU | Mandatory for Makro receipts (6-13 digit codes) |
+| Translation | Expanded dictionary: 20+ Thai→English specific translations |
+| max_tokens | 4096 → 8192 (long receipts need more output space) |
+| temperature | 0.1 → 0.05 (more deterministic) |
+| User prompt | Explicit: "Scan grid line by line. Do NOT stop until TOTAL row." |
+
+### Fix 2: Supplier Category Auto-fill
+
+| File | Change |
+|---|---|
+| `StagingArea.tsx` | On mount: if supplier matched and category empty → auto-fill from `supplier.category_code` |
+| `StagingArea.tsx` | On supplier change: auto-fill category from supplier defaults when category is empty |
+| `useExpenseLedger.ts` | Already fetches `category_code` from suppliers (confirmed) |
+
+### Fix 3: "Move to Food" Button
+
+| File | Change |
+|---|---|
+| `StagingArea.tsx` | Added `moveOpexToFood(i)` handler: removes OpEx item → adds to Food items array |
+| `StagingArea.tsx` | Added ArrowUpRight icon button in each OpEx row (visible on hover, green tint) |
+| `StagingArea.tsx` | OpEx section headers updated to 7 columns (added "Move" column) |
+
+### Build: `tsc -b && vite build` = ✅ 0 errors
+
+### Deploy Steps (CEO)
+1. Deploy Edge Function: `supabase functions deploy parse-receipts` (new prompt + gpt-4o model)

@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   AlertTriangle,
+  ArrowUpRight,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -116,6 +117,14 @@ export function StagingArea({
   const [paidBy, setPaidBy] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
 
+  // ── Auto-fill category from supplier on initial match ──
+  useEffect(() => {
+    if (supplierId && categoryCode === '') {
+      const sup = suppliersList.find((s) => s.id === supplierId)
+      if (sup?.category_code) setCategoryCode(sup.category_code)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- only on mount
+
   // ── Line items state (editable) ──
   const [foodItems, setFoodItems] = useState<FoodItem[]>(
     () => receipt.food_items.map((f) => ({ ...f })),
@@ -207,6 +216,23 @@ export function StagingArea({
       ...prev,
       { description: '', quantity: 1, unit: 'pcs', unit_price: 0, total_price: 0 },
     ])
+
+  // Phase 4.7: Move opex/uncategorized item → food items
+  const moveOpexToFood = (i: number) => {
+    const item = opexItems[i]
+    setOpexItems((prev) => prev.filter((_, idx) => idx !== i))
+    setFoodItems((prev) => [
+      ...prev,
+      {
+        name: item.description,
+        quantity: item.quantity,
+        unit: item.unit || 'pcs',
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+      },
+    ])
+    if (!foodOpen) setFoodOpen(true)
+  }
 
   const handleApprove = async () => {
     setIsApproving(true)
@@ -321,7 +347,17 @@ export function StagingArea({
               <label className={labelCls}>Supplier</label>
               <select
                 value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
+                onChange={(e) => {
+                  const newId = e.target.value
+                  setSupplierId(newId)
+                  // Auto-fill category from supplier's default category_code
+                  if (newId) {
+                    const sup = suppliersList.find((s) => s.id === newId)
+                    if (sup?.category_code && categoryCode === '') {
+                      setCategoryCode(sup.category_code)
+                    }
+                  }
+                }}
                 className={selectCls}
               >
                 <option value="">Select supplier...</option>
@@ -732,8 +768,8 @@ export function StagingArea({
             open={opexOpen}
             onToggle={() => setOpexOpen(!opexOpen)}
             color="cyan"
-            headers={['Description', 'Qty', 'Unit', 'Price', 'Total', '']}
-            colWidths={['', 'w-16', 'w-16', 'w-20', 'w-20', 'w-8']}
+            headers={['Description', 'Qty', 'Unit', 'Price', 'Total', '', '']}
+            colWidths={['', 'w-16', 'w-16', 'w-20', 'w-20', 'w-8', 'w-8']}
           >
             {opexItems.map((item, i) => (
               <tr
@@ -786,6 +822,16 @@ export function StagingArea({
                 <td className="w-8 px-1.5 py-1.5">
                   <button
                     type="button"
+                    onClick={() => moveOpexToFood(i)}
+                    title="Move to Food items"
+                    className="rounded-lg p-1 text-slate-600 opacity-0 transition-all duration-150 hover:bg-emerald-500/10 hover:text-emerald-400 group-hover/row:opacity-100"
+                  >
+                    <ArrowUpRight className="h-3 w-3" />
+                  </button>
+                </td>
+                <td className="w-8 px-1.5 py-1.5">
+                  <button
+                    type="button"
                     onClick={() => removeOpex(i)}
                     className="rounded-lg p-1 text-slate-600 opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400 group-hover/row:opacity-100"
                   >
@@ -795,7 +841,7 @@ export function StagingArea({
               </tr>
             ))}
             <tr>
-              <td colSpan={6} className="px-1.5 py-2">
+              <td colSpan={7} className="px-1.5 py-2">
                 <button
                   type="button"
                   onClick={addOpex}
