@@ -59,6 +59,7 @@ export function ExpenseHistory({
   /* ── Active filter count ── */
   const activeCount = useMemo(() => {
     let n = 0
+    if (filters.searchText) n++
     if (filters.dateFrom) n++
     if (filters.dateTo) n++
     if (filters.categoryCode !== null) n++
@@ -69,7 +70,22 @@ export function ExpenseHistory({
 
   /* ── Filtered rows (AND logic) ── */
   const filteredRows = useMemo(() => {
+    const q = filters.searchText.toLowerCase().trim()
     return rows.filter((r) => {
+      // Text search — matches supplier_name, details, comments, category_name
+      if (q) {
+        const haystack = [
+          r.supplier_name,
+          r.details,
+          r.comments,
+          r.category_name,
+          r.sub_category_name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        if (!haystack.includes(q)) return false
+      }
       if (filters.dateFrom && r.transaction_date < filters.dateFrom) return false
       if (filters.dateTo && r.transaction_date > filters.dateTo) return false
       if (filters.categoryCode !== null && r.category_code !== filters.categoryCode) return false

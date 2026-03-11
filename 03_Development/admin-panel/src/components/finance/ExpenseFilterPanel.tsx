@@ -1,4 +1,4 @@
-import { CalendarDays, Filter, X } from 'lucide-react'
+import { CalendarDays, Filter, Search, X } from 'lucide-react'
 import type { FinCategory, Supplier } from '../../hooks/useExpenseLedger'
 
 /* ═══════════════════════════════════════════════════════════════
@@ -7,6 +7,7 @@ import type { FinCategory, Supplier } from '../../hooks/useExpenseLedger'
    ═══════════════════════════════════════════════════════════════ */
 
 export interface ExpenseFilters {
+  searchText: string
   dateFrom: string
   dateTo: string
   categoryCode: number | null
@@ -15,6 +16,7 @@ export interface ExpenseFilters {
 }
 
 export const EMPTY_FILTERS: ExpenseFilters = {
+  searchText: '',
   dateFrom: '',
   dateTo: '',
   categoryCode: null,
@@ -68,6 +70,27 @@ export function ExpenseFilterPanel({
           >
             <X className="h-3 w-3" />
             Clear all
+          </button>
+        )}
+      </div>
+
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+        <input
+          type="text"
+          placeholder="Search by supplier, details, comments…"
+          value={filters.searchText}
+          onChange={(e) => patch({ searchText: e.target.value })}
+          className={`${inputCls} pl-8`}
+        />
+        {filters.searchText && (
+          <button
+            type="button"
+            onClick={() => patch({ searchText: '' })}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 hover:text-slate-300"
+          >
+            <X className="h-3 w-3" />
           </button>
         )}
       </div>

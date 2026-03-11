@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-11T02:30 (ICT)  
+**Последнее обновление:** 2026-03-11T03:00 (ICT)
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -1247,3 +1247,34 @@ payload.category_code  →  suppliers.category_code  →  2000 (Operating Expens
 ### Boris Rule: NEVER use implicit Supabase joins for nullable FKs
 
 Added comment in `useExpenseLedger.ts`: NEVER use `.select('*, fin_categories(name)')` pattern — it acts as INNER JOIN and silently hides rows where FK is NULL. Always use separate queries + JS join (CLAUDE.md Rule #3).
+
+## Phase 4.5c: Makro Supplier Fix + Text Search + Auto-Create Suppliers (2026-03-11)
+
+### Root Cause
+"Makro" didn't exist in suppliers table — migration 032 UPDATE didn't match anything. Supplier_id on Makro receipt was NULL, making it show as "—" in the table with wrong category.
+
+### Migration 033: fix_makro_supplier.sql
+
+| Part | Change | Description |
+|---|---|---|
+| 1 | INSERT `suppliers` | Created "Makro" with `category_code = 4100` (Raw Materials / Food) |
+| 2 | UPDATE `expense_ledger` | Linked orphaned Makro receipt: set supplier_id, category_code=4100, date=today |
+| 3 | CREATE OR REPLACE `fn_approve_receipt` | Added: supplier_name ILIKE lookup → **AUTO-CREATE** new supplier if not found → 3-tier category resolution |
+
+### Supplier Resolution Chain (fn_approve_receipt v3)
+
+```
+payload.supplier_id  →  ILIKE name lookup  →  AUTO-CREATE new supplier  →  category resolution
+    (dropdown)           (AI-parsed name)      (INSERT w/ default 2000)     (payload→supplier→2000)
+```
+
+**CEO RULE: New supplier_name → auto-insert into suppliers table. Never lose supplier data.**
+
+### Frontend: Text Search Filter
+
+| File | Change |
+|---|---|
+| `ExpenseFilterPanel.tsx` | Added `searchText` field to `ExpenseFilters` interface + search input with 🔍 icon and clear button |
+| `ExpenseHistory.tsx` | Text search filters across: supplier_name, details, comments, category_name, sub_category_name |
+
+### Build: `tsc -b && vite build` = ✅ 0 errors
