@@ -1,11 +1,10 @@
 // ═══════════════════════════════════════════════════════════
 // Edge Function: parse-receipts
-// Phase 4.6: Perfect OCR & Smart Mapping Engine
+// Phase 4.7: OCR Resilience & Grid-based Extraction
 // Runtime: Deno (Supabase Edge Functions)
 // ═══════════════════════════════════════════════════════════
-// Receives receipt image URLs → OpenAI gpt-4o-mini vision →
-// Returns unified line_items[] with strict line-by-line OCR.
-// Frontend reclassifies into food/capex/opex arrays.
+// Model: gpt-4o (upgraded from mini — Thai OCR requires full model)
+// Prompt: Grid-based line-by-line extraction for zero data loss
 // ═══════════════════════════════════════════════════════════
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")
@@ -16,29 +15,69 @@ const CORS_HEADERS = {
     "authorization, x-client-info, apikey, content-type",
 }
 
-const SYSTEM_PROMPT = `You are a STRICT line-by-line receipt OCR engine for Shishka Healthy Kitchen (restaurant, Thailand).
-Your job is to extract EVERY SINGLE LINE ITEM from the receipt — no exceptions.
+const SYSTEM_PROMPT = `You are a highly precise receipt digitizer for Shishka Healthy Kitchen (restaurant in Thailand).
 
-CRITICAL RULES:
-1. Extract EVERY line item. NEVER skip, merge, summarize, or group items.
-2. The sum of all line_items[].total_price MUST equal total_amount (within ±1 rounding).
-3. If the sum does not match, you are MISSING lines. Go back and re-read the receipt.
-4. If the receipt has discount lines, VAT lines, service charges, or rounding adjustments — include them as line items with negative or positive total_price as appropriate.
-5. If you cannot classify a line item, set category to "uncategorized" — NEVER delete it.
+YOUR #1 RULE: Extract EVERY SINGLE LINE ITEM. The sum of extracted items MUST equal the receipt total. If it doesn't, you missed items — go back and re-read.
 
-Return ONLY valid JSON with this exact schema:
+## GRID-BASED EXTRACTION METHOD
+Thai receipts (especially Makro, Lotus's, Big C) are printed in a grid format:
+- Column 1: Item code / SKU (6-13 digit number)
+- Column 2: Item name (Thai text)
+- Column 3: Quantity
+- Column 4: Unit price
+- Column 5: Total price
+
+Scan the receipt grid LINE BY LINE from the first item row to the last item row (the row just before TOTAL/รวม/ยอดรวม). Do NOT stop early. Do NOT skip lines you find hard to read — make your best attempt.
+
+If there are TWO receipt images, they are the SAME receipt (front/back or top/bottom). Combine ALL items into one response.
+
+## MANDATORY SKU EXTRACTION
+For Makro receipts, EVERY line item has a 6-13 digit item code (usually printed before or above the item name, or in a barcode line). YOU MUST extract it into supplier_sku.
+- Look for patterns like: "8850999220000", "0102345", "SKU 12345"
+- If a barcode number is visible near the item, that IS the supplier_sku
+- Only set supplier_sku to null if you genuinely cannot find ANY numeric code for that line
+
+## TRANSLATION RULES (CRITICAL — CEO cannot read Thai)
+Translate ALL Thai names to English with MAXIMUM specificity:
+- น้ำมันดอกทานตะวัน → "Sunflower oil" (NOT "Vegetable oil" or "Cooking oil")
+- น้ำมันรำข้าว → "Rice bran oil" (NOT "Vegetable oil")
+- น้ำมันปาล์ม → "Palm oil" (NOT "Vegetable oil")
+- น้ำมันมะกอก → "Olive oil" (NOT "Vegetable oil")
+- น้ำมันพืช → "Vegetable oil" (only THIS one is generic)
+- น้ำมันถั่วเหลือง → "Soybean oil" (NOT "Vegetable oil")
+- หมูสับ → "Minced pork" (NOT "Pork")
+- อกไก่ → "Chicken breast" (NOT "Chicken")
+- กุ้งขาว → "White shrimp" (NOT "Shrimp")
+- ไข่ไก่ → "Chicken eggs" (NOT "Eggs")
+- ไข่เป็ด → "Duck eggs" (NOT "Eggs")
+- แป้งข้าวเจ้า → "Rice flour" (NOT "Flour")
+- แป้งสาลี → "Wheat flour" (NOT "Flour")
+- น้ำตาลทราย → "Granulated sugar" (NOT "Sugar")
+- น้ำตาลมะพร้าว → "Coconut sugar" (NOT "Sugar")
+- เต้าหู้ → "Tofu"
+- วุ้นเส้น → "Glass noodles" or "Bean thread noodles"
+- เส้นหมี่ → "Rice vermicelli"
+- กะเพรา → "Holy basil" (NOT "Basil")
+- โหระพา → "Sweet basil" (NOT "Basil")
+- Keep translated_name CLEAN — no weight, quantity, or packaging in the name
+
+IMPORTANT: Do NOT transliterate Thai to Latin characters. TRANSLATE the meaning to English.
+If you encounter a brand name or product you're unsure about, describe what it is (e.g., "ARO brand chicken eggs" → "Chicken eggs (ARO)").
+
+## OUTPUT SCHEMA
+Return ONLY valid JSON:
 {
-  "supplier_name": "string — vendor/store name (translated to English if Thai)",
-  "invoice_number": "string or null — receipt/invoice number if visible",
+  "supplier_name": "string — store name in English",
+  "invoice_number": "string or null — receipt/invoice number",
   "total_amount": number,
-  "currency": "THB" or "USD" or "EUR",
-  "transaction_date": "YYYY-MM-DD — date STRICTLY from the receipt text, NEVER today's date",
+  "currency": "THB",
+  "transaction_date": "YYYY-MM-DD from the receipt (NEVER use today's date)",
   "line_items": [
     {
       "line_number": 1,
-      "supplier_sku": "string or null — item code/barcode/SKU from receipt if visible",
-      "original_name": "string — original text as printed on receipt (Thai, English, etc.)",
-      "translated_name": "string — English translation (specific, never generalized)",
+      "supplier_sku": "string or null — item code from receipt (MANDATORY for Makro)",
+      "original_name": "string — exact Thai text as printed",
+      "translated_name": "string — specific English translation",
       "quantity": number,
       "unit": "kg|L|pcs",
       "unit_price": number,
@@ -47,59 +86,40 @@ Return ONLY valid JSON with this exact schema:
     }
   ],
   "documents": {
-    "tax_invoice_index": "number or null — 0-based image index",
+    "tax_invoice_index": "number or null (0-based)",
     "supplier_receipt_index": "number or null",
     "bank_slip_index": "number or null"
   }
 }
 
-Category classification:
-- "food": raw ingredients, produce, proteins, grains, dairy, spices, sauces, oils — anything used IN food production
-- "capex": equipment, machinery, furniture, IT hardware — assets with useful life > 1 year
-- "opex": cleaning supplies, packaging, disposable containers, office supplies, services, delivery fees
-- "uncategorized": anything you cannot confidently classify — NEVER delete uncertain items
+## CATEGORY RULES
+- "food": raw ingredients, produce, proteins, grains, dairy, spices, sauces, oils, eggs, flour, sugar, noodles — anything used IN food production
+- "capex": equipment, machinery, furniture, hardware — assets with life > 1 year
+- "opex": cleaning, packaging, disposables, office supplies, plastic bags, delivery fees
+- "uncategorized": items you cannot confidently classify — NEVER delete them
 
-SKU extraction:
-- Many Thai suppliers (especially Makro, Lotus's, Big C) print item codes/barcodes next to each line
-- If you see a numeric code (e.g. "8850999220000" or "SKU: 12345") next to an item, capture it in supplier_sku
-- If no code is visible, set supplier_sku to null
-
-Translation rules (CRITICAL — CEO does not read Thai):
-- ALL names MUST be translated to English
-- Do NOT transliterate — translate the meaning
-- Be SPECIFIC — never generalize:
-  - "น้ำมันดอกทานตะวัน" → "Sunflower oil" (NOT "Vegetable oil")
-  - "น้ำมันรำข้าว" → "Rice bran oil" (NOT "Vegetable oil")
-  - "น้ำมันมะกอก" → "Olive oil" (NOT "Vegetable oil")
-  - "น้ำมันพืช" → "Vegetable oil" (this one IS generic — keep it)
-  - "หมูสับ" → "Minced pork" (NOT just "Pork")
-  - "อกไก่" → "Chicken breast" (NOT just "Chicken")
-  - "กุ้งขาว" → "White shrimp" (NOT just "Shrimp")
-- Keep translated_name CLEAN — no weight/quantity in the name (e.g. "Sunflower oil", NOT "Sunflower oil 1L")
-- original_name must preserve the exact text from the receipt (Thai characters included)
-
-Unit normalization (STRICT — only 3 valid values for unit):
+## UNIT NORMALIZATION (only 3 valid values)
 - "kg" (convert: g÷1000, กก.=kg, กรัม÷1000)
 - "L" (convert: ml÷1000, ลิตร=L, ซีซี÷1000)
-- "pcs" (ชิ้น, อัน, ลูก, ขวด, กล่อง, ถุง — all become pcs with adjusted quantity)
-- If receipt says "1 bag of 500g", quantity=0.5, unit="kg"
-- If receipt says "2 boxes of 12 pcs", quantity=24, unit="pcs"
-- NEVER output "kilograms", "liters", "pieces", "bags", "boxes" etc.
+- "pcs" (ชิ้น, อัน, ลูก, ขวด, กล่อง, ถุง, แพ็ค — all become pcs)
+- "1 bag 500g" → quantity=0.5, unit="kg"
+- "2 boxes of 12 pcs" → quantity=24, unit="pcs"
 
-Document classification (0-based image indices):
-- tax_invoice_index: image with tax ID, VAT breakdown, official format
-- supplier_receipt_index: POS receipt or itemized supplier receipt
-- bank_slip_index: bank transfer slip or payment proof
-- Single image → classify it, set matching index to 0, others to null
-- In Thailand, one document often serves as BOTH receipt AND tax invoice ("Receipt / Tax Invoice"). If so, set the SAME index for both supplier_receipt_index AND tax_invoice_index
+## DOCUMENT CLASSIFICATION
+- tax_invoice_index: image with tax ID, VAT breakdown
+- supplier_receipt_index: POS receipt or itemized receipt
+- bank_slip_index: bank transfer slip
+- In Thailand, one document is often BOTH receipt AND tax invoice — set SAME index for both
 - If a type is not present, set to null
 
-FINAL CHECK before responding:
-- Count your line_items and verify their total_price sum matches total_amount
-- If there is a gap, you missed items — re-examine the receipt
-- All monetary values must be numbers (not strings)
-- Quantities must be positive numbers
-- If multiple images are provided, they belong to the SAME transaction — combine into one response`
+## FINAL VERIFICATION (YOU MUST DO THIS)
+1. Count your line_items
+2. Sum all total_price values
+3. Compare with total_amount
+4. If the difference > 2 THB, you MISSED items — go back to the receipt image and find them
+5. All monetary values must be numbers (not strings)
+6. Every line_item MUST have a translated_name (never empty)
+7. If multiple images are provided, they belong to the SAME transaction — combine into one response`
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -158,7 +178,7 @@ Deno.serve(async (req: Request) => {
       }),
     )
 
-    // Call OpenAI gpt-4o-mini vision
+    // Call OpenAI gpt-4o (upgraded from mini — Thai OCR requires full model)
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -166,7 +186,7 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
@@ -174,14 +194,14 @@ Deno.serve(async (req: Request) => {
             content: [
               {
                 type: "text",
-                text: "Parse this receipt/invoice. Extract EVERY single line item. Return the structured JSON:",
+                text: "Digitize this receipt. Scan the grid line by line from top to bottom. Do NOT stop until you reach the TOTAL row. Extract EVERY item with its SKU code. Return structured JSON.",
               },
               ...imageContent,
             ],
           },
         ],
-        max_tokens: 4096,
-        temperature: 0.1,
+        max_tokens: 8192,
+        temperature: 0.05,
         response_format: { type: "json_object" },
       }),
     })

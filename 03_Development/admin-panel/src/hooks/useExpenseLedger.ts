@@ -44,6 +44,7 @@ export interface FinSubCategory {
 export interface Supplier {
   id: string
   name: string
+  category_code?: number | null
 }
 
 export interface MonthlySummary {
@@ -113,7 +114,7 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
       supabase.from('fin_sub_categories').select('sub_code, category_code, name').order('sub_code'),
       supabase
         .from('suppliers')
-        .select('id, name')
+        .select('id, name, category_code')
         .eq('is_deleted', false)
         .order('name'),
     ])
@@ -169,7 +170,7 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
         name: sc.name as string,
       })),
     )
-    setSuppliers((supRes.data ?? []).map((s) => ({ id: s.id as string, name: s.name as string })))
+    setSuppliers((supRes.data ?? []).map((s) => ({ id: s.id as string, name: s.name as string, category_code: s.category_code as number | null })))
     setIsLoading(false)
   }, [])
 

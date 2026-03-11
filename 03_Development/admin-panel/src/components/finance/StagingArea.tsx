@@ -33,7 +33,7 @@ export interface StagingAreaProps {
   /** All uploaded image URLs for split-screen viewer (Phase 4.6) */
   imageUrls: string[]
   nomenclatureList: { id: string; name: string; product_code: string }[]
-  suppliersList: { id: string; name: string }[]
+  suppliersList: { id: string; name: string; category_code?: number | null }[]
   categories: { code: number; name: string }[]
   subCategories: { sub_code: number; category_code: number; name: string }[]
   onApprove: (payload: ApprovePayload) => Promise<void>
@@ -99,8 +99,16 @@ export function StagingArea({
   const [totalAmount, setTotalAmount] = useState(receipt.total_amount)
   const [currency, setCurrency] = useState(receipt.currency || 'THB')
   const [exchangeRate, setExchangeRate] = useState(currency === 'THB' ? 1 : 1)
-  const [flowType, setFlowType] = useState<'OpEx' | 'CapEx'>('OpEx')
-  const [categoryCode, setCategoryCode] = useState<number | ''>('')
+  // Auto-detect flowType & category from supplier's default category
+  const matchedSupplier = suppliersList.find((s) => s.id === supplierId)
+  const supplierCat = matchedSupplier?.category_code
+  const isCapExSupplier = supplierCat ? supplierCat >= 1000 && supplierCat < 2000 : false
+  const [flowType, setFlowType] = useState<'OpEx' | 'CapEx'>(() =>
+    isCapExSupplier ? 'CapEx' : 'OpEx',
+  )
+  const [categoryCode, setCategoryCode] = useState<number | ''>(() =>
+    supplierCat ?? '',
+  )
   const [subCategoryCode, setSubCategoryCode] = useState<number | ''>('')
   const [details, setDetails] = useState(
     `Receipt from ${receipt.supplier_name || 'supplier'}`,
