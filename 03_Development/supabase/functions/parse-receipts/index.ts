@@ -3,7 +3,7 @@
 // Phase 4.18: The Gemini Pivot
 // Runtime: Deno (Supabase Edge Functions)
 // ═══════════════════════════════════════════════════════════
-// Engine: Google Gemini 2.5 Flash (vision + reasoning)
+// Engine: Google Gemini 1.5 Pro (vision + reasoning)
 //   — No 2048×2048 crush, native Thai OCR, spatial reasoning
 //   — Images sent as inlineData (Base64)
 //   — Structured JSON output via responseMimeType
@@ -16,7 +16,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai"
-import { encodeBase64 } from "jsr:@std/encoding/base64"
+import { Buffer } from "node:buffer"
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")
 
@@ -38,7 +38,7 @@ const FOOTER_RE = /^(total|subtotal|grand\s*total|net|net\s*total|vat|tax|discou
 const VALID_UNITS = new Set(["kg", "L", "pcs"])
 const VALID_CATEGORIES = new Set(["food", "capex", "opex", "uncategorized"])
 
-const GEMINI_MODEL = "gemini-2.5-flash"
+const GEMINI_MODEL = "gemini-1.5-pro"
 
 // ── Phase 4.13b: Server-side schema validation ──
 // deno-lint-ignore no-explicit-any
@@ -119,10 +119,10 @@ async function downloadImageAsBase64(url: string): Promise<{ base64: string; mim
   if (!response.ok) {
     throw new Error(`Failed to download image (${response.status}): ${url.substring(0, 80)}`)
   }
-  const buffer = new Uint8Array(await response.arrayBuffer())
+  const arrayBuf = await response.arrayBuffer()
   const mimeType = response.headers.get("content-type") || "image/jpeg"
-  const base64 = encodeBase64(buffer)
-  console.log(`[download] OK: ${(buffer.length / 1024).toFixed(0)} KB, ${mimeType}`)
+  const base64 = Buffer.from(arrayBuf).toString("base64")
+  console.log(`[download] OK: ${(arrayBuf.byteLength / 1024).toFixed(0)} KB, ${mimeType}`)
   return { base64, mimeType }
 }
 
