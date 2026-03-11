@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // Types: Receipt Parsing & Staging Area
-// Phase 4.4: AI Receipt Clustering & Smart Line-Item Routing
+// Phase 4.6: Perfect OCR & Smart Mapping Engine
 // ═══════════════════════════════════════════════════════════
 
 /** AI-classified document positions from the uploaded images array */
@@ -10,6 +10,28 @@ export interface DocumentClassification {
   bank_slip_index: number | null
 }
 
+/** Unified line item from Edge Function strict OCR (Phase 4.6) */
+export interface LineItem {
+  line_number: number
+  supplier_sku: string | null
+  original_name: string
+  translated_name: string
+  quantity: number
+  unit: string
+  unit_price: number
+  total_price: number
+  category: 'food' | 'capex' | 'opex' | 'uncategorized'
+  /** Populated by frontend mapping engine (useSupplierMapping) */
+  nomenclature_id?: string | null
+}
+
+/** Sum validation from Edge Function */
+export interface SumMismatch {
+  line_items_sum: number
+  declared_total: number
+  difference: number
+}
+
 /** Parsed receipt data returned by the parse-receipts Edge Function */
 export interface ParsedReceipt {
   supplier_name: string
@@ -17,11 +39,16 @@ export interface ParsedReceipt {
   total_amount: number
   currency: string
   transaction_date: string // YYYY-MM-DD — strictly from document, never today
+  /** NEW (Phase 4.6): Unified line items from strict OCR */
+  line_items?: LineItem[]
+  /** Legacy arrays — populated by Edge Function from line_items for backward compat */
   food_items: FoodItem[]
   capex_items: CapexItem[]
   opex_items: OpexItem[]
   /** AI classification of which uploaded image is which document type */
   documents?: DocumentClassification
+  /** Set by Edge Function when line_items sum ≠ total_amount */
+  _sum_mismatch?: SumMismatch
 }
 
 /** Food ingredient line item → inserts into purchase_logs */
@@ -33,6 +60,10 @@ export interface FoodItem {
   total_price: number
   /** Assigned by user in StagingArea dropdown, or '__NEW__' for auto-create, or null */
   nomenclature_id?: string | null
+  /** Supplier item code (e.g. Makro barcode) — used for smart mapping */
+  supplier_sku?: string | null
+  /** Original name as printed on receipt (Thai) — used for smart mapping fallback */
+  original_name?: string | null
 }
 
 /** Capital equipment line item → inserts into capex_transactions */
@@ -57,6 +88,16 @@ export interface ReceiptUrls {
   supplier?: string
   bank?: string
   tax?: string
+}
+
+/** Supplier→Nomenclature mapping record (from supplier_item_mapping table) */
+export interface SupplierItemMapping {
+  id: string
+  supplier_id: string
+  supplier_sku: string | null
+  original_name: string
+  nomenclature_id: string
+  match_count: number
 }
 
 /** Payload sent to fn_approve_receipt RPC */

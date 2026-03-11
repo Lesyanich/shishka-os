@@ -6,7 +6,7 @@ tags:
   - supabase
   - architecture
   - schema
-date: 2026-03-10
+date: 2026-03-11
 status: active
 aliases:
   - DB Schema
@@ -213,6 +213,17 @@ erDiagram
         NUMERIC total_price
     }
 
+    supplier_item_mapping {
+        UUID id PK
+        UUID supplier_id FK
+        TEXT supplier_sku
+        TEXT original_name
+        UUID nomenclature_id FK
+        INT match_count
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
     nomenclature ||--o{ bom_structures : "parent_id"
     nomenclature ||--o{ bom_structures : "ingredient_id"
     nomenclature ||--o{ inventory_balances : "nomenclature_id"
@@ -244,6 +255,9 @@ erDiagram
     expense_ledger ||--o{ purchase_logs : "expense_id"
     expense_ledger ||--o{ capex_transactions : "expense_id"
     expense_ledger ||--o{ opex_items : "expense_id"
+
+    suppliers ||--o{ supplier_item_mapping : "supplier_id"
+    nomenclature ||--o{ supplier_item_mapping : "nomenclature_id"
 ```
 
 ## Tables Index
@@ -273,6 +287,7 @@ erDiagram
 | `plan_targets` | `id` UUID | target_qty, UNIQUE(plan_id,nomenclature_id) | plan_id -> production_plans (CASCADE), nomenclature_id -> nomenclature | 023 |
 | `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030 |
 | `opex_items` | `id` UUID | description, quantity, unit, unit_price, total_price | expense_id -> expense_ledger (CASCADE) | 030 |
+| `supplier_item_mapping` | `id` UUID | supplier_sku, original_name, match_count | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE) | 035 |
 
 ## Custom ENUM Types
 
@@ -334,6 +349,7 @@ erDiagram
 | `order_items` | authenticated CRUD | ALL | {authenticated} | `USING (true)` | 022 |
 | `production_plans` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
 | `plan_targets` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
+| `supplier_item_mapping` | `sim_select` / `sim_insert` / `sim_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 035 |
 
 ## Column-Level Privilege Restrictions (Migration 031)
 

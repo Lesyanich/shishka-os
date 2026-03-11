@@ -2,6 +2,7 @@ import { Loader2, Package, ShoppingCart, Wrench } from 'lucide-react'
 import { useSpokeData } from '../../hooks/useSpokeData'
 import type { PurchaseLogRow, CapexTransactionRow, OpexItemRow } from '../../hooks/useSpokeData'
 import { formatTHB } from './helpers'
+import { NomenclatureLabel } from './NomenclatureLabel'
 
 /* ═══════════════════════════════════════════════════════════════
    SpokeDetail — Expandable row content for Hub→Spoke line items
@@ -105,7 +106,11 @@ export function SpokeDetail({ expenseId }: Props) {
               {data.purchaseLogs.map((r: PurchaseLogRow) => (
                 <tr key={r.id} className="hover:bg-slate-800/10">
                   <td className="px-2 py-1.5 text-slate-300">
-                    {r.nomenclature_name || r.nomenclature_id}
+                    {r.nomenclature_name && r.nomenclature_code ? (
+                      <NomenclatureLabel productCode={r.nomenclature_code} name={r.nomenclature_name} />
+                    ) : (
+                      r.nomenclature_name || r.nomenclature_id
+                    )}
                     {r.notes && (
                       <span className="ml-1.5 text-[10px] text-slate-600">{r.notes}</span>
                     )}

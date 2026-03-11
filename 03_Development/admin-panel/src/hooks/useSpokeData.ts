@@ -19,6 +19,7 @@ export interface PurchaseLogRow {
   invoice_date: string
   notes: string | null
   nomenclature_name: string | null
+  nomenclature_code: string | null
 }
 
 export interface CapexTransactionRow {
@@ -114,14 +115,17 @@ export function useSpokeData(expenseId: string | null): {
           .map((r) => r.nomenclature_id as string)
           .filter(Boolean)
 
-        const nomMap: Record<string, string> = {}
+        const nomMap: Record<string, { name: string; product_code: string }> = {}
         if (nomIds.length > 0) {
           const { data: noms } = await supabase
             .from('nomenclature')
-            .select('id, name')
+            .select('id, name, product_code')
             .in('id', nomIds)
           for (const n of noms ?? []) {
-            nomMap[n.id as string] = n.name as string
+            nomMap[n.id as string] = {
+              name: n.name as string,
+              product_code: (n.product_code ?? '') as string,
+            }
           }
         }
 
@@ -135,7 +139,8 @@ export function useSpokeData(expenseId: string | null): {
             total_price: Number(r.total_price ?? 0),
             invoice_date: r.invoice_date as string,
             notes: (r.notes ?? null) as string | null,
-            nomenclature_name: nomMap[r.nomenclature_id as string] ?? null,
+            nomenclature_name: nomMap[r.nomenclature_id as string]?.name ?? null,
+            nomenclature_code: nomMap[r.nomenclature_id as string]?.product_code ?? null,
           })),
           capexTransactions: (ctRes.data ?? []).map((r) => ({
             id: r.id as string,

@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════
 // Edge Function: parse-receipts
-// Phase 4.4: AI Receipt Clustering & Smart Line-Item Routing
+// Phase 4.6: Perfect OCR & Smart Mapping Engine
 // Runtime: Deno (Supabase Edge Functions)
 // ═══════════════════════════════════════════════════════════
 // Receives receipt image URLs → OpenAI gpt-4o-mini vision →
-// Returns structured JSON with supplier, items classified as
-// food / capex / opex.
+// Returns unified line_items[] with strict line-by-line OCR.
+// Frontend reclassifies into food/capex/opex arrays.
 // ═══════════════════════════════════════════════════════════
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")
@@ -16,70 +16,90 @@ const CORS_HEADERS = {
     "authorization, x-client-info, apikey, content-type",
 }
 
-const SYSTEM_PROMPT = `You are a receipt/invoice parser for a restaurant kitchen supply chain (Shishka Healthy Kitchen, Thailand).
-Analyze the provided receipt or invoice images and extract structured data.
+const SYSTEM_PROMPT = `You are a STRICT line-by-line receipt OCR engine for Shishka Healthy Kitchen (restaurant, Thailand).
+Your job is to extract EVERY SINGLE LINE ITEM from the receipt — no exceptions.
+
+CRITICAL RULES:
+1. Extract EVERY line item. NEVER skip, merge, summarize, or group items.
+2. The sum of all line_items[].total_price MUST equal total_amount (within ±1 rounding).
+3. If the sum does not match, you are MISSING lines. Go back and re-read the receipt.
+4. If the receipt has discount lines, VAT lines, service charges, or rounding adjustments — include them as line items with negative or positive total_price as appropriate.
+5. If you cannot classify a line item, set category to "uncategorized" — NEVER delete it.
 
 Return ONLY valid JSON with this exact schema:
 {
-  "supplier_name": "string — the vendor / store name from the receipt",
-  "invoice_number": "string or null — receipt or invoice number if visible",
+  "supplier_name": "string — vendor/store name (translated to English if Thai)",
+  "invoice_number": "string or null — receipt/invoice number if visible",
   "total_amount": number,
-  "currency": "THB" or "USD" or "EUR" etc.,
-  "transaction_date": "YYYY-MM-DD — date from the receipt (STRICTLY from the document, never today's date)",
-  "food_items": [
-    { "name": "string", "quantity": number, "unit": "kg|L|pcs", "unit_price": number, "total_price": number }
-  ],
-  "capex_items": [
-    { "name": "string", "quantity": number, "unit_price": number, "total_price": number }
-  ],
-  "opex_items": [
-    { "description": "string", "quantity": number, "unit": "pcs|roll|bottle", "unit_price": number, "total_price": number }
+  "currency": "THB" or "USD" or "EUR",
+  "transaction_date": "YYYY-MM-DD — date STRICTLY from the receipt text, NEVER today's date",
+  "line_items": [
+    {
+      "line_number": 1,
+      "supplier_sku": "string or null — item code/barcode/SKU from receipt if visible",
+      "original_name": "string — original text as printed on receipt (Thai, English, etc.)",
+      "translated_name": "string — English translation (specific, never generalized)",
+      "quantity": number,
+      "unit": "kg|L|pcs",
+      "unit_price": number,
+      "total_price": number,
+      "category": "food|capex|opex|uncategorized"
+    }
   ],
   "documents": {
-    "tax_invoice_index": number or null,
-    "supplier_receipt_index": number or null,
-    "bank_slip_index": number or null
+    "tax_invoice_index": "number or null — 0-based image index",
+    "supplier_receipt_index": "number or null",
+    "bank_slip_index": "number or null"
   }
 }
 
-Item classification rules:
-- food_items: raw ingredients, produce, proteins, grains, dairy, spices, sauces, oils — anything that goes INTO food production
-- capex_items: equipment, machinery, furniture, construction materials, IT hardware, appliances — assets with useful life > 1 year
-- opex_items: cleaning supplies, packaging materials, disposable containers, office supplies, services, delivery fees — consumables used up quickly
+Category classification:
+- "food": raw ingredients, produce, proteins, grains, dairy, spices, sauces, oils — anything used IN food production
+- "capex": equipment, machinery, furniture, IT hardware — assets with useful life > 1 year
+- "opex": cleaning supplies, packaging, disposable containers, office supplies, services, delivery fees
+- "uncategorized": anything you cannot confidently classify — NEVER delete uncertain items
 
-Unit normalization (CRITICAL for BOM integrity):
-- Always normalize food_items unit to standard metric: kg, L, or pcs
-- If receipt says "1 bag of 500g", extract quantity as 0.5 and unit as "kg"
-- If receipt says "2 boxes of 12 pcs", extract quantity as 24 and unit as "pcs"
-- Convert grams to kg (divide by 1000), milliliters to L (divide by 1000)
-- NEVER use bag, box, pack, bundle, can, bottle as food_items unit — always convert to kg, L, or pcs
+SKU extraction:
+- Many Thai suppliers (especially Makro, Lotus's, Big C) print item codes/barcodes next to each line
+- If you see a numeric code (e.g. "8850999220000" or "SKU: 12345") next to an item, capture it in supplier_sku
+- If no code is visible, set supplier_sku to null
+
+Translation rules (CRITICAL — CEO does not read Thai):
+- ALL names MUST be translated to English
+- Do NOT transliterate — translate the meaning
+- Be SPECIFIC — never generalize:
+  - "น้ำมันดอกทานตะวัน" → "Sunflower oil" (NOT "Vegetable oil")
+  - "น้ำมันรำข้าว" → "Rice bran oil" (NOT "Vegetable oil")
+  - "น้ำมันมะกอก" → "Olive oil" (NOT "Vegetable oil")
+  - "น้ำมันพืช" → "Vegetable oil" (this one IS generic — keep it)
+  - "หมูสับ" → "Minced pork" (NOT just "Pork")
+  - "อกไก่" → "Chicken breast" (NOT just "Chicken")
+  - "กุ้งขาว" → "White shrimp" (NOT just "Shrimp")
+- Keep translated_name CLEAN — no weight/quantity in the name (e.g. "Sunflower oil", NOT "Sunflower oil 1L")
+- original_name must preserve the exact text from the receipt (Thai characters included)
+
+Unit normalization (STRICT — only 3 valid values for unit):
+- "kg" (convert: g÷1000, กก.=kg, กรัม÷1000)
+- "L" (convert: ml÷1000, ลิตร=L, ซีซี÷1000)
+- "pcs" (ชิ้น, อัน, ลูก, ขวด, กล่อง, ถุง — all become pcs with adjusted quantity)
+- If receipt says "1 bag of 500g", quantity=0.5, unit="kg"
+- If receipt says "2 boxes of 12 pcs", quantity=24, unit="pcs"
+- NEVER output "kilograms", "liters", "pieces", "bags", "boxes" etc.
 
 Document classification (0-based image indices):
-- tax_invoice_index: image that is a tax invoice (has tax ID number, VAT breakdown, official government format)
-- supplier_receipt_index: image that is a supplier receipt or POS receipt (itemized list from store/supplier)
-- bank_slip_index: image that is a bank transfer slip or payment proof
-- If only one image, classify it and set the matching index to 0, others to null
-- IMPORTANT: In Thailand, a single document often serves as BOTH receipt and tax invoice (printed "Receipt / Tax Invoice"). If so, set the SAME image index for both supplier_receipt_index AND tax_invoice_index
-- If a document type is not present, set its index to null
+- tax_invoice_index: image with tax ID, VAT breakdown, official format
+- supplier_receipt_index: POS receipt or itemized supplier receipt
+- bank_slip_index: bank transfer slip or payment proof
+- Single image → classify it, set matching index to 0, others to null
+- In Thailand, one document often serves as BOTH receipt AND tax invoice ("Receipt / Tax Invoice"). If so, set the SAME index for both supplier_receipt_index AND tax_invoice_index
+- If a type is not present, set to null
 
-Language (CRITICAL — CEO does not read Thai):
-- ALL item names, descriptions, and supplier_name MUST be translated to English
-- Thai text on receipts must be translated, not transliterated
-- Example: "พริกหวาน" → "Sweet pepper" (NOT "Phrik Wan")
-- Example: "น้ำมันพืช" → "Vegetable oil" (NOT "Nam Man Phuet")
-- Example: "มะเขือเทศเชอร์รี่" → "Cherry tomato"
-- Keep the name CLEAN — do NOT include weight/quantity in the name field (e.g. "Sweet pepper", NOT "Sweet pepper 100g")
-
-Unit values (STRICT — only these 3 strings are valid for food_items.unit):
-- "kg" (not "kilograms", not "kgs", not "กก", not "กก.")
-- "L" (not "liters", not "litres", not "liter", not "ลิตร")
-- "pcs" (not "pieces", not "piece", not "ชิ้น")
-
-If a category has no items, return an empty array [].
-If you cannot determine a field, use null.
-All monetary values must be numbers (not strings).
-Quantities must be positive numbers.
-If multiple receipt images are provided, they belong to the SAME transaction — combine all items into a single response.`
+FINAL CHECK before responding:
+- Count your line_items and verify their total_price sum matches total_amount
+- If there is a gap, you missed items — re-examine the receipt
+- All monetary values must be numbers (not strings)
+- Quantities must be positive numbers
+- If multiple images are provided, they belong to the SAME transaction — combine into one response`
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -154,13 +174,13 @@ Deno.serve(async (req: Request) => {
             content: [
               {
                 type: "text",
-                text: "Parse this receipt/invoice and return the structured JSON:",
+                text: "Parse this receipt/invoice. Extract EVERY single line item. Return the structured JSON:",
               },
               ...imageContent,
             ],
           },
         ],
-        max_tokens: 3000,
+        max_tokens: 4096,
         temperature: 0.1,
         response_format: { type: "json_object" },
       }),
@@ -191,23 +211,69 @@ Deno.serve(async (req: Request) => {
 
     const parsed = JSON.parse(content)
 
-    // Ensure arrays and objects exist (defensive)
-    parsed.food_items = parsed.food_items ?? []
-    parsed.capex_items = parsed.capex_items ?? []
-    parsed.opex_items = parsed.opex_items ?? []
+    // Ensure line_items array exists
+    parsed.line_items = parsed.line_items ?? []
+
+    // Ensure documents object exists
     parsed.documents = parsed.documents ?? {
       tax_invoice_index: null,
       supplier_receipt_index: null,
       bank_slip_index: null,
     }
 
+    // ── Sum validation: line_items total vs declared total ──
+    const lineSum = parsed.line_items.reduce(
+      (s: number, item: { total_price?: number }) => s + (item.total_price || 0),
+      0,
+    )
+    const declared = parsed.total_amount || 0
+    if (Math.abs(lineSum - declared) > 1) {
+      parsed._sum_mismatch = {
+        line_items_sum: Math.round(lineSum * 100) / 100,
+        declared_total: declared,
+        difference: Math.round((declared - lineSum) * 100) / 100,
+      }
+    }
+
+    // ── Backward compatibility: populate legacy 3-array format from line_items ──
+    parsed.food_items = parsed.line_items
+      .filter((li: { category?: string }) => li.category === "food")
+      .map((li: { translated_name?: string; original_name?: string; supplier_sku?: string; quantity?: number; unit?: string; unit_price?: number; total_price?: number }) => ({
+        name: li.translated_name || li.original_name || "",
+        quantity: li.quantity || 0,
+        unit: li.unit || "pcs",
+        unit_price: li.unit_price || 0,
+        total_price: li.total_price || 0,
+        supplier_sku: li.supplier_sku || null,
+        original_name: li.original_name || null,
+      }))
+
+    parsed.capex_items = parsed.line_items
+      .filter((li: { category?: string }) => li.category === "capex")
+      .map((li: { translated_name?: string; original_name?: string; quantity?: number; unit_price?: number; total_price?: number }) => ({
+        name: li.translated_name || li.original_name || "",
+        quantity: li.quantity || 0,
+        unit_price: li.unit_price || 0,
+        total_price: li.total_price || 0,
+      }))
+
+    parsed.opex_items = parsed.line_items
+      .filter((li: { category?: string }) => li.category === "opex" || li.category === "uncategorized")
+      .map((li: { translated_name?: string; original_name?: string; quantity?: number; unit?: string; unit_price?: number; total_price?: number }) => ({
+        description: li.translated_name || li.original_name || "",
+        quantity: li.quantity || 0,
+        unit: li.unit || "pcs",
+        unit_price: li.unit_price || 0,
+        total_price: li.total_price || 0,
+      }))
+
     console.log(
       `[parse-receipts] OK: ${parsed.supplier_name}, ` +
+        `lines=${parsed.line_items.length}, ` +
         `food=${parsed.food_items.length}, capex=${parsed.capex_items.length}, ` +
         `opex=${parsed.opex_items.length}, ` +
-        `docs: tax=${parsed.documents.tax_invoice_index}, ` +
-        `supplier=${parsed.documents.supplier_receipt_index}, ` +
-        `bank=${parsed.documents.bank_slip_index}`,
+        `sum=${lineSum}, declared=${declared}` +
+        (parsed._sum_mismatch ? ` ⚠️ MISMATCH: ${parsed._sum_mismatch.difference}` : " ✅"),
     )
 
     return new Response(JSON.stringify(parsed), {

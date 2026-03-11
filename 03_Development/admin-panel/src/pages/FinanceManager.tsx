@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useExpenseLedger } from '../hooks/useExpenseLedger'
 import type { ExpenseRow } from '../hooks/useExpenseLedger'
+import { useSupplierMapping } from '../hooks/useSupplierMapping'
 import { supabase } from '../lib/supabase'
 import { formatTHB } from '../components/finance/helpers'
 import { KpiCard } from '../components/finance/KpiCard'
@@ -12,12 +13,30 @@ import { MagicDropzone } from '../components/finance/MagicDropzone'
 import { SmartTextInput } from '../components/finance/SmartTextInput'
 import { ReceiptLightbox } from '../components/finance/ReceiptLightbox'
 import { StagingArea } from '../components/finance/StagingArea'
-import type { ParsedReceipt, ReceiptUrls, ApprovePayload } from '../types/receipt'
+import type { ParsedReceipt, ReceiptUrls, ApprovePayload, FoodItem } from '../types/receipt'
 
 /* ═══════════════════════════════════════════════════════════════════
    FinanceManager — Thin Page Orchestrator
    State machine: idle → analyzing → staging → (approve|cancel) → idle
+   Phase 4.6: Added smart mapping pipeline + image passthrough
    ═══════════════════════════════════════════════════════════════════ */
+
+/** Fuzzy match supplier name from AI to existing suppliers */
+function fuzzyMatchSupplier(
+  aiName: string,
+  suppliers: { id: string; name: string }[],
+): string {
+  if (!aiName) return ''
+  const lower = aiName.toLowerCase()
+  const exact = suppliers.find((s) => s.name.toLowerCase() === lower)
+  if (exact) return exact.id
+  const partial = suppliers.find(
+    (s) =>
+      s.name.toLowerCase().includes(lower) ||
+      lower.includes(s.name.toLowerCase()),
+  )
+  return partial?.id ?? ''
+}
 
 export function FinanceManager() {
   const {
@@ -33,6 +52,8 @@ export function FinanceManager() {
     updateExpense,
   } = useExpenseLedger()
 
+  const { applyMappings, saveMapping } = useSupplierMapping()
+
   /* Receipt URLs injected from MagicDropzone */
   const [receiptUrls, setReceiptUrls] = useState<ReceiptUrls>({})
 
@@ -45,10 +66,11 @@ export function FinanceManager() {
   /* Quick text from SmartTextInput — passed to ExpenseForm */
   const [quickText, setQuickText] = useState<string | undefined>(undefined)
 
-  /* ── Staging Area state (Phase 4.4) ── */
+  /* ── Staging Area state (Phase 4.4 + 4.6: added imageUrls) ── */
   const [stagingData, setStagingData] = useState<{
     receipt: ParsedReceipt
     urls: ReceiptUrls
+    imageUrls: string[]
   } | null>(null)
 
   /* Lazy-loaded nomenclature for staging area food item mapping */
@@ -73,9 +95,67 @@ export function FinanceManager() {
     refetch()
   }
 
-  /* ── AI result handler — transitions to staging ── */
-  const handleAiResult = (receipt: ParsedReceipt, urls: ReceiptUrls) => {
-    setStagingData({ receipt, urls })
+  /* ── AI result handler — Phase 4.6: mapping pipeline + reclassification ── */
+  const handleAiResult = async (
+    receipt: ParsedReceipt,
+    urls: ReceiptUrls,
+    imageUrls: string[],
+  ) => {
+    // Phase 4.6: If new line_items[] format, run mapping engine + reclassify
+    if (receipt.line_items && receipt.line_items.length > 0) {
+      // Resolve supplier_id for mapping lookup
+      const supplierId = fuzzyMatchSupplier(receipt.supplier_name, suppliers)
+
+      // Apply saved mappings (SKU → nomenclature_id)
+      const mapped = supplierId
+        ? await applyMappings(supplierId, receipt.line_items)
+        : receipt.line_items
+
+      // Reclassify into legacy 3-array format for existing RPC
+      receipt.food_items = mapped
+        .filter((li) => li.category === 'food')
+        .map((li) => ({
+          name: li.translated_name || li.original_name || '',
+          quantity: li.quantity || 0,
+          unit: li.unit || 'pcs',
+          unit_price: li.unit_price || 0,
+          total_price: li.total_price || 0,
+          nomenclature_id: li.nomenclature_id ?? undefined,
+          supplier_sku: li.supplier_sku ?? null,
+          original_name: li.original_name ?? null,
+        } as FoodItem))
+
+      receipt.capex_items = mapped
+        .filter((li) => li.category === 'capex')
+        .map((li) => ({
+          name: li.translated_name || li.original_name || '',
+          quantity: li.quantity || 0,
+          unit_price: li.unit_price || 0,
+          total_price: li.total_price || 0,
+        }))
+
+      receipt.opex_items = mapped
+        .filter((li) => li.category === 'opex' || li.category === 'uncategorized')
+        .map((li) => ({
+          description: li.translated_name || li.original_name || '',
+          quantity: li.quantity || 0,
+          unit: li.unit || 'pcs',
+          unit_price: li.unit_price || 0,
+          total_price: li.total_price || 0,
+        }))
+    }
+
+    setStagingData({ receipt, urls, imageUrls })
+  }
+
+  /* ── Save mapping callback — passed to StagingArea ── */
+  const handleSaveMapping = async (params: {
+    supplierId: string
+    supplierSku: string | null
+    originalName: string
+    nomenclatureId: string
+  }) => {
+    await saveMapping(params)
   }
 
   /* ── Approve handler — calls fn_approve_receipt RPC ── */
@@ -149,12 +229,14 @@ export function FinanceManager() {
             <StagingArea
               receipt={stagingData.receipt}
               receiptUrls={stagingData.urls}
+              imageUrls={stagingData.imageUrls}
               nomenclatureList={nomenclature}
               suppliersList={suppliers}
               categories={categories}
               subCategories={subCategories}
               onApprove={handleApprove}
               onCancel={() => setStagingData(null)}
+              onSaveMapping={handleSaveMapping}
             />
           ) : (
             <ExpenseForm

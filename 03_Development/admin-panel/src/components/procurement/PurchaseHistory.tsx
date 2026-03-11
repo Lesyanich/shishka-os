@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { NomenclatureLabel } from '../finance/NomenclatureLabel'
 
 type PurchaseRow = {
   id: string
@@ -133,12 +134,11 @@ export function PurchaseHistory({ refreshKey }: { refreshKey: number }) {
                     {r.invoice_date}
                   </td>
                   <td className="py-2 pr-2">
-                    <div className="font-mono text-slate-100">
-                      {r.item_code}
-                    </div>
-                    <div className="text-[10px] text-slate-500">
-                      {r.item_name}
-                    </div>
+                    <NomenclatureLabel
+                      productCode={r.item_code}
+                      name={r.item_name}
+                      size="md"
+                    />
                   </td>
                   <td className="py-2 pr-2 text-slate-300">
                     {r.supplier_name}

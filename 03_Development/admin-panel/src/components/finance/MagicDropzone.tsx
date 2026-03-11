@@ -14,8 +14,8 @@ interface DroppedFile {
 export interface MagicDropzoneProps {
   /** Called after upload — passes the first 3 URLs mapped to supplier/bank/tax slots */
   onUrlsReady: (urls: ReceiptUrls) => void
-  /** Called when AI parse-receipts Edge Function returns structured data */
-  onAiResult?: (result: ParsedReceipt, urls: ReceiptUrls) => void
+  /** Called when AI parse-receipts Edge Function returns structured data + all image URLs */
+  onAiResult?: (result: ParsedReceipt, urls: ReceiptUrls, imageUrls: string[]) => void
 }
 
 /* ────────────────────────── Compression ────────────────────────── */
@@ -187,7 +187,7 @@ export function MagicDropzone({ onUrlsReady, onAiResult }: MagicDropzoneProps) {
         }
 
         onUrlsReady(receiptUrls)
-        onAiResult(parsed, receiptUrls)
+        onAiResult(parsed, receiptUrls, imageUrls)
 
         // Clear files on success
         for (const f of files) {

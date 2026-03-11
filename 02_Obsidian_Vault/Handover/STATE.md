@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-11T04:00 (ICT)
+**Последнее обновление:** 2026-03-11T06:00 (ICT)
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -1323,3 +1323,65 @@ Nomenclature: payload.nomenclature_id → AUTO-CREATE RAW-AUTO-{8hex} (type='goo
 "NEVER overwrite historical transaction_date. Dates come strictly from source documents."
 
 ### Build: `tsc -b && vite build` = ✅ 0 errors
+
+## Phase 4.6: Perfect OCR & Smart Mapping Engine (2026-03-11)
+
+### CEO Problems Found (Phase 4.5d Testing)
+1. **Massive Data Loss**: AI recognized 1.3K THB of items but receipt total was 4.2K — AI skips/summarizes lines
+2. **Bad Translations**: AI generalized specific oils to "Vegetable oil" — lost product specificity
+3. **No Memory**: Makro receipts have clear SKU codes being ignored. User mappings not remembered
+4. **Blind UX**: Can't see receipt image while mapping items in StagingArea
+5. **Ugly Nomenclature**: Shows `RAW-Sugar — Sugar` instead of clean `Sugar` + type badge
+
+### Migration 035: supplier_item_mapping.sql
+
+| Part | Change | Description |
+|---|---|---|
+| 1 | CREATE TABLE `supplier_item_mapping` | Stores supplier→nomenclature mappings with match_count for ranking |
+| 2 | CREATE INDEX `idx_sim_sku` | Non-unique index on (supplier_id, supplier_sku) WHERE supplier_sku IS NOT NULL |
+| 3 | CREATE INDEX `idx_sim_name` | Non-unique index on (supplier_id, original_name) |
+| 4 | RLS policies | sim_select, sim_insert, sim_update — all USING (true) for anon access |
+| 5 | updated_at trigger | Auto-update via fn_set_updated_at() |
+
+**CEO Amendment**: Indexes are NON-UNIQUE. One supplier_sku can map to multiple nomenclature_ids. Hook sorts by match_count DESC and takes first (LIMIT 1).
+
+### Edge Function: parse-receipts (Complete Rewrite)
+
+| Feature | Description |
+|---|---|
+| Unified `line_items[]` | Single array instead of 3 separate food/capex/opex arrays. Frontend reclassifies |
+| Strict OCR | "Extract EVERY single line. NEVER skip, merge, or summarize" |
+| Sum Validation | `_sum_mismatch` flag if line_items sum ≠ declared total_amount (±1 satang) |
+| Specific Translation | "Do NOT generalize. น้ำมันดอกทานตะวัน → Sunflower oil, NOT Vegetable oil" |
+| SKU Extraction | Captures supplier_sku from receipt item codes/barcodes |
+| max_tokens | 3000 → 4096 |
+| Backward Compat | Populates legacy food_items[], capex_items[], opex_items[] from line_items by category |
+
+### Frontend Changes
+
+| File | Action | Description |
+|---|---|---|
+| `types/receipt.ts` | REWRITE | Added LineItem, SumMismatch, SupplierItemMapping interfaces. Updated ParsedReceipt + FoodItem |
+| `hooks/useSupplierMapping.ts` | CREATE | Smart mapping hook: lookupMappings, saveMapping (upsert + match_count++), applyMappings (SKU→name fallback) |
+| `components/finance/NomenclatureLabel.tsx` | CREATE | Clean display: name + colored type badge (Raw=emerald, Prep=violet, Topping=amber, Menu=indigo, Auto=slate) |
+| `components/finance/ReceiptImageViewer.tsx` | CREATE | Receipt viewer with zoom (1x/1.5x/2x/3x), thumbnail strip, dark theme |
+| `components/finance/MagicDropzone.tsx` | MODIFY | Extended onAiResult callback to pass imageUrls as 3rd param |
+| `pages/FinanceManager.tsx` | REWRITE | Added mapping pipeline: resolve supplier → applyMappings → reclassify line_items into food/capex/opex |
+| `components/finance/StagingArea.tsx` | REWRITE | Added ReceiptImageViewer at top, sum mismatch warning, onSaveMapping callback, clean nomenclature dropdowns |
+| `hooks/useSpokeData.ts` | MODIFY | Fetch nomenclature product_code for NomenclatureLabel. Added nomenclature_code to PurchaseLogRow |
+| `components/finance/SpokeDetail.tsx` | MODIFY | Uses NomenclatureLabel for food items display |
+| `components/procurement/PurchaseHistory.tsx` | MODIFY | Uses NomenclatureLabel instead of raw product_code + name |
+
+### Mapping Engine Resolution Chain
+
+```
+Lookup:  supplier_sku match (sku:{sku})  →  original_name match (name:{name})  →  unmapped
+Ranking: ORDER BY match_count DESC, LIMIT 1 (non-unique indexes per CEO rule)
+Save:    existing mapping → match_count++ (UPDATE)  |  new → INSERT (match_count=1)
+```
+
+### Build: `tsc -b && vite build` = ✅ 0 errors
+
+### Deploy Steps (CEO)
+1. Apply migration 035 in Supabase SQL Editor
+2. Deploy Edge Function: `supabase functions deploy parse-receipts`
