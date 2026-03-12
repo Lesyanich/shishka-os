@@ -791,6 +791,47 @@ Do NOT transliterate Thai to Latin characters. TRANSLATE the meaning.\n\
 Brand names: put brand into the separate "brand" field, NOT into translated_name.\n\
   Example: ARO chicken eggs → translated_name: "Chicken eggs", brand: "ARO"\n\
 \n\
+## THAI RECEIPT ABBREVIATIONS — Common thermal receipt shorthand\n\
+Thai receipts truncate product names to fit ~20 characters on thermal paper.\n\
+If you see a truncated name, reconstruct the FULL product name from context.\n\
+\n\
+Abbreviation patterns:\n\
+- น.ม. / นม → นมสด = "Fresh milk"\n\
+- น้ำม. → น้ำมัน = "Oil" (then check type: ดอกทาน, ปาล์ม, มะกอก, etc.)\n\
+- ไก่. / ไก่สด → "Fresh chicken" (check cut: อก=breast, น่อง=thigh, สะโพก=leg, ปีก=wing)\n\
+- หมู / หมูสด → "Fresh pork" (check: สับ=minced, สัน=loin, คอ=neck, หมูแดง=red pork)\n\
+- กก / กก. → กิโลกรัม = kilogram (unit, not product)\n\
+- ลท. / ลิ. → ลิตร = liter\n\
+- ชก. → ชิ้น/กล่อง = piece/box\n\
+- ผ.ซ. / ผงซ. → ผงซักฟอก = "Laundry detergent" (category: opex)\n\
+- น้ำยา → "Cleaning solution" (category: opex)\n\
+- ถ. → ถุง = bag (unit)\n\
+- แพ็ค / PK → pack (unit)\n\
+- ซ. → ซอง = sachet (unit)\n\
+- ARO, MKP, MAKRO → Makro house brands (put in "brand" field)\n\
+- CP, เบทาโกร, Betagro → CP/Betagro brand (put in "brand" field)\n\
+\n\
+IMPORTANT: If you can read PART of the name but not all, translate what you CAN read\n\
+and mark confidence as "medium". Do NOT fill in the rest with guesses.\n\
+\n\
+## CULINARY CONTEXT — This is a professional restaurant kitchen\n\
+Shishka Healthy Kitchen buys ingredients for healthy food production.\n\
+Common purchases (use ONLY to validate words you can actually read):\n\
+\n\
+Proteins: chicken breast/thigh/wings, pork loin/minced/belly, shrimp, fish fillet, salmon, tofu, eggs\n\
+Vegetables: lettuce, spinach, kale, broccoli, bell pepper, tomato, cucumber, carrot, onion, garlic, ginger\n\
+Herbs: holy basil, sweet basil, lemongrass, galangal, kaffir lime leaves, coriander, mint\n\
+Staples: jasmine rice, brown rice, wheat flour, rice flour, oats, quinoa, pasta, glass noodles\n\
+Oils & sauces: olive oil, rice bran oil, sesame oil, soy sauce, fish sauce, oyster sauce, vinegar\n\
+Dairy: fresh milk, cream, yogurt, butter, cheese\n\
+Sweeteners: coconut sugar, stevia, honey, granulated sugar\n\
+Spices: turmeric, cumin, cinnamon, black pepper, chili flakes, curry paste\n\
+\n\
+Use this culinary list ONLY to validate words you can actually read.\n\
+NEVER use this list to guess missing letters.\n\
+If a word is truncated and you are not 100% certain it matches an item\n\
+from this list based on the visible Thai characters, you MUST output "[UNREADABLE]".\n\
+\n\
 ## CATEGORY RULES — AUTO-DETECT FROM SUPPLIER\n\
 First, identify the supplier from the header:\n\
 - Makro, Lotus\'s, Big C, ตลาด (market), Fresh mart → default category = "food"\n\
@@ -860,17 +901,37 @@ Return ONLY valid JSON with this structure:\n\
    - "medium": some characters unclear but context helps\n\
    - "low": significant guessing involved\n\
 \n\
-3. UNREADABLE ITEMS: If you cannot read >50% of an item\'s name:\n\
-   - Set translated_name to "[UNREADABLE]"\n\
+3. UNREADABLE ITEMS — CRITICAL (prefer [UNREADABLE] over guessing):\n\
+   - If you cannot read >30% of an item\'s name → translated_name = "[UNREADABLE]"\n\
+   - If the Thai text is blurry, smudged, or cut off → "[UNREADABLE]"\n\
+   - If you are GUESSING based on price/quantity alone → "[UNREADABLE]"\n\
    - Set confidence to "low"\n\
-   - Still extract quantity/price if visible\n\
-   - Do NOT invent a product name\n\
+   - Still extract quantity/price/SKU if those are readable\n\
+   - Do NOT invent a product name — a wrong name is WORSE than "[UNREADABLE]"\n\
+   - NEVER translate abbreviations you do not recognize as real Thai words\n\
+   - It is ALWAYS better to say "[UNREADABLE]" than to guess wrong\n\
+\n\
+   BAD examples (NEVER do this):\n\
+   × Blurry text → "Frozen carrots" (invented)\n\
+   × "กร..." (truncated) → "Crab meat" (wild guess)\n\
+   × Unreadable + price 200 THB → "Salmon fillet" (price-based guess)\n\
+\n\
+   GOOD examples:\n\
+   ✓ Blurry text → "[UNREADABLE]", confidence: "low"\n\
+   ✓ "กร..." but SKU matches known item → translate that item, confidence: "medium"\n\
+   ✓ "ไก่อก" (clearly readable) → "Chicken breast", confidence: "high"\n\
 \n\
 4. PRICE SANITY: Thai grocery items typically cost 10-2000 THB per line.\n\
    If a line_item total_price > 5000 THB, double-check — it might be a subtotal row.\n\
 \n\
 5. NO EXTRAPOLATION: If the receipt image is cut off or blurry at the bottom,\n\
    STOP extracting. Do not guess what items might follow.\n\
+\n\
+6. TRANSLATION HONESTY: Your translated_name must be a faithful translation of original_name.\n\
+   If original_name is unclear, your translation must reflect that uncertainty.\n\
+   NEVER translate unclear Thai into confident English.\n\
+   The CEO reviews translations — an honest "[UNREADABLE]" builds trust,\n\
+   a wrong "Frozen carrots" destroys it.\n\
 \n\
 ## DOCUMENT CLASSIFICATION\n\
 - tax_invoice_index: image with Tax ID, VAT breakdown\n\
