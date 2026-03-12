@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Handover/HANDOVER.md",
+                "file": "Handover/STATE.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "HANDOVER"
+              "title": "STATE"
             }
           }
         ]
@@ -185,7 +185,11 @@
   },
   "active": "52a870b73ac906e5",
   "lastOpenFiles": [
+    "Receipt Routing Architecture.md",
     "Shishka OS Architecture.md",
+    "Database Schema.md",
+    "Financial Ledger.md",
+    "Agent Skills & Capabilities.md",
     "Handover/STATE.md",
     "Handover/HANDOVER.md",
     "Blueprints/Infrastructure_Map.md",
@@ -212,10 +216,6 @@
     "_Archive/03_Infrastructure/Equipment",
     "_Archive/03_Infrastructure",
     "_Archive/01_Menu/Semi_Finished/PF-PUMPKIN_COCONUT_BASE.md",
-    "_Archive/01_Menu/Semi_Finished/PF-VEGETABLE_BROTH.md",
-    "_Archive/01_Menu/Semi_Finished/PF-MIREPOIX_SAUTE.md",
-    "_Archive/01_Menu/Semi_Finished/PF-FERMENTED_CABBAGE.md",
-    "_Archive/01_Menu/Semi_Finished/PF-BORSCH_BASE.md",
     "_Archive/01_Menu/Semi_Finished",
     "_Archive/01_Menu/Ingredients",
     "_Archive/01_Menu/Finished_Dishes",

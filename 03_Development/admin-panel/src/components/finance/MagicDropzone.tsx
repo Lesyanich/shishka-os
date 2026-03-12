@@ -24,7 +24,7 @@ export interface MagicDropzoneProps {
 
 // Phase 4.16b: WebP byte compression — preserve 100% pixel resolution, reduce file weight only
 const MAX_FILE_SIZE = 15 * 1024 * 1024  // 15 MB — raw camera photos (before processing)
-const WEBP_QUALITY = 0.5                // aggressive byte reduction: 15MB → ~800KB
+const WEBP_QUALITY = 0.3                // micro-files for 60s Edge Function limit
 
 /* ────────────── WebP Byte Compression (Phase 4.16b) ─────────── */
 
@@ -184,11 +184,21 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
           throw new Error(insertErr?.message || 'Failed to create receipt job')
         }
 
-        // Step 3: Fire Edge Function — don't await the result.
-        // The Edge Function writes to receipt_jobs; frontend listens via Realtime.
-        supabase.functions.invoke('parse-receipts', {
-          body: { job_id: job.id, image_urls: imageUrls },
-        }).catch((err) => {
+        // Step 3: Fire Edge Function — NO BODY, job_id in URL query param.
+        // Phase 5.0c: Supabase Edge Functions have a fatal bug where req.json()
+        // hangs indefinitely. We pass job_id in the URL and the function reads
+        // image_urls from the receipt_jobs DB row (already saved in Step 2).
+        const { data: { session } } = await supabase.auth.getSession()
+        fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipts?job_id=${encodeURIComponent(job.id)}`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session?.access_token ?? ''}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+          }
+        ).catch((err) => {
           // Phase 4.14 Resilience: catch AbortError / network failures silently.
           // The Edge Function may still complete — DB has the job row.
           // Zombie cleanup RPC handles truly dead jobs after 5 min.
