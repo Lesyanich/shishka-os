@@ -6,11 +6,12 @@ Consolidated from all phases. Items marked with phase of origin.
 
 ### Phase 6: UoM Conversion UI (pending)
 - `useSupplierMapping` hook returns `MappingMatch` with conversion data, but UI not yet built
-- `fn_approve_receipt` does not yet apply `conversion_factor` when inserting `purchase_logs`
-- Formula ready: `inventory_quantity = receipt_quantity × conversion_factor`
+- ~~`fn_approve_receipt` does not yet apply `conversion_factor`~~ → **FIXED in Migration 040 (v6)**
+- Need: UoM Badge + Inline Editor in StagingArea (Phase 6.5)
+- Need: Batch UoM Tuning view in Procurement (Phase 6.6)
 
 ### Phase 6: Pending Migrations
-- Migrations 038 & 039 need `supabase db push` or SQL execution in Dashboard
+- Migration 040 needs SQL execution in Dashboard (Supabase CLI not linked)
 - GAS needs `clasp push && npm run deploy` from `03_Development/gas/`
 
 ### Phase 5: Bundle Size

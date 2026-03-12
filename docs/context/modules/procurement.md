@@ -25,7 +25,8 @@ Save:    existing → match_count++ (UPDATE)  |  new → INSERT (match_count=1)
 - `conversion_factor` — Multiplier to base_unit
 - `base_unit` — Kitchen unit (kg/L/pcs)
 - Formula: `inventory_quantity = receipt_quantity × conversion_factor`
-- **UI pending** — hook ready in useSupplierMapping.ts
+- **DB LIVE (Migration 040)** — fn_approve_receipt v6 applies conversion_factor on approval
+- **UI pending** — hook ready in useSupplierMapping.ts, inline editor TBD
 
 ## Frontend
 | File | Purpose |
@@ -39,7 +40,8 @@ Save:    existing → match_count++ (UPDATE)  |  new → INSERT (match_count=1)
 ## Patterns & Gotchas
 - Column-level REVOKE on purchase_logs (entire table) — RPCs retain privileges
 - PurchaseHistory uses NomenclatureLabel for clean display
-- Supplier auto-creation: fn_approve_receipt v5 auto-inserts unknown supplier_name
+- Supplier auto-creation: fn_approve_receipt v6 auto-inserts unknown supplier_name
+- UoM conversion: v6 applies conversion_factor (if not NULL) to purchase_logs.quantity + recalculates price_per_unit. total_price is NEVER changed.
 - Two-query + JS join for PurchaseHistory (Rule #3)
 
 → Schema: `02_Obsidian_Vault/Database Schema.md`

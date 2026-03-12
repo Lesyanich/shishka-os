@@ -10,7 +10,7 @@
 - `opex_items` — Operating expense items (Spoke 3, expense_id FK CASCADE)
 
 ## RPCs
-- `fn_approve_receipt(JSONB)` v5 — Atomic Hub+Spoke insert. 3-tier supplier resolution (payload → ILIKE → auto-create). 3-tier category resolution (payload → supplier default → 2000). Auto-creates nomenclature for unmapped food items.
+- `fn_approve_receipt(JSONB)` v6 — Atomic Hub+Spoke insert. 3-tier supplier resolution (payload → ILIKE → auto-create). 3-tier category resolution (payload → supplier default → 2000). Auto-creates nomenclature for unmapped food items. **v6: applies conversion_factor from supplier_item_mapping** — recalculates quantity + price_per_unit, preserves total_price.
 - `fn_update_cost_on_purchase()` — Trigger: auto-updates nomenclature.cost_per_unit on purchase_logs INSERT
 - `fn_cleanup_stale_receipt_jobs()` — Marks zombie jobs (>5min) as failed
 

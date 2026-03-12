@@ -48,7 +48,7 @@
 | `fn_process_new_order(UUID)` | RPC | LIVE — BOM explosion for orders |
 | `fn_run_mrp(UUID)` | RPC | LIVE — 2-level BOM explosion + inventory deduction |
 | `fn_approve_plan(UUID)` | RPC | LIVE — creates production_tasks from plan |
-| `fn_approve_receipt(JSONB)` | RPC | LIVE (v5) — Hub+Spoke atomic insert |
+| `fn_approve_receipt(JSONB)` | RPC | LIVE (v6) — Hub+Spoke atomic insert + UoM conversion |
 | `fn_update_cost_on_purchase()` | TRIGGER | LIVE — auto-updates nomenclature.cost_per_unit |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | LIVE — zombie job cleanup |
 
@@ -69,8 +69,9 @@
 
 ## Migrations Applied
 
-39 migrations total (001–039). Latest:
+40 migrations total (001–040). Latest:
 - 038: `expense_ledger` reconciliation columns + `fn_approve_receipt` v5
 - 039: `supplier_item_mapping` UoM conversion columns
+- 040: `fn_approve_receipt` v6 — applies conversion_factor from supplier_item_mapping
 
 → Full schema: `02_Obsidian_Vault/Database Schema.md`
