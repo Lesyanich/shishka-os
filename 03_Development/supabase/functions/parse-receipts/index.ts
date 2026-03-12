@@ -99,11 +99,13 @@ Deno.serve(async (req: Request) => {
     console.log("[parse-receipts] PROXY: status → processing")
 
     // ── Fire POST to GAS — use waitUntil if available ──
+    // NOTE: supabase_key is NOT sent to GAS (Phase 5.0f).
+    // GAS writes to DB via update-receipt-job Edge Function (bypasses RLS).
+    // Only supabase_url is needed for GAS to call the Edge Function.
     const gasPayload = JSON.stringify({
       job_id,
       image_urls,
       supabase_url: supabaseUrl,
-      supabase_key: supabaseKey,
     })
     console.log(`[parse-receipts] PROXY: GAS payload ${gasPayload.length} bytes`)
 

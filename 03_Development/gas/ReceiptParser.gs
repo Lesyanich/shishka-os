@@ -1,23 +1,31 @@
 // ═══════════════════════════════════════════════════════════
 // Google Apps Script: ReceiptParser
-// Phase 5.0c: Unkillable Logging Edition
+// Phase 5.0f: Edge Function Callback Edition
 // ═══════════════════════════════════════════════════════════
-// Debug strategy: ALL logs → debugLog[] array → written to
-// receipt_jobs.error column on ANY failure. This bypasses
-// the broken GAS Executions UI entirely.
+// ROOT CAUSE FOUND: GAS raw HTTP PATCH to PostgREST returns
+// 200 [] (empty) because RLS blocks writes. The service role
+// key is NOT recognized as a JWT by PostgREST in newer
+// Supabase projects (sb_publishable_ key format).
+//
+// FIX: ALL DB writes now go through update-receipt-job Edge
+// Function which uses createClient() admin — properly
+// bypasses RLS. No more raw PostgREST calls from GAS.
+//
+// Every step phones home via Edge Function. If the script
+// dies at any point, we see exactly where in the DB.
 // ═══════════════════════════════════════════════════════════
 // SETUP:
 //   1. Script Properties (Settings → Script Properties):
 //      - GEMINI_API_KEY
 //      - DRIVE_FOLDER_ID = 1KUDflDuCkJL3rG0ldNGUqJW_rOErNGZi
-//      - SUPABASE_URL
-//      - SUPABASE_SERVICE_ROLE_KEY
 //   2. Deploy as Web App: Execute as "Me", Access "Anyone"
+//   3. Edge Function update-receipt-job must be deployed
+//      with --no-verify-jwt
 // ═══════════════════════════════════════════════════════════
 
-var GEMINI_MODEL = "gemini-2.0-flash";
+var GEMINI_MODEL = "gemini-2.5-flash";
 
-// ── Debug log accumulator — the "black box" ──
+// ── Debug log accumulator ──
 var debugLog = [];
 
 function log_(msg) {
@@ -40,13 +48,59 @@ function getConfig_() {
   return {
     geminiApiKey: props.getProperty("GEMINI_API_KEY"),
     driveFolderId: props.getProperty("DRIVE_FOLDER_ID") || "1KUDflDuCkJL3rG0ldNGUqJW_rOErNGZi",
-    supabaseUrl: props.getProperty("SUPABASE_URL") || "",
-    supabaseKey: props.getProperty("SUPABASE_SERVICE_ROLE_KEY") || "",
   };
 }
 
 // ═══════════════════════════════════════════════════════════
-// doGet — placeholder to stop red "Failed" noise in GAS logs
+// UPDATE JOB — via Edge Function (bypasses RLS)
+// Replaces all raw PostgREST PATCH calls.
+// Uses POST to update-receipt-job Edge Function which has
+// --no-verify-jwt and uses admin client internally.
+// ═══════════════════════════════════════════════════════════
+function updateJob_(supabaseUrl, jobId, data) {
+  var url = supabaseUrl + "/functions/v1/update-receipt-job?job_id=" + encodeURIComponent(jobId);
+  var response = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(data),
+    muteHttpExceptions: true,
+  });
+  var code = response.getResponseCode();
+  var body = response.getContentText();
+  log_("updateJob_ HTTP " + code + ": " + body.substring(0, 300));
+
+  if (code === 200) {
+    var result = JSON.parse(body);
+    if (result.ok && result.rows_updated > 0) {
+      log_("updateJob_ VERIFIED: " + result.rows_updated + " row(s)");
+      return result;
+    }
+    // 200 but 0 rows — job_id not found
+    throw new Error("updateJob_ 200 but 0 rows updated. job_id=" + jobId + ", response=" + body.substring(0, 300));
+  }
+
+  throw new Error("updateJob_ HTTP " + code + ": " + body.substring(0, 500));
+}
+
+// ── Phone Home — quick status write via Edge Function ──
+function phoneHome_(supabaseUrl, jobId, message) {
+  try {
+    var url = supabaseUrl + "/functions/v1/update-receipt-job?job_id=" + encodeURIComponent(jobId);
+    var response = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({ error: message }),
+      muteHttpExceptions: true,
+    });
+    return response.getResponseCode();
+  } catch (e) {
+    logError_("phoneHome_ crash: " + e.toString());
+    return 0;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// doGet — placeholder to stop red "Failed" noise
 // ═══════════════════════════════════════════════════════════
 function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify({
@@ -57,54 +111,107 @@ function doGet(e) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// WEB APP ENTRY POINT
+// WEB APP ENTRY POINT — EDGE FUNCTION CALLBACK EDITION
+// Every step independently phones home to DB via Edge Function
 // ═══════════════════════════════════════════════════════════
-
 function doPost(e) {
   var startMs = Date.now();
   var jobId = null;
   var supabaseUrl = null;
-  var supabaseKey = null;
+  var imageUrls = null;
+  var config = null;
 
+  // ═══════════════════════════════════════════════════════
+  // STEP 0: Parse payload
+  // ═══════════════════════════════════════════════════════
   try {
     log_("═══ doPost ENTRY ═══");
-
-    // ── Parse input ──
     var raw = e.postData.contents;
     log_("Raw payload length: " + raw.length);
 
     var json = JSON.parse(raw);
-    jobId = (json.job_id || "").trim();   // ← .trim() to sanitize
-    var imageUrls = json.image_urls;
+    jobId = (json.job_id || "").trim();
+    imageUrls = json.image_urls;
+    supabaseUrl = (json.supabase_url || "").trim();
 
-    // ── Credential resolution: payload → Script Properties fallback ──
-    var config = getConfig_();
-    supabaseUrl = (json.supabase_url || config.supabaseUrl || "").trim();
-    supabaseKey = (json.supabase_key || config.supabaseKey || "").trim();
+    config = getConfig_();
 
-    log_("job_id: " + jobId);
-    log_("job_id length: " + jobId.length);
+    log_("job_id: " + jobId + " (len=" + jobId.length + ")");
     log_("images: " + (imageUrls ? imageUrls.length : "MISSING"));
     log_("supabase_url: " + (supabaseUrl ? supabaseUrl.substring(0, 50) : "MISSING"));
-    log_("supabase_key: " + (supabaseKey ? "present (" + supabaseKey.length + " chars)" : "MISSING"));
-    log_("credential source: url=" + (json.supabase_url ? "payload" : "script_props") +
-         ", key=" + (json.supabase_key ? "payload" : "script_props"));
 
     if (!jobId) throw new Error("job_id is empty or missing");
     if (!imageUrls || !imageUrls.length) throw new Error("image_urls is empty or missing");
-    if (!supabaseUrl) throw new Error("supabase_url is empty — check payload AND Script Properties");
-    if (!supabaseKey) throw new Error("supabase_key is empty — check payload AND Script Properties");
+    if (!supabaseUrl) throw new Error("supabase_url is empty");
+  } catch (parseErr) {
+    logError_("STEP_0 PARSE FAIL: " + parseErr.toString());
+    if (jobId && supabaseUrl) {
+      try { phoneHome_(supabaseUrl, jobId, "STEP_0 PARSE FAIL: " + parseErr.toString()); } catch(x) {}
+    }
+    return ContentService.createTextOutput(JSON.stringify({
+      error: "STEP_0: " + parseErr.toString(),
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
 
-    // ── 1. Download images & convert to Base64 ──
-    var imageParts = [];
+  // ═══════════════════════════════════════════════════════
+  // STEP 1: AUTH TEST — phone home via Edge Function
+  // If this fails, Edge Function callback is broken
+  // ═══════════════════════════════════════════════════════
+  try {
+    var authMsg = "STEP_1: GAS alive. images=" + imageUrls.length +
+                  ", ts=" + new Date().toISOString();
+    var authCode = phoneHome_(supabaseUrl, jobId, authMsg);
+    log_("STEP_1 phone home HTTP " + authCode);
+
+    if (authCode !== 200) {
+      var failMsg = "STEP_1 AUTH FAIL: Edge Function callback returned HTTP " + authCode +
+                    ". supabase_url=" + supabaseUrl;
+      logError_(failMsg);
+      return ContentService.createTextOutput(JSON.stringify({
+        error: failMsg,
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    log_("STEP_1 phone home OK — Edge Function callback works!");
+  } catch (authErr) {
+    logError_("STEP_1 CRASH: " + authErr.toString());
+    return ContentService.createTextOutput(JSON.stringify({
+      error: "STEP_1 CRASH: " + authErr.toString(),
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // STEP 2: Download images
+  // ═══════════════════════════════════════════════════════
+  var imageParts = [];
+  try {
     for (var i = 0; i < imageUrls.length; i++) {
       log_("Downloading image " + (i + 1) + ": " + imageUrls[i].substring(0, 80) + "...");
       var img = downloadImageAsBase64_(imageUrls[i]);
       imageParts.push(img);
       log_("Downloaded image " + (i + 1) + ": " + img.sizeKb + " KB, " + img.mimeType);
     }
+    phoneHome_(supabaseUrl, jobId,
+      "STEP_2: Images OK. count=" + imageParts.length +
+      ", sizes=" + imageParts.map(function(p) { return p.sizeKb + "KB"; }).join("+"));
+  } catch (dlErr) {
+    var dlMsg = "STEP_2 IMAGE FAIL: " + dlErr.toString() +
+                " | downloaded=" + imageParts.length + "/" + imageUrls.length;
+    logError_(dlMsg);
+    try {
+      updateJob_(supabaseUrl, jobId, {
+        status: "failed", error: dlMsg + "\n\nDEBUG:\n" + debugLog.join("\n"),
+        completed_at: new Date().toISOString(), duration_ms: Date.now() - startMs,
+      });
+    } catch(x) {
+      try { phoneHome_(supabaseUrl, jobId, dlMsg); } catch(y) {}
+    }
+    return ContentService.createTextOutput(JSON.stringify({ error: dlMsg })).setMimeType(ContentService.MimeType.JSON);
+  }
 
-    // ── 2. Save copies to Google Drive (archive) ──
+  // ═══════════════════════════════════════════════════════
+  // STEP 3: Save to Google Drive (archive) — non-fatal
+  // ═══════════════════════════════════════════════════════
+  try {
     log_("Saving to Drive folder: " + config.driveFolderId);
     var folder = DriveApp.getFolderById(config.driveFolderId);
     for (var j = 0; j < imageParts.length; j++) {
@@ -113,25 +220,72 @@ function doPost(e) {
       folder.createFile(blob);
     }
     log_("Saved " + imageParts.length + " image(s) to Drive");
+    phoneHome_(supabaseUrl, jobId, "STEP_3: Drive OK. " + imageParts.length + " files");
+  } catch (driveErr) {
+    logError_("STEP_3 DRIVE FAIL (non-fatal): " + driveErr.toString());
+    try { phoneHome_(supabaseUrl, jobId, "STEP_3: Drive FAIL (continuing): " + driveErr.toString().substring(0, 200)); } catch(x) {}
+  }
 
-    // ── 3. Call Gemini 2.0 Flash ──
+  // ═══════════════════════════════════════════════════════
+  // STEP 4: Call Gemini 2.0 Flash
+  // ═══════════════════════════════════════════════════════
+  var geminiResult = null;
+  try {
     log_("Calling Gemini " + GEMINI_MODEL + "...");
-    var geminiResult = callGemini_(imageParts, config.geminiApiKey);
-    log_("Gemini OK, response JSON length: " + JSON.stringify(geminiResult).length);
+    phoneHome_(supabaseUrl, jobId, "STEP_4: Calling Gemini " + GEMINI_MODEL + "...");
+    geminiResult = callGemini_(imageParts, config.geminiApiKey);
+    var geminiJson = JSON.stringify(geminiResult);
+    log_("Gemini OK, response length: " + geminiJson.length);
+    phoneHome_(supabaseUrl, jobId, "STEP_4: Gemini OK. response_len=" + geminiJson.length);
+  } catch (gemErr) {
+    var gemMsg = "STEP_4 GEMINI FAIL: " + gemErr.toString();
+    logError_(gemMsg);
+    try {
+      updateJob_(supabaseUrl, jobId, {
+        status: "failed", error: gemMsg + "\n\nDEBUG:\n" + debugLog.join("\n"),
+        completed_at: new Date().toISOString(), duration_ms: Date.now() - startMs,
+      });
+    } catch(x) {
+      try { phoneHome_(supabaseUrl, jobId, gemMsg); } catch(y) {}
+    }
+    return ContentService.createTextOutput(JSON.stringify({ error: gemMsg })).setMimeType(ContentService.MimeType.JSON);
+  }
 
-    // ── 4. Post-process ──
+  // ═══════════════════════════════════════════════════════
+  // STEP 5: Post-process
+  // ═══════════════════════════════════════════════════════
+  var processed = null;
+  try {
     log_("Post-processing...");
-    var processed = validateAndPostProcess_(geminiResult);
+    processed = validateAndPostProcess_(geminiResult);
     log_("Post-processing done: " + processed.line_items.length + " items");
+    phoneHome_(supabaseUrl, jobId, "STEP_5: PostProcess OK. items=" + processed.line_items.length);
+  } catch (ppErr) {
+    var ppMsg = "STEP_5 POSTPROCESS FAIL: " + ppErr.toString();
+    logError_(ppMsg);
+    try {
+      updateJob_(supabaseUrl, jobId, {
+        status: "failed", error: ppMsg + "\n\nDEBUG:\n" + debugLog.join("\n"),
+        completed_at: new Date().toISOString(), duration_ms: Date.now() - startMs,
+      });
+    } catch(x) {
+      try { phoneHome_(supabaseUrl, jobId, ppMsg); } catch(y) {}
+    }
+    return ContentService.createTextOutput(JSON.stringify({ error: ppMsg })).setMimeType(ContentService.MimeType.JSON);
+  }
 
-    // ── 5. Write result to Supabase ──
+  // ═══════════════════════════════════════════════════════
+  // STEP 6: Write final result via Edge Function callback
+  // ═══════════════════════════════════════════════════════
+  try {
     var durationMs = Date.now() - startMs;
-    log_("Writing result to Supabase...");
-    updateSupabaseJob_(supabaseUrl, supabaseKey, jobId, {
+    log_("STEP_6: Writing final result...");
+    updateJob_(supabaseUrl, jobId, {
       status: "completed",
       result: processed,
       model: GEMINI_MODEL,
       ocr_text: null,
+      error: null,
       completed_at: new Date().toISOString(),
       duration_ms: durationMs,
     });
@@ -145,36 +299,20 @@ function doPost(e) {
       line_items: processed.line_items.length,
     })).setMimeType(ContentService.MimeType.JSON);
 
-  } catch (err) {
-    var errMsg = err.toString();
-    var errStack = err.stack || "no stack";
-    logError_(errMsg);
-    logError_("Stack: " + errStack);
-    logError_("Duration: " + (Date.now() - startMs) + "ms");
-
-    // ── LOG-TO-DB: Write debugLog to receipt_jobs.error column ──
-    // This is our ONLY reliable way to see what happened
-    if (jobId && supabaseUrl && supabaseKey) {
-      var debugDump = debugLog.join("\n");
-      try {
-        rawPatchSupabase_(supabaseUrl, supabaseKey, jobId, {
-          status: "failed",
-          error: debugDump,
-          completed_at: new Date().toISOString(),
-          duration_ms: Date.now() - startMs,
-        });
-        log_("Debug dump written to Supabase OK");
-      } catch (patchErr) {
-        logError_("DOUBLE FAULT — cannot write to Supabase: " + patchErr.toString());
-      }
-    } else {
-      logError_("Cannot write to DB — missing: jobId=" + !!jobId +
-                ", url=" + !!supabaseUrl + ", key=" + !!supabaseKey);
-    }
-
-    // ── HARDCORE THROW: Force GAS to show error text in Executions list ──
-    // Google shows throw message on hover even when logs are broken
-    throw new Error("DEBUG_DATA:" + debugLog.join("|"));
+  } catch (finalErr) {
+    var finalMsg = "STEP_6 FINAL WRITE FAIL: " + finalErr.toString();
+    logError_(finalMsg);
+    try { phoneHome_(supabaseUrl, jobId, finalMsg + " | items=" + processed.line_items.length + " | result_size=" + JSON.stringify(processed).length); } catch(x) {}
+    // Try simpler write without result
+    try {
+      updateJob_(supabaseUrl, jobId, {
+        status: "failed",
+        error: finalMsg + "\n\nDEBUG:\n" + debugLog.join("\n"),
+        completed_at: new Date().toISOString(),
+        duration_ms: Date.now() - startMs,
+      });
+    } catch(x2) {}
+    return ContentService.createTextOutput(JSON.stringify({ error: finalMsg })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -223,7 +361,9 @@ function callGemini_(imageParts, apiKey) {
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.2,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 65536,
+      // Gemini 2.5 Flash: disable "thinking" for clean JSON output
+      thinkingConfig: { thinkingBudget: 0 },
     },
   };
 
@@ -253,120 +393,14 @@ function callGemini_(imageParts, apiKey) {
   if (!content) throw new Error("Empty Gemini response");
   log_("Gemini text length: " + content.length);
 
-  return JSON.parse(content);
-}
-
-// ═══════════════════════════════════════════════════════════
-// SUPABASE REST API — PATCH receipt_jobs (with full verification)
-// ═══════════════════════════════════════════════════════════
-
-function updateSupabaseJob_(supabaseUrl, supabaseKey, jobId, data) {
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("FATAL: Missing Supabase credentials! url=" + !!supabaseUrl + ", key=" + !!supabaseKey);
+  try {
+    return JSON.parse(content);
+  } catch (parseErr) {
+    // Log raw text for debugging malformed JSON
+    log_("RAW GEMINI TEXT (first 500): " + content.substring(0, 500));
+    log_("RAW GEMINI TEXT (last 200): " + content.substring(Math.max(0, content.length - 200)));
+    throw parseErr;
   }
-
-  var url = supabaseUrl + "/rest/v1/receipt_jobs?id=eq." + jobId;
-
-  log_("PATCH URL: " + url);
-  log_("PATCH payload keys: " + Object.keys(data).join(", "));
-
-  var options = {
-    method: "post",
-    headers: {
-      "Authorization": "Bearer " + supabaseKey,
-      "apikey": supabaseKey,
-      "Content-Type": "application/json",
-      "Prefer": "return=representation",
-      "X-HTTP-Method-Override": "PATCH",
-    },
-    payload: JSON.stringify(data),
-    muteHttpExceptions: true,
-  };
-
-  var response = UrlFetchApp.fetch(url, options);
-  var code = response.getResponseCode();
-  var body = response.getContentText();
-
-  log_("PATCH response code: " + code);
-  log_("PATCH response body (first 500): " + body.substring(0, 500));
-
-  // ── 204 = PostgREST ignored return=representation ──
-  if (code === 204) {
-    throw new Error(
-      "PATCH 204 No Content — return=representation IGNORED. " +
-      "Likely X-HTTP-Method-Override not working. job_id=" + jobId
-    );
-  }
-
-  // ── 200 = verify rows were actually returned ──
-  if (code === 200) {
-    var rows;
-    try { rows = JSON.parse(body); } catch (pe) {
-      throw new Error("PATCH 200 but body not JSON: " + body.substring(0, 300));
-    }
-    if (!Array.isArray(rows) || rows.length === 0) {
-      throw new Error(
-        "PATCH 200 but EMPTY [] — job_id=" + jobId + " not found in receipt_jobs!"
-      );
-    }
-    log_("PATCH VERIFIED: " + rows.length + " row(s), status=" + rows[0].status);
-    return;
-  }
-
-  // ── Any other code ──
-  throw new Error("Supabase PATCH HTTP " + code + ": " + body.substring(0, 500));
-}
-
-// ═══════════════════════════════════════════════════════════
-// RAW PATCH — minimal, no verification, for writing debugLog
-// Uses standard PATCH method (not POST+override) as fallback
-// ═══════════════════════════════════════════════════════════
-
-function rawPatchSupabase_(supabaseUrl, supabaseKey, jobId, data) {
-  var url = supabaseUrl + "/rest/v1/receipt_jobs?id=eq." + jobId;
-
-  // Attempt 1: POST + X-HTTP-Method-Override
-  var options1 = {
-    method: "post",
-    headers: {
-      "Authorization": "Bearer " + supabaseKey,
-      "apikey": supabaseKey,
-      "Content-Type": "application/json",
-      "Prefer": "return=minimal",
-      "X-HTTP-Method-Override": "PATCH",
-    },
-    payload: JSON.stringify(data),
-    muteHttpExceptions: true,
-  };
-
-  var r1 = UrlFetchApp.fetch(url, options1);
-  var c1 = r1.getResponseCode();
-  log_("rawPatch attempt1 (POST+override): HTTP " + c1);
-
-  if (c1 >= 200 && c1 < 300) return;
-
-  // Attempt 2: native PATCH method
-  var options2 = {
-    method: "patch",
-    headers: {
-      "Authorization": "Bearer " + supabaseKey,
-      "apikey": supabaseKey,
-      "Content-Type": "application/json",
-      "Prefer": "return=minimal",
-    },
-    payload: JSON.stringify(data),
-    muteHttpExceptions: true,
-  };
-
-  var r2 = UrlFetchApp.fetch(url, options2);
-  var c2 = r2.getResponseCode();
-  log_("rawPatch attempt2 (native PATCH): HTTP " + c2);
-
-  if (c2 >= 200 && c2 < 300) return;
-
-  throw new Error("rawPatch BOTH methods failed: attempt1=" + c1 + ", attempt2=" + c2 +
-                  ", body1=" + r1.getContentText().substring(0, 200) +
-                  ", body2=" + r2.getContentText().substring(0, 200));
 }
 
 // ═══════════════════════════════════════════════════════════

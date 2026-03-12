@@ -1891,3 +1891,75 @@ Stores raw GCV OCR output for debugging when LLM misinterprets text.
 1. Migration 037 applied via `supabase db push`
 2. Edge Function deployed: `supabase functions deploy parse-receipts --no-verify-jwt`
 3. Test: Upload tall Makro receipt → verify all items readable, check `receipt_jobs.ocr_text` and `model = "gcv+gpt-4o-mini"`
+
+---
+
+## Phase 5.0: The Gemini Pivot & Edge Function Callback Architecture (2026-03-12)
+
+### What Changed
+Completely replaced the receipt parsing backend: OpenAI + Google Cloud Vision → **Google Apps Script (GAS) + Gemini 2.5 Flash**.
+
+### Why
+1. OpenAI API costs and edge function timeout issues
+2. GCV + gpt-4o-mini two-stage pipeline was fragile (sequential OCR → LLM)
+3. Gemini 2.5 Flash does vision + structuring in a single API call
+4. GAS provides free compute with 6-minute timeout (vs Supabase 150s limit)
+
+### Architecture (Phase 5.0f — Final)
+```
+Frontend → Supabase Edge Function (parse-receipts, proxy)
+         → Google Apps Script (GAS) → Gemini 2.5 Flash (vision + JSON)
+         → Edge Function callback (update-receipt-job) → DB
+         → Supabase Realtime → Frontend
+```
+
+**Key innovation**: GAS writes ALL results to DB via `update-receipt-job` Edge Function callback (not raw PostgREST). This solves the RLS bypass issue where raw HTTP PATCH with service role key returned `200 []` (0 rows updated) in newer Supabase projects with `sb_publishable_` key format.
+
+### New Edge Function: `update-receipt-job`
+- **Purpose**: Callback endpoint for GAS to write to `receipt_jobs` table
+- **Auth**: Deployed with `--no-verify-jwt` (GAS has no JWT)
+- **RLS bypass**: Uses `createClient()` with service role key (SDK handles auth correctly)
+- **GET mode**: Returns job status for debugging (`?job_id=xxx`)
+- **POST mode**: Updates job fields (`?job_id=xxx` + JSON body)
+
+### Edge Function: `parse-receipts` (Updated)
+- Zero-body architecture preserved (reads `job_id` from URL query param)
+- **Security improvement**: `supabase_key` removed from GAS payload — GAS no longer needs it
+- Only `supabase_url` sent (GAS constructs callback URL from it)
+
+### GAS: `ReceiptParser.gs` (Phase 5.0f)
+- **Model**: `gemini-2.5-flash` (replaced `gemini-2.0-flash` which was deprecated)
+- **Thinking disabled**: `thinkingConfig: { thinkingBudget: 0 }` for clean JSON output
+- **Token limit**: `maxOutputTokens: 65536` (was 4096)
+- **Phone Home architecture**: Every step independently writes progress to `receipt_jobs.error` via callback — if GAS dies at any step, the last message shows exactly where
+- **6 isolated steps**: STEP_0 (parse payload), STEP_1 (auth test), STEP_2 (fetch images), STEP_3 (save to Drive), STEP_4 (Gemini call), STEP_5 (postprocess), STEP_6 (final write)
+- **All DB writes** via `updateJob_()` and `phoneHome_()` functions → `update-receipt-job` Edge Function
+
+### clasp Automation
+- `gas/.clasp.json` — Script ID: `14BpgyjV6qH1a2mL3u6zC7p6GJAmGDkfXR7Qi1b9ufU2ItxrvOW_pvI8P`
+- `gas/appsscript.json` — webapp config (executeAs: USER_DEPLOYING, access: ANYONE_ANONYMOUS)
+- `gas/package.json` — deploy scripts with pinned `--deploymentId` (URL never changes)
+- Deploy: `cd 03_Development/gas && npm run deploy`
+
+### Performance (Verified E2E Test)
+| Metric | Before (GCV + gpt-4o-mini) | After (GAS + Gemini 2.5 Flash) |
+|---|---|---|
+| Total time | ~10-20s | ~30s |
+| Cost/receipt | ~$0.0035 | Free (Gemini free tier) / ~$0.001 (paid) |
+| Timeout risk | Medium (Supabase 150s) | None (GAS 6-min limit) |
+| Items parsed | 27 (Makro receipt) | 27 (same receipt, identical accuracy) |
+
+### Secrets Required
+- `GAS_WEB_APP_URL` — pinned GAS deployment URL (set in Supabase Secrets)
+- `GEMINI_API_KEY` — set in GAS Script Properties
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — used by `update-receipt-job` Edge Function
+
+### Files Changed
+| File | Action |
+|---|---|
+| `supabase/functions/parse-receipts/index.ts` | EDIT — removed `supabase_key` from GAS payload |
+| `supabase/functions/update-receipt-job/index.ts` | NEW — callback Edge Function |
+| `gas/ReceiptParser.gs` | REWRITE — Phase 5.0f with Gemini + callback |
+| `gas/.clasp.json` | NEW — clasp config |
+| `gas/appsscript.json` | NEW — GAS manifest |
+| `gas/package.json` | NEW — deploy scripts |
