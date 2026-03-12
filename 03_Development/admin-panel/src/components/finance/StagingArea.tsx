@@ -149,6 +149,10 @@ export function StagingArea({
   const [vatAmount, setVatAmount] = useState(
     receipt.footer?.vat_amount ?? 0,
   )
+  // Phase 6.6: Delivery fee state
+  const [deliveryFee, setDeliveryFee] = useState(
+    receipt.footer?.delivery_fee ?? 0,
+  )
 
   // ── Auto-fill category from supplier on initial match ──
   useEffect(() => {
@@ -323,6 +327,7 @@ export function StagingArea({
         exchange_rate: currency === 'THB' ? 1 : exchangeRate,
         discount_total: discountTotal,
         vat_amount: vatAmount,
+        delivery_fee: deliveryFee,
         paid_by: paidBy.trim(),
         payment_method: paymentMethod,
         status: 'paid',
@@ -395,8 +400,10 @@ export function StagingArea({
             itemsSum={computedTotal}
             discountTotal={discountTotal}
             vatAmount={vatAmount}
+            deliveryFee={deliveryFee}
             onDiscountChange={setDiscountTotal}
             onVatChange={setVatAmount}
+            onDeliveryFeeChange={setDeliveryFee}
           />
         )}
         {/* Legacy: show simple mismatch if no footer available */}
@@ -724,6 +731,18 @@ export function StagingArea({
                       >
                         {item.supplier_sku}
                       </button>
+                    )}
+                    {/* Phase 6.6: Brand chip */}
+                    {item.brand && (
+                      <span className="shrink-0 rounded bg-purple-500/10 px-1 py-0.5 text-[9px] text-purple-400">
+                        {item.brand}
+                      </span>
+                    )}
+                    {/* Phase 6.6: Package weight chip */}
+                    {item.package_weight && (
+                      <span className="shrink-0 rounded bg-orange-500/10 px-1 py-0.5 text-[9px] text-orange-400">
+                        {item.package_weight}
+                      </span>
                     )}
                   </div>
                   <input
@@ -1398,18 +1417,22 @@ function ReconciliationPanel({
   itemsSum,
   discountTotal,
   vatAmount,
+  deliveryFee,
   onDiscountChange,
   onVatChange,
+  onDeliveryFeeChange,
 }: {
   footer: ReceiptFooter
   reconciliation?: Reconciliation
   itemsSum: number
   discountTotal: number
   vatAmount: number
+  deliveryFee: number
   onDiscountChange: (v: number) => void
   onVatChange: (v: number) => void
+  onDeliveryFeeChange: (v: number) => void
 }) {
-  const grandTotal = itemsSum + discountTotal + vatAmount
+  const grandTotal = itemsSum + discountTotal + vatAmount + deliveryFee
   const declaredTotal = footer.grand_total
   const isBalanced = Math.abs(grandTotal - declaredTotal) <= 2
 
@@ -1461,6 +1484,18 @@ function ReconciliationPanel({
               value={vatAmount}
               onChange={(e) => onVatChange(Number(e.target.value))}
               className="h-6 w-24 rounded border border-slate-700/60 bg-slate-800/80 px-2 text-right font-mono text-xs text-slate-300 outline-none focus:border-indigo-500/60"
+            />
+          </div>
+
+          {/* Phase 6.6: Delivery fee (editable) */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-slate-400">Delivery</span>
+            <input
+              type="number"
+              step="1"
+              value={deliveryFee}
+              onChange={(e) => onDeliveryFeeChange(Number(e.target.value))}
+              className="h-6 w-24 rounded border border-slate-700/60 bg-slate-800/80 px-2 text-right font-mono text-xs text-blue-300 outline-none focus:border-indigo-500/60"
             />
           </div>
 

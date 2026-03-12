@@ -48,10 +48,16 @@ Frontend (FinanceManager)
 - GAS post-processing: item count validation, price math check, duplicate detection
 - Frontend: confidence-colored borders (green/amber/red), warning tooltips
 
-## Reconciliation (Phase 6.1)
-- Footer: {subtotal, discount_total, vat_amount, grand_total}
-- Formula: subtotal + discount_total + vat_amount = grand_total
-- ReconciliationPanel: editable, green checkmark when balanced
+## Reconciliation (Phase 6.1, updated 6.6)
+- Footer: {subtotal, discount_total, vat_amount, delivery_fee, grand_total}
+- Formula: subtotal + discount_total + vat_amount + delivery_fee = grand_total
+- ReconciliationPanel: editable (discount, VAT, delivery), green checkmark when balanced
+
+## Data Sanitization (Phase 6.6)
+- `sanitizeNumber_(val)` — Strips OCR dust (`/[^\d.]/g`), handles multiple dots, null → 0
+- `sanitizeSigned_(val)` — Like sanitizeNumber_ but preserves negative sign (for discount_total)
+- Applied to all numeric fields in validateAndPostProcess_ (line items + footer)
+- Schema: brand, package_weight per line item; delivery_fee in footer
 
 ## Key Secrets
 - `GAS_WEB_APP_URL` — In Supabase Secrets

@@ -7,10 +7,10 @@ Consolidated from all phases. Items marked with phase of origin.
 ### Phase 6: UoM Conversion (mostly complete)
 - ~~`fn_approve_receipt` does not yet apply `conversion_factor`~~ → **FIXED in Migration 040 (v6)**
 - ~~UoM Badge + Inline Editor in StagingArea~~ → **DONE (Phase 6.5)**
-- Need: Batch UoM Tuning view in Procurement (Phase 6.6)
+- Need: Batch UoM Tuning view in Procurement (Phase 6.7+)
 
-### Phase 6: Pending Migrations
-- Migration 040 needs SQL execution in Dashboard (Supabase CLI not linked)
+### Phase 6.6: Pending Migrations & Deploys
+- Migration 041 needs SQL execution in Dashboard (Supabase CLI not linked)
 - GAS needs `clasp push && npm run deploy` from `03_Development/gas/`
 
 ### Phase 5: Bundle Size
@@ -38,3 +38,6 @@ Consolidated from all phases. Items marked with phase of origin.
 - ~~Image compression kills OCR~~ → WebP byte compression + UX tiling (Phase 4.16b)
 - ~~Synchronous receipt parsing timeout~~ → Async receipt_jobs + Realtime (Phase 4.14)
 - ~~OpenAI Vision cost ($0.03/receipt)~~ → GAS + Gemini 2.5 Flash (free tier) (Phase 5.0f)
+- ~~OCR dust in numbers (225!, 210')~~ → sanitizeNumber_/sanitizeSigned_ in GAS (Phase 6.6)
+- ~~No delivery_fee capture~~ → delivery_fee in footer + expense_ledger + ReconciliationPanel (Phase 6.6)
+- ~~Lost brand/package_weight metadata~~ → Gemini schema + FoodItem chips (Phase 6.6)

@@ -18,6 +18,8 @@ export interface ReceiptFooter {
   discount_total: number
   /** VAT amount. 0 if VAT-inclusive pricing */
   vat_amount: number
+  /** Phase 6.6: Delivery/shipping charge (positive number). 0 if no delivery */
+  delivery_fee?: number
   /** Final amount paid (ยอดสุทธิ, Net, Grand Total) */
   grand_total: number
 }
@@ -47,6 +49,10 @@ export interface LineItem {
   category: 'food' | 'capex' | 'opex' | 'uncategorized'
   /** AI confidence: "high" = clear text, "medium" = some guessing, "low" = significant guessing */
   confidence?: 'high' | 'medium' | 'low'
+  /** Phase 6.6: Brand name if visible on receipt (display-only) */
+  brand?: string
+  /** Phase 6.6: Package weight as printed on receipt, e.g. "500g", "1kg" (display-only) */
+  package_weight?: string
   /** Post-processing warning (e.g., price math mismatch) */
   _warning?: string
   /** Populated by frontend mapping engine (useSupplierMapping) */
@@ -100,6 +106,10 @@ export interface FoodItem {
   supplier_sku?: string | null
   /** Original name as printed on receipt (Thai) — used for smart mapping fallback */
   original_name?: string | null
+  /** Phase 6.6: Brand name if visible (display-only chip in StagingArea) */
+  brand?: string
+  /** Phase 6.6: Package weight as printed, e.g. "500g" (display-only chip) */
+  package_weight?: string
 }
 
 /** Capital equipment line item → inserts into capex_transactions */
@@ -166,6 +176,8 @@ export interface ApprovePayload {
   discount_total: number
   /** Phase 6.1: VAT amount */
   vat_amount: number
+  /** Phase 6.6: Delivery/shipping charge (positive number) */
+  delivery_fee?: number
   paid_by: string
   payment_method: string
   status: string

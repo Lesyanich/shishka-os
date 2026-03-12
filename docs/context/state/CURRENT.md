@@ -18,7 +18,7 @@
 | `fin_sub_categories` | `sub_code` INT | LIVE | 28 sub-categories |
 | `capex_assets` | `id` UUID | LIVE | Linked to equipment via UUID FK |
 | `capex_transactions` | `id` UUID | LIVE | Purchase and repair transactions |
-| `expense_ledger` | `id` UUID | LIVE | Financial SSoT. Hub for receipt spokes. |
+| `expense_ledger` | `id` UUID | LIVE | Financial SSoT. Hub for receipt spokes. delivery_fee (v7). |
 | `suppliers` | `id` UUID | LIVE | With category_code defaults. Auto-create on receipt. |
 | `purchase_logs` | `id` UUID | LIVE | Food item purchases (spoke 1) |
 | `opex_items` | `id` UUID | LIVE | Operating expense items (spoke 3) |
@@ -48,7 +48,7 @@
 | `fn_process_new_order(UUID)` | RPC | LIVE — BOM explosion for orders |
 | `fn_run_mrp(UUID)` | RPC | LIVE — 2-level BOM explosion + inventory deduction |
 | `fn_approve_plan(UUID)` | RPC | LIVE — creates production_tasks from plan |
-| `fn_approve_receipt(JSONB)` | RPC | LIVE (v6) — Hub+Spoke atomic insert + UoM conversion |
+| `fn_approve_receipt(JSONB)` | RPC | LIVE (v7) — Hub+Spoke atomic insert + UoM conversion + delivery_fee |
 | `fn_update_cost_on_purchase()` | TRIGGER | LIVE — auto-updates nomenclature.cost_per_unit |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | LIVE — zombie job cleanup |
 
@@ -69,9 +69,10 @@
 
 ## Migrations Applied
 
-40 migrations total (001–040). Latest:
+41 migrations total (001–041). Latest:
 - 038: `expense_ledger` reconciliation columns + `fn_approve_receipt` v5
 - 039: `supplier_item_mapping` UoM conversion columns
 - 040: `fn_approve_receipt` v6 — applies conversion_factor from supplier_item_mapping
+- 041: `expense_ledger.delivery_fee` column + `fn_approve_receipt` v7
 
 → Full schema: `02_Obsidian_Vault/Database Schema.md`

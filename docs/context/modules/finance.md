@@ -1,7 +1,7 @@
 # Finance Module Context
 
 ## Tables
-- `expense_ledger` — Financial SSoT (Hub). Multi-currency, generated amount_thb.
+- `expense_ledger` — Financial SSoT (Hub). Multi-currency, generated amount_thb. Phase 6.6: delivery_fee column.
 - `fin_categories` (code INT) — 18 standardized financial codes
 - `fin_sub_categories` (sub_code INT) — 28 sub-categories
 - `suppliers` — With category_code defaults. Auto-created on receipt.
@@ -10,7 +10,7 @@
 - `opex_items` — Operating expense items (Spoke 3, expense_id FK CASCADE)
 
 ## RPCs
-- `fn_approve_receipt(JSONB)` v6 — Atomic Hub+Spoke insert. 3-tier supplier resolution (payload → ILIKE → auto-create). 3-tier category resolution (payload → supplier default → 2000). Auto-creates nomenclature for unmapped food items. **v6: applies conversion_factor from supplier_item_mapping** — recalculates quantity + price_per_unit, preserves total_price.
+- `fn_approve_receipt(JSONB)` v7 — Atomic Hub+Spoke insert. 3-tier supplier resolution (payload → ILIKE → auto-create). 3-tier category resolution (payload → supplier default → 2000). Auto-creates nomenclature for unmapped food items. **v6: applies conversion_factor from supplier_item_mapping** — recalculates quantity + price_per_unit, preserves total_price. **v7: delivery_fee in Hub INSERT**.
 - `fn_update_cost_on_purchase()` — Trigger: auto-updates nomenclature.cost_per_unit on purchase_logs INSERT
 - `fn_cleanup_stale_receipt_jobs()` — Marks zombie jobs (>5min) as failed
 
@@ -19,7 +19,7 @@
 - `update-receipt-job` — Callback for GAS. `--no-verify-jwt`. Service role key for RLS bypass.
 
 ## GAS
-- `ReceiptParser.gs` — Gemini 2.5 Flash vision+JSON. 6-step Phone Home architecture.
+- `ReceiptParser.gs` — Gemini 2.5 Flash vision+JSON. 6-step Phone Home architecture. **Phase 6.6: sanitizeNumber_/sanitizeSigned_ strip OCR dust. Schema: brand, package_weight, delivery_fee.**
 - Deploy: `cd 03_Development/gas && npm run deploy`
 
 ## Frontend

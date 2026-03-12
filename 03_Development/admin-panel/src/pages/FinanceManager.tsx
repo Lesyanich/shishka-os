@@ -205,6 +205,8 @@ export function FinanceManager() {
           nomenclature_id: li.nomenclature_id ?? undefined,
           supplier_sku: li.supplier_sku ?? null,
           original_name: li.original_name ?? null,
+          brand: li.brand ?? undefined,
+          package_weight: li.package_weight ?? undefined,
         } as FoodItem))
 
       receipt.capex_items = mapped

@@ -188,6 +188,7 @@ erDiagram
         NUMERIC amount_thb "GENERATED"
         NUMERIC discount_total
         NUMERIC vat_amount
+        NUMERIC delivery_fee
         TEXT status
         BOOLEAN has_tax_invoice
     }
@@ -303,7 +304,7 @@ erDiagram
 | `order_items` | `id` UUID | quantity, price_at_purchase | order_id -> orders (CASCADE), nomenclature_id -> nomenclature | 022 |
 | `production_plans` | `id` UUID | name, target_date, status, mrp_result | -- | 023 |
 | `plan_targets` | `id` UUID | target_qty, UNIQUE(plan_id,nomenclature_id) | plan_id -> production_plans (CASCADE), nomenclature_id -> nomenclature | 023 |
-| `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice, discount_total, vat_amount | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030, 038 |
+| `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice, discount_total, vat_amount, delivery_fee | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030, 038, 041 |
 | `opex_items` | `id` UUID | description, quantity, unit, unit_price, total_price | expense_id -> expense_ledger (CASCADE) | 030 |
 | `supplier_item_mapping` | `id` UUID | supplier_sku, original_name, match_count, purchase_unit, conversion_factor, base_unit | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE) | 035, 039 |
 | `receipt_jobs` | `id` UUID | status, image_urls (JSONB), result (JSONB), error, ocr_text, duration_ms, model | -- (standalone, pre-approval) | 036, 037 |
@@ -335,7 +336,7 @@ erDiagram
 | `fn_run_mrp(UUID)` | RPC | 2-level MRP engine: SALE->PF/MOD->RAW, inventory deduction | 023 |
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
 | `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter | 021 |
-| `fn_approve_receipt(JSONB)` | RPC | Atomic receipt approval: Hub (expense_ledger) + Spokes (purchase_logs, capex_transactions, opex_items). v6: applies UoM conversion_factor from supplier_item_mapping to purchase_logs | 030, 038, 040 |
+| `fn_approve_receipt(JSONB)` | RPC | Atomic receipt approval: Hub (expense_ledger) + Spokes (purchase_logs, capex_transactions, opex_items). v6: UoM conversion_factor. v7: delivery_fee in Hub INSERT | 030, 038, 040, 041 |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | Lazy cleanup: marks zombie receipt_jobs (processing >5min) as failed | 036 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
 

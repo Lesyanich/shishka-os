@@ -408,7 +408,39 @@ function callGemini_(imageParts, apiKey) {
 // Ported from parse-receipts/index.ts (Phase 4.13+)
 // ═══════════════════════════════════════════════════════════
 
-var FOOTER_RE = /^(total|subtotal|grand\s*total|net|net\s*total|vat|tax|discount|change|cash|card|credit|debit|points|member|bag\s*fee|rounding|round|ส่วนลด|ภาษี|ภาษีมูลค่าเพิ่ม|เงินทอน|เงินสด|รวม|ยอดรวม|ยอดสุทธิ|สุทธิ|บัตร|แต้ม|คูปอง|ทอน|เศษสตางค์)$/i;
+var FOOTER_RE = /^(total|subtotal|grand\s*total|net|net\s*total|vat|tax|discount|change|cash|card|credit|debit|points|member|bag\s*fee|rounding|round|delivery|shipping|ค่าจัดส่ง|ค่าขนส่ง|ส่วนลด|ภาษี|ภาษีมูลค่าเพิ่ม|เงินทอน|เงินสด|รวม|ยอดรวม|ยอดสุทธิ|สุทธิ|บัตร|แต้ม|คูปอง|ทอน|เศษสตางค์)$/i;
+
+// ── Phase 6.6: Number sanitizers — strip OCR dust from numeric fields ──
+
+/**
+ * Strip non-numeric chars (dust: !, ', stray commas etc.) and return a clean positive number.
+ * Handles: null, "", "225!", "1,200.50", "210'", multiple dots.
+ * @param {*} val - Raw value from Gemini output
+ * @return {number} Sanitized positive number, 0 if unparseable
+ */
+function sanitizeNumber_(val) {
+  if (val == null || val === "") return 0;
+  var s = String(val).replace(/[^\d.]/g, "");
+  var parts = s.split(".");
+  if (parts.length > 2) {
+    s = parts[0] + "." + parts.slice(1).join("");
+  }
+  var n = Number(s);
+  return isNaN(n) ? 0 : n;
+}
+
+/**
+ * Like sanitizeNumber_ but preserves negative sign.
+ * Used for discount_total which must remain negative.
+ * @param {*} val - Raw value (may have leading minus)
+ * @return {number} Sanitized number (negative if input had "-")
+ */
+function sanitizeSigned_(val) {
+  if (val == null || val === "") return 0;
+  var neg = String(val).indexOf("-") >= 0;
+  var n = sanitizeNumber_(val);
+  return neg ? -Math.abs(n) : n;
+}
 
 var VALID_UNITS = { "kg": true, "L": true, "pcs": true };
 var VALID_CATEGORIES = { "food": true, "capex": true, "opex": true, "uncategorized": true };
@@ -453,9 +485,11 @@ function validateAndPostProcess_(parsed) {
       li.translated_name = li.original_name || "[ITEM " + (i + 1) + "]";
       warnings.push("line_items[" + i + "].translated_name missing");
     }
-    if (typeof li.quantity !== "number") li.quantity = Number(li.quantity) || 1;
-    if (typeof li.unit_price !== "number") li.unit_price = Number(li.unit_price) || 0;
-    if (typeof li.total_price !== "number") li.total_price = Number(li.total_price) || 0;
+    // Phase 6.6: Sanitize numeric fields (strip OCR dust: "225!" → 225)
+    li.quantity = sanitizeNumber_(li.quantity) || 1;
+    li.unit_price = sanitizeNumber_(li.unit_price);
+    li.total_price = sanitizeNumber_(li.total_price);
+    li.discount = sanitizeSigned_(li.discount);
     if (!VALID_UNITS[li.unit]) {
       warnings.push("line_items[" + i + "].unit " + li.unit + " → pcs");
       li.unit = "pcs";
@@ -527,14 +561,17 @@ function validateAndPostProcess_(parsed) {
       subtotal: 0,
       discount_total: 0,
       vat_amount: 0,
+      delivery_fee: 0,
       grand_total: parsed.total_amount || 0,
     };
     warnings.push("footer object missing — reconstructed from total_amount");
   } else {
-    parsed.footer.subtotal = Number(parsed.footer.subtotal) || 0;
-    parsed.footer.discount_total = Number(parsed.footer.discount_total) || 0;
-    parsed.footer.vat_amount = Number(parsed.footer.vat_amount) || 0;
-    parsed.footer.grand_total = Number(parsed.footer.grand_total) || (parsed.total_amount || 0);
+    // Phase 6.6: Sanitize footer numeric fields (strip OCR dust)
+    parsed.footer.subtotal = sanitizeNumber_(parsed.footer.subtotal);
+    parsed.footer.discount_total = sanitizeSigned_(parsed.footer.discount_total);
+    parsed.footer.vat_amount = sanitizeNumber_(parsed.footer.vat_amount);
+    parsed.footer.delivery_fee = sanitizeNumber_(parsed.footer.delivery_fee);
+    parsed.footer.grand_total = sanitizeNumber_(parsed.footer.grand_total) || sanitizeNumber_(parsed.total_amount);
   }
   // Sync total_amount with footer.grand_total
   parsed.total_amount = parsed.footer.grand_total;
@@ -547,8 +584,10 @@ function validateAndPostProcess_(parsed) {
   var declared = parsed.total_amount || 0;
 
   // Reconciliation: check if items sum ≈ footer.subtotal, and formula balances
+  // Phase 6.6: formula includes delivery_fee
   var footerSubtotal = parsed.footer.subtotal;
-  var footerFormula = parsed.footer.subtotal + parsed.footer.discount_total + parsed.footer.vat_amount;
+  var deliveryFee = parsed.footer.delivery_fee || 0;
+  var footerFormula = parsed.footer.subtotal + parsed.footer.discount_total + parsed.footer.vat_amount + deliveryFee;
   footerFormula = Math.round(footerFormula * 100) / 100;
 
   var reconStatus = "balanced";
@@ -567,7 +606,7 @@ function validateAndPostProcess_(parsed) {
   parsed._reconciliation = {
     status: reconStatus,
     items_sum: lineSum,
-    formula: parsed.footer.subtotal + " + (" + parsed.footer.discount_total + ") + " + parsed.footer.vat_amount + " = " + parsed.footer.grand_total,
+    formula: parsed.footer.subtotal + " + (" + parsed.footer.discount_total + ") + " + parsed.footer.vat_amount + " + " + deliveryFee + " = " + parsed.footer.grand_total,
   };
 
   // Legacy _sum_mismatch (keep for backward compat with existing UI)
@@ -695,6 +734,7 @@ ZONE 1 — HEADER (metadata only):\n\
 ZONE 2 — ITEM GRID (extract products ONLY from here):\n\
   SKU | Product Name (Thai) | Qty | Unit Price | Total Price\n\
   → Extract: each row as a line_item\n\
+  → Also extract brand (if visible) and package_weight (e.g. 500g, 1kg) per item\n\
 \n\
 ZONE 3 — FOOTER (financial summary — extract as structured data):\n\
   Starts at first line containing: รวม, ยอดรวม, Subtotal, Total, ส่วนลด, Discount, VAT, ภาษี, สุทธิ, Net\n\
@@ -703,13 +743,14 @@ ZONE 3 — FOOTER (financial summary — extract as structured data):\n\
     - subtotal: sum before discounts (รวม, Subtotal) — should equal sum of line_item prices\n\
     - discount_total: total receipt discount as NEGATIVE number (ส่วนลด, Discount, e.g., -500). 0 if no discount.\n\
     - vat_amount: VAT amount (ภาษี, VAT). 0 if VAT-inclusive pricing or no VAT shown.\n\
+    - delivery_fee: delivery/shipping charge (positive number). 0 if no delivery fee.\n\
     - grand_total: final amount paid (ยอดสุทธิ, Net, Grand Total)\n\
   → Also set total_amount = grand_total (for backward compatibility)\n\
-  → Formula: subtotal + discount_total + vat_amount = grand_total\n\
+  → Formula: subtotal + discount_total + vat_amount + delivery_fee = grand_total\n\
 \n\
 ## BLACKLIST — NEVER add as line_items\n\
-Total, Subtotal, Grand Total, Net, VAT, Tax, Discount, Change, Cash, Card, Credit, Debit, Points, Member, Bag fee, Rounding,\n\
-รวม, ยอดรวม, ยอดสุทธิ, สุทธิ, ภาษี, ภาษีมูลค่าเพิ่ม, ส่วนลด, เงินสด, เงินทอน, ทอน, บัตร, แต้ม, คูปอง, เศษสตางค์\n\
+Total, Subtotal, Grand Total, Net, VAT, Tax, Discount, Change, Cash, Card, Credit, Debit, Points, Member, Bag fee, Rounding, Delivery, Shipping,\n\
+รวม, ยอดรวม, ยอดสุทธิ, สุทธิ, ภาษี, ภาษีมูลค่าเพิ่ม, ส่วนลด, เงินสด, เงินทอน, ทอน, บัตร, แต้ม, คูปอง, เศษสตางค์, ค่าจัดส่ง, ค่าขนส่ง\n\
 \n\
 ## ANCHORING RULE (CRITICAL — prevents repetition loops)\n\
 For EACH item row, you MUST:\n\
@@ -745,9 +786,10 @@ Translate Thai → English with MAXIMUM specificity:\n\
 - เส้นหมี่ → "Rice vermicelli"\n\
 - กะเพรา → "Holy basil" (NOT "Basil")\n\
 - โหระพา → "Sweet basil" (NOT "Basil")\n\
-- Keep translated_name CLEAN — no weight, quantity, or packaging info in the name\n\
+- Keep translated_name CLEAN — no weight, quantity, brand, or packaging info in the name\n\
 Do NOT transliterate Thai to Latin characters. TRANSLATE the meaning.\n\
-Brand names: describe the product (e.g., "Chicken eggs (ARO)").\n\
+Brand names: put brand into the separate "brand" field, NOT into translated_name.\n\
+  Example: ARO chicken eggs → translated_name: "Chicken eggs", brand: "ARO"\n\
 \n\
 ## CATEGORY RULES — AUTO-DETECT FROM SUPPLIER\n\
 First, identify the supplier from the header:\n\
@@ -779,6 +821,7 @@ Return ONLY valid JSON with this structure:\n\
     "subtotal": number,\n\
     "discount_total": number,\n\
     "vat_amount": number,\n\
+    "delivery_fee": number or 0,\n\
     "grand_total": number\n\
   },\n\
   "item_count_observed": number,\n\
@@ -794,7 +837,9 @@ Return ONLY valid JSON with this structure:\n\
       "unit_price": number,\n\
       "total_price": number,\n\
       "category": "food" | "capex" | "opex" | "uncategorized",\n\
-      "confidence": "high" | "medium" | "low"\n\
+      "confidence": "high" | "medium" | "low",\n\
+      "brand": "string or null — brand name if visible on receipt",\n\
+      "package_weight": "string or null — package weight as printed, e.g. 500g, 1kg"\n\
     }\n\
   ],\n\
   "documents": {\n\
