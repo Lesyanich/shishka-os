@@ -671,8 +671,8 @@ export function StagingArea({
             open={foodOpen}
             onToggle={() => setFoodOpen(!foodOpen)}
             color="emerald"
-            headers={['Item', 'Qty', 'Unit', 'Price', 'Total', 'Nomenclature', '']}
-            colWidths={['', 'w-16', 'w-16', 'w-20', 'w-20', 'w-36', 'w-8']}
+            headers={['Item', 'Brand', 'Wt', 'Qty', 'Unit', 'Price', 'Total', 'Nomenclature', '']}
+            colWidths={['', 'w-20', 'w-16', 'w-14', 'w-14', 'w-18', 'w-18', 'w-36', 'w-8']}
           >
             {foodItems.map((item, i) => {
               // Phase 6.2: Find matching line_item for confidence/warning data
@@ -716,6 +716,12 @@ export function StagingArea({
                       onChange={(e) => updateFood(i, { name: e.target.value })}
                       className={`${inputCls} flex-1 ${isUnreadable ? 'italic text-slate-500' : ''}`}
                     />
+                    {/* Phase 6.7: Makro verification badge */}
+                    {item.makro_name && (
+                      <span className="ml-1 shrink-0 text-[9px] text-emerald-400" title={`Verified by Makro: ${item.makro_name}`}>
+                        ✓
+                      </span>
+                    )}
                   </div>
                   {/* Metadata chips row — UNDER the name */}
                   <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -739,25 +745,25 @@ export function StagingArea({
                         SKU:{item.supplier_sku}
                       </button>
                     )}
-                    {/* Brand chip */}
-                    {item.brand && (
-                      <span className="shrink-0 rounded bg-purple-500/15 px-1.5 py-0.5 text-[9px] font-medium text-purple-400">
-                        {item.brand}
-                      </span>
-                    )}
-                    {/* Package weight chip */}
-                    {item.package_weight && (
-                      <span className="shrink-0 rounded bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-medium text-orange-400">
-                        {item.package_weight}
-                      </span>
-                    )}
                   </div>
                   {/* Warning tooltip */}
                   {warning && (
                     <p className="mt-0.5 text-[9px] text-rose-400/70">{warning}</p>
                   )}
                 </td>
-                <td className="w-16 px-1.5 py-1.5">
+                {/* Phase 6.7: Brand column */}
+                <td className="w-20 px-1 py-1.5">
+                  {item.brand && (
+                    <span className="text-xs text-purple-400">{item.brand}</span>
+                  )}
+                </td>
+                {/* Phase 6.7: Weight column */}
+                <td className="w-16 px-1 py-1.5">
+                  {item.package_weight && (
+                    <span className="text-xs text-orange-400">{item.package_weight}</span>
+                  )}
+                </td>
+                <td className="w-14 px-1.5 py-1.5">
                   <input
                     type="number"
                     step="0.01"
@@ -766,7 +772,7 @@ export function StagingArea({
                     className={`${inputCls} font-mono`}
                   />
                 </td>
-                <td className="w-16 px-1.5 py-1.5">
+                <td className="w-14 px-1.5 py-1.5">
                   <input
                     type="text"
                     value={item.unit}
@@ -774,7 +780,7 @@ export function StagingArea({
                     className={inputCls}
                   />
                 </td>
-                <td className="w-20 px-1.5 py-1.5">
+                <td className="w-18 px-1.5 py-1.5">
                   <input
                     type="number"
                     step="0.01"
@@ -783,7 +789,7 @@ export function StagingArea({
                     className={`${inputCls} font-mono ${hasMathError ? 'text-rose-400 border-rose-500/50' : ''}`}
                   />
                 </td>
-                <td className="w-20 px-1.5 py-1.5">
+                <td className="w-18 px-1.5 py-1.5">
                   <input
                     type="number"
                     step="0.01"

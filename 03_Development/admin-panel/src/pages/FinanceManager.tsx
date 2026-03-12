@@ -216,7 +216,7 @@ export function FinanceManager() {
       receipt.food_items = mapped
         .filter((li) => li.category === 'food')
         .map((li) => ({
-          name: li.translated_name || li.original_name || '',
+          name: li.makro_name || li.translated_name || li.original_name || '',
           quantity: sanitizeNum(li.quantity),
           unit: li.unit || 'pcs',
           unit_price: sanitizeNum(li.unit_price),
@@ -226,6 +226,7 @@ export function FinanceManager() {
           original_name: li.original_name ?? null,
           brand: li.brand ?? undefined,
           package_weight: li.package_weight ?? undefined,
+          makro_name: li.makro_name ?? undefined,
         } as FoodItem))
 
       receipt.capex_items = mapped
