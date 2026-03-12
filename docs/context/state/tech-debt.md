@@ -4,10 +4,9 @@ Consolidated from all phases. Items marked with phase of origin.
 
 ## Active Debt
 
-### Phase 6: UoM Conversion UI (pending)
-- `useSupplierMapping` hook returns `MappingMatch` with conversion data, but UI not yet built
+### Phase 6: UoM Conversion (mostly complete)
 - ~~`fn_approve_receipt` does not yet apply `conversion_factor`~~ → **FIXED in Migration 040 (v6)**
-- Need: UoM Badge + Inline Editor in StagingArea (Phase 6.5)
+- ~~UoM Badge + Inline Editor in StagingArea~~ → **DONE (Phase 6.5)**
 - Need: Batch UoM Tuning view in Procurement (Phase 6.6)
 
 ### Phase 6: Pending Migrations

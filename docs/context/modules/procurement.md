@@ -26,7 +26,7 @@ Save:    existing → match_count++ (UPDATE)  |  new → INSERT (match_count=1)
 - `base_unit` — Kitchen unit (kg/L/pcs)
 - Formula: `inventory_quantity = receipt_quantity × conversion_factor`
 - **DB LIVE (Migration 040)** — fn_approve_receipt v6 applies conversion_factor on approval
-- **UI pending** — hook ready in useSupplierMapping.ts, inline editor TBD
+- **UI LIVE (Phase 6.5)** — UoM Badge in StagingArea + inline editor + updateConversion in hook
 
 ## Frontend
 | File | Purpose |

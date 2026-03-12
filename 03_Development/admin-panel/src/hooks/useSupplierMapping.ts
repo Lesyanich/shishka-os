@@ -198,5 +198,55 @@ export function useSupplierMapping() {
     [lookupMappings],
   )
 
-  return { lookupMappings, saveMapping, applyMappings }
+  /**
+   * Phase 6.5: Update conversion_factor / purchase_unit / base_unit
+   * for an existing mapping (by supplier_id + nomenclature_id).
+   * If no mapping exists yet, creates one with the given original_name.
+   */
+  const updateConversion = useCallback(
+    async (params: {
+      supplierId: string
+      nomenclatureId: string
+      originalName: string
+      supplierSku?: string | null
+      purchaseUnit: string
+      conversionFactor: number
+      baseUnit: string
+    }) => {
+      const { supplierId, nomenclatureId, originalName, supplierSku, purchaseUnit, conversionFactor, baseUnit } = params
+      if (!supplierId || !nomenclatureId) return
+
+      // Find existing mapping
+      const { data } = await supabase
+        .from('supplier_item_mapping')
+        .select('id')
+        .eq('supplier_id', supplierId)
+        .eq('nomenclature_id', nomenclatureId)
+        .order('match_count', { ascending: false })
+        .limit(1)
+
+      if (data && data.length > 0) {
+        // Update existing
+        await supabase
+          .from('supplier_item_mapping')
+          .update({ purchase_unit: purchaseUnit, conversion_factor: conversionFactor, base_unit: baseUnit })
+          .eq('id', data[0].id)
+      } else {
+        // Create new mapping with conversion data
+        await supabase.from('supplier_item_mapping').insert({
+          supplier_id: supplierId,
+          supplier_sku: supplierSku || null,
+          original_name: originalName,
+          nomenclature_id: nomenclatureId,
+          match_count: 1,
+          purchase_unit: purchaseUnit,
+          conversion_factor: conversionFactor,
+          base_unit: baseUnit,
+        })
+      }
+    },
+    [],
+  )
+
+  return { lookupMappings, saveMapping, applyMappings, updateConversion }
 }

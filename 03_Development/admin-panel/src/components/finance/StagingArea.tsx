@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -7,13 +7,16 @@ import {
   ChevronRight,
   Loader2,
   Package,
+  Pencil,
   Plus,
+  Save,
   ShoppingCart,
   Sparkles,
   Trash2,
   Wrench,
   X,
 } from 'lucide-react'
+import type { MappingMatch } from '../../hooks/useSupplierMapping'
 import { CURRENCY_OPTIONS, PAYMENT_METHODS, formatTHB } from './helpers'
 import { ReceiptImageViewer } from './ReceiptImageViewer'
 import { nomenclatureOptionText } from './NomenclatureLabel'
@@ -53,6 +56,18 @@ export interface StagingAreaProps {
     name: string
     baseUnit: string
   }) => Promise<string>
+  /** Phase 6.5: Lookup all mappings for a supplier → Map of MappingMatch */
+  onLookupMappings?: (supplierId: string) => Promise<Map<string, MappingMatch>>
+  /** Phase 6.5: Update conversion_factor for a supplier+nomenclature pair */
+  onUpdateConversion?: (params: {
+    supplierId: string
+    nomenclatureId: string
+    originalName: string
+    supplierSku?: string | null
+    purchaseUnit: string
+    conversionFactor: number
+    baseUnit: string
+  }) => Promise<void>
 }
 
 /* ────────────────────────── Helpers ────────────────────────── */
@@ -94,6 +109,8 @@ export function StagingArea({
   onCancel,
   onSaveMapping,
   onCreateNomenclature,
+  onLookupMappings,
+  onUpdateConversion,
 }: StagingAreaProps) {
   // ── Header state (editable) ──
   const [supplierId, setSupplierId] = useState(
@@ -165,6 +182,38 @@ export function StagingArea({
   const [createModalIndex, setCreateModalIndex] = useState<number | null>(null)
   const [createName, setCreateName] = useState('')
   const [createUnit, setCreateUnit] = useState<'kg' | 'L' | 'pcs'>('kg')
+
+  // Phase 6.5: UoM mapping data (loaded from supplier_item_mapping)
+  const [uomMap, setUomMap] = useState<Map<string, MappingMatch>>(new Map())
+  // Track which food item index is being UoM-edited (inline editor)
+  const [uomEditIdx, setUomEditIdx] = useState<number | null>(null)
+  const [uomPurchaseUnit, setUomPurchaseUnit] = useState('')
+  const [uomFactor, setUomFactor] = useState('')
+  const [uomBaseUnit, setUomBaseUnit] = useState<'kg' | 'L' | 'pcs'>('kg')
+
+  // Load mapping data on mount (if supplier is resolved)
+  useEffect(() => {
+    if (supplierId && onLookupMappings) {
+      onLookupMappings(supplierId).then(setUomMap)
+    }
+  }, [supplierId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper: find UoM data for a food item
+  const getUomForItem = useCallback(
+    (item: FoodItem): MappingMatch | null => {
+      if (uomMap.size === 0) return null
+      if (item.supplier_sku) {
+        const skuMatch = uomMap.get(`sku:${item.supplier_sku}`)
+        if (skuMatch) return skuMatch
+      }
+      if (item.original_name) {
+        const nameMatch = uomMap.get(`name:${item.original_name.toLowerCase()}`)
+        if (nameMatch) return nameMatch
+      }
+      return null
+    },
+    [uomMap],
+  )
 
   // ── Sub-category filtering ──
   const filteredSubCats = useMemo(
@@ -759,6 +808,109 @@ export function StagingArea({
                       </option>
                     ))}
                   </select>
+                  {/* ── Phase 6.5: UoM Badge + Inline Editor ── */}
+                  {item.nomenclature_id && item.nomenclature_id !== '' && item.nomenclature_id !== '__NEW__' && (() => {
+                    const uom = getUomForItem(item)
+                    const hasUom = uom?.conversionFactor != null && uom.conversionFactor > 0
+
+                    if (uomEditIdx === i) {
+                      // Inline UoM editor
+                      return (
+                        <div className="mt-1 flex items-center gap-1 rounded-md border border-indigo-500/30 bg-slate-800/60 px-1.5 py-1">
+                          <input
+                            type="text"
+                            value={uomPurchaseUnit}
+                            onChange={(e) => setUomPurchaseUnit(e.target.value)}
+                            placeholder="unit"
+                            className="h-5 w-12 rounded border border-slate-700 bg-slate-900/60 px-1 text-[10px] text-slate-200 outline-none focus:border-indigo-500/50"
+                          />
+                          <span className="text-[10px] text-slate-500">&times;</span>
+                          <input
+                            type="number"
+                            step="0.001"
+                            value={uomFactor}
+                            onChange={(e) => setUomFactor(e.target.value)}
+                            placeholder="factor"
+                            className="h-5 w-14 rounded border border-slate-700 bg-slate-900/60 px-1 font-mono text-[10px] text-slate-200 outline-none focus:border-indigo-500/50"
+                          />
+                          <select
+                            value={uomBaseUnit}
+                            onChange={(e) => setUomBaseUnit(e.target.value as 'kg' | 'L' | 'pcs')}
+                            className="h-5 rounded border border-slate-700 bg-slate-900/60 px-0.5 text-[10px] text-slate-200 outline-none focus:border-indigo-500/50"
+                          >
+                            <option value="kg">kg</option>
+                            <option value="L">L</option>
+                            <option value="pcs">pcs</option>
+                          </select>
+                          <button
+                            type="button"
+                            title="Save UoM"
+                            onClick={async () => {
+                              const factor = parseFloat(uomFactor)
+                              if (onUpdateConversion && factor > 0 && supplierId) {
+                                await onUpdateConversion({
+                                  supplierId,
+                                  nomenclatureId: item.nomenclature_id!,
+                                  originalName: item.original_name ?? item.name,
+                                  supplierSku: item.supplier_sku,
+                                  purchaseUnit: uomPurchaseUnit,
+                                  conversionFactor: factor,
+                                  baseUnit: uomBaseUnit,
+                                })
+                                // Refresh mapping data
+                                if (onLookupMappings) {
+                                  const fresh = await onLookupMappings(supplierId)
+                                  setUomMap(fresh)
+                                }
+                              }
+                              setUomEditIdx(null)
+                            }}
+                            className="rounded p-0.5 text-emerald-400 hover:bg-emerald-500/20"
+                          >
+                            <Save className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Cancel"
+                            onClick={() => setUomEditIdx(null)}
+                            className="rounded p-0.5 text-slate-500 hover:bg-slate-500/20"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )
+                    }
+
+                    // UoM display badge (clickable to edit)
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUomEditIdx(i)
+                          setUomPurchaseUnit(uom?.purchaseUnit || item.unit || '')
+                          setUomFactor(uom?.conversionFactor?.toString() || '1')
+                          setUomBaseUnit((uom?.baseUnit as 'kg' | 'L' | 'pcs') || 'kg')
+                        }}
+                        className={`mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] transition-colors ${
+                          hasUom
+                            ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'
+                            : 'bg-slate-700/30 text-slate-500 hover:bg-slate-700/50'
+                        }`}
+                        title={hasUom ? 'Edit UoM conversion' : 'Set UoM conversion'}
+                      >
+                        {hasUom ? (
+                          <>
+                            1 {uom!.purchaseUnit} &rarr; {uom!.conversionFactor} {uom!.baseUnit}
+                            <Pencil className="ml-0.5 h-2.5 w-2.5" />
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-2.5 w-2.5" /> UoM
+                          </>
+                        )}
+                      </button>
+                    )
+                  })()}
                 </td>
                 <td className="w-8 px-1.5 py-1.5">
                   <button
@@ -1243,7 +1395,6 @@ function ItemSection({
 
 function ReconciliationPanel({
   footer,
-  reconciliation,
   itemsSum,
   discountTotal,
   vatAmount,

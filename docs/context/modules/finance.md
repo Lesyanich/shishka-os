@@ -35,7 +35,7 @@
 | `src/components/finance/ExpenseEditModal.tsx` | Edit existing expense |
 | `src/components/finance/ReconciliationPanel.tsx` | Inline in StagingArea |
 | `src/hooks/useExpenseLedger.ts` | 4-query + JS join (ledger + categories + sub_categories + suppliers) |
-| `src/hooks/useSupplierMapping.ts` | Smart SKU→name mapping with match_count ranking |
+| `src/hooks/useSupplierMapping.ts` | Smart SKU→name mapping with match_count ranking + UoM updateConversion |
 | `src/hooks/useSpokeData.ts` | Lazy-fetch spoke data with module-scope Map cache |
 
 ## Patterns & Gotchas

@@ -52,7 +52,7 @@ export function FinanceManager() {
     updateExpense,
   } = useExpenseLedger()
 
-  const { applyMappings, saveMapping } = useSupplierMapping()
+  const { applyMappings, saveMapping, lookupMappings, updateConversion } = useSupplierMapping()
 
   /* Receipt URLs injected from MagicDropzone */
   const [receiptUrls, setReceiptUrls] = useState<ReceiptUrls>({})
@@ -393,6 +393,8 @@ export function FinanceManager() {
               onCancel={() => setStagingData(null)}
               onSaveMapping={handleSaveMapping}
               onCreateNomenclature={handleCreateNomenclature}
+              onLookupMappings={lookupMappings}
+              onUpdateConversion={updateConversion}
             />
           ) : (
             <ExpenseForm
