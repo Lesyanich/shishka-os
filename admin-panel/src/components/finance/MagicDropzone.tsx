@@ -184,20 +184,12 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
           throw new Error(insertErr?.message || 'Failed to create receipt job')
         }
 
-        // Step 3: Fire Edge Function — NO BODY, job_id in URL query param.
-        // Phase 5.0c: Supabase Edge Functions have a fatal bug where req.json()
-        // hangs indefinitely. We pass job_id in the URL and the function reads
-        // image_urls from the receipt_jobs DB row (already saved in Step 2).
-        const { data: { session } } = await supabase.auth.getSession()
-        fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipts?job_id=${encodeURIComponent(job.id)}`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session?.access_token ?? ''}`,
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-          }
+        // Step 3: Fire Edge Function — job_id in URL query param.
+        // Phase 5.0d: supabase.functions.invoke() auto-includes user JWT.
+        // Raw fetch() broke auth (401 Invalid JWT). Edge Function reads
+        // job_id from URL params, image_urls from DB. Zero body parsing.
+        supabase.functions.invoke(
+          `parse-receipts?job_id=${encodeURIComponent(job.id)}`
         ).catch((err) => {
           // Phase 4.14 Resilience: catch AbortError / network failures silently.
           // The Edge Function may still complete — DB has the job row.

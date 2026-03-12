@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -7,18 +7,23 @@ import {
   ChevronRight,
   Loader2,
   Package,
+  Pencil,
   Plus,
+  Save,
   ShoppingCart,
   Sparkles,
   Trash2,
   Wrench,
   X,
 } from 'lucide-react'
+import type { MappingMatch } from '../../hooks/useSupplierMapping'
 import { CURRENCY_OPTIONS, PAYMENT_METHODS, formatTHB } from './helpers'
 import { ReceiptImageViewer } from './ReceiptImageViewer'
 import { nomenclatureOptionText } from './NomenclatureLabel'
 import type {
   ParsedReceipt,
+  ReceiptFooter,
+  Reconciliation,
   FoodItem,
   CapexItem,
   OpexItem,
@@ -45,6 +50,23 @@ export interface StagingAreaProps {
     supplierSku: string | null
     originalName: string
     nomenclatureId: string
+  }) => Promise<void>
+  /** Phase 6.3: Create new nomenclature item and return its ID */
+  onCreateNomenclature?: (params: {
+    name: string
+    baseUnit: string
+  }) => Promise<string>
+  /** Phase 6.5: Lookup all mappings for a supplier → Map of MappingMatch */
+  onLookupMappings?: (supplierId: string) => Promise<Map<string, MappingMatch>>
+  /** Phase 6.5: Update conversion_factor for a supplier+nomenclature pair */
+  onUpdateConversion?: (params: {
+    supplierId: string
+    nomenclatureId: string
+    originalName: string
+    supplierSku?: string | null
+    purchaseUnit: string
+    conversionFactor: number
+    baseUnit: string
   }) => Promise<void>
 }
 
@@ -86,6 +108,9 @@ export function StagingArea({
   onApprove,
   onCancel,
   onSaveMapping,
+  onCreateNomenclature,
+  onLookupMappings,
+  onUpdateConversion,
 }: StagingAreaProps) {
   // ── Header state (editable) ──
   const [supplierId, setSupplierId] = useState(
@@ -117,6 +142,18 @@ export function StagingArea({
   const [paidBy, setPaidBy] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
 
+  // Phase 6.1: Reconciliation state (editable discount & VAT)
+  const [discountTotal, setDiscountTotal] = useState(
+    receipt.footer?.discount_total ?? 0,
+  )
+  const [vatAmount, setVatAmount] = useState(
+    receipt.footer?.vat_amount ?? 0,
+  )
+  // Phase 6.6: Delivery fee state
+  const [deliveryFee, setDeliveryFee] = useState(
+    receipt.footer?.delivery_fee ?? 0,
+  )
+
   // ── Auto-fill category from supplier on initial match ──
   useEffect(() => {
     if (supplierId && categoryCode === '') {
@@ -144,6 +181,43 @@ export function StagingArea({
   // ── UI state ──
   const [isApproving, setIsApproving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Phase 6.3: Create New Item modal state
+  const [createModalIndex, setCreateModalIndex] = useState<number | null>(null)
+  const [createName, setCreateName] = useState('')
+  const [createUnit, setCreateUnit] = useState<'kg' | 'L' | 'pcs'>('kg')
+
+  // Phase 6.5: UoM mapping data (loaded from supplier_item_mapping)
+  const [uomMap, setUomMap] = useState<Map<string, MappingMatch>>(new Map())
+  // Track which food item index is being UoM-edited (inline editor)
+  const [uomEditIdx, setUomEditIdx] = useState<number | null>(null)
+  const [uomPurchaseUnit, setUomPurchaseUnit] = useState('')
+  const [uomFactor, setUomFactor] = useState('')
+  const [uomBaseUnit, setUomBaseUnit] = useState<'kg' | 'L' | 'pcs'>('kg')
+
+  // Load mapping data on mount (if supplier is resolved)
+  useEffect(() => {
+    if (supplierId && onLookupMappings) {
+      onLookupMappings(supplierId).then(setUomMap)
+    }
+  }, [supplierId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper: find UoM data for a food item
+  const getUomForItem = useCallback(
+    (item: FoodItem): MappingMatch | null => {
+      if (uomMap.size === 0) return null
+      if (item.supplier_sku) {
+        const skuMatch = uomMap.get(`sku:${item.supplier_sku}`)
+        if (skuMatch) return skuMatch
+      }
+      if (item.original_name) {
+        const nameMatch = uomMap.get(`name:${item.original_name.toLowerCase()}`)
+        if (nameMatch) return nameMatch
+      }
+      return null
+    },
+    [uomMap],
+  )
 
   // ── Sub-category filtering ──
   const filteredSubCats = useMemo(
@@ -251,6 +325,9 @@ export function StagingArea({
         amount_original: totalAmount,
         currency,
         exchange_rate: currency === 'THB' ? 1 : exchangeRate,
+        discount_total: discountTotal,
+        vat_amount: vatAmount,
+        delivery_fee: deliveryFee,
         paid_by: paidBy.trim(),
         payment_method: paymentMethod,
         status: 'paid',
@@ -315,8 +392,22 @@ export function StagingArea({
           </div>
         )}
 
-        {/* Phase 4.6: Sum mismatch warning from Edge Function */}
-        {receipt._sum_mismatch && (
+        {/* Phase 6.1: Financial Reconciliation Panel */}
+        {receipt.footer && (
+          <ReconciliationPanel
+            footer={receipt.footer}
+            reconciliation={receipt._reconciliation}
+            itemsSum={computedTotal}
+            discountTotal={discountTotal}
+            vatAmount={vatAmount}
+            deliveryFee={deliveryFee}
+            onDiscountChange={setDiscountTotal}
+            onVatChange={setVatAmount}
+            onDeliveryFeeChange={setDeliveryFee}
+          />
+        )}
+        {/* Legacy: show simple mismatch if no footer available */}
+        {!receipt.footer && receipt._sum_mismatch && (
           <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
             <div>
@@ -329,6 +420,18 @@ export function StagingArea({
                 Missing: <span className="font-mono font-semibold text-amber-200">{formatTHB(receipt._sum_mismatch.difference)}</span>
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Phase 6.2: AI warnings banner */}
+        {receipt._warnings && receipt._warnings.length > 0 && (
+          <div className="mb-4 rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3">
+            <p className="text-[11px] font-medium text-rose-300">AI Warnings:</p>
+            <ul className="mt-1 space-y-0.5">
+              {receipt._warnings.map((w, i) => (
+                <li key={i} className="text-[10px] text-rose-300/70">{w}</li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -586,18 +689,88 @@ export function StagingArea({
             headers={['Item', 'Qty', 'Unit', 'Price', 'Total', 'Nomenclature', '']}
             colWidths={['', 'w-16', 'w-16', 'w-20', 'w-20', 'w-36', 'w-8']}
           >
-            {foodItems.map((item, i) => (
+            {foodItems.map((item, i) => {
+              // Phase 6.2: Find matching line_item for confidence/warning data
+              const lineItem = receipt.line_items?.find(
+                (li) =>
+                  (li.supplier_sku && li.supplier_sku === item.supplier_sku) ||
+                  (li.original_name && li.original_name === item.original_name),
+              )
+              const confidence = lineItem?.confidence ?? 'high'
+              const warning = lineItem?._warning
+              const lineNumber = lineItem?.line_number
+              const confidenceBorder =
+                confidence === 'low'
+                  ? 'border-l-2 border-l-rose-500'
+                  : confidence === 'medium'
+                    ? 'border-l-2 border-l-amber-500'
+                    : ''
+              const isUnreadable = item.name === '[UNREADABLE]'
+              // Phase 6.6: Math validation — qty × unit_price ≈ total_price
+              const expectedTotal = Math.round(item.quantity * item.unit_price * 100) / 100
+              const hasMathError = item.quantity > 0 && item.unit_price > 0 && item.total_price > 0
+                && Math.abs(expectedTotal - item.total_price) > 2
+
+              return (
               <tr
                 key={i}
-                className="group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20"
+                className={`group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20 ${confidenceBorder} ${isUnreadable ? 'bg-slate-800/40' : ''}`}
+                title={warning || undefined}
               >
                 <td className="px-1.5 py-1.5">
-                  <input
-                    type="text"
-                    value={item.name}
-                    onChange={(e) => updateFood(i, { name: e.target.value })}
-                    className={inputCls}
-                  />
+                  {/* Line number + editable name */}
+                  <div className="flex items-center gap-1.5">
+                    {lineNumber && (
+                      <span className="shrink-0 rounded bg-slate-700/60 px-1 py-0.5 font-mono text-[9px] text-slate-500">
+                        #{lineNumber}
+                      </span>
+                    )}
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => updateFood(i, { name: e.target.value })}
+                      className={`${inputCls} flex-1 ${isUnreadable ? 'italic text-slate-500' : ''}`}
+                    />
+                  </div>
+                  {/* Metadata chips row — UNDER the name */}
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {/* Thai original (always show for CEO verification) */}
+                    {item.original_name && (
+                      <span
+                        className="truncate rounded bg-slate-700/40 px-1 py-0.5 text-[9px] text-slate-500 max-w-[180px]"
+                        title={item.original_name}
+                      >
+                        {item.original_name}
+                      </span>
+                    )}
+                    {/* SKU chip */}
+                    {item.supplier_sku && (
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(item.supplier_sku!)}
+                        title={`Copy SKU: ${item.supplier_sku}`}
+                        className="shrink-0 rounded bg-slate-600/30 px-1 py-0.5 font-mono text-[9px] text-slate-400 hover:bg-slate-600/50"
+                      >
+                        SKU:{item.supplier_sku}
+                      </button>
+                    )}
+                    {/* Brand chip */}
+                    {item.brand && (
+                      <span className="shrink-0 rounded bg-purple-500/15 px-1.5 py-0.5 text-[9px] font-medium text-purple-400">
+                        {item.brand}
+                      </span>
+                    )}
+                    {/* Package weight chip */}
+                    {item.package_weight && (
+                      <span className="shrink-0 rounded bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-medium text-orange-400">
+                        {item.package_weight}
+                      </span>
+                    )}
+                  </div>
+                  {/* Warning tooltip */}
+                  {warning && (
+                    <p className="mt-0.5 text-[9px] text-rose-400/70">{warning}</p>
+                  )}
                 </td>
                 <td className="w-16 px-1.5 py-1.5">
                   <input
@@ -622,7 +795,7 @@ export function StagingArea({
                     step="0.01"
                     value={item.unit_price}
                     onChange={(e) => updateFood(i, { unit_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
+                    className={`${inputCls} font-mono ${hasMathError ? 'text-rose-400 border-rose-500/50' : ''}`}
                   />
                 </td>
                 <td className="w-20 px-1.5 py-1.5">
@@ -631,24 +804,36 @@ export function StagingArea({
                     step="0.01"
                     value={item.total_price}
                     onChange={(e) => updateFood(i, { total_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
+                    className={`${inputCls} font-mono ${hasMathError ? 'text-rose-400 border-rose-500/50' : ''}`}
                   />
+                  {hasMathError && (
+                    <p className="mt-0.5 flex items-center gap-0.5 text-[9px] text-rose-400">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      Math: {item.quantity}&times;{item.unit_price}={expectedTotal}
+                    </p>
+                  )}
                 </td>
                 <td className="w-36 px-1.5 py-1.5">
                   <select
                     value={item.nomenclature_id || ''}
-                    onChange={(e) => updateFood(i, { nomenclature_id: e.target.value })}
+                    onChange={(e) => {
+                      if (e.target.value === '__CREATE__') {
+                        setCreateModalIndex(i)
+                        setCreateName(item.name || '')
+                        setCreateUnit('kg')
+                      } else {
+                        updateFood(i, { nomenclature_id: e.target.value })
+                      }
+                    }}
                     className={`${selectCls} ${
                       !item.nomenclature_id
                         ? 'border-amber-500/40 ring-1 ring-amber-500/10'
-                        : item.nomenclature_id === '__NEW__'
-                          ? 'border-violet-500/40 ring-1 ring-violet-500/10'
-                          : 'border-emerald-500/30'
+                        : 'border-emerald-500/30'
                     }`}
                   >
                     <option value="">Map to item...</option>
                     {item.name && (
-                      <option value="__NEW__">
+                      <option value="__CREATE__">
                         + Create new: &quot;{item.name}&quot;
                       </option>
                     )}
@@ -658,6 +843,109 @@ export function StagingArea({
                       </option>
                     ))}
                   </select>
+                  {/* ── Phase 6.5: UoM Badge + Inline Editor ── */}
+                  {item.nomenclature_id && item.nomenclature_id !== '' && item.nomenclature_id !== '__NEW__' && (() => {
+                    const uom = getUomForItem(item)
+                    const hasUom = uom?.conversionFactor != null && uom.conversionFactor > 0
+
+                    if (uomEditIdx === i) {
+                      // Inline UoM editor
+                      return (
+                        <div className="mt-1 flex items-center gap-1 rounded-md border border-indigo-500/30 bg-slate-800/60 px-1.5 py-1">
+                          <input
+                            type="text"
+                            value={uomPurchaseUnit}
+                            onChange={(e) => setUomPurchaseUnit(e.target.value)}
+                            placeholder="unit"
+                            className="h-5 w-12 rounded border border-slate-700 bg-slate-900/60 px-1 text-[10px] text-slate-200 outline-none focus:border-indigo-500/50"
+                          />
+                          <span className="text-[10px] text-slate-500">&times;</span>
+                          <input
+                            type="number"
+                            step="0.001"
+                            value={uomFactor}
+                            onChange={(e) => setUomFactor(e.target.value)}
+                            placeholder="factor"
+                            className="h-5 w-14 rounded border border-slate-700 bg-slate-900/60 px-1 font-mono text-[10px] text-slate-200 outline-none focus:border-indigo-500/50"
+                          />
+                          <select
+                            value={uomBaseUnit}
+                            onChange={(e) => setUomBaseUnit(e.target.value as 'kg' | 'L' | 'pcs')}
+                            className="h-5 rounded border border-slate-700 bg-slate-900/60 px-0.5 text-[10px] text-slate-200 outline-none focus:border-indigo-500/50"
+                          >
+                            <option value="kg">kg</option>
+                            <option value="L">L</option>
+                            <option value="pcs">pcs</option>
+                          </select>
+                          <button
+                            type="button"
+                            title="Save UoM"
+                            onClick={async () => {
+                              const factor = parseFloat(uomFactor)
+                              if (onUpdateConversion && factor > 0 && supplierId) {
+                                await onUpdateConversion({
+                                  supplierId,
+                                  nomenclatureId: item.nomenclature_id!,
+                                  originalName: item.original_name ?? item.name,
+                                  supplierSku: item.supplier_sku,
+                                  purchaseUnit: uomPurchaseUnit,
+                                  conversionFactor: factor,
+                                  baseUnit: uomBaseUnit,
+                                })
+                                // Refresh mapping data
+                                if (onLookupMappings) {
+                                  const fresh = await onLookupMappings(supplierId)
+                                  setUomMap(fresh)
+                                }
+                              }
+                              setUomEditIdx(null)
+                            }}
+                            className="rounded p-0.5 text-emerald-400 hover:bg-emerald-500/20"
+                          >
+                            <Save className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Cancel"
+                            onClick={() => setUomEditIdx(null)}
+                            className="rounded p-0.5 text-slate-500 hover:bg-slate-500/20"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )
+                    }
+
+                    // UoM display badge (clickable to edit)
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUomEditIdx(i)
+                          setUomPurchaseUnit(uom?.purchaseUnit || item.unit || '')
+                          setUomFactor(uom?.conversionFactor?.toString() || '1')
+                          setUomBaseUnit((uom?.baseUnit as 'kg' | 'L' | 'pcs') || 'kg')
+                        }}
+                        className={`mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] transition-colors ${
+                          hasUom
+                            ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'
+                            : 'bg-slate-700/30 text-slate-500 hover:bg-slate-700/50'
+                        }`}
+                        title={hasUom ? 'Edit UoM conversion' : 'Set UoM conversion'}
+                      >
+                        {hasUom ? (
+                          <>
+                            1 {uom!.purchaseUnit} &rarr; {uom!.conversionFactor} {uom!.baseUnit}
+                            <Pencil className="ml-0.5 h-2.5 w-2.5" />
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-2.5 w-2.5" /> UoM
+                          </>
+                        )}
+                      </button>
+                    )
+                  })()}
                 </td>
                 <td className="w-8 px-1.5 py-1.5">
                   <button
@@ -669,7 +957,8 @@ export function StagingArea({
                   </button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
             <tr>
               <td colSpan={7} className="px-1.5 py-2">
                 <button
@@ -906,6 +1195,102 @@ export function StagingArea({
             )}
           </div>
 
+          {/* ═══ Phase 6.3: Create New Item Modal ═══ */}
+          {createModalIndex !== null && (
+            <div className="overflow-hidden rounded-xl border border-violet-500/30 bg-violet-500/[0.06]">
+              <div className="px-4 py-3">
+                <p className="text-xs font-medium text-violet-300">Create New Inventory Item</p>
+                <div className="mt-3 grid grid-cols-[1fr_auto] gap-3">
+                  <div>
+                    <label className={labelCls}>Name</label>
+                    <input
+                      type="text"
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
+                      className={inputCls}
+                      autoFocus
+                    />
+                    {/* Fuzzy match: suggest existing items */}
+                    {createName.length >= 2 && (() => {
+                      const lower = createName.toLowerCase()
+                      const matches = nomenclatureList.filter(
+                        (n) => n.name.toLowerCase().includes(lower) || lower.includes(n.name.toLowerCase()),
+                      ).slice(0, 3)
+                      if (matches.length === 0) return null
+                      return (
+                        <div className="mt-1.5 space-y-1">
+                          <p className="text-[9px] text-slate-500">Did you mean?</p>
+                          {matches.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                updateFood(createModalIndex, { nomenclature_id: m.id })
+                                setCreateModalIndex(null)
+                              }}
+                              className="block w-full rounded-lg border border-slate-700/40 bg-slate-800/40 px-2.5 py-1.5 text-left text-[10px] text-slate-300 transition-colors hover:border-indigo-500/30 hover:bg-indigo-500/[0.06]"
+                            >
+                              <span className="font-mono text-indigo-400">{m.product_code}</span>{' '}
+                              {m.name}
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                  <div>
+                    <label className={labelCls}>Base unit</label>
+                    <div className="flex gap-1">
+                      {(['kg', 'L', 'pcs'] as const).map((u) => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => setCreateUnit(u)}
+                          className={`h-8 rounded-lg border px-3 text-xs font-medium transition-all ${
+                            createUnit === u
+                              ? 'border-violet-500/50 bg-violet-500/[0.15] text-violet-300'
+                              : 'border-slate-700/60 bg-slate-800/60 text-slate-500 hover:text-slate-400'
+                          }`}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCreateModalIndex(null)}
+                    className="h-8 rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 text-xs text-slate-400 hover:text-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!createName.trim() || !onCreateNomenclature}
+                    onClick={async () => {
+                      if (!onCreateNomenclature || createModalIndex === null) return
+                      try {
+                        const newId = await onCreateNomenclature({
+                          name: createName.trim(),
+                          baseUnit: createUnit,
+                        })
+                        updateFood(createModalIndex, { nomenclature_id: newId })
+                        setCreateModalIndex(null)
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : String(err))
+                      }
+                    }}
+                    className="h-8 rounded-lg border border-violet-500/40 bg-violet-500/[0.12] px-4 text-xs font-medium text-violet-200 transition-all hover:bg-violet-500/20 disabled:opacity-40"
+                  >
+                    Create & Map
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ═══ Action Buttons ═══ */}
           <div className="flex gap-3">
             <button
@@ -1037,6 +1422,131 @@ function ItemSection({
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ────────────────────────── Sub-component: Reconciliation Panel ────────────────────────── */
+
+function ReconciliationPanel({
+  footer,
+  itemsSum,
+  discountTotal,
+  vatAmount,
+  deliveryFee,
+  onDiscountChange,
+  onVatChange,
+  onDeliveryFeeChange,
+}: {
+  footer: ReceiptFooter
+  reconciliation?: Reconciliation
+  itemsSum: number
+  discountTotal: number
+  vatAmount: number
+  deliveryFee: number
+  onDiscountChange: (v: number) => void
+  onVatChange: (v: number) => void
+  onDeliveryFeeChange: (v: number) => void
+}) {
+  const grandTotal = itemsSum + discountTotal + vatAmount + deliveryFee
+  const declaredTotal = footer.grand_total
+  const isBalanced = Math.abs(grandTotal - declaredTotal) <= 2
+
+  return (
+    <div
+      className={`mb-4 overflow-hidden rounded-xl border ${
+        isBalanced
+          ? 'border-emerald-500/30 bg-emerald-500/[0.04]'
+          : 'border-amber-500/30 bg-amber-500/[0.06]'
+      }`}
+    >
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2 mb-2.5">
+          {isBalanced ? (
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+          ) : (
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+          )}
+          <span className={`text-[11px] font-medium ${isBalanced ? 'text-emerald-300' : 'text-amber-300'}`}>
+            {isBalanced ? 'Receipt balanced' : 'Receipt not balanced — adjust discount/VAT'}
+          </span>
+        </div>
+
+        <div className="space-y-1.5">
+          {/* ── Subtotal row ── */}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-slate-400">Subtotal</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-slate-200">{formatTHB(itemsSum)}</span>
+              {footer.subtotal > 0 && Math.abs(itemsSum - footer.subtotal) > 2 && (
+                <span className="font-mono text-[9px] text-amber-400" title="Receipt subtotal">
+                  (receipt: {formatTHB(footer.subtotal)})
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* ── Discount row (editable, red) ── */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-rose-400">Discount</span>
+            <input
+              type="number"
+              step="1"
+              value={discountTotal}
+              onChange={(e) => onDiscountChange(Number(e.target.value))}
+              className="h-6 w-24 rounded border border-rose-500/30 bg-slate-800/80 px-2 text-right font-mono text-xs text-rose-300 outline-none focus:border-rose-500/60"
+            />
+          </div>
+
+          {/* ── VAT row (editable) ── */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-slate-400">VAT</span>
+            <input
+              type="number"
+              step="1"
+              value={vatAmount}
+              onChange={(e) => onVatChange(Number(e.target.value))}
+              className="h-6 w-24 rounded border border-slate-700/60 bg-slate-800/80 px-2 text-right font-mono text-xs text-slate-300 outline-none focus:border-indigo-500/60"
+            />
+          </div>
+
+          {/* ── Delivery row (editable, blue) ── */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-blue-400">Delivery</span>
+            <input
+              type="number"
+              step="1"
+              value={deliveryFee}
+              onChange={(e) => onDeliveryFeeChange(Number(e.target.value))}
+              className="h-6 w-24 rounded border border-blue-500/30 bg-slate-800/80 px-2 text-right font-mono text-xs text-blue-300 outline-none focus:border-blue-500/60"
+            />
+          </div>
+
+          {/* ── Divider ── */}
+          <div className="h-px bg-slate-700/40" />
+
+          {/* ── Grand Total: computed vs declared ── */}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-200">Grand Total</span>
+            <span className={`font-mono text-xs font-bold ${isBalanced ? 'text-emerald-300' : 'text-amber-300'}`}>
+              {formatTHB(grandTotal)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-slate-500">Receipt says</span>
+            <span className="font-mono text-xs text-slate-500">{formatTHB(declaredTotal)}</span>
+          </div>
+
+          {!isBalanced && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-amber-400/80">Difference</span>
+              <span className="font-mono text-xs font-semibold text-amber-300">
+                {formatTHB(Math.abs(grandTotal - declaredTotal))}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

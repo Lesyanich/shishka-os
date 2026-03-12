@@ -1,23 +1,31 @@
 // ═══════════════════════════════════════════════════════════
 // Google Apps Script: ReceiptParser
-// Phase 5.0c: Unkillable Logging Edition
+// Phase 5.0f: Edge Function Callback Edition
 // ═══════════════════════════════════════════════════════════
-// Debug strategy: ALL logs → debugLog[] array → written to
-// receipt_jobs.error column on ANY failure. This bypasses
-// the broken GAS Executions UI entirely.
+// ROOT CAUSE FOUND: GAS raw HTTP PATCH to PostgREST returns
+// 200 [] (empty) because RLS blocks writes. The service role
+// key is NOT recognized as a JWT by PostgREST in newer
+// Supabase projects (sb_publishable_ key format).
+//
+// FIX: ALL DB writes now go through update-receipt-job Edge
+// Function which uses createClient() admin — properly
+// bypasses RLS. No more raw PostgREST calls from GAS.
+//
+// Every step phones home via Edge Function. If the script
+// dies at any point, we see exactly where in the DB.
 // ═══════════════════════════════════════════════════════════
 // SETUP:
 //   1. Script Properties (Settings → Script Properties):
 //      - GEMINI_API_KEY
 //      - DRIVE_FOLDER_ID = 1KUDflDuCkJL3rG0ldNGUqJW_rOErNGZi
-//      - SUPABASE_URL
-//      - SUPABASE_SERVICE_ROLE_KEY
 //   2. Deploy as Web App: Execute as "Me", Access "Anyone"
+//   3. Edge Function update-receipt-job must be deployed
+//      with --no-verify-jwt
 // ═══════════════════════════════════════════════════════════
 
-var GEMINI_MODEL = "gemini-2.0-flash";
+var GEMINI_MODEL = "gemini-2.5-flash";
 
-// ── Debug log accumulator — the "black box" ──
+// ── Debug log accumulator ──
 var debugLog = [];
 
 function log_(msg) {
@@ -40,13 +48,59 @@ function getConfig_() {
   return {
     geminiApiKey: props.getProperty("GEMINI_API_KEY"),
     driveFolderId: props.getProperty("DRIVE_FOLDER_ID") || "1KUDflDuCkJL3rG0ldNGUqJW_rOErNGZi",
-    supabaseUrl: props.getProperty("SUPABASE_URL") || "",
-    supabaseKey: props.getProperty("SUPABASE_SERVICE_ROLE_KEY") || "",
   };
 }
 
 // ═══════════════════════════════════════════════════════════
-// doGet — placeholder to stop red "Failed" noise in GAS logs
+// UPDATE JOB — via Edge Function (bypasses RLS)
+// Replaces all raw PostgREST PATCH calls.
+// Uses POST to update-receipt-job Edge Function which has
+// --no-verify-jwt and uses admin client internally.
+// ═══════════════════════════════════════════════════════════
+function updateJob_(supabaseUrl, jobId, data) {
+  var url = supabaseUrl + "/functions/v1/update-receipt-job?job_id=" + encodeURIComponent(jobId);
+  var response = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(data),
+    muteHttpExceptions: true,
+  });
+  var code = response.getResponseCode();
+  var body = response.getContentText();
+  log_("updateJob_ HTTP " + code + ": " + body.substring(0, 300));
+
+  if (code === 200) {
+    var result = JSON.parse(body);
+    if (result.ok && result.rows_updated > 0) {
+      log_("updateJob_ VERIFIED: " + result.rows_updated + " row(s)");
+      return result;
+    }
+    // 200 but 0 rows — job_id not found
+    throw new Error("updateJob_ 200 but 0 rows updated. job_id=" + jobId + ", response=" + body.substring(0, 300));
+  }
+
+  throw new Error("updateJob_ HTTP " + code + ": " + body.substring(0, 500));
+}
+
+// ── Phone Home — quick status write via Edge Function ──
+function phoneHome_(supabaseUrl, jobId, message) {
+  try {
+    var url = supabaseUrl + "/functions/v1/update-receipt-job?job_id=" + encodeURIComponent(jobId);
+    var response = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({ error: message }),
+      muteHttpExceptions: true,
+    });
+    return response.getResponseCode();
+  } catch (e) {
+    logError_("phoneHome_ crash: " + e.toString());
+    return 0;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// doGet — placeholder to stop red "Failed" noise
 // ═══════════════════════════════════════════════════════════
 function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify({
@@ -57,54 +111,107 @@ function doGet(e) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// WEB APP ENTRY POINT
+// WEB APP ENTRY POINT — EDGE FUNCTION CALLBACK EDITION
+// Every step independently phones home to DB via Edge Function
 // ═══════════════════════════════════════════════════════════
-
 function doPost(e) {
   var startMs = Date.now();
   var jobId = null;
   var supabaseUrl = null;
-  var supabaseKey = null;
+  var imageUrls = null;
+  var config = null;
 
+  // ═══════════════════════════════════════════════════════
+  // STEP 0: Parse payload
+  // ═══════════════════════════════════════════════════════
   try {
     log_("═══ doPost ENTRY ═══");
-
-    // ── Parse input ──
     var raw = e.postData.contents;
     log_("Raw payload length: " + raw.length);
 
     var json = JSON.parse(raw);
-    jobId = (json.job_id || "").trim();   // ← .trim() to sanitize
-    var imageUrls = json.image_urls;
+    jobId = (json.job_id || "").trim();
+    imageUrls = json.image_urls;
+    supabaseUrl = (json.supabase_url || "").trim();
 
-    // ── Credential resolution: payload → Script Properties fallback ──
-    var config = getConfig_();
-    supabaseUrl = (json.supabase_url || config.supabaseUrl || "").trim();
-    supabaseKey = (json.supabase_key || config.supabaseKey || "").trim();
+    config = getConfig_();
 
-    log_("job_id: " + jobId);
-    log_("job_id length: " + jobId.length);
+    log_("job_id: " + jobId + " (len=" + jobId.length + ")");
     log_("images: " + (imageUrls ? imageUrls.length : "MISSING"));
     log_("supabase_url: " + (supabaseUrl ? supabaseUrl.substring(0, 50) : "MISSING"));
-    log_("supabase_key: " + (supabaseKey ? "present (" + supabaseKey.length + " chars)" : "MISSING"));
-    log_("credential source: url=" + (json.supabase_url ? "payload" : "script_props") +
-         ", key=" + (json.supabase_key ? "payload" : "script_props"));
 
     if (!jobId) throw new Error("job_id is empty or missing");
     if (!imageUrls || !imageUrls.length) throw new Error("image_urls is empty or missing");
-    if (!supabaseUrl) throw new Error("supabase_url is empty — check payload AND Script Properties");
-    if (!supabaseKey) throw new Error("supabase_key is empty — check payload AND Script Properties");
+    if (!supabaseUrl) throw new Error("supabase_url is empty");
+  } catch (parseErr) {
+    logError_("STEP_0 PARSE FAIL: " + parseErr.toString());
+    if (jobId && supabaseUrl) {
+      try { phoneHome_(supabaseUrl, jobId, "STEP_0 PARSE FAIL: " + parseErr.toString()); } catch(x) {}
+    }
+    return ContentService.createTextOutput(JSON.stringify({
+      error: "STEP_0: " + parseErr.toString(),
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
 
-    // ── 1. Download images & convert to Base64 ──
-    var imageParts = [];
+  // ═══════════════════════════════════════════════════════
+  // STEP 1: AUTH TEST — phone home via Edge Function
+  // If this fails, Edge Function callback is broken
+  // ═══════════════════════════════════════════════════════
+  try {
+    var authMsg = "STEP_1: GAS alive. images=" + imageUrls.length +
+                  ", ts=" + new Date().toISOString();
+    var authCode = phoneHome_(supabaseUrl, jobId, authMsg);
+    log_("STEP_1 phone home HTTP " + authCode);
+
+    if (authCode !== 200) {
+      var failMsg = "STEP_1 AUTH FAIL: Edge Function callback returned HTTP " + authCode +
+                    ". supabase_url=" + supabaseUrl;
+      logError_(failMsg);
+      return ContentService.createTextOutput(JSON.stringify({
+        error: failMsg,
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    log_("STEP_1 phone home OK — Edge Function callback works!");
+  } catch (authErr) {
+    logError_("STEP_1 CRASH: " + authErr.toString());
+    return ContentService.createTextOutput(JSON.stringify({
+      error: "STEP_1 CRASH: " + authErr.toString(),
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // STEP 2: Download images
+  // ═══════════════════════════════════════════════════════
+  var imageParts = [];
+  try {
     for (var i = 0; i < imageUrls.length; i++) {
       log_("Downloading image " + (i + 1) + ": " + imageUrls[i].substring(0, 80) + "...");
       var img = downloadImageAsBase64_(imageUrls[i]);
       imageParts.push(img);
       log_("Downloaded image " + (i + 1) + ": " + img.sizeKb + " KB, " + img.mimeType);
     }
+    phoneHome_(supabaseUrl, jobId,
+      "STEP_2: Images OK. count=" + imageParts.length +
+      ", sizes=" + imageParts.map(function(p) { return p.sizeKb + "KB"; }).join("+"));
+  } catch (dlErr) {
+    var dlMsg = "STEP_2 IMAGE FAIL: " + dlErr.toString() +
+                " | downloaded=" + imageParts.length + "/" + imageUrls.length;
+    logError_(dlMsg);
+    try {
+      updateJob_(supabaseUrl, jobId, {
+        status: "failed", error: dlMsg + "\n\nDEBUG:\n" + debugLog.join("\n"),
+        completed_at: new Date().toISOString(), duration_ms: Date.now() - startMs,
+      });
+    } catch(x) {
+      try { phoneHome_(supabaseUrl, jobId, dlMsg); } catch(y) {}
+    }
+    return ContentService.createTextOutput(JSON.stringify({ error: dlMsg })).setMimeType(ContentService.MimeType.JSON);
+  }
 
-    // ── 2. Save copies to Google Drive (archive) ──
+  // ═══════════════════════════════════════════════════════
+  // STEP 3: Save to Google Drive (archive) — non-fatal
+  // ═══════════════════════════════════════════════════════
+  try {
     log_("Saving to Drive folder: " + config.driveFolderId);
     var folder = DriveApp.getFolderById(config.driveFolderId);
     for (var j = 0; j < imageParts.length; j++) {
@@ -113,25 +220,72 @@ function doPost(e) {
       folder.createFile(blob);
     }
     log_("Saved " + imageParts.length + " image(s) to Drive");
+    phoneHome_(supabaseUrl, jobId, "STEP_3: Drive OK. " + imageParts.length + " files");
+  } catch (driveErr) {
+    logError_("STEP_3 DRIVE FAIL (non-fatal): " + driveErr.toString());
+    try { phoneHome_(supabaseUrl, jobId, "STEP_3: Drive FAIL (continuing): " + driveErr.toString().substring(0, 200)); } catch(x) {}
+  }
 
-    // ── 3. Call Gemini 2.0 Flash ──
+  // ═══════════════════════════════════════════════════════
+  // STEP 4: Call Gemini 2.0 Flash
+  // ═══════════════════════════════════════════════════════
+  var geminiResult = null;
+  try {
     log_("Calling Gemini " + GEMINI_MODEL + "...");
-    var geminiResult = callGemini_(imageParts, config.geminiApiKey);
-    log_("Gemini OK, response JSON length: " + JSON.stringify(geminiResult).length);
+    phoneHome_(supabaseUrl, jobId, "STEP_4: Calling Gemini " + GEMINI_MODEL + "...");
+    geminiResult = callGemini_(imageParts, config.geminiApiKey);
+    var geminiJson = JSON.stringify(geminiResult);
+    log_("Gemini OK, response length: " + geminiJson.length);
+    phoneHome_(supabaseUrl, jobId, "STEP_4: Gemini OK. response_len=" + geminiJson.length);
+  } catch (gemErr) {
+    var gemMsg = "STEP_4 GEMINI FAIL: " + gemErr.toString();
+    logError_(gemMsg);
+    try {
+      updateJob_(supabaseUrl, jobId, {
+        status: "failed", error: gemMsg + "\n\nDEBUG:\n" + debugLog.join("\n"),
+        completed_at: new Date().toISOString(), duration_ms: Date.now() - startMs,
+      });
+    } catch(x) {
+      try { phoneHome_(supabaseUrl, jobId, gemMsg); } catch(y) {}
+    }
+    return ContentService.createTextOutput(JSON.stringify({ error: gemMsg })).setMimeType(ContentService.MimeType.JSON);
+  }
 
-    // ── 4. Post-process ──
+  // ═══════════════════════════════════════════════════════
+  // STEP 5: Post-process
+  // ═══════════════════════════════════════════════════════
+  var processed = null;
+  try {
     log_("Post-processing...");
-    var processed = validateAndPostProcess_(geminiResult);
+    processed = validateAndPostProcess_(geminiResult);
     log_("Post-processing done: " + processed.line_items.length + " items");
+    phoneHome_(supabaseUrl, jobId, "STEP_5: PostProcess OK. items=" + processed.line_items.length);
+  } catch (ppErr) {
+    var ppMsg = "STEP_5 POSTPROCESS FAIL: " + ppErr.toString();
+    logError_(ppMsg);
+    try {
+      updateJob_(supabaseUrl, jobId, {
+        status: "failed", error: ppMsg + "\n\nDEBUG:\n" + debugLog.join("\n"),
+        completed_at: new Date().toISOString(), duration_ms: Date.now() - startMs,
+      });
+    } catch(x) {
+      try { phoneHome_(supabaseUrl, jobId, ppMsg); } catch(y) {}
+    }
+    return ContentService.createTextOutput(JSON.stringify({ error: ppMsg })).setMimeType(ContentService.MimeType.JSON);
+  }
 
-    // ── 5. Write result to Supabase ──
+  // ═══════════════════════════════════════════════════════
+  // STEP 6: Write final result via Edge Function callback
+  // ═══════════════════════════════════════════════════════
+  try {
     var durationMs = Date.now() - startMs;
-    log_("Writing result to Supabase...");
-    updateSupabaseJob_(supabaseUrl, supabaseKey, jobId, {
+    log_("STEP_6: Writing final result...");
+    updateJob_(supabaseUrl, jobId, {
       status: "completed",
       result: processed,
       model: GEMINI_MODEL,
       ocr_text: null,
+      error: null,
       completed_at: new Date().toISOString(),
       duration_ms: durationMs,
     });
@@ -145,36 +299,20 @@ function doPost(e) {
       line_items: processed.line_items.length,
     })).setMimeType(ContentService.MimeType.JSON);
 
-  } catch (err) {
-    var errMsg = err.toString();
-    var errStack = err.stack || "no stack";
-    logError_(errMsg);
-    logError_("Stack: " + errStack);
-    logError_("Duration: " + (Date.now() - startMs) + "ms");
-
-    // ── LOG-TO-DB: Write debugLog to receipt_jobs.error column ──
-    // This is our ONLY reliable way to see what happened
-    if (jobId && supabaseUrl && supabaseKey) {
-      var debugDump = debugLog.join("\n");
-      try {
-        rawPatchSupabase_(supabaseUrl, supabaseKey, jobId, {
-          status: "failed",
-          error: debugDump,
-          completed_at: new Date().toISOString(),
-          duration_ms: Date.now() - startMs,
-        });
-        log_("Debug dump written to Supabase OK");
-      } catch (patchErr) {
-        logError_("DOUBLE FAULT — cannot write to Supabase: " + patchErr.toString());
-      }
-    } else {
-      logError_("Cannot write to DB — missing: jobId=" + !!jobId +
-                ", url=" + !!supabaseUrl + ", key=" + !!supabaseKey);
-    }
-
-    // ── HARDCORE THROW: Force GAS to show error text in Executions list ──
-    // Google shows throw message on hover even when logs are broken
-    throw new Error("DEBUG_DATA:" + debugLog.join("|"));
+  } catch (finalErr) {
+    var finalMsg = "STEP_6 FINAL WRITE FAIL: " + finalErr.toString();
+    logError_(finalMsg);
+    try { phoneHome_(supabaseUrl, jobId, finalMsg + " | items=" + processed.line_items.length + " | result_size=" + JSON.stringify(processed).length); } catch(x) {}
+    // Try simpler write without result
+    try {
+      updateJob_(supabaseUrl, jobId, {
+        status: "failed",
+        error: finalMsg + "\n\nDEBUG:\n" + debugLog.join("\n"),
+        completed_at: new Date().toISOString(),
+        duration_ms: Date.now() - startMs,
+      });
+    } catch(x2) {}
+    return ContentService.createTextOutput(JSON.stringify({ error: finalMsg })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -223,7 +361,9 @@ function callGemini_(imageParts, apiKey) {
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.2,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 65536,
+      // Gemini 2.5 Flash: disable "thinking" for clean JSON output
+      thinkingConfig: { thinkingBudget: 0 },
     },
   };
 
@@ -253,120 +393,14 @@ function callGemini_(imageParts, apiKey) {
   if (!content) throw new Error("Empty Gemini response");
   log_("Gemini text length: " + content.length);
 
-  return JSON.parse(content);
-}
-
-// ═══════════════════════════════════════════════════════════
-// SUPABASE REST API — PATCH receipt_jobs (with full verification)
-// ═══════════════════════════════════════════════════════════
-
-function updateSupabaseJob_(supabaseUrl, supabaseKey, jobId, data) {
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("FATAL: Missing Supabase credentials! url=" + !!supabaseUrl + ", key=" + !!supabaseKey);
+  try {
+    return JSON.parse(content);
+  } catch (parseErr) {
+    // Log raw text for debugging malformed JSON
+    log_("RAW GEMINI TEXT (first 500): " + content.substring(0, 500));
+    log_("RAW GEMINI TEXT (last 200): " + content.substring(Math.max(0, content.length - 200)));
+    throw parseErr;
   }
-
-  var url = supabaseUrl + "/rest/v1/receipt_jobs?id=eq." + jobId;
-
-  log_("PATCH URL: " + url);
-  log_("PATCH payload keys: " + Object.keys(data).join(", "));
-
-  var options = {
-    method: "post",
-    headers: {
-      "Authorization": "Bearer " + supabaseKey,
-      "apikey": supabaseKey,
-      "Content-Type": "application/json",
-      "Prefer": "return=representation",
-      "X-HTTP-Method-Override": "PATCH",
-    },
-    payload: JSON.stringify(data),
-    muteHttpExceptions: true,
-  };
-
-  var response = UrlFetchApp.fetch(url, options);
-  var code = response.getResponseCode();
-  var body = response.getContentText();
-
-  log_("PATCH response code: " + code);
-  log_("PATCH response body (first 500): " + body.substring(0, 500));
-
-  // ── 204 = PostgREST ignored return=representation ──
-  if (code === 204) {
-    throw new Error(
-      "PATCH 204 No Content — return=representation IGNORED. " +
-      "Likely X-HTTP-Method-Override not working. job_id=" + jobId
-    );
-  }
-
-  // ── 200 = verify rows were actually returned ──
-  if (code === 200) {
-    var rows;
-    try { rows = JSON.parse(body); } catch (pe) {
-      throw new Error("PATCH 200 but body not JSON: " + body.substring(0, 300));
-    }
-    if (!Array.isArray(rows) || rows.length === 0) {
-      throw new Error(
-        "PATCH 200 but EMPTY [] — job_id=" + jobId + " not found in receipt_jobs!"
-      );
-    }
-    log_("PATCH VERIFIED: " + rows.length + " row(s), status=" + rows[0].status);
-    return;
-  }
-
-  // ── Any other code ──
-  throw new Error("Supabase PATCH HTTP " + code + ": " + body.substring(0, 500));
-}
-
-// ═══════════════════════════════════════════════════════════
-// RAW PATCH — minimal, no verification, for writing debugLog
-// Uses standard PATCH method (not POST+override) as fallback
-// ═══════════════════════════════════════════════════════════
-
-function rawPatchSupabase_(supabaseUrl, supabaseKey, jobId, data) {
-  var url = supabaseUrl + "/rest/v1/receipt_jobs?id=eq." + jobId;
-
-  // Attempt 1: POST + X-HTTP-Method-Override
-  var options1 = {
-    method: "post",
-    headers: {
-      "Authorization": "Bearer " + supabaseKey,
-      "apikey": supabaseKey,
-      "Content-Type": "application/json",
-      "Prefer": "return=minimal",
-      "X-HTTP-Method-Override": "PATCH",
-    },
-    payload: JSON.stringify(data),
-    muteHttpExceptions: true,
-  };
-
-  var r1 = UrlFetchApp.fetch(url, options1);
-  var c1 = r1.getResponseCode();
-  log_("rawPatch attempt1 (POST+override): HTTP " + c1);
-
-  if (c1 >= 200 && c1 < 300) return;
-
-  // Attempt 2: native PATCH method
-  var options2 = {
-    method: "patch",
-    headers: {
-      "Authorization": "Bearer " + supabaseKey,
-      "apikey": supabaseKey,
-      "Content-Type": "application/json",
-      "Prefer": "return=minimal",
-    },
-    payload: JSON.stringify(data),
-    muteHttpExceptions: true,
-  };
-
-  var r2 = UrlFetchApp.fetch(url, options2);
-  var c2 = r2.getResponseCode();
-  log_("rawPatch attempt2 (native PATCH): HTTP " + c2);
-
-  if (c2 >= 200 && c2 < 300) return;
-
-  throw new Error("rawPatch BOTH methods failed: attempt1=" + c1 + ", attempt2=" + c2 +
-                  ", body1=" + r1.getContentText().substring(0, 200) +
-                  ", body2=" + r2.getContentText().substring(0, 200));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -374,7 +408,39 @@ function rawPatchSupabase_(supabaseUrl, supabaseKey, jobId, data) {
 // Ported from parse-receipts/index.ts (Phase 4.13+)
 // ═══════════════════════════════════════════════════════════
 
-var FOOTER_RE = /^(total|subtotal|grand\s*total|net|net\s*total|vat|tax|discount|change|cash|card|credit|debit|points|member|bag\s*fee|rounding|round|ส่วนลด|ภาษี|ภาษีมูลค่าเพิ่ม|เงินทอน|เงินสด|รวม|ยอดรวม|ยอดสุทธิ|สุทธิ|บัตร|แต้ม|คูปอง|ทอน|เศษสตางค์)$/i;
+var FOOTER_RE = /^(total|subtotal|grand\s*total|net|net\s*total|vat|tax|discount|change|cash|card|credit|debit|points|member|bag\s*fee|rounding|round|delivery|shipping|ค่าจัดส่ง|ค่าขนส่ง|ส่วนลด|ภาษี|ภาษีมูลค่าเพิ่ม|เงินทอน|เงินสด|รวม|ยอดรวม|ยอดสุทธิ|สุทธิ|บัตร|แต้ม|คูปอง|ทอน|เศษสตางค์)$/i;
+
+// ── Phase 6.6: Number sanitizers — strip OCR dust from numeric fields ──
+
+/**
+ * Strip non-numeric chars (dust: !, ', stray commas etc.) and return a clean positive number.
+ * Handles: null, "", "225!", "1,200.50", "210'", multiple dots.
+ * @param {*} val - Raw value from Gemini output
+ * @return {number} Sanitized positive number, 0 if unparseable
+ */
+function sanitizeNumber_(val) {
+  if (val == null || val === "") return 0;
+  var s = String(val).replace(/[^\d.]/g, "");
+  var parts = s.split(".");
+  if (parts.length > 2) {
+    s = parts[0] + "." + parts.slice(1).join("");
+  }
+  var n = Number(s);
+  return isNaN(n) ? 0 : n;
+}
+
+/**
+ * Like sanitizeNumber_ but preserves negative sign.
+ * Used for discount_total which must remain negative.
+ * @param {*} val - Raw value (may have leading minus)
+ * @return {number} Sanitized number (negative if input had "-")
+ */
+function sanitizeSigned_(val) {
+  if (val == null || val === "") return 0;
+  var neg = String(val).indexOf("-") >= 0;
+  var n = sanitizeNumber_(val);
+  return neg ? -Math.abs(n) : n;
+}
 
 var VALID_UNITS = { "kg": true, "L": true, "pcs": true };
 var VALID_CATEGORIES = { "food": true, "capex": true, "opex": true, "uncategorized": true };
@@ -419,9 +485,11 @@ function validateAndPostProcess_(parsed) {
       li.translated_name = li.original_name || "[ITEM " + (i + 1) + "]";
       warnings.push("line_items[" + i + "].translated_name missing");
     }
-    if (typeof li.quantity !== "number") li.quantity = Number(li.quantity) || 1;
-    if (typeof li.unit_price !== "number") li.unit_price = Number(li.unit_price) || 0;
-    if (typeof li.total_price !== "number") li.total_price = Number(li.total_price) || 0;
+    // Phase 6.6: Sanitize numeric fields (strip OCR dust: "225!" → 225)
+    li.quantity = sanitizeNumber_(li.quantity) || 1;
+    li.unit_price = sanitizeNumber_(li.unit_price);
+    li.total_price = sanitizeNumber_(li.total_price);
+    li.discount = sanitizeSigned_(li.discount);
     if (!VALID_UNITS[li.unit]) {
       warnings.push("line_items[" + i + "].unit " + li.unit + " → pcs");
       li.unit = "pcs";
@@ -487,18 +555,105 @@ function validateAndPostProcess_(parsed) {
     }
   }
 
-  // ── Sum validation ──
+  // ── Footer validation & reconciliation ──
+  if (!parsed.footer || typeof parsed.footer !== "object") {
+    parsed.footer = {
+      subtotal: 0,
+      discount_total: 0,
+      vat_amount: 0,
+      delivery_fee: 0,
+      grand_total: parsed.total_amount || 0,
+    };
+    warnings.push("footer object missing — reconstructed from total_amount");
+  } else {
+    // Phase 6.6: Sanitize footer numeric fields (strip OCR dust)
+    parsed.footer.subtotal = sanitizeNumber_(parsed.footer.subtotal);
+    parsed.footer.discount_total = sanitizeSigned_(parsed.footer.discount_total);
+    parsed.footer.vat_amount = sanitizeNumber_(parsed.footer.vat_amount);
+    parsed.footer.delivery_fee = sanitizeNumber_(parsed.footer.delivery_fee);
+    parsed.footer.grand_total = sanitizeNumber_(parsed.footer.grand_total) || sanitizeNumber_(parsed.total_amount);
+  }
+  // Sync total_amount with footer.grand_total
+  parsed.total_amount = parsed.footer.grand_total;
+
   var lineSum = 0;
   for (var s = 0; s < parsed.line_items.length; s++) {
     lineSum += (parsed.line_items[s].total_price || 0);
   }
+  lineSum = Math.round(lineSum * 100) / 100;
   var declared = parsed.total_amount || 0;
+
+  // Reconciliation: check if items sum ≈ footer.subtotal, and formula balances
+  // Phase 6.6: formula includes delivery_fee
+  var footerSubtotal = parsed.footer.subtotal;
+  var deliveryFee = parsed.footer.delivery_fee || 0;
+  var footerFormula = parsed.footer.subtotal + parsed.footer.discount_total + parsed.footer.vat_amount + deliveryFee;
+  footerFormula = Math.round(footerFormula * 100) / 100;
+
+  var reconStatus = "balanced";
+  if (footerSubtotal > 0 && Math.abs(lineSum - footerSubtotal) > 2) {
+    reconStatus = "items_mismatch";
+  }
+  if (parsed.footer.grand_total > 0 && Math.abs(footerFormula - parsed.footer.grand_total) > 2) {
+    reconStatus = reconStatus === "items_mismatch" ? "items_mismatch" : "footer_mismatch";
+  }
+  // If footer.subtotal is 0 but lineSum > 0, auto-fill subtotal from items
+  if (footerSubtotal === 0 && lineSum > 0) {
+    parsed.footer.subtotal = lineSum;
+    warnings.push("footer.subtotal was 0, filled from items sum: " + lineSum);
+  }
+
+  parsed._reconciliation = {
+    status: reconStatus,
+    items_sum: lineSum,
+    formula: parsed.footer.subtotal + " + (" + parsed.footer.discount_total + ") + " + parsed.footer.vat_amount + " + " + deliveryFee + " = " + parsed.footer.grand_total,
+  };
+
+  // Legacy _sum_mismatch (keep for backward compat with existing UI)
   if (Math.abs(lineSum - declared) > 1) {
     parsed._sum_mismatch = {
-      line_items_sum: Math.round(lineSum * 100) / 100,
+      line_items_sum: lineSum,
       declared_total: declared,
       difference: Math.round((declared - lineSum) * 100) / 100,
     };
+  }
+
+  // ── Item count validation ──
+  if (typeof parsed.item_count_observed === "number" && parsed.item_count_observed > 0) {
+    var actualCount = parsed.line_items.length;
+    if (Math.abs(actualCount - parsed.item_count_observed) > 2) {
+      warnings.push("Item count mismatch: AI observed " + parsed.item_count_observed + " but extracted " + actualCount);
+    }
+  }
+
+  // ── Per-item price sanity & math check ──
+  for (var pc = 0; pc < parsed.line_items.length; pc++) {
+    var pli = parsed.line_items[pc];
+    if (!pli.confidence) pli.confidence = "high";
+    if (pli.unit_price <= 0 || pli.total_price <= 0) {
+      pli.confidence = "low";
+      pli._warning = "Zero or negative price";
+    }
+    if (pli.total_price > 5000) {
+      pli._warning = (pli._warning ? pli._warning + "; " : "") + "Unusually high price — may be subtotal";
+    }
+    var expectedPrice = Math.round(pli.unit_price * pli.quantity * 100) / 100;
+    if (Math.abs(expectedPrice - pli.total_price) > 2) {
+      pli._warning = (pli._warning ? pli._warning + "; " : "") +
+        "Price math: " + pli.unit_price + " × " + pli.quantity + " ≠ " + pli.total_price;
+    }
+  }
+
+  // ── Stricter duplicate detection ──
+  var dupNameMap = {};
+  for (var dn = 0; dn < parsed.line_items.length; dn++) {
+    var dnKey = (parsed.line_items[dn].original_name || "").trim().toLowerCase();
+    dupNameMap[dnKey] = (dupNameMap[dnKey] || 0) + 1;
+  }
+  for (var dupKey in dupNameMap) {
+    if (dupNameMap[dupKey] > 1) {
+      warnings.push("Duplicate item: '" + dupKey + "' appears " + dupNameMap[dupKey] + " times");
+    }
   }
 
   parsed._pipeline = {
@@ -579,15 +734,23 @@ ZONE 1 — HEADER (metadata only):\n\
 ZONE 2 — ITEM GRID (extract products ONLY from here):\n\
   SKU | Product Name (Thai) | Qty | Unit Price | Total Price\n\
   → Extract: each row as a line_item\n\
+  → Also extract brand (if visible) and package_weight (e.g. 500g, 1kg) per item\n\
 \n\
-ZONE 3 — FOOTER (total only):\n\
+ZONE 3 — FOOTER (financial summary — extract as structured data):\n\
   Starts at first line containing: รวม, ยอดรวม, Subtotal, Total, ส่วนลด, Discount, VAT, ภาษี, สุทธิ, Net\n\
   Everything at and below = NOT products.\n\
-  → Extract: total_amount (final amount paid)\n\
+  → Extract into a "footer" object with these fields:\n\
+    - subtotal: sum before discounts (รวม, Subtotal) — should equal sum of line_item prices\n\
+    - discount_total: total receipt discount as NEGATIVE number (ส่วนลด, Discount, e.g., -500). 0 if no discount.\n\
+    - vat_amount: VAT amount (ภาษี, VAT). 0 if VAT-inclusive pricing or no VAT shown.\n\
+    - delivery_fee: delivery/shipping charge (positive number). 0 if no delivery fee.\n\
+    - grand_total: final amount paid (ยอดสุทธิ, Net, Grand Total)\n\
+  → Also set total_amount = grand_total (for backward compatibility)\n\
+  → Formula: subtotal + discount_total + vat_amount + delivery_fee = grand_total\n\
 \n\
 ## BLACKLIST — NEVER add as line_items\n\
-Total, Subtotal, Grand Total, Net, VAT, Tax, Discount, Change, Cash, Card, Credit, Debit, Points, Member, Bag fee, Rounding,\n\
-รวม, ยอดรวม, ยอดสุทธิ, สุทธิ, ภาษี, ภาษีมูลค่าเพิ่ม, ส่วนลด, เงินสด, เงินทอน, ทอน, บัตร, แต้ม, คูปอง, เศษสตางค์\n\
+Total, Subtotal, Grand Total, Net, VAT, Tax, Discount, Change, Cash, Card, Credit, Debit, Points, Member, Bag fee, Rounding, Delivery, Shipping,\n\
+รวม, ยอดรวม, ยอดสุทธิ, สุทธิ, ภาษี, ภาษีมูลค่าเพิ่ม, ส่วนลด, เงินสด, เงินทอน, ทอน, บัตร, แต้ม, คูปอง, เศษสตางค์, ค่าจัดส่ง, ค่าขนส่ง\n\
 \n\
 ## ANCHORING RULE (CRITICAL — prevents repetition loops)\n\
 For EACH item row, you MUST:\n\
@@ -623,9 +786,51 @@ Translate Thai → English with MAXIMUM specificity:\n\
 - เส้นหมี่ → "Rice vermicelli"\n\
 - กะเพรา → "Holy basil" (NOT "Basil")\n\
 - โหระพา → "Sweet basil" (NOT "Basil")\n\
-- Keep translated_name CLEAN — no weight, quantity, or packaging info in the name\n\
+- Keep translated_name CLEAN — no weight, quantity, brand, or packaging info in the name\n\
 Do NOT transliterate Thai to Latin characters. TRANSLATE the meaning.\n\
-Brand names: describe the product (e.g., "Chicken eggs (ARO)").\n\
+Brand names: put brand into the separate "brand" field, NOT into translated_name.\n\
+  Example: ARO chicken eggs → translated_name: "Chicken eggs", brand: "ARO"\n\
+\n\
+## THAI RECEIPT ABBREVIATIONS — Common thermal receipt shorthand\n\
+Thai receipts truncate product names to fit ~20 characters on thermal paper.\n\
+If you see a truncated name, reconstruct the FULL product name from context.\n\
+\n\
+Abbreviation patterns:\n\
+- น.ม. / นม → นมสด = "Fresh milk"\n\
+- น้ำม. → น้ำมัน = "Oil" (then check type: ดอกทาน, ปาล์ม, มะกอก, etc.)\n\
+- ไก่. / ไก่สด → "Fresh chicken" (check cut: อก=breast, น่อง=thigh, สะโพก=leg, ปีก=wing)\n\
+- หมู / หมูสด → "Fresh pork" (check: สับ=minced, สัน=loin, คอ=neck, หมูแดง=red pork)\n\
+- กก / กก. → กิโลกรัม = kilogram (unit, not product)\n\
+- ลท. / ลิ. → ลิตร = liter\n\
+- ชก. → ชิ้น/กล่อง = piece/box\n\
+- ผ.ซ. / ผงซ. → ผงซักฟอก = "Laundry detergent" (category: opex)\n\
+- น้ำยา → "Cleaning solution" (category: opex)\n\
+- ถ. → ถุง = bag (unit)\n\
+- แพ็ค / PK → pack (unit)\n\
+- ซ. → ซอง = sachet (unit)\n\
+- ARO, MKP, MAKRO → Makro house brands (put in "brand" field)\n\
+- CP, เบทาโกร, Betagro → CP/Betagro brand (put in "brand" field)\n\
+\n\
+IMPORTANT: If you can read PART of the name but not all, translate what you CAN read\n\
+and mark confidence as "medium". Do NOT fill in the rest with guesses.\n\
+\n\
+## CULINARY CONTEXT — This is a professional restaurant kitchen\n\
+Shishka Healthy Kitchen buys ingredients for healthy food production.\n\
+Common purchases (use ONLY to validate words you can actually read):\n\
+\n\
+Proteins: chicken breast/thigh/wings, pork loin/minced/belly, shrimp, fish fillet, salmon, tofu, eggs\n\
+Vegetables: lettuce, spinach, kale, broccoli, bell pepper, tomato, cucumber, carrot, onion, garlic, ginger\n\
+Herbs: holy basil, sweet basil, lemongrass, galangal, kaffir lime leaves, coriander, mint\n\
+Staples: jasmine rice, brown rice, wheat flour, rice flour, oats, quinoa, pasta, glass noodles\n\
+Oils & sauces: olive oil, rice bran oil, sesame oil, soy sauce, fish sauce, oyster sauce, vinegar\n\
+Dairy: fresh milk, cream, yogurt, butter, cheese\n\
+Sweeteners: coconut sugar, stevia, honey, granulated sugar\n\
+Spices: turmeric, cumin, cinnamon, black pepper, chili flakes, curry paste\n\
+\n\
+Use this culinary list ONLY to validate words you can actually read.\n\
+NEVER use this list to guess missing letters.\n\
+If a word is truncated and you are not 100% certain it matches an item\n\
+from this list based on the visible Thai characters, you MUST output "[UNREADABLE]".\n\
 \n\
 ## CATEGORY RULES — AUTO-DETECT FROM SUPPLIER\n\
 First, identify the supplier from the header:\n\
@@ -653,6 +858,14 @@ Return ONLY valid JSON with this structure:\n\
   "total_amount": number,\n\
   "currency": "THB",\n\
   "transaction_date": "YYYY-MM-DD",\n\
+  "footer": {\n\
+    "subtotal": number,\n\
+    "discount_total": number,\n\
+    "vat_amount": number,\n\
+    "delivery_fee": number or 0,\n\
+    "grand_total": number\n\
+  },\n\
+  "item_count_observed": number,\n\
   "line_items": [\n\
     {\n\
       "line_number": 1,\n\
@@ -661,9 +874,13 @@ Return ONLY valid JSON with this structure:\n\
       "translated_name": "English translation",\n\
       "quantity": number,\n\
       "unit": "kg" | "L" | "pcs",\n\
+      "purchase_unit": "unit exactly as printed on receipt (Thai or English)",\n\
       "unit_price": number,\n\
       "total_price": number,\n\
-      "category": "food" | "capex" | "opex" | "uncategorized"\n\
+      "category": "food" | "capex" | "opex" | "uncategorized",\n\
+      "confidence": "high" | "medium" | "low",\n\
+      "brand": "string or null — brand name if visible on receipt",\n\
+      "package_weight": "string or null — package weight as printed, e.g. 500g, 1kg"\n\
     }\n\
   ],\n\
   "documents": {\n\
@@ -672,6 +889,49 @@ Return ONLY valid JSON with this structure:\n\
     "bank_slip_index": number or null\n\
   }\n\
 }\n\
+\n\
+## ANTI-HALLUCINATION RULES\n\
+\n\
+1. ITEM COUNT ANCHOR: Before extracting items, COUNT the number of product rows\n\
+   visible in the receipt ITEM GRID. Report this count as "item_count_observed".\n\
+   Your line_items array length MUST match this count (±1 tolerance).\n\
+\n\
+2. CONFIDENCE SCORING: For each line_item, set "confidence":\n\
+   - "high": text clearly readable, numbers parse cleanly\n\
+   - "medium": some characters unclear but context helps\n\
+   - "low": significant guessing involved\n\
+\n\
+3. UNREADABLE ITEMS — CRITICAL (prefer [UNREADABLE] over guessing):\n\
+   - If you cannot read >30% of an item\'s name → translated_name = "[UNREADABLE]"\n\
+   - If the Thai text is blurry, smudged, or cut off → "[UNREADABLE]"\n\
+   - If you are GUESSING based on price/quantity alone → "[UNREADABLE]"\n\
+   - Set confidence to "low"\n\
+   - Still extract quantity/price/SKU if those are readable\n\
+   - Do NOT invent a product name — a wrong name is WORSE than "[UNREADABLE]"\n\
+   - NEVER translate abbreviations you do not recognize as real Thai words\n\
+   - It is ALWAYS better to say "[UNREADABLE]" than to guess wrong\n\
+\n\
+   BAD examples (NEVER do this):\n\
+   × Blurry text → "Frozen carrots" (invented)\n\
+   × "กร..." (truncated) → "Crab meat" (wild guess)\n\
+   × Unreadable + price 200 THB → "Salmon fillet" (price-based guess)\n\
+\n\
+   GOOD examples:\n\
+   ✓ Blurry text → "[UNREADABLE]", confidence: "low"\n\
+   ✓ "กร..." but SKU matches known item → translate that item, confidence: "medium"\n\
+   ✓ "ไก่อก" (clearly readable) → "Chicken breast", confidence: "high"\n\
+\n\
+4. PRICE SANITY: Thai grocery items typically cost 10-2000 THB per line.\n\
+   If a line_item total_price > 5000 THB, double-check — it might be a subtotal row.\n\
+\n\
+5. NO EXTRAPOLATION: If the receipt image is cut off or blurry at the bottom,\n\
+   STOP extracting. Do not guess what items might follow.\n\
+\n\
+6. TRANSLATION HONESTY: Your translated_name must be a faithful translation of original_name.\n\
+   If original_name is unclear, your translation must reflect that uncertainty.\n\
+   NEVER translate unclear Thai into confident English.\n\
+   The CEO reviews translations — an honest "[UNREADABLE]" builds trust,\n\
+   a wrong "Frozen carrots" destroys it.\n\
 \n\
 ## DOCUMENT CLASSIFICATION\n\
 - tax_invoice_index: image with Tax ID, VAT breakdown\n\

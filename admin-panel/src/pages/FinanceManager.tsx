@@ -52,7 +52,7 @@ export function FinanceManager() {
     updateExpense,
   } = useExpenseLedger()
 
-  const { applyMappings, saveMapping } = useSupplierMapping()
+  const { applyMappings, saveMapping, lookupMappings, updateConversion } = useSupplierMapping()
 
   /* Receipt URLs injected from MagicDropzone */
   const [receiptUrls, setReceiptUrls] = useState<ReceiptUrls>({})
@@ -205,6 +205,8 @@ export function FinanceManager() {
           nomenclature_id: li.nomenclature_id ?? undefined,
           supplier_sku: li.supplier_sku ?? null,
           original_name: li.original_name ?? null,
+          brand: li.brand ?? undefined,
+          package_weight: li.package_weight ?? undefined,
         } as FoodItem))
 
       receipt.capex_items = mapped
@@ -238,6 +240,54 @@ export function FinanceManager() {
     nomenclatureId: string
   }) => {
     await saveMapping(params)
+  }
+
+  /* ── Phase 6.3: Create new nomenclature item ── */
+  const handleCreateNomenclature = async (params: {
+    name: string
+    baseUnit: string
+  }): Promise<string> => {
+    // Generate product_code: RAW-{UPPER_SLUG}
+    const slug = params.name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .substring(0, 30)
+    const productCode = `RAW-${slug}`
+
+    // Check for duplicate
+    const { data: existing } = await supabase
+      .from('nomenclature')
+      .select('id')
+      .eq('product_code', productCode)
+      .maybeSingle()
+
+    if (existing) {
+      // Already exists — just return its id
+      return existing.id
+    }
+
+    const { data, error: insertErr } = await supabase
+      .from('nomenclature')
+      .insert({
+        product_code: productCode,
+        name: params.name,
+        type: 'good',
+        base_unit: params.baseUnit,
+      })
+      .select('id')
+      .single()
+
+    if (insertErr) throw insertErr
+    // Refresh nomenclature list for staging area
+    const { data: freshNom } = await supabase
+      .from('nomenclature')
+      .select('id, name, product_code')
+      .ilike('product_code', 'RAW-%')
+      .order('name')
+    if (freshNom) setNomenclature(freshNom)
+
+    return data.id
   }
 
   /* ── Approve handler — calls fn_approve_receipt RPC ── */
@@ -344,6 +394,9 @@ export function FinanceManager() {
               onApprove={handleApprove}
               onCancel={() => setStagingData(null)}
               onSaveMapping={handleSaveMapping}
+              onCreateNomenclature={handleCreateNomenclature}
+              onLookupMappings={lookupMappings}
+              onUpdateConversion={updateConversion}
             />
           ) : (
             <ExpenseForm
