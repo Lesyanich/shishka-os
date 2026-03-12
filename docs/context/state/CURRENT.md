@@ -1,7 +1,7 @@
 # Current Deployment State
 
 **Last updated:** 2026-03-12
-**Active phase:** Phase 6 — Perfect Inventory & Mapping Engine
+**Active phase:** Phase 6.7 — Makro SKU Lookup + Table Layout Overhaul
 **Branch:** `feature/phase-6-mapping-engine`
 
 ## Tables (Supabase public schema)
