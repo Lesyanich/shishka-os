@@ -234,9 +234,6 @@ export function StagingArea({
   const opexTotal = opexItems.reduce((s, o) => s + (o.total_price || 0), 0)
   const computedTotal = foodTotal + capexTotal + opexTotal
 
-  const mismatch =
-    totalAmount > 0 && Math.abs(computedTotal - totalAmount) / totalAmount > 0.01
-
   // ── Validation: all food items must have nomenclature_id ──
   const allFoodMapped =
     foodItems.length === 0 ||
@@ -392,36 +389,24 @@ export function StagingArea({
           </div>
         )}
 
-        {/* Phase 6.1: Financial Reconciliation Panel */}
-        {receipt.footer && (
-          <ReconciliationPanel
-            footer={receipt.footer}
-            reconciliation={receipt._reconciliation}
-            itemsSum={computedTotal}
-            discountTotal={discountTotal}
-            vatAmount={vatAmount}
-            deliveryFee={deliveryFee}
-            onDiscountChange={setDiscountTotal}
-            onVatChange={setVatAmount}
-            onDeliveryFeeChange={setDeliveryFee}
-          />
-        )}
-        {/* Legacy: show simple mismatch if no footer available */}
-        {!receipt.footer && receipt._sum_mismatch && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-            <div>
-              <p className="text-xs font-medium text-amber-300">
-                Line items sum mismatch
-              </p>
-              <p className="mt-0.5 text-[11px] text-amber-300/70">
-                Items total: {formatTHB(receipt._sum_mismatch.line_items_sum)} &middot;
-                Receipt total: {formatTHB(receipt._sum_mismatch.declared_total)} &middot;
-                Missing: <span className="font-mono font-semibold text-amber-200">{formatTHB(receipt._sum_mismatch.difference)}</span>
-              </p>
-            </div>
-          </div>
-        )}
+        {/* Phase 6.6c: Reconciliation Panel — ALWAYS rendered (footer fallback if GAS didn't send one) */}
+        <ReconciliationPanel
+          footer={receipt.footer ?? {
+            subtotal: 0,
+            discount_total: 0,
+            vat_amount: 0,
+            delivery_fee: 0,
+            grand_total: receipt.total_amount || 0,
+          }}
+          reconciliation={receipt._reconciliation}
+          itemsSum={computedTotal}
+          discountTotal={discountTotal}
+          vatAmount={vatAmount}
+          deliveryFee={deliveryFee}
+          onDiscountChange={setDiscountTotal}
+          onVatChange={setVatAmount}
+          onDeliveryFeeChange={setDeliveryFee}
+        />
 
         {/* Phase 6.2: AI warnings banner */}
         {receipt._warnings && receipt._warnings.length > 0 && (
@@ -706,6 +691,10 @@ export function StagingArea({
                     ? 'border-l-2 border-l-amber-500'
                     : ''
               const isUnreadable = item.name === '[UNREADABLE]'
+              // Phase 6.6: Math validation — qty × unit_price ≈ total_price
+              const expectedTotal = Math.round(item.quantity * item.unit_price * 100) / 100
+              const hasMathError = item.quantity > 0 && item.unit_price > 0 && item.total_price > 0
+                && Math.abs(expectedTotal - item.total_price) > 2
 
               return (
               <tr
@@ -714,11 +703,29 @@ export function StagingArea({
                 title={warning || undefined}
               >
                 <td className="px-1.5 py-1.5">
+                  {/* Line number + editable name */}
                   <div className="flex items-center gap-1.5">
-                    {/* Line number badge */}
                     {lineNumber && (
                       <span className="shrink-0 rounded bg-slate-700/60 px-1 py-0.5 font-mono text-[9px] text-slate-500">
                         #{lineNumber}
+                      </span>
+                    )}
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => updateFood(i, { name: e.target.value })}
+                      className={`${inputCls} flex-1 ${isUnreadable ? 'italic text-slate-500' : ''}`}
+                    />
+                  </div>
+                  {/* Metadata chips row — UNDER the name */}
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {/* Thai original (always show for CEO verification) */}
+                    {item.original_name && (
+                      <span
+                        className="truncate rounded bg-slate-700/40 px-1 py-0.5 text-[9px] text-slate-500 max-w-[180px]"
+                        title={item.original_name}
+                      >
+                        {item.original_name}
                       </span>
                     )}
                     {/* SKU chip */}
@@ -727,36 +734,24 @@ export function StagingArea({
                         type="button"
                         onClick={() => navigator.clipboard.writeText(item.supplier_sku!)}
                         title={`Copy SKU: ${item.supplier_sku}`}
-                        className="shrink-0 rounded bg-indigo-500/10 px-1 py-0.5 font-mono text-[9px] text-indigo-400 hover:bg-indigo-500/20"
+                        className="shrink-0 rounded bg-slate-600/30 px-1 py-0.5 font-mono text-[9px] text-slate-400 hover:bg-slate-600/50"
                       >
-                        {item.supplier_sku}
+                        SKU:{item.supplier_sku}
                       </button>
                     )}
-                    {/* Phase 6.6: Brand chip */}
+                    {/* Brand chip */}
                     {item.brand && (
-                      <span className="shrink-0 rounded bg-purple-500/10 px-1 py-0.5 text-[9px] text-purple-400">
+                      <span className="shrink-0 rounded bg-purple-500/15 px-1.5 py-0.5 text-[9px] font-medium text-purple-400">
                         {item.brand}
                       </span>
                     )}
-                    {/* Phase 6.6: Package weight chip */}
+                    {/* Package weight chip */}
                     {item.package_weight && (
-                      <span className="shrink-0 rounded bg-orange-500/10 px-1 py-0.5 text-[9px] text-orange-400">
+                      <span className="shrink-0 rounded bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-medium text-orange-400">
                         {item.package_weight}
                       </span>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    value={item.name}
-                    onChange={(e) => updateFood(i, { name: e.target.value })}
-                    className={`${inputCls} ${isUnreadable ? 'italic text-slate-500' : ''}`}
-                  />
-                  {/* Thai original text for verification */}
-                  {item.original_name && item.original_name !== item.name && (
-                    <p className="mt-0.5 truncate text-[9px] text-slate-600" title={item.original_name}>
-                      {item.original_name}
-                    </p>
-                  )}
                   {/* Warning tooltip */}
                   {warning && (
                     <p className="mt-0.5 text-[9px] text-rose-400/70">{warning}</p>
@@ -785,7 +780,7 @@ export function StagingArea({
                     step="0.01"
                     value={item.unit_price}
                     onChange={(e) => updateFood(i, { unit_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
+                    className={`${inputCls} font-mono ${hasMathError ? 'text-rose-400 border-rose-500/50' : ''}`}
                   />
                 </td>
                 <td className="w-20 px-1.5 py-1.5">
@@ -794,8 +789,14 @@ export function StagingArea({
                     step="0.01"
                     value={item.total_price}
                     onChange={(e) => updateFood(i, { total_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
+                    className={`${inputCls} font-mono ${hasMathError ? 'text-rose-400 border-rose-500/50' : ''}`}
                   />
+                  {hasMathError && (
+                    <p className="mt-0.5 flex items-center gap-0.5 text-[9px] text-rose-400">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      Math: {item.quantity}&times;{item.unit_price}={expectedTotal}
+                    </p>
+                  )}
                 </td>
                 <td className="w-36 px-1.5 py-1.5">
                   <select
@@ -1126,19 +1127,9 @@ export function StagingArea({
             </tr>
           </ItemSection>
 
-          {/* ═══ Summary Card ═══ */}
+          {/* ═══ Category Breakdown + Warnings ═══ */}
           <div className="overflow-hidden rounded-xl border border-slate-700/40 bg-slate-800/30">
-            <div className="flex items-center justify-between border-b border-slate-700/30 px-4 py-3">
-              <span className="text-xs font-medium tracking-wide text-slate-400">
-                Computed Total
-              </span>
-              <span className="font-mono text-base font-semibold tracking-tight text-slate-100">
-                {formatTHB(computedTotal)}{' '}
-                <span className="text-xs font-normal text-slate-500">{currency}</span>
-              </span>
-            </div>
-
-            <div className="flex divide-x divide-slate-700/30 px-1">
+            <div className="flex divide-x divide-slate-700/30">
               {[
                 { label: 'Food', value: foodTotal, color: 'text-emerald-400' },
                 { label: 'CapEx', value: capexTotal, color: 'text-amber-400' },
@@ -1155,26 +1146,14 @@ export function StagingArea({
               ))}
             </div>
 
-            {(mismatch || (!allFoodMapped && foodItems.length > 0)) && (
-              <div className="space-y-2 border-t border-slate-700/30 px-4 py-3">
-                {mismatch && (
-                  <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
-                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
-                    <p className="text-[11px] leading-relaxed text-amber-300/80">
-                      Computed total ({formatTHB(computedTotal)}) differs from AI total (
-                      {formatTHB(totalAmount)}) by{' '}
-                      {Math.abs(((computedTotal - totalAmount) / totalAmount) * 100).toFixed(1)}%
-                    </p>
-                  </div>
-                )}
-                {!allFoodMapped && foodItems.length > 0 && (
-                  <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
-                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
-                    <p className="text-[11px] leading-relaxed text-amber-300/80">
-                      All food items must be mapped to nomenclature or marked &quot;Create new&quot; before approval
-                    </p>
-                  </div>
-                )}
+            {!allFoodMapped && foodItems.length > 0 && (
+              <div className="border-t border-slate-700/30 px-4 py-3">
+                <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
+                  <p className="text-[11px] leading-relaxed text-amber-300/80">
+                    All food items must be mapped to nomenclature or marked &quot;Create new&quot; before approval
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -1457,25 +1436,32 @@ function ReconciliationPanel({
         </div>
 
         <div className="space-y-1.5">
-          {/* Items subtotal (read-only — computed from line items) */}
+          {/* ── Subtotal row ── */}
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Items subtotal</span>
-            <span className="font-mono text-xs text-slate-200">{formatTHB(itemsSum)}</span>
+            <span className="text-[11px] text-slate-400">Subtotal</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-slate-200">{formatTHB(itemsSum)}</span>
+              {footer.subtotal > 0 && Math.abs(itemsSum - footer.subtotal) > 2 && (
+                <span className="font-mono text-[9px] text-amber-400" title="Receipt subtotal">
+                  (receipt: {formatTHB(footer.subtotal)})
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Discount (editable) */}
+          {/* ── Discount row (editable, red) ── */}
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] text-slate-400">Discount</span>
+            <span className="text-[11px] text-rose-400">Discount</span>
             <input
               type="number"
               step="1"
               value={discountTotal}
               onChange={(e) => onDiscountChange(Number(e.target.value))}
-              className="h-6 w-24 rounded border border-slate-700/60 bg-slate-800/80 px-2 text-right font-mono text-xs text-rose-300 outline-none focus:border-indigo-500/60"
+              className="h-6 w-24 rounded border border-rose-500/30 bg-slate-800/80 px-2 text-right font-mono text-xs text-rose-300 outline-none focus:border-rose-500/60"
             />
           </div>
 
-          {/* VAT (editable) */}
+          {/* ── VAT row (editable) ── */}
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] text-slate-400">VAT</span>
             <input
@@ -1487,29 +1473,31 @@ function ReconciliationPanel({
             />
           </div>
 
-          {/* Phase 6.6: Delivery fee (editable) */}
+          {/* ── Delivery row (editable, blue) ── */}
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] text-slate-400">Delivery</span>
+            <span className="text-[11px] text-blue-400">Delivery</span>
             <input
               type="number"
               step="1"
               value={deliveryFee}
               onChange={(e) => onDeliveryFeeChange(Number(e.target.value))}
-              className="h-6 w-24 rounded border border-slate-700/60 bg-slate-800/80 px-2 text-right font-mono text-xs text-blue-300 outline-none focus:border-indigo-500/60"
+              className="h-6 w-24 rounded border border-blue-500/30 bg-slate-800/80 px-2 text-right font-mono text-xs text-blue-300 outline-none focus:border-blue-500/60"
             />
           </div>
 
-          {/* Divider */}
+          {/* ── Divider ── */}
           <div className="h-px bg-slate-700/40" />
 
-          {/* Computed grand total vs declared */}
+          {/* ── Grand Total: computed vs declared ── */}
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-slate-300">Computed total</span>
-            <span className="font-mono text-xs font-semibold text-slate-100">{formatTHB(grandTotal)}</span>
+            <span className="text-[11px] font-semibold text-slate-200">Grand Total</span>
+            <span className={`font-mono text-xs font-bold ${isBalanced ? 'text-emerald-300' : 'text-amber-300'}`}>
+              {formatTHB(grandTotal)}
+            </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Receipt says</span>
-            <span className="font-mono text-xs text-slate-400">{formatTHB(declaredTotal)}</span>
+            <span className="text-[11px] text-slate-500">Receipt says</span>
+            <span className="font-mono text-xs text-slate-500">{formatTHB(declaredTotal)}</span>
           </div>
 
           {!isBalanced && (

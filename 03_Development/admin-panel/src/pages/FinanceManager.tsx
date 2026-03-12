@@ -21,6 +21,24 @@ import type { ParsedReceipt, ReceiptUrls, ApprovePayload, FoodItem, ReceiptJob }
    Phase 4.14: Async receipt processing via Realtime subscription
    ═══════════════════════════════════════════════════════════════════ */
 
+/** Phase 6.6c: Sanitize OCR-dirty numbers (e.g., "225,!" → 225, "1.0.00" → 1) */
+function sanitizeNum(v: unknown): number {
+  if (v == null || v === '') return 0
+  const s = String(v).replace(/[^\d.]/g, '')
+  const parts = s.split('.')
+  const clean = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : s
+  const n = Number(clean)
+  return isNaN(n) ? 0 : n
+}
+
+/** Sanitize number preserving negative sign (for discount_total) */
+function sanitizeSigned(v: unknown): number {
+  if (v == null || v === '') return 0
+  const neg = String(v).includes('-')
+  const n = sanitizeNum(v)
+  return neg ? -Math.abs(n) : n
+}
+
 /** Fuzzy match supplier name from AI to existing suppliers */
 function fuzzyMatchSupplier(
   aiName: string,
@@ -194,14 +212,15 @@ export function FinanceManager() {
         : receipt.line_items
 
       // Reclassify into legacy 3-array format for existing RPC
+      // Phase 6.6c: Sanitize all numeric fields (strip OCR dust like "225,!")
       receipt.food_items = mapped
         .filter((li) => li.category === 'food')
         .map((li) => ({
           name: li.translated_name || li.original_name || '',
-          quantity: li.quantity || 0,
+          quantity: sanitizeNum(li.quantity),
           unit: li.unit || 'pcs',
-          unit_price: li.unit_price || 0,
-          total_price: li.total_price || 0,
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
           nomenclature_id: li.nomenclature_id ?? undefined,
           supplier_sku: li.supplier_sku ?? null,
           original_name: li.original_name ?? null,
@@ -213,20 +232,32 @@ export function FinanceManager() {
         .filter((li) => li.category === 'capex')
         .map((li) => ({
           name: li.translated_name || li.original_name || '',
-          quantity: li.quantity || 0,
-          unit_price: li.unit_price || 0,
-          total_price: li.total_price || 0,
+          quantity: sanitizeNum(li.quantity),
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
         }))
 
       receipt.opex_items = mapped
         .filter((li) => li.category === 'opex' || li.category === 'uncategorized')
         .map((li) => ({
           description: li.translated_name || li.original_name || '',
-          quantity: li.quantity || 0,
+          quantity: sanitizeNum(li.quantity),
           unit: li.unit || 'pcs',
-          unit_price: li.unit_price || 0,
-          total_price: li.total_price || 0,
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
         }))
+    }
+
+    // Phase 6.6c: Sanitize total_amount and footer values (OCR dust defense)
+    receipt.total_amount = sanitizeNum(receipt.total_amount)
+    if (receipt.footer) {
+      receipt.footer = {
+        subtotal: sanitizeNum(receipt.footer.subtotal),
+        discount_total: sanitizeSigned(receipt.footer.discount_total),
+        vat_amount: sanitizeNum(receipt.footer.vat_amount),
+        delivery_fee: sanitizeNum(receipt.footer.delivery_fee),
+        grand_total: sanitizeNum(receipt.footer.grand_total),
+      }
     }
 
     setStagingData({ receipt, urls, imageUrls })
