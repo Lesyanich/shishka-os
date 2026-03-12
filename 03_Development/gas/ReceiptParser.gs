@@ -360,7 +360,7 @@ function callGemini_(imageParts, apiKey) {
     contents: [{ parts: parts }],
     generationConfig: {
       responseMimeType: "application/json",
-      temperature: 0.2,
+      temperature: 0,
       maxOutputTokens: 65536,
       // Gemini 2.5 Flash: disable "thinking" for clean JSON output
       thinkingConfig: { thinkingBudget: 0 },
@@ -791,6 +791,18 @@ Do NOT transliterate Thai to Latin characters. TRANSLATE the meaning.\n\
 Brand names: put brand into the separate "brand" field, NOT into translated_name.\n\
   Example: ARO chicken eggs → translated_name: "Chicken eggs", brand: "ARO"\n\
 \n\
+## COLUMN ALIGNMENT — CRITICAL for Makro receipts\n\
+Makro receipts have a strict table layout:\n\
+  QUANTITY | ARTICLE NUMBER | ARTICLE DESCRIPTION (Thai) | UNIT | PACKS | PRICE | DISCOUNT | ORDER PRICE\n\
+Rules:\n\
+- Each ARTICLE NUMBER (barcode) and its ARTICLE DESCRIPTION are on the SAME physical row\n\
+- NEVER associate a barcode from one row with a description from another row\n\
+- If a description wraps to two lines, both lines belong to the SAME barcode\n\
+- The barcode is NOT a product name — do NOT decode barcodes into product names\n\
+- Read the Thai text in ARTICLE DESCRIPTION column ONLY and translate THAT text\n\
+- If you cannot read the ARTICLE DESCRIPTION for a row, set translated_name to "[UNREADABLE]"\n\
+  but STILL extract the barcode as supplier_sku, and extract quantity/price if readable\n\
+\n\
 ## THAI RECEIPT ABBREVIATIONS — Common thermal receipt shorthand\n\
 Thai receipts truncate product names to fit ~20 characters on thermal paper.\n\
 If you see a truncated name, reconstruct the FULL product name from context.\n\
@@ -932,6 +944,14 @@ Return ONLY valid JSON with this structure:\n\
    NEVER translate unclear Thai into confident English.\n\
    The CEO reviews translations — an honest "[UNREADABLE]" builds trust,\n\
    a wrong "Frozen carrots" destroys it.\n\
+\n\
+7. ZERO INVENTION RULE: You may ONLY translate words that are physically printed on the receipt.\n\
+   - Do NOT combine partial words from different rows into a new product name\n\
+   - Do NOT use the price or quantity to guess what the product might be\n\
+   - Do NOT generate creative product names like "Smoky Fresh hamburger"\n\
+   - If the Thai text says "แป้ง" (flour), translate as "Flour", NOT "Whole wheat flour"\n\
+     unless "โฮลวีท" is also visible in the SAME row\n\
+   - Each translated_name must have a 1:1 correspondence with original_name characters\n\
 \n\
 ## DOCUMENT CLASSIFICATION\n\
 - tax_invoice_index: image with Tax ID, VAT breakdown\n\
