@@ -186,6 +186,8 @@ erDiagram
         TEXT currency
         NUMERIC exchange_rate
         NUMERIC amount_thb "GENERATED"
+        NUMERIC discount_total
+        NUMERIC vat_amount
         TEXT status
         BOOLEAN has_tax_invoice
     }
@@ -220,6 +222,9 @@ erDiagram
         TEXT original_name
         UUID nomenclature_id FK
         INT match_count
+        TEXT purchase_unit
+        NUMERIC conversion_factor
+        TEXT base_unit
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
@@ -298,9 +303,9 @@ erDiagram
 | `order_items` | `id` UUID | quantity, price_at_purchase | order_id -> orders (CASCADE), nomenclature_id -> nomenclature | 022 |
 | `production_plans` | `id` UUID | name, target_date, status, mrp_result | -- | 023 |
 | `plan_targets` | `id` UUID | target_qty, UNIQUE(plan_id,nomenclature_id) | plan_id -> production_plans (CASCADE), nomenclature_id -> nomenclature | 023 |
-| `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030 |
+| `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice, discount_total, vat_amount | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030, 038 |
 | `opex_items` | `id` UUID | description, quantity, unit, unit_price, total_price | expense_id -> expense_ledger (CASCADE) | 030 |
-| `supplier_item_mapping` | `id` UUID | supplier_sku, original_name, match_count | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE) | 035 |
+| `supplier_item_mapping` | `id` UUID | supplier_sku, original_name, match_count, purchase_unit, conversion_factor, base_unit | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE) | 035, 039 |
 | `receipt_jobs` | `id` UUID | status, image_urls (JSONB), result (JSONB), error, ocr_text, duration_ms, model | -- (standalone, pre-approval) | 036, 037 |
 
 ## Custom ENUM Types

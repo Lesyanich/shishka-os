@@ -240,6 +240,54 @@ export function FinanceManager() {
     await saveMapping(params)
   }
 
+  /* ── Phase 6.3: Create new nomenclature item ── */
+  const handleCreateNomenclature = async (params: {
+    name: string
+    baseUnit: string
+  }): Promise<string> => {
+    // Generate product_code: RAW-{UPPER_SLUG}
+    const slug = params.name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .substring(0, 30)
+    const productCode = `RAW-${slug}`
+
+    // Check for duplicate
+    const { data: existing } = await supabase
+      .from('nomenclature')
+      .select('id')
+      .eq('product_code', productCode)
+      .maybeSingle()
+
+    if (existing) {
+      // Already exists — just return its id
+      return existing.id
+    }
+
+    const { data, error: insertErr } = await supabase
+      .from('nomenclature')
+      .insert({
+        product_code: productCode,
+        name: params.name,
+        type: 'good',
+        base_unit: params.baseUnit,
+      })
+      .select('id')
+      .single()
+
+    if (insertErr) throw insertErr
+    // Refresh nomenclature list for staging area
+    const { data: freshNom } = await supabase
+      .from('nomenclature')
+      .select('id, name, product_code')
+      .ilike('product_code', 'RAW-%')
+      .order('name')
+    if (freshNom) setNomenclature(freshNom)
+
+    return data.id
+  }
+
   /* ── Approve handler — calls fn_approve_receipt RPC ── */
   const handleApprove = async (payload: ApprovePayload) => {
     const { data, error: rpcErr } = await supabase.rpc('fn_approve_receipt', {
@@ -344,6 +392,7 @@ export function FinanceManager() {
               onApprove={handleApprove}
               onCancel={() => setStagingData(null)}
               onSaveMapping={handleSaveMapping}
+              onCreateNomenclature={handleCreateNomenclature}
             />
           ) : (
             <ExpenseForm

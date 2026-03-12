@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // Types: Receipt Parsing & Staging Area
-// Phase 4.6: Perfect OCR & Smart Mapping Engine
+// Phase 6.1: Financial Reconciliation + Anti-Hallucination
 // ═══════════════════════════════════════════════════════════
 
 /** AI-classified document positions from the uploaded images array */
@@ -10,7 +10,29 @@ export interface DocumentClassification {
   bank_slip_index: number | null
 }
 
-/** Unified line item from Edge Function strict OCR (Phase 4.6) */
+/** Receipt footer — financial summary extracted from ZONE 3 */
+export interface ReceiptFooter {
+  /** Sum before discounts (รวม, Subtotal) */
+  subtotal: number
+  /** Total receipt discount as NEGATIVE number (ส่วนลด, e.g., -500). 0 if none */
+  discount_total: number
+  /** VAT amount. 0 if VAT-inclusive pricing */
+  vat_amount: number
+  /** Final amount paid (ยอดสุทธิ, Net, Grand Total) */
+  grand_total: number
+}
+
+/** Reconciliation status from post-processing */
+export interface Reconciliation {
+  /** "balanced" = all checks pass, "items_mismatch" = items sum ≠ subtotal, "footer_mismatch" = footer formula fails */
+  status: 'balanced' | 'items_mismatch' | 'footer_mismatch'
+  /** Computed sum of line_items[].total_price */
+  items_sum: number
+  /** Human-readable formula, e.g., "4700 + (-500) + 0 = 4200" */
+  formula: string
+}
+
+/** Unified line item from Edge Function strict OCR (Phase 6.1) */
 export interface LineItem {
   line_number: number
   supplier_sku: string | null
@@ -18,14 +40,20 @@ export interface LineItem {
   translated_name: string
   quantity: number
   unit: string
+  /** Unit exactly as printed on receipt (e.g., "แพ็ค", "bag 500g") — preserved for UoM conversion */
+  purchase_unit?: string
   unit_price: number
   total_price: number
   category: 'food' | 'capex' | 'opex' | 'uncategorized'
+  /** AI confidence: "high" = clear text, "medium" = some guessing, "low" = significant guessing */
+  confidence?: 'high' | 'medium' | 'low'
+  /** Post-processing warning (e.g., price math mismatch) */
+  _warning?: string
   /** Populated by frontend mapping engine (useSupplierMapping) */
   nomenclature_id?: string | null
 }
 
-/** Sum validation from Edge Function */
+/** Sum validation from Edge Function (legacy — kept for backward compat) */
 export interface SumMismatch {
   line_items_sum: number
   declared_total: number
@@ -39,7 +67,11 @@ export interface ParsedReceipt {
   total_amount: number
   currency: string
   transaction_date: string // YYYY-MM-DD — strictly from document, never today
-  /** NEW (Phase 4.6): Unified line items from strict OCR */
+  /** Phase 6.1: Structured financial footer (discount, VAT, grand total) */
+  footer?: ReceiptFooter
+  /** Phase 6.2: How many product rows AI counted in the receipt image */
+  item_count_observed?: number
+  /** Unified line items from strict OCR */
   line_items?: LineItem[]
   /** Legacy arrays — populated by Edge Function from line_items for backward compat */
   food_items: FoodItem[]
@@ -47,8 +79,12 @@ export interface ParsedReceipt {
   opex_items: OpexItem[]
   /** AI classification of which uploaded image is which document type */
   documents?: DocumentClassification
-  /** Set by Edge Function when line_items sum ≠ total_amount */
+  /** Phase 6.1: Reconciliation result — formula check */
+  _reconciliation?: Reconciliation
+  /** Legacy: Set by Edge Function when line_items sum ≠ total_amount */
   _sum_mismatch?: SumMismatch
+  /** Post-processing warnings array */
+  _warnings?: string[]
 }
 
 /** Food ingredient line item → inserts into purchase_logs */
@@ -126,6 +162,10 @@ export interface ApprovePayload {
   amount_original: number
   currency: string
   exchange_rate: number
+  /** Phase 6.1: Receipt-level discount (negative number) */
+  discount_total: number
+  /** Phase 6.1: VAT amount */
+  vat_amount: number
   paid_by: string
   payment_method: string
   status: string

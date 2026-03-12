@@ -521,18 +521,100 @@ function validateAndPostProcess_(parsed) {
     }
   }
 
-  // ── Sum validation ──
+  // ── Footer validation & reconciliation ──
+  if (!parsed.footer || typeof parsed.footer !== "object") {
+    parsed.footer = {
+      subtotal: 0,
+      discount_total: 0,
+      vat_amount: 0,
+      grand_total: parsed.total_amount || 0,
+    };
+    warnings.push("footer object missing — reconstructed from total_amount");
+  } else {
+    parsed.footer.subtotal = Number(parsed.footer.subtotal) || 0;
+    parsed.footer.discount_total = Number(parsed.footer.discount_total) || 0;
+    parsed.footer.vat_amount = Number(parsed.footer.vat_amount) || 0;
+    parsed.footer.grand_total = Number(parsed.footer.grand_total) || (parsed.total_amount || 0);
+  }
+  // Sync total_amount with footer.grand_total
+  parsed.total_amount = parsed.footer.grand_total;
+
   var lineSum = 0;
   for (var s = 0; s < parsed.line_items.length; s++) {
     lineSum += (parsed.line_items[s].total_price || 0);
   }
+  lineSum = Math.round(lineSum * 100) / 100;
   var declared = parsed.total_amount || 0;
+
+  // Reconciliation: check if items sum ≈ footer.subtotal, and formula balances
+  var footerSubtotal = parsed.footer.subtotal;
+  var footerFormula = parsed.footer.subtotal + parsed.footer.discount_total + parsed.footer.vat_amount;
+  footerFormula = Math.round(footerFormula * 100) / 100;
+
+  var reconStatus = "balanced";
+  if (footerSubtotal > 0 && Math.abs(lineSum - footerSubtotal) > 2) {
+    reconStatus = "items_mismatch";
+  }
+  if (parsed.footer.grand_total > 0 && Math.abs(footerFormula - parsed.footer.grand_total) > 2) {
+    reconStatus = reconStatus === "items_mismatch" ? "items_mismatch" : "footer_mismatch";
+  }
+  // If footer.subtotal is 0 but lineSum > 0, auto-fill subtotal from items
+  if (footerSubtotal === 0 && lineSum > 0) {
+    parsed.footer.subtotal = lineSum;
+    warnings.push("footer.subtotal was 0, filled from items sum: " + lineSum);
+  }
+
+  parsed._reconciliation = {
+    status: reconStatus,
+    items_sum: lineSum,
+    formula: parsed.footer.subtotal + " + (" + parsed.footer.discount_total + ") + " + parsed.footer.vat_amount + " = " + parsed.footer.grand_total,
+  };
+
+  // Legacy _sum_mismatch (keep for backward compat with existing UI)
   if (Math.abs(lineSum - declared) > 1) {
     parsed._sum_mismatch = {
-      line_items_sum: Math.round(lineSum * 100) / 100,
+      line_items_sum: lineSum,
       declared_total: declared,
       difference: Math.round((declared - lineSum) * 100) / 100,
     };
+  }
+
+  // ── Item count validation ──
+  if (typeof parsed.item_count_observed === "number" && parsed.item_count_observed > 0) {
+    var actualCount = parsed.line_items.length;
+    if (Math.abs(actualCount - parsed.item_count_observed) > 2) {
+      warnings.push("Item count mismatch: AI observed " + parsed.item_count_observed + " but extracted " + actualCount);
+    }
+  }
+
+  // ── Per-item price sanity & math check ──
+  for (var pc = 0; pc < parsed.line_items.length; pc++) {
+    var pli = parsed.line_items[pc];
+    if (!pli.confidence) pli.confidence = "high";
+    if (pli.unit_price <= 0 || pli.total_price <= 0) {
+      pli.confidence = "low";
+      pli._warning = "Zero or negative price";
+    }
+    if (pli.total_price > 5000) {
+      pli._warning = (pli._warning ? pli._warning + "; " : "") + "Unusually high price — may be subtotal";
+    }
+    var expectedPrice = Math.round(pli.unit_price * pli.quantity * 100) / 100;
+    if (Math.abs(expectedPrice - pli.total_price) > 2) {
+      pli._warning = (pli._warning ? pli._warning + "; " : "") +
+        "Price math: " + pli.unit_price + " × " + pli.quantity + " ≠ " + pli.total_price;
+    }
+  }
+
+  // ── Stricter duplicate detection ──
+  var dupNameMap = {};
+  for (var dn = 0; dn < parsed.line_items.length; dn++) {
+    var dnKey = (parsed.line_items[dn].original_name || "").trim().toLowerCase();
+    dupNameMap[dnKey] = (dupNameMap[dnKey] || 0) + 1;
+  }
+  for (var dupKey in dupNameMap) {
+    if (dupNameMap[dupKey] > 1) {
+      warnings.push("Duplicate item: '" + dupKey + "' appears " + dupNameMap[dupKey] + " times");
+    }
   }
 
   parsed._pipeline = {
@@ -614,10 +696,16 @@ ZONE 2 — ITEM GRID (extract products ONLY from here):\n\
   SKU | Product Name (Thai) | Qty | Unit Price | Total Price\n\
   → Extract: each row as a line_item\n\
 \n\
-ZONE 3 — FOOTER (total only):\n\
+ZONE 3 — FOOTER (financial summary — extract as structured data):\n\
   Starts at first line containing: รวม, ยอดรวม, Subtotal, Total, ส่วนลด, Discount, VAT, ภาษี, สุทธิ, Net\n\
   Everything at and below = NOT products.\n\
-  → Extract: total_amount (final amount paid)\n\
+  → Extract into a "footer" object with these fields:\n\
+    - subtotal: sum before discounts (รวม, Subtotal) — should equal sum of line_item prices\n\
+    - discount_total: total receipt discount as NEGATIVE number (ส่วนลด, Discount, e.g., -500). 0 if no discount.\n\
+    - vat_amount: VAT amount (ภาษี, VAT). 0 if VAT-inclusive pricing or no VAT shown.\n\
+    - grand_total: final amount paid (ยอดสุทธิ, Net, Grand Total)\n\
+  → Also set total_amount = grand_total (for backward compatibility)\n\
+  → Formula: subtotal + discount_total + vat_amount = grand_total\n\
 \n\
 ## BLACKLIST — NEVER add as line_items\n\
 Total, Subtotal, Grand Total, Net, VAT, Tax, Discount, Change, Cash, Card, Credit, Debit, Points, Member, Bag fee, Rounding,\n\
@@ -687,6 +775,13 @@ Return ONLY valid JSON with this structure:\n\
   "total_amount": number,\n\
   "currency": "THB",\n\
   "transaction_date": "YYYY-MM-DD",\n\
+  "footer": {\n\
+    "subtotal": number,\n\
+    "discount_total": number,\n\
+    "vat_amount": number,\n\
+    "grand_total": number\n\
+  },\n\
+  "item_count_observed": number,\n\
   "line_items": [\n\
     {\n\
       "line_number": 1,\n\
@@ -695,9 +790,11 @@ Return ONLY valid JSON with this structure:\n\
       "translated_name": "English translation",\n\
       "quantity": number,\n\
       "unit": "kg" | "L" | "pcs",\n\
+      "purchase_unit": "unit exactly as printed on receipt (Thai or English)",\n\
       "unit_price": number,\n\
       "total_price": number,\n\
-      "category": "food" | "capex" | "opex" | "uncategorized"\n\
+      "category": "food" | "capex" | "opex" | "uncategorized",\n\
+      "confidence": "high" | "medium" | "low"\n\
     }\n\
   ],\n\
   "documents": {\n\
@@ -706,6 +803,29 @@ Return ONLY valid JSON with this structure:\n\
     "bank_slip_index": number or null\n\
   }\n\
 }\n\
+\n\
+## ANTI-HALLUCINATION RULES\n\
+\n\
+1. ITEM COUNT ANCHOR: Before extracting items, COUNT the number of product rows\n\
+   visible in the receipt ITEM GRID. Report this count as "item_count_observed".\n\
+   Your line_items array length MUST match this count (±1 tolerance).\n\
+\n\
+2. CONFIDENCE SCORING: For each line_item, set "confidence":\n\
+   - "high": text clearly readable, numbers parse cleanly\n\
+   - "medium": some characters unclear but context helps\n\
+   - "low": significant guessing involved\n\
+\n\
+3. UNREADABLE ITEMS: If you cannot read >50% of an item\'s name:\n\
+   - Set translated_name to "[UNREADABLE]"\n\
+   - Set confidence to "low"\n\
+   - Still extract quantity/price if visible\n\
+   - Do NOT invent a product name\n\
+\n\
+4. PRICE SANITY: Thai grocery items typically cost 10-2000 THB per line.\n\
+   If a line_item total_price > 5000 THB, double-check — it might be a subtotal row.\n\
+\n\
+5. NO EXTRAPOLATION: If the receipt image is cut off or blurry at the bottom,\n\
+   STOP extracting. Do not guess what items might follow.\n\
 \n\
 ## DOCUMENT CLASSIFICATION\n\
 - tax_invoice_index: image with Tax ID, VAT breakdown\n\

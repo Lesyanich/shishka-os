@@ -19,6 +19,8 @@ import { ReceiptImageViewer } from './ReceiptImageViewer'
 import { nomenclatureOptionText } from './NomenclatureLabel'
 import type {
   ParsedReceipt,
+  ReceiptFooter,
+  Reconciliation,
   FoodItem,
   CapexItem,
   OpexItem,
@@ -46,6 +48,11 @@ export interface StagingAreaProps {
     originalName: string
     nomenclatureId: string
   }) => Promise<void>
+  /** Phase 6.3: Create new nomenclature item and return its ID */
+  onCreateNomenclature?: (params: {
+    name: string
+    baseUnit: string
+  }) => Promise<string>
 }
 
 /* ────────────────────────── Helpers ────────────────────────── */
@@ -86,6 +93,7 @@ export function StagingArea({
   onApprove,
   onCancel,
   onSaveMapping,
+  onCreateNomenclature,
 }: StagingAreaProps) {
   // ── Header state (editable) ──
   const [supplierId, setSupplierId] = useState(
@@ -117,6 +125,14 @@ export function StagingArea({
   const [paidBy, setPaidBy] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
 
+  // Phase 6.1: Reconciliation state (editable discount & VAT)
+  const [discountTotal, setDiscountTotal] = useState(
+    receipt.footer?.discount_total ?? 0,
+  )
+  const [vatAmount, setVatAmount] = useState(
+    receipt.footer?.vat_amount ?? 0,
+  )
+
   // ── Auto-fill category from supplier on initial match ──
   useEffect(() => {
     if (supplierId && categoryCode === '') {
@@ -144,6 +160,11 @@ export function StagingArea({
   // ── UI state ──
   const [isApproving, setIsApproving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Phase 6.3: Create New Item modal state
+  const [createModalIndex, setCreateModalIndex] = useState<number | null>(null)
+  const [createName, setCreateName] = useState('')
+  const [createUnit, setCreateUnit] = useState<'kg' | 'L' | 'pcs'>('kg')
 
   // ── Sub-category filtering ──
   const filteredSubCats = useMemo(
@@ -251,6 +272,8 @@ export function StagingArea({
         amount_original: totalAmount,
         currency,
         exchange_rate: currency === 'THB' ? 1 : exchangeRate,
+        discount_total: discountTotal,
+        vat_amount: vatAmount,
         paid_by: paidBy.trim(),
         payment_method: paymentMethod,
         status: 'paid',
@@ -315,8 +338,20 @@ export function StagingArea({
           </div>
         )}
 
-        {/* Phase 4.6: Sum mismatch warning from Edge Function */}
-        {receipt._sum_mismatch && (
+        {/* Phase 6.1: Financial Reconciliation Panel */}
+        {receipt.footer && (
+          <ReconciliationPanel
+            footer={receipt.footer}
+            reconciliation={receipt._reconciliation}
+            itemsSum={computedTotal}
+            discountTotal={discountTotal}
+            vatAmount={vatAmount}
+            onDiscountChange={setDiscountTotal}
+            onVatChange={setVatAmount}
+          />
+        )}
+        {/* Legacy: show simple mismatch if no footer available */}
+        {!receipt.footer && receipt._sum_mismatch && (
           <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
             <div>
@@ -329,6 +364,18 @@ export function StagingArea({
                 Missing: <span className="font-mono font-semibold text-amber-200">{formatTHB(receipt._sum_mismatch.difference)}</span>
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Phase 6.2: AI warnings banner */}
+        {receipt._warnings && receipt._warnings.length > 0 && (
+          <div className="mb-4 rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3">
+            <p className="text-[11px] font-medium text-rose-300">AI Warnings:</p>
+            <ul className="mt-1 space-y-0.5">
+              {receipt._warnings.map((w, i) => (
+                <li key={i} className="text-[10px] text-rose-300/70">{w}</li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -586,18 +633,66 @@ export function StagingArea({
             headers={['Item', 'Qty', 'Unit', 'Price', 'Total', 'Nomenclature', '']}
             colWidths={['', 'w-16', 'w-16', 'w-20', 'w-20', 'w-36', 'w-8']}
           >
-            {foodItems.map((item, i) => (
+            {foodItems.map((item, i) => {
+              // Phase 6.2: Find matching line_item for confidence/warning data
+              const lineItem = receipt.line_items?.find(
+                (li) =>
+                  (li.supplier_sku && li.supplier_sku === item.supplier_sku) ||
+                  (li.original_name && li.original_name === item.original_name),
+              )
+              const confidence = lineItem?.confidence ?? 'high'
+              const warning = lineItem?._warning
+              const lineNumber = lineItem?.line_number
+              const confidenceBorder =
+                confidence === 'low'
+                  ? 'border-l-2 border-l-rose-500'
+                  : confidence === 'medium'
+                    ? 'border-l-2 border-l-amber-500'
+                    : ''
+              const isUnreadable = item.name === '[UNREADABLE]'
+
+              return (
               <tr
                 key={i}
-                className="group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20"
+                className={`group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20 ${confidenceBorder} ${isUnreadable ? 'bg-slate-800/40' : ''}`}
+                title={warning || undefined}
               >
                 <td className="px-1.5 py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    {/* Line number badge */}
+                    {lineNumber && (
+                      <span className="shrink-0 rounded bg-slate-700/60 px-1 py-0.5 font-mono text-[9px] text-slate-500">
+                        #{lineNumber}
+                      </span>
+                    )}
+                    {/* SKU chip */}
+                    {item.supplier_sku && (
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(item.supplier_sku!)}
+                        title={`Copy SKU: ${item.supplier_sku}`}
+                        className="shrink-0 rounded bg-indigo-500/10 px-1 py-0.5 font-mono text-[9px] text-indigo-400 hover:bg-indigo-500/20"
+                      >
+                        {item.supplier_sku}
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={item.name}
                     onChange={(e) => updateFood(i, { name: e.target.value })}
-                    className={inputCls}
+                    className={`${inputCls} ${isUnreadable ? 'italic text-slate-500' : ''}`}
                   />
+                  {/* Thai original text for verification */}
+                  {item.original_name && item.original_name !== item.name && (
+                    <p className="mt-0.5 truncate text-[9px] text-slate-600" title={item.original_name}>
+                      {item.original_name}
+                    </p>
+                  )}
+                  {/* Warning tooltip */}
+                  {warning && (
+                    <p className="mt-0.5 text-[9px] text-rose-400/70">{warning}</p>
+                  )}
                 </td>
                 <td className="w-16 px-1.5 py-1.5">
                   <input
@@ -637,18 +732,24 @@ export function StagingArea({
                 <td className="w-36 px-1.5 py-1.5">
                   <select
                     value={item.nomenclature_id || ''}
-                    onChange={(e) => updateFood(i, { nomenclature_id: e.target.value })}
+                    onChange={(e) => {
+                      if (e.target.value === '__CREATE__') {
+                        setCreateModalIndex(i)
+                        setCreateName(item.name || '')
+                        setCreateUnit('kg')
+                      } else {
+                        updateFood(i, { nomenclature_id: e.target.value })
+                      }
+                    }}
                     className={`${selectCls} ${
                       !item.nomenclature_id
                         ? 'border-amber-500/40 ring-1 ring-amber-500/10'
-                        : item.nomenclature_id === '__NEW__'
-                          ? 'border-violet-500/40 ring-1 ring-violet-500/10'
-                          : 'border-emerald-500/30'
+                        : 'border-emerald-500/30'
                     }`}
                   >
                     <option value="">Map to item...</option>
                     {item.name && (
-                      <option value="__NEW__">
+                      <option value="__CREATE__">
                         + Create new: &quot;{item.name}&quot;
                       </option>
                     )}
@@ -669,7 +770,8 @@ export function StagingArea({
                   </button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
             <tr>
               <td colSpan={7} className="px-1.5 py-2">
                 <button
@@ -906,6 +1008,102 @@ export function StagingArea({
             )}
           </div>
 
+          {/* ═══ Phase 6.3: Create New Item Modal ═══ */}
+          {createModalIndex !== null && (
+            <div className="overflow-hidden rounded-xl border border-violet-500/30 bg-violet-500/[0.06]">
+              <div className="px-4 py-3">
+                <p className="text-xs font-medium text-violet-300">Create New Inventory Item</p>
+                <div className="mt-3 grid grid-cols-[1fr_auto] gap-3">
+                  <div>
+                    <label className={labelCls}>Name</label>
+                    <input
+                      type="text"
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
+                      className={inputCls}
+                      autoFocus
+                    />
+                    {/* Fuzzy match: suggest existing items */}
+                    {createName.length >= 2 && (() => {
+                      const lower = createName.toLowerCase()
+                      const matches = nomenclatureList.filter(
+                        (n) => n.name.toLowerCase().includes(lower) || lower.includes(n.name.toLowerCase()),
+                      ).slice(0, 3)
+                      if (matches.length === 0) return null
+                      return (
+                        <div className="mt-1.5 space-y-1">
+                          <p className="text-[9px] text-slate-500">Did you mean?</p>
+                          {matches.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                updateFood(createModalIndex, { nomenclature_id: m.id })
+                                setCreateModalIndex(null)
+                              }}
+                              className="block w-full rounded-lg border border-slate-700/40 bg-slate-800/40 px-2.5 py-1.5 text-left text-[10px] text-slate-300 transition-colors hover:border-indigo-500/30 hover:bg-indigo-500/[0.06]"
+                            >
+                              <span className="font-mono text-indigo-400">{m.product_code}</span>{' '}
+                              {m.name}
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                  <div>
+                    <label className={labelCls}>Base unit</label>
+                    <div className="flex gap-1">
+                      {(['kg', 'L', 'pcs'] as const).map((u) => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => setCreateUnit(u)}
+                          className={`h-8 rounded-lg border px-3 text-xs font-medium transition-all ${
+                            createUnit === u
+                              ? 'border-violet-500/50 bg-violet-500/[0.15] text-violet-300'
+                              : 'border-slate-700/60 bg-slate-800/60 text-slate-500 hover:text-slate-400'
+                          }`}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCreateModalIndex(null)}
+                    className="h-8 rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 text-xs text-slate-400 hover:text-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!createName.trim() || !onCreateNomenclature}
+                    onClick={async () => {
+                      if (!onCreateNomenclature || createModalIndex === null) return
+                      try {
+                        const newId = await onCreateNomenclature({
+                          name: createName.trim(),
+                          baseUnit: createUnit,
+                        })
+                        updateFood(createModalIndex, { nomenclature_id: newId })
+                        setCreateModalIndex(null)
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : String(err))
+                      }
+                    }}
+                    className="h-8 rounded-lg border border-violet-500/40 bg-violet-500/[0.12] px-4 text-xs font-medium text-violet-200 transition-all hover:bg-violet-500/20 disabled:opacity-40"
+                  >
+                    Create & Map
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ═══ Action Buttons ═══ */}
           <div className="flex gap-3">
             <button
@@ -1037,6 +1235,107 @@ function ItemSection({
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ────────────────────────── Sub-component: Reconciliation Panel ────────────────────────── */
+
+function ReconciliationPanel({
+  footer,
+  reconciliation,
+  itemsSum,
+  discountTotal,
+  vatAmount,
+  onDiscountChange,
+  onVatChange,
+}: {
+  footer: ReceiptFooter
+  reconciliation?: Reconciliation
+  itemsSum: number
+  discountTotal: number
+  vatAmount: number
+  onDiscountChange: (v: number) => void
+  onVatChange: (v: number) => void
+}) {
+  const grandTotal = itemsSum + discountTotal + vatAmount
+  const declaredTotal = footer.grand_total
+  const isBalanced = Math.abs(grandTotal - declaredTotal) <= 2
+
+  return (
+    <div
+      className={`mb-4 overflow-hidden rounded-xl border ${
+        isBalanced
+          ? 'border-emerald-500/30 bg-emerald-500/[0.04]'
+          : 'border-amber-500/30 bg-amber-500/[0.06]'
+      }`}
+    >
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2 mb-2.5">
+          {isBalanced ? (
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+          ) : (
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+          )}
+          <span className={`text-[11px] font-medium ${isBalanced ? 'text-emerald-300' : 'text-amber-300'}`}>
+            {isBalanced ? 'Receipt balanced' : 'Receipt not balanced — adjust discount/VAT'}
+          </span>
+        </div>
+
+        <div className="space-y-1.5">
+          {/* Items subtotal (read-only — computed from line items) */}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-slate-400">Items subtotal</span>
+            <span className="font-mono text-xs text-slate-200">{formatTHB(itemsSum)}</span>
+          </div>
+
+          {/* Discount (editable) */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-slate-400">Discount</span>
+            <input
+              type="number"
+              step="1"
+              value={discountTotal}
+              onChange={(e) => onDiscountChange(Number(e.target.value))}
+              className="h-6 w-24 rounded border border-slate-700/60 bg-slate-800/80 px-2 text-right font-mono text-xs text-rose-300 outline-none focus:border-indigo-500/60"
+            />
+          </div>
+
+          {/* VAT (editable) */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-slate-400">VAT</span>
+            <input
+              type="number"
+              step="1"
+              value={vatAmount}
+              onChange={(e) => onVatChange(Number(e.target.value))}
+              className="h-6 w-24 rounded border border-slate-700/60 bg-slate-800/80 px-2 text-right font-mono text-xs text-slate-300 outline-none focus:border-indigo-500/60"
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-slate-700/40" />
+
+          {/* Computed grand total vs declared */}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium text-slate-300">Computed total</span>
+            <span className="font-mono text-xs font-semibold text-slate-100">{formatTHB(grandTotal)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-slate-400">Receipt says</span>
+            <span className="font-mono text-xs text-slate-400">{formatTHB(declaredTotal)}</span>
+          </div>
+
+          {!isBalanced && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-amber-400/80">Difference</span>
+              <span className="font-mono text-xs font-semibold text-amber-300">
+                {formatTHB(Math.abs(grandTotal - declaredTotal))}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,11 +1,14 @@
 // ═══════════════════════════════════════════════════════════
 // Hook: useSupplierMapping
-// Phase 4.6: Smart Mapping Engine
+// Phase 6.4: Smart Mapping Engine + UoM Conversion
 // ═══════════════════════════════════════════════════════════
 // Looks up and saves supplier_item_mapping records so the
 // system "remembers" user's manual nomenclature assignments.
 // Lookup priority: SKU match first → fallback to name match.
 // CEO rule: indexes are non-unique; sort by match_count DESC.
+//
+// Phase 6.4: Also loads conversion_factor, purchase_unit, base_unit
+// for UoM conversion between receipt units and inventory units.
 // ═══════════════════════════════════════════════════════════
 
 import { useCallback } from 'react'
@@ -17,22 +20,34 @@ interface SaveMappingParams {
   supplierSku: string | null
   originalName: string
   nomenclatureId: string
+  /** Phase 6.4: Optional UoM conversion fields */
+  purchaseUnit?: string
+  conversionFactor?: number
+  baseUnit?: string
+}
+
+/** Rich mapping data including UoM conversion */
+export interface MappingMatch {
+  nomenclatureId: string
+  conversionFactor: number | null
+  purchaseUnit: string | null
+  baseUnit: string | null
 }
 
 export function useSupplierMapping() {
   /**
    * Fetch all mappings for a supplier.
-   * Returns a Map keyed by supplier_sku (preferred) or original_name → nomenclature_id.
+   * Returns a Map keyed by supplier_sku or original_name → MappingMatch.
    * For duplicate keys, the one with highest match_count wins.
    */
   const lookupMappings = useCallback(
-    async (supplierId: string): Promise<Map<string, string>> => {
-      const map = new Map<string, string>()
+    async (supplierId: string): Promise<Map<string, MappingMatch>> => {
+      const map = new Map<string, MappingMatch>()
       if (!supplierId) return map
 
       const { data, error } = await supabase
         .from('supplier_item_mapping')
-        .select('supplier_sku, original_name, nomenclature_id, match_count')
+        .select('supplier_sku, original_name, nomenclature_id, match_count, conversion_factor, purchase_unit, base_unit')
         .eq('supplier_id', supplierId)
         .order('match_count', { ascending: false })
 
@@ -43,14 +58,21 @@ export function useSupplierMapping() {
 
       // Build lookup map — first occurrence wins (already sorted by match_count DESC)
       for (const row of data ?? []) {
+        const match: MappingMatch = {
+          nomenclatureId: row.nomenclature_id,
+          conversionFactor: row.conversion_factor ?? null,
+          purchaseUnit: row.purchase_unit ?? null,
+          baseUnit: row.base_unit ?? null,
+        }
+
         // SKU-based key (higher priority)
         if (row.supplier_sku) {
           const skuKey = `sku:${row.supplier_sku}`
-          if (!map.has(skuKey)) map.set(skuKey, row.nomenclature_id)
+          if (!map.has(skuKey)) map.set(skuKey, match)
         }
         // Name-based key (fallback)
         const nameKey = `name:${row.original_name.toLowerCase()}`
-        if (!map.has(nameKey)) map.set(nameKey, row.nomenclature_id)
+        if (!map.has(nameKey)) map.set(nameKey, match)
       }
 
       return map
@@ -61,9 +83,10 @@ export function useSupplierMapping() {
   /**
    * Save (upsert) a mapping when user manually assigns a nomenclature_id.
    * If mapping already exists, increment match_count.
+   * Phase 6.4: Optionally saves conversion_factor, purchase_unit, base_unit.
    */
   const saveMapping = useCallback(
-    async ({ supplierId, supplierSku, originalName, nomenclatureId }: SaveMappingParams) => {
+    async ({ supplierId, supplierSku, originalName, nomenclatureId, purchaseUnit, conversionFactor, baseUnit }: SaveMappingParams) => {
       if (!supplierId || !nomenclatureId || !originalName) return
 
       // Check if mapping already exists (by SKU or by name)
@@ -82,10 +105,17 @@ export function useSupplierMapping() {
         existingId = data?.[0]?.id ?? null
 
         if (existingId) {
-          // Update match_count
+          // Update match_count + optional UoM fields
+          const update: Record<string, unknown> = {
+            match_count: (data![0].match_count || 1) + 1,
+          }
+          if (purchaseUnit !== undefined) update.purchase_unit = purchaseUnit
+          if (conversionFactor !== undefined) update.conversion_factor = conversionFactor
+          if (baseUnit !== undefined) update.base_unit = baseUnit
+
           await supabase
             .from('supplier_item_mapping')
-            .update({ match_count: (data![0].match_count || 1) + 1 })
+            .update(update)
             .eq('id', existingId)
           return
         }
@@ -102,9 +132,16 @@ export function useSupplierMapping() {
         existingId = data?.[0]?.id ?? null
 
         if (existingId) {
+          const update: Record<string, unknown> = {
+            match_count: (data![0].match_count || 1) + 1,
+          }
+          if (purchaseUnit !== undefined) update.purchase_unit = purchaseUnit
+          if (conversionFactor !== undefined) update.conversion_factor = conversionFactor
+          if (baseUnit !== undefined) update.base_unit = baseUnit
+
           await supabase
             .from('supplier_item_mapping')
-            .update({ match_count: (data![0].match_count || 1) + 1 })
+            .update(update)
             .eq('id', existingId)
           return
         }
@@ -117,6 +154,9 @@ export function useSupplierMapping() {
         original_name: originalName,
         nomenclature_id: nomenclatureId,
         match_count: 1,
+        purchase_unit: purchaseUnit ?? null,
+        conversion_factor: conversionFactor ?? null,
+        base_unit: baseUnit ?? null,
       })
 
       if (error) {
@@ -145,12 +185,12 @@ export function useSupplierMapping() {
         // Try SKU match first (most reliable)
         if (li.supplier_sku) {
           const skuMatch = mappings.get(`sku:${li.supplier_sku}`)
-          if (skuMatch) return { ...li, nomenclature_id: skuMatch }
+          if (skuMatch) return { ...li, nomenclature_id: skuMatch.nomenclatureId }
         }
 
         // Fallback: name match (case-insensitive)
         const nameMatch = mappings.get(`name:${li.original_name.toLowerCase()}`)
-        if (nameMatch) return { ...li, nomenclature_id: nameMatch }
+        if (nameMatch) return { ...li, nomenclature_id: nameMatch.nomenclatureId }
 
         return li
       })

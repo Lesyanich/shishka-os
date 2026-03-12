@@ -1,5 +1,5 @@
 # 🔖 STATE.md — Agent Save-Game File
-**Последнее обновление:** 2026-03-11T14:00 (ICT)
+**Последнее обновление:** 2026-03-12T12:00 (ICT)
 **Проект Supabase:** `qcqgtcsjoacuktcewpvo` (ap-south-1, ACTIVE_HEALTHY)  
 **Передача от:** Antigravity (Lead Backend Developer)  
 **Принять:** Любой агент (Claude, Gemini, GPT)
@@ -1963,3 +1963,65 @@ Frontend → Supabase Edge Function (parse-receipts, proxy)
 | `gas/.clasp.json` | NEW — clasp config |
 | `gas/appsscript.json` | NEW — GAS manifest |
 | `gas/package.json` | NEW — deploy scripts |
+
+---
+
+## Phase 6: Perfect Inventory & Mapping Engine (2026-03-12)
+
+Receipt upload infrastructure was solved (Phases 4–5.0f). Gemini 2.5 Flash parses receipts in seconds. But business logic had 5 critical gaps: math mismatches (discounts/VAT not extracted), UoM chaos (purchase units vs kitchen units), ugly `RAW-AUTO-{hash}` nomenclature, AI hallucinations, and difficulty verifying Thai line items. Phase 6 solves all five.
+
+### Phase 6.1: Financial Reconciliation
+- AI now extracts structured `footer` object: `{subtotal, discount_total, vat_amount, grand_total}`
+- Balancing formula: `subtotal + discount_total + vat_amount = grand_total`
+- GAS `validateAndPostProcess_` cross-checks items sum vs subtotal, formula check
+- New `ReconciliationPanel` in StagingArea: editable discount/VAT, green checkmark when balanced
+- Migration 038: `expense_ledger` gains `discount_total`, `vat_amount`, `invoice_number` columns
+- `fn_approve_receipt` v5: accepts and stores new financial fields
+
+### Phase 6.2: Anti-Hallucination + Confidence Scoring
+- 3-layer defense: prompt engineering → GAS post-processing → frontend visual cues
+- Prompt: item_count_observed anchor, confidence scoring (high/medium/low), UNREADABLE rule, price sanity, no extrapolation
+- Post-processing: item count validation, per-item price math check (qty × unit_price ≈ total_price), stricter duplicate detection, high-price anomaly flag
+- Frontend: confidence-colored left borders (green/amber/red), warning tooltips, UNREADABLE row styling
+
+### Phase 6.3: Smart Nomenclature Creation
+- Replaced `__NEW__` (ugly `RAW-AUTO-{hash}`) with guided Create Item modal
+- Modal: name (pre-filled from translated_name), auto-generated `RAW-{SLUG}` code, base_unit radio (kg/L/pcs)
+- Fuzzy match suggestions from existing nomenclature before creating duplicates
+- `handleCreateNomenclature` in FinanceManager: duplicate check → INSERT → refresh list
+
+### Phase 6.4: UoM Conversion Layer
+- Migration 039: `supplier_item_mapping` gains `purchase_unit`, `conversion_factor`, `base_unit`
+- `useSupplierMapping` hook returns `MappingMatch` with conversion data
+- `saveMapping()` accepts optional UoM fields for future conversion UI
+- Formula: `inventory_quantity = receipt_quantity × conversion_factor`
+
+### Phase 6.5: Item Identification UX
+- Line number badges (`#N`) per food item row
+- SKU chips (clickable → copy to clipboard) when supplier_sku exists
+- Thai `original_name` shown below English translated_name for receipt verification
+- Per-item `_warning` text displayed inline
+
+### Migrations
+| Migration | Purpose |
+|---|---|
+| `038_reconciliation.sql` | `expense_ledger`: discount_total, vat_amount, invoice_number + `fn_approve_receipt` v5 |
+| `039_uom_conversion.sql` | `supplier_item_mapping`: purchase_unit, conversion_factor, base_unit |
+
+### Files Changed
+| File | Action |
+|---|---|
+| `supabase/migrations/038_reconciliation.sql` | NEW — reconciliation columns + fn_approve_receipt v5 |
+| `supabase/migrations/039_uom_conversion.sql` | NEW — UoM conversion columns |
+| `gas/ReceiptParser.gs` | EDIT — footer extraction, anti-hallucination prompt, post-processing |
+| `admin-panel/src/types/receipt.ts` | REWRITE — ReceiptFooter, Reconciliation, confidence, purchase_unit |
+| `admin-panel/src/components/finance/StagingArea.tsx` | EDIT — ReconciliationPanel, confidence UX, Create Item modal, line badges |
+| `admin-panel/src/pages/FinanceManager.tsx` | EDIT — handleCreateNomenclature, pass prop |
+| `admin-panel/src/hooks/useSupplierMapping.ts` | REWRITE — MappingMatch with UoM conversion support |
+| `02_Obsidian_Vault/Database Schema.md` | EDIT — expense_ledger + supplier_item_mapping updates |
+
+### Pending (Not Yet Deployed)
+- Migrations 038 & 039 need `supabase db push` or SQL execution in Dashboard
+- GAS needs `clasp push && npm run deploy` from `03_Development/gas/`
+- UoM conversion UI in StagingArea (mismatch badge + inline conversion input) — hook ready, UI pending
+- `fn_approve_receipt` does not yet apply conversion_factor when inserting purchase_logs
