@@ -1,7 +1,7 @@
 # Current Deployment State
 
 **Last updated:** 2026-03-13
-**Active phase:** Phase 6.8b — Nomenclature Deduplication & Salt Taxonomy
+**Active phase:** Phase 7.0 — FMCG + Restaurant Hybrid Categorization System
 **Branch:** `feature/phase-6-mapping-engine`
 
 ## Tables (Supabase public schema)
@@ -33,7 +33,11 @@
 | `inventory_batches` | `id` UUID | LIVE | Batch tracking with barcodes. |
 | `stock_transfers` | `id` UUID | LIVE | Batch movement log. |
 | `supplier_item_mapping` | `id` UUID | LIVE | Smart supplier→nomenclature mapping. |
-| `supplier_products` | `id` UUID | LIVE | Verified product catalog (17 items). full_title, package_qty/unit, category_code FK, nomenclature_id FK. |
+| `supplier_products` | `id` UUID | LIVE | Verified product catalog (17 items). full_title, package_qty/unit, category_code FK, nomenclature_id FK, brand_id FK. |
+| `product_categories` | `id` UUID | LIVE | Self-referencing 3-level product hierarchy (3 L1 → 16 L2 → 56 L3). Migration 045. |
+| `brands` | `id` UUID | LIVE | Normalized brand directory (10 brands). Migration 045. |
+| `tags` | `id` UUID | LIVE | Cross-cutting attributes: dietary, allergen, functional, storage, quality, cuisine, technique (~37 tags). Migration 045. |
+| `nomenclature_tags` | `(nom_id, tag_id)` | LIVE | Junction: nomenclature ↔ tags (many-to-many). Migration 045. |
 
 ## Key RPCs & Functions
 
@@ -49,7 +53,7 @@
 | `fn_process_new_order(UUID)` | RPC | LIVE — BOM explosion for orders |
 | `fn_run_mrp(UUID)` | RPC | LIVE — 2-level BOM explosion + inventory deduction |
 | `fn_approve_plan(UUID)` | RPC | LIVE — creates production_tasks from plan |
-| `fn_approve_receipt(JSONB)` | RPC | LIVE (v7) — Hub+Spoke atomic insert + UoM conversion + delivery_fee |
+| `fn_approve_receipt(JSONB)` | RPC | LIVE (v8) — Hub+Spoke atomic insert + UoM conversion + delivery_fee + auto-derive sub_category from product_categories |
 | `fn_update_cost_on_purchase()` | TRIGGER | LIVE — auto-updates nomenclature.cost_per_unit |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | LIVE — zombie job cleanup |
 
@@ -70,10 +74,12 @@
 
 ## Migrations Applied
 
-44 migrations total (001–044). Latest:
-- 041: `expense_ledger.delivery_fee` column + `fn_approve_receipt` v7
+47 migrations total (001–047). Latest:
 - 042: `supplier_products` table — verified product catalog with 17 Makro items
 - 043: Product Catalog Overhaul — fin_sub_categories 3→11 food, ALTER supplier_products (full_title, package_qty/unit, category_code FK, nomenclature_id FK), SEED nomenclature ~38 RAW-
 - 044: Nomenclature dedup — merge 9 duplicate groups, salt 3→3 (iodized/plain/curing per CEO), fix null base_units, standardize product_code naming to hyphens
+- 045: FMCG+Restaurant categorization — product_categories (3L hierarchy, 75 nodes), brands (10), tags (~37), nomenclature_tags junction. tag_group ENUM.
+- 046: Link nomenclature + supplier_products to categories & brands — ALTER ADD category_id/brand_id FKs, backfill all ~78 items
+- 047: `fn_approve_receipt` v8 — auto-derive sub_category_code from product_categories.default_fin_sub_code
 
 → Full schema: `02_Obsidian_Vault/Database Schema.md`
