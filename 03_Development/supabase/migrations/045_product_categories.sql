@@ -284,9 +284,9 @@ ON CONFLICT (code) DO NOTHING;
 
 -- ── L3: NON-FOOD → Packaging ──
 INSERT INTO product_categories (code, name, name_th, parent_id, level, sort_order, default_fin_sub_code) VALUES
-  ('NF-PKG-CNT', 'Containers & Bowls','กล่อง/ชาม',   (SELECT id FROM product_categories WHERE code='NF-PKG'), 3, 1, 4200),
-  ('NF-PKG-CTL', 'Cutlery & Napkins', 'ช้อนส้อม/ผ้าเช็ด',(SELECT id FROM product_categories WHERE code='NF-PKG'), 3, 2, 4200),
-  ('NF-PKG-BAG', 'Bags & Wrap',       'ถุง/ฟิล์ม',    (SELECT id FROM product_categories WHERE code='NF-PKG'), 3, 3, 4200)
+  ('NF-PKG-CNT', 'Containers & Bowls','กล่อง/ชาม',   (SELECT id FROM product_categories WHERE code='NF-PKG'), 3, 1, 4201),
+  ('NF-PKG-CTL', 'Cutlery & Napkins', 'ช้อนส้อม/ผ้าเช็ด',(SELECT id FROM product_categories WHERE code='NF-PKG'), 3, 2, 4202),
+  ('NF-PKG-BAG', 'Bags & Wrap',       'ถุง/ฟิล์ม',    (SELECT id FROM product_categories WHERE code='NF-PKG'), 3, 3, NULL)
 ON CONFLICT (code) DO NOTHING;
 
 -- ── L3: NON-FOOD → Disposables ──
