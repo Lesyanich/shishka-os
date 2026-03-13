@@ -2,6 +2,7 @@
 
 **Last updated:** 2026-03-13
 **Active phase:** Phase 7.0 — FMCG + Restaurant Hybrid Categorization System
+**Error monitoring:** Sentry (`@sentry/react`) — ErrorBoundary + browserTracing + replay. Source maps: `hidden`.
 **Branch:** `feature/phase-6-mapping-engine`
 
 ## Tables (Supabase public schema)
