@@ -715,10 +715,11 @@ export function StagingArea({
                       value={item.name}
                       onChange={(e) => updateFood(i, { name: e.target.value })}
                       className={`${inputCls} flex-1 ${isUnreadable ? 'italic text-slate-500' : ''}`}
+                      title={item.full_title || ''}
                     />
                     {/* Phase 6.7: Makro verification badge */}
                     {item.makro_name && (
-                      <span className="ml-1 shrink-0 text-[9px] text-emerald-400" title={`Verified by Makro: ${item.makro_name}`}>
+                      <span className="ml-1 shrink-0 text-[9px] text-emerald-400" title={item.full_title ? `Makro: ${item.full_title}` : `Verified: ${item.makro_name}`}>
                         ✓
                       </span>
                     )}

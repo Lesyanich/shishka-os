@@ -55,6 +55,8 @@ export interface LineItem {
   package_weight?: string
   /** Phase 6.7: Verified English name from Makro product database (populated by GAS STEP 5.5) */
   makro_name?: string
+  /** Phase 6.8: Full product title as on Makro website (e.g. "KNORR Corn Flour 700 g") */
+  full_title?: string
   /** Post-processing warning (e.g., price math mismatch) */
   _warning?: string
   /** Populated by frontend mapping engine (useSupplierMapping) */
@@ -114,6 +116,8 @@ export interface FoodItem {
   package_weight?: string
   /** Phase 6.7: Verified English name from Makro product database */
   makro_name?: string
+  /** Phase 6.8: Full product title as on Makro website */
+  full_title?: string
 }
 
 /** Capital equipment line item → inserts into capex_transactions */

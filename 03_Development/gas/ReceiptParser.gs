@@ -367,6 +367,7 @@ function lookupMakroSkus_(parsed) {
       if (!cleanResult.name) continue;
 
       items[i].makro_name = cleanResult.name;
+      items[i].full_title = cleanResult.fullTitle;
       if (product.brandEn && product.brandEn.toUpperCase() !== "MAKRO") {
         items[i].brand = product.brandEn;
       }
@@ -443,12 +444,14 @@ function fetchMakroProduct_(barcode) {
 }
 
 /**
- * Parse Makro's titleEn into clean product name + weight.
+ * Parse Makro's titleEn into clean product name + weight + fullTitle.
  * Example: "IMPERIAL Whole Wheat Flour 1 kg" + brandEn="IMPERIAL"
- *   → { name: "Whole Wheat Flour", weight: "1 kg" }
+ *   → { name: "Whole Wheat Flour", weight: "1 kg", fullTitle: "IMPERIAL Whole Wheat Flour 1 kg",
+ *       packageQty: 1, packageUnit: "kg" }
  */
 function parseMakroTitle_(titleEn, brandEn) {
-  var name = titleEn || "";
+  var fullTitle = titleEn || "";
+  var name = fullTitle;
 
   // Remove brand prefix if present at start
   if (brandEn) {
@@ -475,7 +478,18 @@ function parseMakroTitle_(titleEn, brandEn) {
     }
   }
 
-  return { name: name, weight: weight };
+  // Parse weight into qty + unit (e.g. "700 g" → 700, "g")
+  var packageQty = null;
+  var packageUnit = null;
+  if (weight) {
+    var qtyMatch = weight.match(/^(\d+(?:[.,]\d+)?)\s*(.+)$/);
+    if (qtyMatch) {
+      packageQty = parseFloat(qtyMatch[1].replace(",", "."));
+      packageUnit = qtyMatch[2].trim();
+    }
+  }
+
+  return { name: name, weight: weight, fullTitle: fullTitle, packageQty: packageQty, packageUnit: packageUnit };
 }
 
 // ═══════════════════════════════════════════════════════════

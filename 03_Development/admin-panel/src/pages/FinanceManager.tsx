@@ -227,6 +227,7 @@ export function FinanceManager() {
           brand: li.brand ?? undefined,
           package_weight: li.package_weight ?? undefined,
           makro_name: li.makro_name ?? undefined,
+          full_title: li.full_title ?? undefined,
         } as FoodItem))
 
       receipt.capex_items = mapped

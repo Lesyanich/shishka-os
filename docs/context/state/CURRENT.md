@@ -1,7 +1,7 @@
 # Current Deployment State
 
-**Last updated:** 2026-03-12
-**Active phase:** Phase 6.7 — Makro SKU Lookup + Table Layout Overhaul
+**Last updated:** 2026-03-13
+**Active phase:** Phase 6.8 — Product Catalog Overhaul + Category Expansion + Nomenclature Seeding
 **Branch:** `feature/phase-6-mapping-engine`
 
 ## Tables (Supabase public schema)
@@ -15,7 +15,7 @@
 | `daily_plan` | `id` UUID | LIVE | Transformed to UUID in Migration 006. |
 | `production_tasks` | `id` UUID | LIVE | KDS tasks. Migration 010, 016. |
 | `fin_categories` | `code` INT | LIVE | 18 standardized financial codes |
-| `fin_sub_categories` | `sub_code` INT | LIVE | 28 sub-categories |
+| `fin_sub_categories` | `sub_code` INT | LIVE | 36 sub-categories (11 food: 4101-4111) |
 | `capex_assets` | `id` UUID | LIVE | Linked to equipment via UUID FK |
 | `capex_transactions` | `id` UUID | LIVE | Purchase and repair transactions |
 | `expense_ledger` | `id` UUID | LIVE | Financial SSoT. Hub for receipt spokes. delivery_fee (v7). |
@@ -33,6 +33,7 @@
 | `inventory_batches` | `id` UUID | LIVE | Batch tracking with barcodes. |
 | `stock_transfers` | `id` UUID | LIVE | Batch movement log. |
 | `supplier_item_mapping` | `id` UUID | LIVE | Smart supplier→nomenclature mapping. |
+| `supplier_products` | `id` UUID | LIVE | Verified product catalog (17 items). full_title, package_qty/unit, category_code FK, nomenclature_id FK. |
 
 ## Key RPCs & Functions
 
@@ -69,10 +70,10 @@
 
 ## Migrations Applied
 
-41 migrations total (001–041). Latest:
-- 038: `expense_ledger` reconciliation columns + `fn_approve_receipt` v5
-- 039: `supplier_item_mapping` UoM conversion columns
+43 migrations total (001–043). Latest:
 - 040: `fn_approve_receipt` v6 — applies conversion_factor from supplier_item_mapping
 - 041: `expense_ledger.delivery_fee` column + `fn_approve_receipt` v7
+- 042: `supplier_products` table — verified product catalog with 17 Makro items
+- 043: Product Catalog Overhaul — fin_sub_categories 3→11 food, ALTER supplier_products (full_title, package_qty/unit, category_code FK, nomenclature_id FK), SEED nomenclature ~38 RAW-
 
 → Full schema: `02_Obsidian_Vault/Database Schema.md`

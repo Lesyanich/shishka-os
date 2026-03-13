@@ -230,6 +230,26 @@ erDiagram
         TIMESTAMPTZ updated_at
     }
 
+    supplier_products {
+        UUID id PK
+        UUID supplier_id FK
+        TEXT barcode
+        TEXT product_name
+        TEXT product_name_th
+        TEXT brand
+        TEXT full_title
+        TEXT package_weight
+        NUMERIC package_qty
+        TEXT package_unit
+        TEXT package_type
+        INTEGER category_code FK
+        INTEGER sub_category_code FK
+        UUID nomenclature_id FK
+        NUMERIC last_seen_price
+        TEXT source
+        TIMESTAMPTZ verified_at
+    }
+
     receipt_jobs {
         UUID id PK
         TEXT status "pending processing completed failed"
@@ -277,6 +297,10 @@ erDiagram
 
     suppliers ||--o{ supplier_item_mapping : "supplier_id"
     nomenclature ||--o{ supplier_item_mapping : "nomenclature_id"
+    suppliers ||--o{ supplier_products : "supplier_id"
+    nomenclature ||--o{ supplier_products : "nomenclature_id"
+    fin_categories ||--o{ supplier_products : "category_code"
+    fin_sub_categories ||--o{ supplier_products : "sub_category_code"
 ```
 
 ## Tables Index
@@ -307,6 +331,7 @@ erDiagram
 | `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice, discount_total, vat_amount, delivery_fee | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030, 038, 041 |
 | `opex_items` | `id` UUID | description, quantity, unit, unit_price, total_price | expense_id -> expense_ledger (CASCADE) | 030 |
 | `supplier_item_mapping` | `id` UUID | supplier_sku, original_name, match_count, purchase_unit, conversion_factor, base_unit | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE) | 035, 039 |
+| `supplier_products` | `id` UUID | barcode, product_name, product_name_th, brand, full_title, package_qty, package_unit, package_type, last_seen_price, source | supplier_id -> suppliers, category_code -> fin_categories, sub_category_code -> fin_sub_categories, nomenclature_id -> nomenclature | 042, 043 |
 | `receipt_jobs` | `id` UUID | status, image_urls (JSONB), result (JSONB), error, ocr_text, duration_ms, model | -- (standalone, pre-approval) | 036, 037 |
 
 ## Custom ENUM Types
@@ -371,6 +396,7 @@ erDiagram
 | `production_plans` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
 | `plan_targets` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
 | `supplier_item_mapping` | `sim_select` / `sim_insert` / `sim_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 035 |
+| `supplier_products` | `sp_select` / `sp_insert` / `sp_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 042 |
 | `receipt_jobs` | `receipt_jobs_select` / `receipt_jobs_insert` | SELECT/INSERT | {public} | `USING (true)` / `WITH CHECK (true)` | 036 |
 
 ## Column-Level Privilege Restrictions (Migration 031)
