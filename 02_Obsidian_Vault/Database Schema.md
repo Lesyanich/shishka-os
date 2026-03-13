@@ -6,7 +6,7 @@ tags:
   - supabase
   - architecture
   - schema
-date: 2026-03-11
+date: 2026-03-13
 status: active
 aliases:
   - DB Schema

@@ -1,7 +1,7 @@
 # Current Deployment State
 
 **Last updated:** 2026-03-13
-**Active phase:** Phase 6.8 — Product Catalog Overhaul + Category Expansion + Nomenclature Seeding
+**Active phase:** Phase 6.8b — Nomenclature Deduplication & Salt Taxonomy
 **Branch:** `feature/phase-6-mapping-engine`
 
 ## Tables (Supabase public schema)
@@ -70,10 +70,10 @@
 
 ## Migrations Applied
 
-43 migrations total (001–043). Latest:
-- 040: `fn_approve_receipt` v6 — applies conversion_factor from supplier_item_mapping
+44 migrations total (001–044). Latest:
 - 041: `expense_ledger.delivery_fee` column + `fn_approve_receipt` v7
 - 042: `supplier_products` table — verified product catalog with 17 Makro items
 - 043: Product Catalog Overhaul — fin_sub_categories 3→11 food, ALTER supplier_products (full_title, package_qty/unit, category_code FK, nomenclature_id FK), SEED nomenclature ~38 RAW-
+- 044: Nomenclature dedup — merge 9 duplicate groups, salt 3→3 (iodized/plain/curing per CEO), fix null base_units, standardize product_code naming to hyphens
 
 → Full schema: `02_Obsidian_Vault/Database Schema.md`
