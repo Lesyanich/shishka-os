@@ -77,7 +77,7 @@
 47 migrations total (001–047). Latest:
 - 042: `supplier_products` table — verified product catalog with 17 Makro items
 - 043: Product Catalog Overhaul — fin_sub_categories 3→11 food, ALTER supplier_products (full_title, package_qty/unit, category_code FK, nomenclature_id FK), SEED nomenclature ~38 RAW-
-- 044: Nomenclature dedup — merge 9 duplicate groups, salt 3→3 (iodized/plain/curing per CEO), fix null base_units, standardize product_code naming to hyphens
+- 044: Nomenclature dedup — safe FK-aware DELETEs (v2 fix), salt 3→3 (iodized/plain/curing per CEO), fix null base_units, standardize product_code naming to hyphens
 - 045: FMCG+Restaurant categorization — product_categories (3L hierarchy, 75 nodes), brands (10), tags (~37), nomenclature_tags junction. tag_group ENUM.
 - 046: Link nomenclature + supplier_products to categories & brands — ALTER ADD category_id/brand_id FKs, backfill all ~78 items
 - 047: `fn_approve_receipt` v8 — auto-derive sub_category_code from product_categories.default_fin_sub_code

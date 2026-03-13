@@ -5,7 +5,7 @@ tags:
   - shishka-os
   - erp
   - overview
-date: 2026-03-10
+date: 2026-03-13
 status: active
 aliases:
   - System Architecture
@@ -89,6 +89,8 @@ The core data model follows a 4-tier Bill of Materials:
 | 5.4 | [[Agent Skills & Capabilities]] | ✅ LIVE | PDF, XLSX, skill-creator, invoice parser |
 | 4.1 | [[Financial Ledger]] | ✅ LIVE | Expense ledger, multi-currency, receipt storage |
 | 4.2 | [[Financial Ledger]] | ✅ LIVE | Historical sync (62 rows), Magic Dropzone, Receipt Lightbox, component extraction |
+| 6.8 | [[Database Schema]] | ✅ LIVE | Product Catalog Overhaul, supplier_products, nomenclature dedup |
+| 7.0 | [[Product Categorization Architecture]] | ✅ LIVE | FMCG+Restaurant hybrid: 3-level product_categories, brands, tags, auto-derive financial codes |
 
 ## Key Database Functions (RPCs)
 
@@ -101,14 +103,16 @@ The core data model follows a 4-tier Bill of Materials:
 | `fn_process_new_order` | Order BOM explosion into production tasks |
 | `fn_run_mrp` | 2-level MRP engine with inventory deduction |
 | `fn_approve_plan` | Convert MRP results into kitchen tasks |
+| `fn_approve_receipt` | Hub+Spoke receipt approval (v8: auto-derive sub_category from product_categories) |
 
 ## Migrations Index
 
-See [[STATE]] for full migration details (016-025).
+See [[STATE]] for full migration details (001-047).
 
 ## Related
 
 - [[Database Schema]] — Full erDiagram and tables index
+- [[Product Categorization Architecture]] — FMCG+Restaurant hybrid category system (Phase 7.0)
 - [[STATE]] — Current deployment state
 - [[HANDOVER]] — Agent handover reports
 - [[Agent Skills & Capabilities]] — Installed skills registry
