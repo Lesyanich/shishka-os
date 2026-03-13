@@ -97,6 +97,8 @@ erDiagram
         UUID id PK
         UUID equipment_id FK
         UUID order_id FK
+        UUID target_nomenclature_id FK "Phase 7.1"
+        NUMERIC target_quantity "Phase 7.1"
         TEXT status
         TEXT description
         TIMESTAMPTZ scheduled_start
@@ -104,6 +106,15 @@ erDiagram
         NUMERIC theoretical_yield
         NUMERIC actual_weight
         JSONB theoretical_bom_snapshot
+    }
+
+    production_task_outputs {
+        UUID id PK
+        UUID task_id FK
+        UUID nomenclature_id FK
+        NUMERIC planned_quantity
+        NUMERIC actual_quantity
+        BOOLEAN is_primary
     }
 
     inventory_balances {
@@ -190,6 +201,8 @@ erDiagram
         UUID id PK
         UUID order_id FK
         UUID nomenclature_id FK
+        UUID parent_item_id FK "Self-ref Phase 7.1"
+        TEXT modifier_type "topping modifier extra removal side"
         INTEGER quantity
         NUMERIC price_at_purchase
     }
@@ -216,6 +229,7 @@ erDiagram
         INTEGER category_code FK
         INTEGER sub_category_code FK
         UUID supplier_id FK
+        UUID created_by "Phase 7.1"
         TEXT details
         TEXT comments
         TEXT invoice_number
@@ -253,23 +267,16 @@ erDiagram
         NUMERIC total_price
     }
 
-    supplier_item_mapping {
+    supplier_catalog {
         UUID id PK
         UUID supplier_id FK
+        UUID nomenclature_id FK
         TEXT supplier_sku
         TEXT original_name
-        UUID nomenclature_id FK
         INT match_count
         TEXT purchase_unit
         NUMERIC conversion_factor
         TEXT base_unit
-        TIMESTAMPTZ created_at
-        TIMESTAMPTZ updated_at
-    }
-
-    supplier_products {
-        UUID id PK
-        UUID supplier_id FK
         TEXT barcode
         TEXT product_name
         TEXT product_name_th
@@ -282,7 +289,6 @@ erDiagram
         TEXT package_type
         INTEGER category_code FK
         INTEGER sub_category_code FK
-        UUID nomenclature_id FK
         NUMERIC last_seen_price
         TEXT source
         TIMESTAMPTZ verified_at
@@ -310,17 +316,21 @@ erDiagram
     nomenclature ||--o{ order_items : "nomenclature_id"
     nomenclature ||--o{ plan_targets : "nomenclature_id"
     nomenclature ||--o{ nomenclature_tags : "nomenclature_id"
+    nomenclature ||--o{ production_tasks : "target_nomenclature_id"
+    nomenclature ||--o{ production_task_outputs : "nomenclature_id"
 
     product_categories ||--o{ nomenclature : "category_id"
     product_categories ||--o{ product_categories : "parent_id"
     brands ||--o{ nomenclature : "brand_id"
-    brands ||--o{ supplier_products : "brand_id"
+    brands ||--o{ supplier_catalog : "brand_id"
     tags ||--o{ nomenclature_tags : "tag_id"
     fin_sub_categories ||--o{ product_categories : "default_fin_sub_code"
 
     equipment ||--o{ production_tasks : "equipment_id"
     orders ||--o{ order_items : "order_id"
+    order_items ||--o{ order_items : "parent_item_id"
     orders ||--o{ production_tasks : "order_id"
+    production_tasks ||--o{ production_task_outputs : "task_id"
 
     locations ||--o{ inventory_batches : "location_id"
     locations ||--o{ stock_transfers : "from/to"
@@ -341,12 +351,10 @@ erDiagram
     expense_ledger ||--o{ capex_transactions : "expense_id"
     expense_ledger ||--o{ opex_items : "expense_id"
 
-    suppliers ||--o{ supplier_item_mapping : "supplier_id"
-    nomenclature ||--o{ supplier_item_mapping : "nomenclature_id"
-    suppliers ||--o{ supplier_products : "supplier_id"
-    nomenclature ||--o{ supplier_products : "nomenclature_id"
-    fin_categories ||--o{ supplier_products : "category_code"
-    fin_sub_categories ||--o{ supplier_products : "sub_category_code"
+    suppliers ||--o{ supplier_catalog : "supplier_id"
+    nomenclature ||--o{ supplier_catalog : "nomenclature_id"
+    fin_categories ||--o{ supplier_catalog : "category_code"
+    fin_sub_categories ||--o{ supplier_catalog : "sub_category_code"
 ```
 
 ## Tables Index
@@ -356,9 +364,10 @@ erDiagram
 | `nomenclature` | `id` UUID | product_code, name, type, base_unit, cost_per_unit, price, slug, category_id, brand_id | category_id -> product_categories, brand_id -> brands | 005, 019, 020, 046 |
 | `bom_structures` | `id` UUID | parent_id, ingredient_id, quantity_per_unit | parent_id -> nomenclature, ingredient_id -> nomenclature | 007, 012 |
 | `equipment` | `id` UUID | name, category, status, last_service_date | -- | pre-existing |
-| `production_tasks` | `id` UUID | status, scheduled_start, equipment_id, order_id | equipment_id -> equipment, order_id -> orders | 016, 022 |
-| `recipes_flow` | `id` UUID | -- | -- | pre-existing |
-| `daily_plan` | `id` UUID | -- | -- | pre-existing |
+| `production_tasks` | `id` UUID | status, scheduled_start, equipment_id, order_id, target_nomenclature_id, target_quantity | equipment_id -> equipment, order_id -> orders, target_nomenclature_id -> nomenclature | 016, 022, 048 |
+| `production_task_outputs` | `id` UUID | task_id, nomenclature_id, planned_quantity, actual_quantity, is_primary, UNIQUE(task_id,nomenclature_id) | task_id -> production_tasks (CASCADE), nomenclature_id -> nomenclature | 048 |
+| `recipes_flow` | `id` UUID | DEPRECATED | -- | pre-existing, 052 |
+| `daily_plan` | `id` UUID | DEPRECATED | -- | pre-existing, 052 |
 | `fin_categories` | `code` INT | name | -- | 003 |
 | `fin_sub_categories` | `sub_code` INT | category_code, name | category_code -> fin_categories | 003 |
 | `capex_assets` | `id` UUID | equipment FK | equipment_id -> equipment | 003 |
@@ -371,13 +380,14 @@ erDiagram
 | `suppliers` | `id` UUID | name (UNIQUE), is_deleted, category_code, sub_category_code | category_code -> fin_categories | 021, 025, 032 |
 | `purchase_logs` | `id` UUID | quantity, price_per_unit, invoice_date, expense_id | nomenclature_id -> nomenclature, supplier_id -> suppliers, expense_id -> expense_ledger | 021, 030 |
 | `orders` | `id` UUID | source, status, customer_name, total_amount | -- | 022 |
-| `order_items` | `id` UUID | quantity, price_at_purchase | order_id -> orders (CASCADE), nomenclature_id -> nomenclature | 022 |
+| `order_items` | `id` UUID | quantity, price_at_purchase, parent_item_id, modifier_type | order_id -> orders (CASCADE), nomenclature_id -> nomenclature, parent_item_id -> order_items (self-ref CASCADE) | 022, 051 |
 | `production_plans` | `id` UUID | name, target_date, status, mrp_result | -- | 023 |
 | `plan_targets` | `id` UUID | target_qty, UNIQUE(plan_id,nomenclature_id) | plan_id -> production_plans (CASCADE), nomenclature_id -> nomenclature | 023 |
-| `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice, discount_total, vat_amount, delivery_fee | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030, 038, 041 |
+| `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice, discount_total, vat_amount, delivery_fee, created_by | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030, 038, 041, 052 |
 | `opex_items` | `id` UUID | description, quantity, unit, unit_price, total_price | expense_id -> expense_ledger (CASCADE) | 030 |
-| `supplier_item_mapping` | `id` UUID | supplier_sku, original_name, match_count, purchase_unit, conversion_factor, base_unit | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE) | 035, 039 |
-| `supplier_products` | `id` UUID | barcode, product_name, product_name_th, brand, full_title, package_qty, package_unit, package_type, last_seen_price, source, brand_id | supplier_id -> suppliers, category_code -> fin_categories, sub_category_code -> fin_sub_categories, nomenclature_id -> nomenclature, brand_id -> brands | 042, 043, 046 |
+| `supplier_catalog` | `id` UUID | supplier_sku, original_name, match_count, purchase_unit, conversion_factor, base_unit, barcode, product_name, product_name_th, brand, full_title, package_qty, package_unit, package_type, last_seen_price, source, brand_id | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE), category_code -> fin_categories, sub_category_code -> fin_sub_categories, brand_id -> brands | 049 |
+| `supplier_item_mapping` | VIEW | DEPRECATED backward-compat view over supplier_catalog | -- | 049 |
+| `supplier_products` | VIEW | DEPRECATED backward-compat view over supplier_catalog | -- | 049 |
 | `receipt_jobs` | `id` UUID | status, image_urls (JSONB), result (JSONB), error, ocr_text, duration_ms, model | -- (standalone, pre-approval) | 036, 037 |
 | `product_categories` | `id` UUID | code (UNIQUE), name, name_th, level (1-3), sort_order, is_active, default_fin_sub_code | parent_id -> product_categories (self-ref), default_fin_sub_code -> fin_sub_categories | 045 |
 | `brands` | `id` UUID | name (UNIQUE), name_th, country, is_active | -- | 045 |
@@ -407,13 +417,15 @@ erDiagram
 | `fn_create_batches_from_task(UUID, JSONB)` | RPC | Create batches + complete task | 018 |
 | `fn_open_batch(UUID)` | RPC | Open batch, shrink expires_at +12h | 018 |
 | `fn_transfer_batch(TEXT, TEXT)` | RPC | Move batch by barcode, log transfer | 018 |
-| `fn_update_cost_on_purchase()` | TRIGGER FN | Auto-update nomenclature.cost_per_unit on purchase | 021 |
+| `fn_update_cost_on_purchase()` | TRIGGER FN | WAC: Weighted Average Cost on purchase (replaced Last-In) | 021, 050 |
 | `fn_process_new_order(UUID)` | RPC | BOM explosion: order items -> production tasks | 022 |
 | `fn_run_mrp(UUID)` | RPC | 2-level MRP engine: SALE->PF/MOD->RAW, inventory deduction | 023 |
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
 | `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter | 021 |
-| `fn_approve_receipt(JSONB)` | RPC | Atomic receipt approval: Hub (expense_ledger) + Spokes (purchase_logs, capex_transactions, opex_items). v6: UoM conversion_factor. v7: delivery_fee. v8: auto-derive sub_category_code from product_categories.default_fin_sub_code | 030, 038, 040, 041, 047 |
+| `fn_approve_receipt(JSONB)` | RPC | Atomic receipt approval: Hub (expense_ledger) + Spokes (purchase_logs, capex_transactions, opex_items). v6: UoM. v7: delivery_fee. v8: auto-derive sub_category. v9: supplier_catalog SSoT | 030, 038, 040, 041, 047, 049 |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | Lazy cleanup: marks zombie receipt_jobs (processing >5min) as failed | 036 |
+| `fn_is_authenticated()` | UTIL FN | Phase 8 prep: auth gating (currently returns true) | 053 |
+| `fn_current_user_id()` | UTIL FN | Phase 8 prep: user UUID (currently returns NULL) | 053 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
 
 ## Storage Buckets
@@ -424,8 +436,8 @@ erDiagram
 
 ## RLS Policies (Row Level Security)
 
-> [!warning] Admin Panel Access
-> The admin panel uses the Supabase **anon** key. All tables that the frontend reads MUST have `SELECT USING (true)` policies (not restricted to `{authenticated}`).
+> [!warning] Admin Panel Access (Phase 8 will fix)
+> The admin panel uses the Supabase **anon** key. All tables that the frontend reads MUST have `SELECT USING (true)` policies. **Phase 8** will migrate to Supabase Auth (`authenticated` role). Helper functions `fn_is_authenticated()` and `fn_current_user_id()` are deployed (migration 053) as prep.
 
 | Table | Policy Name | Command | Roles | Condition | Migration |
 |---|---|---|---|---|---|
@@ -446,8 +458,10 @@ erDiagram
 | `order_items` | authenticated CRUD | ALL | {authenticated} | `USING (true)` | 022 |
 | `production_plans` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
 | `plan_targets` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
-| `supplier_item_mapping` | `sim_select` / `sim_insert` / `sim_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 035 |
-| `supplier_products` | `sp_select` / `sp_insert` / `sp_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 042 |
+| `supplier_catalog` | `sc_select` / `sc_insert` / `sc_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 049 |
+| `supplier_item_mapping` | VIEW (no RLS) | -- | -- | backward-compat view over supplier_catalog | 049 |
+| `supplier_products` | VIEW (no RLS) | -- | -- | backward-compat view over supplier_catalog | 049 |
+| `production_task_outputs` | `pto_select` / `pto_insert` / `pto_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 048 |
 | `receipt_jobs` | `receipt_jobs_select` / `receipt_jobs_insert` | SELECT/INSERT | {public} | `USING (true)` / `WITH CHECK (true)` | 036 |
 | `product_categories` | `pc_select` / `pc_insert` / `pc_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 045 |
 | `brands` | `brands_select` / `brands_insert` / `brands_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 045 |
