@@ -12,7 +12,9 @@ export interface GanttTask {
   actual_end: string | null
   actual_weight: number | null
   theoretical_yield: number | null
-  flow_step_id: string | null
+  target_nomenclature_id: string | null
+  target_quantity: number | null
+  target_nomenclature: { name: string; product_code: string } | null
 }
 
 export interface GanttConflict {
@@ -86,7 +88,7 @@ export function useGanttTasks(): UseGanttTasksResult {
     const { data, error: fetchError } = await supabase
       .from('production_tasks')
       .select(
-        'id, description, status, scheduled_start, duration_min, equipment_id, actual_start, actual_end, actual_weight, theoretical_yield, flow_step_id',
+        'id, description, status, scheduled_start, duration_min, equipment_id, actual_start, actual_end, actual_weight, theoretical_yield, target_nomenclature_id, target_quantity, nomenclature!target_nomenclature_id(name, product_code)',
       )
       .not('scheduled_start', 'is', null)
       .order('scheduled_start', { ascending: true })
@@ -95,7 +97,12 @@ export function useGanttTasks(): UseGanttTasksResult {
       console.error('[useGanttTasks] fetch error', fetchError)
       setError(fetchError.message)
     } else {
-      setTasks((data ?? []) as GanttTask[])
+      const mapped = (data ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        target_nomenclature: row.nomenclature as { name: string; product_code: string } | null,
+        nomenclature: undefined,
+      })) as unknown as GanttTask[]
+      setTasks(mapped)
     }
 
     setIsLoading(false)

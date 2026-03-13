@@ -109,11 +109,12 @@ export function TaskExecutionCard({ task, onStart, onCompleteBatches }: TaskExec
         <div className="mb-3 flex items-start justify-between">
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-slate-100">
-              {task.description ?? 'Production Task'}
+              {task.target_nomenclature?.name ?? task.description ?? 'Production Task'}
             </p>
             <p className="text-[10px] text-slate-500">
-              {task.id.slice(0, 8)}
-              {task.duration_min ? ` · ${task.duration_min} min expected` : ''}
+              {task.target_nomenclature?.product_code ?? task.id.slice(0, 8)}
+              {task.target_quantity ? ` · ${task.target_quantity} kg` : ''}
+              {task.duration_min ? ` · ${task.duration_min} min` : ''}
             </p>
           </div>
           <span

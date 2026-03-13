@@ -107,19 +107,23 @@ export function useWasteLog(): UseWasteLogResult {
         return { ok: false, error: insertError.message }
       }
 
-      // Also deduct from inventory_balances
-      const { data: currentBalance } = await supabase
-        .from('inventory_balances')
-        .select('quantity')
+      // Phase 10: Deduct from sku_balances (FIFO — oldest received first)
+      let remaining = entry.quantity
+      const { data: skuBalances } = await supabase
+        .from('sku_balances')
+        .select('sku_id, quantity')
         .eq('nomenclature_id', entry.nomenclature_id)
-        .single()
+        .order('last_received_at', { ascending: true, nullsFirst: true })
 
-      if (currentBalance) {
-        const newQty = Math.max(0, Number(currentBalance.quantity) - entry.quantity)
+      for (const bal of skuBalances ?? []) {
+        if (remaining <= 0) break
+        const deduct = Math.min(remaining, Number(bal.quantity))
+        const newQty = Math.max(0, Number(bal.quantity) - deduct)
         await supabase
-          .from('inventory_balances')
+          .from('sku_balances')
           .update({ quantity: newQty })
-          .eq('nomenclature_id', entry.nomenclature_id)
+          .eq('sku_id', bal.sku_id)
+        remaining -= deduct
       }
 
       await fetchLogs()

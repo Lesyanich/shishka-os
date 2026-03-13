@@ -14,8 +14,6 @@ export interface POItem {
 export interface PredictivePOResult {
   ok: boolean
   plan_id?: string
-  product_code?: string
-  target_quantity?: number
   items: POItem[]
   error?: string
 }
@@ -39,7 +37,7 @@ export function usePredictivePO(): UsePredictivePOResult {
 
     const { data, error: rpcError } = await supabase.rpc(
       'fn_predictive_procurement',
-      { p_plan_id: planId },
+      { p_production_plan_id: planId },
     )
 
     if (rpcError) {
@@ -52,8 +50,6 @@ export function usePredictivePO(): UsePredictivePOResult {
       ok: boolean
       error?: string
       plan_id?: string
-      product_code?: string
-      target_quantity?: number
       items?: POItem[]
     }
 
@@ -66,8 +62,6 @@ export function usePredictivePO(): UsePredictivePOResult {
     setResult({
       ok: true,
       plan_id: parsed.plan_id,
-      product_code: parsed.product_code,
-      target_quantity: parsed.target_quantity,
       items: parsed.items ?? [],
     })
     setIsLoading(false)

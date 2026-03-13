@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useExpenseLedger } from '../hooks/useExpenseLedger'
 import type { ExpenseRow } from '../hooks/useExpenseLedger'
 import { useSupplierMapping } from '../hooks/useSupplierMapping'
 import { supabase } from '../lib/supabase'
 import { formatTHB } from '../components/finance/helpers'
 import { KpiCard } from '../components/finance/KpiCard'
-import { MonthlyChart } from '../components/finance/MonthlyChart'
+const MonthlyChart = lazy(() => import('../components/finance/MonthlyChart').then(m => ({ default: m.MonthlyChart })))
 import { ExpenseForm } from '../components/finance/ExpenseForm'
 import { ExpenseHistory } from '../components/finance/ExpenseHistory'
 import { ExpenseEditModal } from '../components/finance/ExpenseEditModal'
@@ -20,6 +20,24 @@ import type { ParsedReceipt, ReceiptUrls, ApprovePayload, FoodItem, ReceiptJob }
    State machine: idle → pending → staging → (approve|cancel) → idle
    Phase 4.14: Async receipt processing via Realtime subscription
    ═══════════════════════════════════════════════════════════════════ */
+
+/** Phase 6.6c: Sanitize OCR-dirty numbers (e.g., "225,!" → 225, "1.0.00" → 1) */
+function sanitizeNum(v: unknown): number {
+  if (v == null || v === '') return 0
+  const s = String(v).replace(/[^\d.]/g, '')
+  const parts = s.split('.')
+  const clean = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : s
+  const n = Number(clean)
+  return isNaN(n) ? 0 : n
+}
+
+/** Sanitize number preserving negative sign (for discount_total) */
+function sanitizeSigned(v: unknown): number {
+  if (v == null || v === '') return 0
+  const neg = String(v).includes('-')
+  const n = sanitizeNum(v)
+  return neg ? -Math.abs(n) : n
+}
 
 /** Fuzzy match supplier name from AI to existing suppliers */
 function fuzzyMatchSupplier(
@@ -194,39 +212,54 @@ export function FinanceManager() {
         : receipt.line_items
 
       // Reclassify into legacy 3-array format for existing RPC
+      // Phase 6.6c: Sanitize all numeric fields (strip OCR dust like "225,!")
       receipt.food_items = mapped
         .filter((li) => li.category === 'food')
         .map((li) => ({
-          name: li.translated_name || li.original_name || '',
-          quantity: li.quantity || 0,
+          name: li.makro_name || li.translated_name || li.original_name || '',
+          quantity: sanitizeNum(li.quantity),
           unit: li.unit || 'pcs',
-          unit_price: li.unit_price || 0,
-          total_price: li.total_price || 0,
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
           nomenclature_id: li.nomenclature_id ?? undefined,
           supplier_sku: li.supplier_sku ?? null,
           original_name: li.original_name ?? null,
           brand: li.brand ?? undefined,
           package_weight: li.package_weight ?? undefined,
+          makro_name: li.makro_name ?? undefined,
+          full_title: li.full_title ?? undefined,
         } as FoodItem))
 
       receipt.capex_items = mapped
         .filter((li) => li.category === 'capex')
         .map((li) => ({
           name: li.translated_name || li.original_name || '',
-          quantity: li.quantity || 0,
-          unit_price: li.unit_price || 0,
-          total_price: li.total_price || 0,
+          quantity: sanitizeNum(li.quantity),
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
         }))
 
       receipt.opex_items = mapped
         .filter((li) => li.category === 'opex' || li.category === 'uncategorized')
         .map((li) => ({
           description: li.translated_name || li.original_name || '',
-          quantity: li.quantity || 0,
+          quantity: sanitizeNum(li.quantity),
           unit: li.unit || 'pcs',
-          unit_price: li.unit_price || 0,
-          total_price: li.total_price || 0,
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
         }))
+    }
+
+    // Phase 6.6c: Sanitize total_amount and footer values (OCR dust defense)
+    receipt.total_amount = sanitizeNum(receipt.total_amount)
+    if (receipt.footer) {
+      receipt.footer = {
+        subtotal: sanitizeNum(receipt.footer.subtotal),
+        discount_total: sanitizeSigned(receipt.footer.discount_total),
+        vat_amount: sanitizeNum(receipt.footer.vat_amount),
+        delivery_fee: sanitizeNum(receipt.footer.delivery_fee),
+        grand_total: sanitizeNum(receipt.footer.grand_total),
+      }
     }
 
     setStagingData({ receipt, urls, imageUrls })
@@ -410,11 +443,13 @@ export function FinanceManager() {
           )}
         </div>
         <div className="space-y-6">
-          <MonthlyChart
-            summaries={monthlySummaries}
-            isLoading={isLoading}
-            error={error}
-          />
+          <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-slate-800/50" />}>
+            <MonthlyChart
+              summaries={monthlySummaries}
+              isLoading={isLoading}
+              error={error}
+            />
+          </Suspense>
           <ExpenseHistory
             rows={rows}
             categories={categories}

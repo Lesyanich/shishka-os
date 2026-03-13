@@ -2,7 +2,7 @@
 // Hook: useSupplierMapping
 // Phase 6.4: Smart Mapping Engine + UoM Conversion
 // ═══════════════════════════════════════════════════════════
-// Looks up and saves supplier_item_mapping records so the
+// Looks up and saves supplier_catalog records so the
 // system "remembers" user's manual nomenclature assignments.
 // Lookup priority: SKU match first → fallback to name match.
 // CEO rule: indexes are non-unique; sort by match_count DESC.
@@ -26,12 +26,20 @@ interface SaveMappingParams {
   baseUnit?: string
 }
 
-/** Rich mapping data including UoM conversion */
+/** Rich mapping data including UoM conversion and SKU info */
 export interface MappingMatch {
   nomenclatureId: string
   conversionFactor: number | null
   purchaseUnit: string | null
   baseUnit: string | null
+  /** Phase 10: Linked SKU id */
+  skuId: string | null
+  /** Phase 10: Product barcode from SKU */
+  barcode: string | null
+  /** Phase 10: Brand name from SKU */
+  brandName: string | null
+  /** Phase 10: Product name from SKU */
+  productName: string | null
 }
 
 export function useSupplierMapping() {
@@ -46,8 +54,8 @@ export function useSupplierMapping() {
       if (!supplierId) return map
 
       const { data, error } = await supabase
-        .from('supplier_item_mapping')
-        .select('supplier_sku, original_name, nomenclature_id, match_count, conversion_factor, purchase_unit, base_unit')
+        .from('supplier_catalog')
+        .select('supplier_sku, original_name, nomenclature_id, match_count, conversion_factor, purchase_unit, base_unit, sku_id, sku:sku_id(barcode, brand, product_name)')
         .eq('supplier_id', supplierId)
         .order('match_count', { ascending: false })
 
@@ -58,11 +66,16 @@ export function useSupplierMapping() {
 
       // Build lookup map — first occurrence wins (already sorted by match_count DESC)
       for (const row of data ?? []) {
+        const skuData = row.sku as unknown as { barcode: string | null; brand: string | null; product_name: string | null } | null
         const match: MappingMatch = {
           nomenclatureId: row.nomenclature_id,
           conversionFactor: row.conversion_factor ?? null,
           purchaseUnit: row.purchase_unit ?? null,
           baseUnit: row.base_unit ?? null,
+          skuId: row.sku_id ?? null,
+          barcode: skuData?.barcode ?? null,
+          brandName: skuData?.brand ?? null,
+          productName: skuData?.product_name ?? null,
         }
 
         // SKU-based key (higher priority)
@@ -94,7 +107,7 @@ export function useSupplierMapping() {
 
       if (supplierSku) {
         const { data } = await supabase
-          .from('supplier_item_mapping')
+          .from('supplier_catalog')
           .select('id, match_count')
           .eq('supplier_id', supplierId)
           .eq('supplier_sku', supplierSku)
@@ -114,14 +127,14 @@ export function useSupplierMapping() {
           if (baseUnit !== undefined) update.base_unit = baseUnit
 
           await supabase
-            .from('supplier_item_mapping')
+            .from('supplier_catalog')
             .update(update)
             .eq('id', existingId)
           return
         }
       } else {
         const { data } = await supabase
-          .from('supplier_item_mapping')
+          .from('supplier_catalog')
           .select('id, match_count')
           .eq('supplier_id', supplierId)
           .eq('original_name', originalName)
@@ -140,7 +153,7 @@ export function useSupplierMapping() {
           if (baseUnit !== undefined) update.base_unit = baseUnit
 
           await supabase
-            .from('supplier_item_mapping')
+            .from('supplier_catalog')
             .update(update)
             .eq('id', existingId)
           return
@@ -148,7 +161,7 @@ export function useSupplierMapping() {
       }
 
       // Insert new mapping
-      const { error } = await supabase.from('supplier_item_mapping').insert({
+      const { error } = await supabase.from('supplier_catalog').insert({
         supplier_id: supplierId,
         supplier_sku: supplierSku || null,
         original_name: originalName,
@@ -218,7 +231,7 @@ export function useSupplierMapping() {
 
       // Find existing mapping
       const { data } = await supabase
-        .from('supplier_item_mapping')
+        .from('supplier_catalog')
         .select('id')
         .eq('supplier_id', supplierId)
         .eq('nomenclature_id', nomenclatureId)
@@ -228,12 +241,12 @@ export function useSupplierMapping() {
       if (data && data.length > 0) {
         // Update existing
         await supabase
-          .from('supplier_item_mapping')
+          .from('supplier_catalog')
           .update({ purchase_unit: purchaseUnit, conversion_factor: conversionFactor, base_unit: baseUnit })
           .eq('id', data[0].id)
       } else {
         // Create new mapping with conversion data
-        await supabase.from('supplier_item_mapping').insert({
+        await supabase.from('supplier_catalog').insert({
           supplier_id: supplierId,
           supplier_sku: supplierSku || null,
           original_name: originalName,

@@ -53,10 +53,18 @@ export interface LineItem {
   brand?: string
   /** Phase 6.6: Package weight as printed on receipt, e.g. "500g", "1kg" (display-only) */
   package_weight?: string
+  /** Phase 6.7: Verified English name from Makro product database (populated by GAS STEP 5.5) */
+  makro_name?: string
+  /** Phase 6.8: Full product title as on Makro website (e.g. "KNORR Corn Flour 700 g") */
+  full_title?: string
   /** Post-processing warning (e.g., price math mismatch) */
   _warning?: string
   /** Populated by frontend mapping engine (useSupplierMapping) */
   nomenclature_id?: string | null
+  /** Phase 10: Resolved SKU id */
+  sku_id?: string | null
+  /** Phase 10: Product barcode (EAN/UPC) for SKU resolution */
+  barcode?: string | null
 }
 
 /** Sum validation from Edge Function (legacy — kept for backward compat) */
@@ -110,6 +118,14 @@ export interface FoodItem {
   brand?: string
   /** Phase 6.6: Package weight as printed, e.g. "500g" (display-only chip) */
   package_weight?: string
+  /** Phase 6.7: Verified English name from Makro product database */
+  makro_name?: string
+  /** Phase 6.8: Full product title as on Makro website */
+  full_title?: string
+  /** Phase 10: Resolved SKU id */
+  sku_id?: string | null
+  /** Phase 10: Product barcode for SKU resolution */
+  barcode?: string | null
 }
 
 /** Capital equipment line item → inserts into capex_transactions */

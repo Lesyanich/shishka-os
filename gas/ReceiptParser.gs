@@ -275,6 +275,25 @@ function doPost(e) {
   }
 
   // ═══════════════════════════════════════════════════════
+  // STEP 5.5: Makro SKU Lookup (non-fatal)
+  // ═══════════════════════════════════════════════════════
+  try {
+    var isMakro = processed.supplier_name &&
+      (processed.supplier_name.toLowerCase().indexOf("makro") !== -1 ||
+       processed.supplier_name.indexOf("\u0E21\u0E32\u0E42\u0E04\u0E23") !== -1);
+    if (isMakro) {
+      log_("STEP_5.5: Makro detected (" + processed.supplier_name + "). Looking up SKUs on makro.pro...");
+      processed = lookupMakroSkus_(processed);
+      phoneHome_(supabaseUrl, jobId, "STEP_5.5: Makro SKU lookup OK");
+    } else {
+      log_("STEP_5.5: Non-Makro supplier (" + processed.supplier_name + "), skipping SKU lookup");
+    }
+  } catch (skuErr) {
+    logError_("STEP_5.5 MAKRO SKU LOOKUP (non-fatal): " + skuErr.toString());
+    try { phoneHome_(supabaseUrl, jobId, "STEP_5.5: SKU lookup WARN: " + skuErr.toString().substring(0, 80)); } catch(x) {}
+  }
+
+  // ═══════════════════════════════════════════════════════
   // STEP 6: Write final result via Edge Function callback
   // ═══════════════════════════════════════════════════════
   try {
@@ -314,6 +333,163 @@ function doPost(e) {
     } catch(x2) {}
     return ContentService.createTextOutput(JSON.stringify({ error: finalMsg })).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAKRO SKU LOOKUP — Phase 6.7
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * For each line_item with a supplier_sku, look up the real English
+ * product name on makro.pro. Populates makro_name, brand, package_weight.
+ * Non-fatal: if any lookup fails, continues with AI translation.
+ */
+function lookupMakroSkus_(parsed) {
+  var items = parsed.line_items || [];
+  var lookupCount = 0;
+  var verifiedCount = 0;
+  var MAX_LOOKUPS = 15;
+
+  for (var i = 0; i < items.length; i++) {
+    if (lookupCount >= MAX_LOOKUPS) {
+      log_("Makro lookup: hit MAX_LOOKUPS cap (" + MAX_LOOKUPS + "), stopping");
+      break;
+    }
+    var sku = items[i].supplier_sku;
+    if (!sku || String(sku).length < 5) continue;
+
+    try {
+      lookupCount++;
+      var product = fetchMakroProduct_(String(sku));
+      if (!product || !product.titleEn) continue;
+
+      var cleanResult = parseMakroTitle_(product.titleEn, product.brandEn);
+      if (!cleanResult.name) continue;
+
+      items[i].makro_name = cleanResult.name;
+      items[i].full_title = cleanResult.fullTitle;
+      if (product.brandEn && product.brandEn.toUpperCase() !== "MAKRO") {
+        items[i].brand = product.brandEn;
+      }
+      if (cleanResult.weight) {
+        items[i].package_weight = cleanResult.weight;
+      }
+      items[i].confidence = "high";
+      verifiedCount++;
+      log_("Makro verified SKU " + sku + " → " + cleanResult.name +
+           (product.brandEn ? " [" + product.brandEn + "]" : "") +
+           (cleanResult.weight ? " (" + cleanResult.weight + ")" : ""));
+    } catch (e) {
+      log_("Makro lookup failed for SKU " + sku + ": " + e.toString());
+    }
+
+    // Small delay to be polite to makro.pro
+    if (lookupCount < MAX_LOOKUPS && i < items.length - 1) {
+      Utilities.sleep(300);
+    }
+  }
+  log_("Makro SKU lookup complete: " + lookupCount + " attempted, " + verifiedCount + " verified");
+  return parsed;
+}
+
+/**
+ * Fetch a single product from makro.pro by barcode/SKU.
+ * Scrapes __NEXT_DATA__ JSON from the SSR HTML response.
+ * Returns { titleEn, brandEn, barcode } or null if not found.
+ */
+function fetchMakroProduct_(barcode) {
+  var url = "https://www.makro.pro/en/c/search?q=" + encodeURIComponent(barcode);
+  var response = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true,
+    followRedirects: true,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9"
+    }
+  });
+
+  var code = response.getResponseCode();
+  if (code !== 200) {
+    log_("Makro fetch HTTP " + code + " for barcode " + barcode);
+    return null;
+  }
+
+  var html = response.getContentText();
+  var match = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/);
+  if (!match) {
+    log_("Makro: no __NEXT_DATA__ found for barcode " + barcode);
+    return null;
+  }
+
+  try {
+    var nextData = JSON.parse(match[1]);
+    var searchResult = nextData.props && nextData.props.pageProps &&
+      nextData.props.pageProps.initialSearchResult;
+    if (!searchResult) return null;
+
+    var hits = searchResult.hits;
+    if (!hits || hits.length === 0) return null;
+
+    var doc = hits[0].document;
+    return {
+      titleEn: doc.titleEn || null,
+      brandEn: doc.brandEn || null,
+      barcode: doc.itemBarCode || barcode
+    };
+  } catch (parseErr) {
+    log_("Makro: JSON parse error for barcode " + barcode + ": " + parseErr.toString());
+    return null;
+  }
+}
+
+/**
+ * Parse Makro's titleEn into clean product name + weight + fullTitle.
+ * Example: "IMPERIAL Whole Wheat Flour 1 kg" + brandEn="IMPERIAL"
+ *   → { name: "Whole Wheat Flour", weight: "1 kg", fullTitle: "IMPERIAL Whole Wheat Flour 1 kg",
+ *       packageQty: 1, packageUnit: "kg" }
+ */
+function parseMakroTitle_(titleEn, brandEn) {
+  var fullTitle = titleEn || "";
+  var name = fullTitle;
+
+  // Remove brand prefix if present at start
+  if (brandEn) {
+    var brandUpper = brandEn.toUpperCase();
+    if (name.toUpperCase().indexOf(brandUpper) === 0) {
+      name = name.substring(brandEn.length).replace(/^\s+/, "");
+    }
+  }
+
+  // Extract trailing weight pattern: "1 kg", "500 g", "100 ml", "200g", "1.5 L"
+  var weightMatch = name.match(/\s+(\d+(?:[.,]\d+)?\s*(?:g|kg|ml|L|l|pcs|pc|unit\(?s?\)?|pack|ea))\s*$/i);
+  var weight = null;
+  if (weightMatch) {
+    weight = weightMatch[1].trim();
+    name = name.substring(0, name.length - weightMatch[0].length).trim();
+  }
+
+  // Also try "500g" without space (e.g., "Parsley 100g")
+  if (!weight) {
+    var noSpaceMatch = name.match(/\s+(\d+(?:[.,]\d+)?(?:g|kg|ml|L|l))\s*$/i);
+    if (noSpaceMatch) {
+      weight = noSpaceMatch[1].trim();
+      name = name.substring(0, name.length - noSpaceMatch[0].length).trim();
+    }
+  }
+
+  // Parse weight into qty + unit (e.g. "700 g" → 700, "g")
+  var packageQty = null;
+  var packageUnit = null;
+  if (weight) {
+    var qtyMatch = weight.match(/^(\d+(?:[.,]\d+)?)\s*(.+)$/);
+    if (qtyMatch) {
+      packageQty = parseFloat(qtyMatch[1].replace(",", "."));
+      packageUnit = qtyMatch[2].trim();
+    }
+  }
+
+  return { name: name, weight: weight, fullTitle: fullTitle, packageQty: packageQty, packageUnit: packageUnit };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -360,7 +536,7 @@ function callGemini_(imageParts, apiKey) {
     contents: [{ parts: parts }],
     generationConfig: {
       responseMimeType: "application/json",
-      temperature: 0.2,
+      temperature: 0,
       maxOutputTokens: 65536,
       // Gemini 2.5 Flash: disable "thinking" for clean JSON output
       thinkingConfig: { thinkingBudget: 0 },
@@ -786,10 +962,29 @@ Translate Thai → English with MAXIMUM specificity:\n\
 - เส้นหมี่ → "Rice vermicelli"\n\
 - กะเพรา → "Holy basil" (NOT "Basil")\n\
 - โหระพา → "Sweet basil" (NOT "Basil")\n\
-- Keep translated_name CLEAN — no weight, quantity, brand, or packaging info in the name\n\
+- CRITICAL: translated_name = ONLY the product name, nothing else.\n\
+  - NO weight (remove 500g, 1 kg, 100 ml — put in package_weight field)\n\
+  - NO brand (remove CP, ARO, IMPERIAL — put in brand field)\n\
+  - NO packaging info (remove per pack, per bag, x 12)\n\
+  - NO quantity descriptors (remove large, jumbo unless part of product variety)\n\
+  GOOD: translated_name="Whole wheat flour", brand="IMPERIAL", package_weight="1 kg"\n\
+  BAD:  translated_name="IMPERIAL Whole Wheat Flour 1 kg" (brand+weight mixed in)\n\
+  BAD:  translated_name="Red chili 100g per pack" (weight+packaging mixed in)\n\
 Do NOT transliterate Thai to Latin characters. TRANSLATE the meaning.\n\
 Brand names: put brand into the separate "brand" field, NOT into translated_name.\n\
   Example: ARO chicken eggs → translated_name: "Chicken eggs", brand: "ARO"\n\
+\n\
+## COLUMN ALIGNMENT — CRITICAL for Makro receipts\n\
+Makro receipts have a strict table layout:\n\
+  QUANTITY | ARTICLE NUMBER | ARTICLE DESCRIPTION (Thai) | UNIT | PACKS | PRICE | DISCOUNT | ORDER PRICE\n\
+Rules:\n\
+- Each ARTICLE NUMBER (barcode) and its ARTICLE DESCRIPTION are on the SAME physical row\n\
+- NEVER associate a barcode from one row with a description from another row\n\
+- If a description wraps to two lines, both lines belong to the SAME barcode\n\
+- The barcode is NOT a product name — do NOT decode barcodes into product names\n\
+- Read the Thai text in ARTICLE DESCRIPTION column ONLY and translate THAT text\n\
+- If you cannot read the ARTICLE DESCRIPTION for a row, set translated_name to "[UNREADABLE]"\n\
+  but STILL extract the barcode as supplier_sku, and extract quantity/price if readable\n\
 \n\
 ## THAI RECEIPT ABBREVIATIONS — Common thermal receipt shorthand\n\
 Thai receipts truncate product names to fit ~20 characters on thermal paper.\n\
@@ -932,6 +1127,14 @@ Return ONLY valid JSON with this structure:\n\
    NEVER translate unclear Thai into confident English.\n\
    The CEO reviews translations — an honest "[UNREADABLE]" builds trust,\n\
    a wrong "Frozen carrots" destroys it.\n\
+\n\
+7. ZERO INVENTION RULE: You may ONLY translate words that are physically printed on the receipt.\n\
+   - Do NOT combine partial words from different rows into a new product name\n\
+   - Do NOT use the price or quantity to guess what the product might be\n\
+   - Do NOT generate creative product names like "Smoky Fresh hamburger"\n\
+   - If the Thai text says "แป้ง" (flour), translate as "Flour", NOT "Whole wheat flour"\n\
+     unless "โฮลวีท" is also visible in the SAME row\n\
+   - Each translated_name must have a 1:1 correspondence with original_name characters\n\
 \n\
 ## DOCUMENT CLASSIFICATION\n\
 - tax_invoice_index: image with Tax ID, VAT breakdown\n\

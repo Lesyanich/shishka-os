@@ -234,9 +234,6 @@ export function StagingArea({
   const opexTotal = opexItems.reduce((s, o) => s + (o.total_price || 0), 0)
   const computedTotal = foodTotal + capexTotal + opexTotal
 
-  const mismatch =
-    totalAmount > 0 && Math.abs(computedTotal - totalAmount) / totalAmount > 0.01
-
   // ── Validation: all food items must have nomenclature_id ──
   const allFoodMapped =
     foodItems.length === 0 ||
@@ -392,36 +389,24 @@ export function StagingArea({
           </div>
         )}
 
-        {/* Phase 6.1: Financial Reconciliation Panel */}
-        {receipt.footer && (
-          <ReconciliationPanel
-            footer={receipt.footer}
-            reconciliation={receipt._reconciliation}
-            itemsSum={computedTotal}
-            discountTotal={discountTotal}
-            vatAmount={vatAmount}
-            deliveryFee={deliveryFee}
-            onDiscountChange={setDiscountTotal}
-            onVatChange={setVatAmount}
-            onDeliveryFeeChange={setDeliveryFee}
-          />
-        )}
-        {/* Legacy: show simple mismatch if no footer available */}
-        {!receipt.footer && receipt._sum_mismatch && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-            <div>
-              <p className="text-xs font-medium text-amber-300">
-                Line items sum mismatch
-              </p>
-              <p className="mt-0.5 text-[11px] text-amber-300/70">
-                Items total: {formatTHB(receipt._sum_mismatch.line_items_sum)} &middot;
-                Receipt total: {formatTHB(receipt._sum_mismatch.declared_total)} &middot;
-                Missing: <span className="font-mono font-semibold text-amber-200">{formatTHB(receipt._sum_mismatch.difference)}</span>
-              </p>
-            </div>
-          </div>
-        )}
+        {/* Phase 6.6c: Reconciliation Panel — ALWAYS rendered (footer fallback if GAS didn't send one) */}
+        <ReconciliationPanel
+          footer={receipt.footer ?? {
+            subtotal: 0,
+            discount_total: 0,
+            vat_amount: 0,
+            delivery_fee: 0,
+            grand_total: receipt.total_amount || 0,
+          }}
+          reconciliation={receipt._reconciliation}
+          itemsSum={computedTotal}
+          discountTotal={discountTotal}
+          vatAmount={vatAmount}
+          deliveryFee={deliveryFee}
+          onDiscountChange={setDiscountTotal}
+          onVatChange={setVatAmount}
+          onDeliveryFeeChange={setDeliveryFee}
+        />
 
         {/* Phase 6.2: AI warnings banner */}
         {receipt._warnings && receipt._warnings.length > 0 && (
@@ -686,8 +671,8 @@ export function StagingArea({
             open={foodOpen}
             onToggle={() => setFoodOpen(!foodOpen)}
             color="emerald"
-            headers={['Item', 'Qty', 'Unit', 'Price', 'Total', 'Nomenclature', '']}
-            colWidths={['', 'w-16', 'w-16', 'w-20', 'w-20', 'w-36', 'w-8']}
+            headers={['Item', 'Brand', 'Wt', 'Qty', 'Unit', 'Price', 'Total', 'Nomenclature', '']}
+            colWidths={['', 'w-20', 'w-16', 'w-14', 'w-14', 'w-18', 'w-18', 'w-36', 'w-8']}
           >
             {foodItems.map((item, i) => {
               // Phase 6.2: Find matching line_item for confidence/warning data
@@ -730,7 +715,14 @@ export function StagingArea({
                       value={item.name}
                       onChange={(e) => updateFood(i, { name: e.target.value })}
                       className={`${inputCls} flex-1 ${isUnreadable ? 'italic text-slate-500' : ''}`}
+                      title={item.full_title || ''}
                     />
+                    {/* Phase 6.7: Makro verification badge */}
+                    {item.makro_name && (
+                      <span className="ml-1 shrink-0 text-[9px] text-emerald-400" title={item.full_title ? `Makro: ${item.full_title}` : `Verified: ${item.makro_name}`}>
+                        ✓
+                      </span>
+                    )}
                   </div>
                   {/* Metadata chips row — UNDER the name */}
                   <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -754,25 +746,25 @@ export function StagingArea({
                         SKU:{item.supplier_sku}
                       </button>
                     )}
-                    {/* Brand chip */}
-                    {item.brand && (
-                      <span className="shrink-0 rounded bg-purple-500/15 px-1.5 py-0.5 text-[9px] font-medium text-purple-400">
-                        {item.brand}
-                      </span>
-                    )}
-                    {/* Package weight chip */}
-                    {item.package_weight && (
-                      <span className="shrink-0 rounded bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-medium text-orange-400">
-                        {item.package_weight}
-                      </span>
-                    )}
                   </div>
                   {/* Warning tooltip */}
                   {warning && (
                     <p className="mt-0.5 text-[9px] text-rose-400/70">{warning}</p>
                   )}
                 </td>
-                <td className="w-16 px-1.5 py-1.5">
+                {/* Phase 6.7: Brand column */}
+                <td className="w-20 px-1 py-1.5">
+                  {item.brand && (
+                    <span className="text-xs text-purple-400">{item.brand}</span>
+                  )}
+                </td>
+                {/* Phase 6.7: Weight column */}
+                <td className="w-16 px-1 py-1.5">
+                  {item.package_weight && (
+                    <span className="text-xs text-orange-400">{item.package_weight}</span>
+                  )}
+                </td>
+                <td className="w-14 px-1.5 py-1.5">
                   <input
                     type="number"
                     step="0.01"
@@ -781,7 +773,7 @@ export function StagingArea({
                     className={`${inputCls} font-mono`}
                   />
                 </td>
-                <td className="w-16 px-1.5 py-1.5">
+                <td className="w-14 px-1.5 py-1.5">
                   <input
                     type="text"
                     value={item.unit}
@@ -789,7 +781,7 @@ export function StagingArea({
                     className={inputCls}
                   />
                 </td>
-                <td className="w-20 px-1.5 py-1.5">
+                <td className="w-18 px-1.5 py-1.5">
                   <input
                     type="number"
                     step="0.01"
@@ -798,7 +790,7 @@ export function StagingArea({
                     className={`${inputCls} font-mono ${hasMathError ? 'text-rose-400 border-rose-500/50' : ''}`}
                   />
                 </td>
-                <td className="w-20 px-1.5 py-1.5">
+                <td className="w-18 px-1.5 py-1.5">
                   <input
                     type="number"
                     step="0.01"
@@ -1142,19 +1134,9 @@ export function StagingArea({
             </tr>
           </ItemSection>
 
-          {/* ═══ Summary Card ═══ */}
+          {/* ═══ Category Breakdown + Warnings ═══ */}
           <div className="overflow-hidden rounded-xl border border-slate-700/40 bg-slate-800/30">
-            <div className="flex items-center justify-between border-b border-slate-700/30 px-4 py-3">
-              <span className="text-xs font-medium tracking-wide text-slate-400">
-                Computed Total
-              </span>
-              <span className="font-mono text-base font-semibold tracking-tight text-slate-100">
-                {formatTHB(computedTotal)}{' '}
-                <span className="text-xs font-normal text-slate-500">{currency}</span>
-              </span>
-            </div>
-
-            <div className="flex divide-x divide-slate-700/30 px-1">
+            <div className="flex divide-x divide-slate-700/30">
               {[
                 { label: 'Food', value: foodTotal, color: 'text-emerald-400' },
                 { label: 'CapEx', value: capexTotal, color: 'text-amber-400' },
@@ -1171,26 +1153,14 @@ export function StagingArea({
               ))}
             </div>
 
-            {(mismatch || (!allFoodMapped && foodItems.length > 0)) && (
-              <div className="space-y-2 border-t border-slate-700/30 px-4 py-3">
-                {mismatch && (
-                  <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
-                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
-                    <p className="text-[11px] leading-relaxed text-amber-300/80">
-                      Computed total ({formatTHB(computedTotal)}) differs from AI total (
-                      {formatTHB(totalAmount)}) by{' '}
-                      {Math.abs(((computedTotal - totalAmount) / totalAmount) * 100).toFixed(1)}%
-                    </p>
-                  </div>
-                )}
-                {!allFoodMapped && foodItems.length > 0 && (
-                  <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
-                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
-                    <p className="text-[11px] leading-relaxed text-amber-300/80">
-                      All food items must be mapped to nomenclature or marked &quot;Create new&quot; before approval
-                    </p>
-                  </div>
-                )}
+            {!allFoodMapped && foodItems.length > 0 && (
+              <div className="border-t border-slate-700/30 px-4 py-3">
+                <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
+                  <p className="text-[11px] leading-relaxed text-amber-300/80">
+                    All food items must be mapped to nomenclature or marked &quot;Create new&quot; before approval
+                  </p>
+                </div>
               </div>
             )}
           </div>

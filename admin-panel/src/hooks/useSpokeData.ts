@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase'
 export interface PurchaseLogRow {
   id: string
   nomenclature_id: string
+  sku_id: string | null
   supplier_id: string
   quantity: number
   price_per_unit: number
@@ -20,6 +21,10 @@ export interface PurchaseLogRow {
   notes: string | null
   nomenclature_name: string | null
   nomenclature_code: string | null
+  /** Phase 10: SKU product name (brand + product) */
+  sku_product_name: string | null
+  /** Phase 10: SKU barcode */
+  sku_barcode: string | null
 }
 
 export interface CapexTransactionRow {
@@ -94,7 +99,7 @@ export function useSpokeData(expenseId: string | null): {
         const [plRes, ctRes, oiRes] = await Promise.all([
           supabase
             .from('purchase_logs')
-            .select('id, nomenclature_id, supplier_id, quantity, price_per_unit, total_price, invoice_date, notes')
+            .select('id, nomenclature_id, sku_id, supplier_id, quantity, price_per_unit, total_price, invoice_date, notes')
             .eq('expense_id', eid),
           supabase
             .from('capex_transactions')
@@ -129,19 +134,45 @@ export function useSpokeData(expenseId: string | null): {
           }
         }
 
+        // Phase 10: 5th query — SKU data for purchase_logs
+        const skuIds = (plRes.data ?? [])
+          .map((r) => (r as Record<string, unknown>).sku_id as string)
+          .filter(Boolean)
+
+        const skuMap: Record<string, { product_name: string; barcode: string | null }> = {}
+        if (skuIds.length > 0) {
+          const { data: skus } = await supabase
+            .from('sku')
+            .select('id, product_name, barcode')
+            .in('id', skuIds)
+          for (const s of skus ?? []) {
+            skuMap[s.id as string] = {
+              product_name: s.product_name as string,
+              barcode: (s.barcode ?? null) as string | null,
+            }
+          }
+        }
+
         const result: SpokeData = {
-          purchaseLogs: (plRes.data ?? []).map((r) => ({
-            id: r.id as string,
-            nomenclature_id: r.nomenclature_id as string,
-            supplier_id: r.supplier_id as string,
-            quantity: Number(r.quantity ?? 0),
-            price_per_unit: Number(r.price_per_unit ?? 0),
-            total_price: Number(r.total_price ?? 0),
-            invoice_date: r.invoice_date as string,
-            notes: (r.notes ?? null) as string | null,
-            nomenclature_name: nomMap[r.nomenclature_id as string]?.name ?? null,
-            nomenclature_code: nomMap[r.nomenclature_id as string]?.product_code ?? null,
-          })),
+          purchaseLogs: (plRes.data ?? []).map((r) => {
+            const row = r as Record<string, unknown>
+            const skuId = (row.sku_id ?? null) as string | null
+            return {
+              id: r.id as string,
+              nomenclature_id: r.nomenclature_id as string,
+              sku_id: skuId,
+              supplier_id: r.supplier_id as string,
+              quantity: Number(r.quantity ?? 0),
+              price_per_unit: Number(r.price_per_unit ?? 0),
+              total_price: Number(r.total_price ?? 0),
+              invoice_date: r.invoice_date as string,
+              notes: (r.notes ?? null) as string | null,
+              nomenclature_name: nomMap[r.nomenclature_id as string]?.name ?? null,
+              nomenclature_code: nomMap[r.nomenclature_id as string]?.product_code ?? null,
+              sku_product_name: skuId ? skuMap[skuId]?.product_name ?? null : null,
+              sku_barcode: skuId ? skuMap[skuId]?.barcode ?? null : null,
+            }
+          }),
           capexTransactions: (ctRes.data ?? []).map((r) => ({
             id: r.id as string,
             transaction_id: (r.transaction_id ?? '') as string,
