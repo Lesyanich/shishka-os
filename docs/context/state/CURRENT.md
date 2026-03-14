@@ -11,7 +11,7 @@
 
 | Phase | Name | Priority | Status |
 |-------|------|----------|--------|
-| 11 | Procurement Foundation (DB Schema) | P0 | PLANNED |
+| 11 | Procurement Foundation (DB Schema) | P0 | **DONE** (060-063) |
 | 12 | Procurement RPCs | P0 | PLANNED |
 | 13 | Receiving Station (Frontend — Cook/Admin UX) | P1 | PLANNED |
 | 14 | Purchase Order Management (Frontend — Admin/Owner) | P2 | PLANNED |
@@ -51,9 +51,9 @@ and destroy in-flight async state (pendingJobId, stagingData).
 | `fin_sub_categories` | `sub_code` INT | LIVE | 36 sub-categories |
 | `capex_assets` | `id` UUID | LIVE | Linked to equipment via UUID FK |
 | `capex_transactions` | `id` UUID | LIVE | Purchase and repair transactions |
-| `expense_ledger` | `id` UUID | LIVE | Financial SSoT. Hub for receipt spokes. +created_by (055). |
+| `expense_ledger` | `id` UUID | LIVE | Financial SSoT. Hub for receipt spokes. +created_by (055). +po_id (063). |
 | `suppliers` | `id` UUID | LIVE | With category_code defaults. Auto-create on receipt. |
-| `purchase_logs` | `id` UUID | LIVE | Food item purchases (spoke 1). +sku_id (057). |
+| `purchase_logs` | `id` UUID | LIVE | Food item purchases (spoke 1). +sku_id (057). +po_line_id, receiving_line_id (063). |
 | `opex_items` | `id` UUID | LIVE | Operating expense items (spoke 3) |
 | `receipt_jobs` | `id` UUID | LIVE | Async AI receipt parsing queue. |
 | `orders` | `id` UUID | LIVE | Order pipeline with Kanban. |
@@ -74,6 +74,10 @@ and destroy in-flight async state (pendingJobId, stagingData).
 | `brands` | `id` UUID | LIVE | Normalized brand directory. |
 | `tags` | `id` UUID | LIVE | Cross-cutting attributes. |
 | `nomenclature_tags` | `(nom_id, tag_id)` | LIVE | Junction: nomenclature ↔ tags. |
+| **`purchase_orders`** | `id` UUID | **LIVE** | **Phase 11: PO lifecycle (draft→reconciled). Auto PO-XXXX. Migration 061.** |
+| **`po_lines`** | `id` UUID | **LIVE** | **Phase 11: PO line items. qty_ordered, unit_price_expected. Migration 061.** |
+| **`receiving_records`** | `id` UUID | **LIVE** | **Phase 11: Physical receiving header. Links to PO or receipt. Migration 062.** |
+| **`receiving_lines`** | `id` UUID | **LIVE** | **Phase 11: Receiving line items. qty_expected/received/rejected. Immutable. Migration 062.** |
 
 ## Views
 
@@ -102,6 +106,8 @@ and destroy in-flight async state (pendingJobId, stagingData).
 | `fn_current_user_id()` | UTIL | LIVE — `auth.uid()` (054) |
 | `fn_set_created_by()` | TRIGGER | LIVE — auto-fills expense_ledger.created_by (055) |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | LIVE — zombie job cleanup |
+| `fn_generate_po_number()` | UTIL | LIVE — Phase 11: generates PO-0001 format codes (061) |
+| `fn_po_set_number()` | TRIGGER | LIVE — auto-assigns po_number on INSERT (061) |
 
 ## 3-Tier Product Architecture (Phase 10)
 
@@ -145,7 +151,7 @@ nomenclature (abstract ingredient: "Olive Oil", base_unit: L)
 
 ## Migrations Applied
 
-59 migrations total (001–059). Latest:
+63 migrations total (001–063). Latest:
 - 049: Supplier catalog SSoT merge. fn_approve_receipt v9.
 - 050: WAC costing — Weighted Average Cost trigger.
 - 051: Order modifiers — parent_item_id + modifier_type.
@@ -157,5 +163,9 @@ nomenclature (abstract ingredient: "Olive Oil", base_unit: L)
 - 057: SKU Layer — sku table, sku_balances, v_inventory_by_nomenclature view, sku_id on supplier_catalog + purchase_logs, data migration from supplier_catalog.
 - 058: SKU-aware RPCs — fn_approve_receipt v10 (SKU resolution), WAC/MRP/procurement → v_inventory_by_nomenclature, DROP inventory_balances.
 - 059: Cleanup — DROP nomenclature.brand_id, nomenclature.syrve_id (deprecated/orphaned columns).
+- 060: Procurement ENUMs — po_status, receiving_source, reject_reason.
+- 061: Purchase Orders — purchase_orders + po_lines tables, auto PO-XXXX trigger, RLS, Realtime.
+- 062: Receiving — receiving_records + receiving_lines tables, immutable audit trail, RLS.
+- 063: Procurement Links — purchase_logs +po_line_id/receiving_line_id, expense_ledger +po_id.
 
 → Full schema: `02_Obsidian_Vault/Database Schema.md`
