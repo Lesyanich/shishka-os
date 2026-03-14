@@ -56,6 +56,111 @@ function fuzzyMatchSupplier(
   return partial?.id ?? ''
 }
 
+/* ── Module-level job resolver — survives HMR remounts ── */
+let _activeResolveJobId: string | null = null
+
+async function resolveJobToSessionStorage(jobId: string) {
+  // Prevent duplicate resolves for the same job
+  if (_activeResolveJobId === jobId) return
+  _activeResolveJobId = jobId
+
+  try {
+    const { data: job } = await supabase
+      .from('receipt_jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single()
+
+    if (!job || job.status !== 'completed' || !job.result) {
+      _activeResolveJobId = null
+      return
+    }
+
+    const result = job.result as ParsedReceipt
+    const imageUrls = (job.image_urls as string[]) || []
+
+    // Build receiptUrls from AI document classification
+    const urls: ReceiptUrls = {}
+    const docs = result.documents
+    if (docs) {
+      if (docs.supplier_receipt_index != null && imageUrls[docs.supplier_receipt_index])
+        urls.supplier = imageUrls[docs.supplier_receipt_index]
+      if (docs.bank_slip_index != null && imageUrls[docs.bank_slip_index])
+        urls.bank = imageUrls[docs.bank_slip_index]
+      if (docs.tax_invoice_index != null && imageUrls[docs.tax_invoice_index])
+        urls.tax = imageUrls[docs.tax_invoice_index]
+    } else {
+      if (imageUrls[0]) urls.supplier = imageUrls[0]
+      if (imageUrls[1]) urls.bank = imageUrls[1]
+      if (imageUrls[2]) urls.tax = imageUrls[2]
+    }
+
+    // Reclassify line_items into food/capex/opex (without applyMappings for now)
+    if (result.line_items?.length) {
+      result.food_items = result.line_items
+        .filter((li) => li.category === 'food')
+        .map((li) => ({
+          name: li.makro_name || li.translated_name || li.original_name || '',
+          quantity: sanitizeNum(li.quantity),
+          unit: li.unit || 'pcs',
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
+          nomenclature_id: li.nomenclature_id ?? undefined,
+          supplier_sku: li.supplier_sku ?? null,
+          original_name: li.original_name ?? null,
+          brand: li.brand ?? undefined,
+          package_weight: li.package_weight ?? undefined,
+          makro_name: li.makro_name ?? undefined,
+          full_title: li.full_title ?? undefined,
+        } as FoodItem))
+
+      result.capex_items = result.line_items
+        .filter((li) => li.category === 'capex')
+        .map((li) => ({
+          name: li.translated_name || li.original_name || '',
+          quantity: sanitizeNum(li.quantity),
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
+        }))
+
+      result.opex_items = result.line_items
+        .filter((li) => li.category === 'opex' || li.category === 'uncategorized')
+        .map((li) => ({
+          description: li.translated_name || li.original_name || '',
+          quantity: sanitizeNum(li.quantity),
+          unit: li.unit || 'pcs',
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
+        }))
+    }
+
+    // Sanitize totals
+    result.total_amount = sanitizeNum(result.total_amount)
+    if (result.footer) {
+      result.footer = {
+        subtotal: sanitizeNum(result.footer.subtotal),
+        discount_total: sanitizeSigned(result.footer.discount_total),
+        vat_amount: sanitizeNum(result.footer.vat_amount),
+        delivery_fee: sanitizeNum(result.footer.delivery_fee),
+        grand_total: sanitizeNum(result.footer.grand_total),
+      }
+    }
+
+    // Write to sessionStorage — React will pick it up on next mount/effect
+    const stagingPayload = { receipt: result, urls, imageUrls }
+    sessionStorage.setItem('stagingData', JSON.stringify(stagingPayload))
+    sessionStorage.removeItem('pendingReceiptJobId')
+    sessionStorage.removeItem('pendingReceiptImageUrls')
+
+    // Signal to any listening component
+    window.dispatchEvent(new Event('receipt-job-resolved'))
+  } catch (err) {
+    console.error('[ReceiptJob] Module-level resolve error:', err)
+  } finally {
+    _activeResolveJobId = null
+  }
+}
+
 export function FinanceManager() {
   const {
     rows,
@@ -85,16 +190,60 @@ export function FinanceManager() {
   const [quickText, setQuickText] = useState<string | undefined>(undefined)
 
   /* ── Phase 4.14: Async job tracking ── */
-  const [pendingJobId, setPendingJobId] = useState<string | null>(null)
-  const [pendingImageUrls, setPendingImageUrls] = useState<string[]>([])
+  /* Persist pendingJobId in sessionStorage so it survives HMR/reload */
+  const [pendingJobId, _setPendingJobId] = useState<string | null>(
+    () => sessionStorage.getItem('pendingReceiptJobId'),
+  )
+  const setPendingJobId = (id: string | null) => {
+    if (id) sessionStorage.setItem('pendingReceiptJobId', id)
+    else sessionStorage.removeItem('pendingReceiptJobId')
+    _setPendingJobId(id)
+  }
+  const [pendingImageUrls, setPendingImageUrls] = useState<string[]>(
+    () => {
+      const stored = sessionStorage.getItem('pendingReceiptImageUrls')
+      return stored ? JSON.parse(stored) : []
+    },
+  )
   const [jobError, setJobError] = useState<string | null>(null)
 
   /* ── Staging Area state (Phase 4.4 + 4.6: added imageUrls) ── */
-  const [stagingData, setStagingData] = useState<{
+  /* Initialize from sessionStorage to survive HMR remounts */
+  const [stagingData, _setStagingData] = useState<{
     receipt: ParsedReceipt
     urls: ReceiptUrls
     imageUrls: string[]
-  } | null>(null)
+  } | null>(() => {
+    const stored = sessionStorage.getItem('stagingData')
+    if (stored) {
+      try { return JSON.parse(stored) } catch { /* ignore */ }
+    }
+    return null
+  })
+  const setStagingData = (data: typeof stagingData) => {
+    if (data) {
+      sessionStorage.setItem('stagingData', JSON.stringify(data))
+    } else {
+      sessionStorage.removeItem('stagingData')
+    }
+    _setStagingData(data)
+  }
+
+  // Listen for module-level resolver completing
+  useEffect(() => {
+    const onResolved = () => {
+      const stored = sessionStorage.getItem('stagingData')
+      if (stored) {
+        try {
+          _setStagingData(JSON.parse(stored))
+          _setPendingJobId(null)
+        } catch { /* ignore */ }
+      }
+    }
+    window.addEventListener('receipt-job-resolved', onResolved)
+    return () => window.removeEventListener('receipt-job-resolved', onResolved)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* Lazy-loaded nomenclature for staging area food item mapping */
   const [nomenclature, setNomenclature] = useState<
@@ -112,10 +261,28 @@ export function FinanceManager() {
       .then(({ data }) => setNomenclature(data ?? []))
   }, [stagingData])
 
-  // Phase 4.14: Realtime subscription — listen for receipt_jobs completion
+  // Phase 4.14: Realtime subscription + module-level resolver
+  // Module-level resolver writes to sessionStorage (survives HMR)
+  // This effect: (1) kicks off resolver, (2) Realtime subscription, (3) listens for resolution
   useEffect(() => {
     if (!pendingJobId) return
 
+    // Kick off module-level resolve (idempotent — won't duplicate)
+    resolveJobToSessionStorage(pendingJobId)
+
+    // Listen for resolution signal from module-level resolver
+    const onResolved = () => {
+      const stored = sessionStorage.getItem('stagingData')
+      if (stored) {
+        try { _setStagingData(JSON.parse(stored)) } catch { /* ignore */ }
+        _setPendingJobId(null)
+        setPendingImageUrls([])
+        setJobError(null)
+      }
+    }
+    window.addEventListener('receipt-job-resolved', onResolved)
+
+    // Realtime subscription as primary channel
     const channel = supabase
       .channel(`receipt-job-${pendingJobId}`)
       .on(
@@ -128,43 +295,29 @@ export function FinanceManager() {
         },
         (payload) => {
           const job = payload.new as ReceiptJob
-          if (job.status === 'completed' && job.result) {
-            handleAiResult(job.result, pendingImageUrls)
-            setPendingJobId(null)
-            setPendingImageUrls([])
-            setJobError(null)
+          if (job.status === 'completed') {
+            resolveJobToSessionStorage(pendingJobId!)
           } else if (job.status === 'failed') {
             setJobError(job.error || 'AI parsing failed')
             setPendingJobId(null)
-            setPendingImageUrls([])
           }
         },
       )
       .subscribe()
 
-    // Fallback poll: check once after 90s in case Realtime missed the event
-    const fallbackTimer = setTimeout(async () => {
-      const { data } = await supabase
-        .from('receipt_jobs')
-        .select('*')
-        .eq('id', pendingJobId)
-        .single()
-
-      if (data?.status === 'completed' && data.result) {
-        handleAiResult(data.result as ParsedReceipt, data.image_urls as string[])
-        setPendingJobId(null)
-        setPendingImageUrls([])
-        setJobError(null)
-      } else if (data?.status === 'failed') {
-        setJobError(data.error || 'AI parsing failed (timeout)')
-        setPendingJobId(null)
-        setPendingImageUrls([])
+    // Fallback poll every 10s
+    const fallbackTimer = setInterval(() => {
+      if (!sessionStorage.getItem('pendingReceiptJobId')) {
+        clearInterval(fallbackTimer)
+        return
       }
-    }, 90_000)
+      resolveJobToSessionStorage(pendingJobId!)
+    }, 10_000)
 
     return () => {
+      window.removeEventListener('receipt-job-resolved', onResolved)
       supabase.removeChannel(channel)
-      clearTimeout(fallbackTimer)
+      clearInterval(fallbackTimer)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingJobId])
@@ -390,6 +543,7 @@ export function FinanceManager() {
         onJobCreated={(jobId, imageUrls) => {
           setPendingJobId(jobId)
           setPendingImageUrls(imageUrls)
+          sessionStorage.setItem('pendingReceiptImageUrls', JSON.stringify(imageUrls))
           setJobError(null)
         }}
         isPending={!!pendingJobId}

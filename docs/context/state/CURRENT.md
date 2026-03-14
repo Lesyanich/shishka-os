@@ -1,10 +1,25 @@
 # Current Deployment State
 
-**Last updated:** 2026-03-13
+**Last updated:** 2026-03-14
 **Active phase:** Phase 10 — SKU Layer (3-tier product architecture: nomenclature → sku → supplier_catalog)
 **Error monitoring:** Sentry (`@sentry/react`) — ErrorBoundary + browserTracing + replay. Source maps: `hidden`.
 **Auth:** Supabase Auth (email/password). `persistSession: true`. ProtectedRoute + AuthProvider.
 **Branch:** `feature/phase-6-mapping-engine`
+
+## Recent Fix: Receipt Job Resilience (2026-03-14)
+
+**Problem:** Realtime subscription for receipt_jobs was unreliable on Google Drive.
+Google Drive file sync causes constant Vite HMR reloads, which remount FinanceManager
+and destroy in-flight async state (pendingJobId, stagingData).
+
+**Solution — 3-layer resilience in FinanceManager.tsx:**
+1. **Module-level resolver** (`resolveJobToSessionStorage`) — async DB work outside React
+   lifecycle. Survives HMR unmount/remount. Writes result to sessionStorage.
+2. **sessionStorage persistence** — `pendingJobId`, `imageUrls`, `stagingData` all
+   persist via sessionStorage. useState initializers read from sessionStorage on mount.
+3. **Custom event bridge** (`receipt-job-resolved`) — module-level resolver dispatches
+   event → React useEffect listener picks up result from sessionStorage.
+4. **Fallback poll** every 10s (was 90s single-shot).
 
 ## Tables (Supabase public schema)
 
