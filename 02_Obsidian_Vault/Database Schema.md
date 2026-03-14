@@ -516,7 +516,7 @@ erDiagram
 | `fn_run_mrp(UUID)` | RPC | MRP v2: reads stock from v_inventory_by_nomenclature (was inventory_balances) | 023, 058 |
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
 | `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter | 021 |
-| `fn_approve_receipt(JSONB)` | RPC | Atomic receipt approval v10: SKU resolution (barcode→catalog→fallback→auto-create), sku_balances UPSERT, purchase_logs.sku_id | 030, 038, 040, 041, 047, 049, 058 |
+| `fn_approve_receipt(JSONB)` | RPC | Receipt approval v11: SKU resolution + sku_balances UPSERT + receiving_records audit trail | 030, 038, 040, 041, 047, 049, 058, 065 |
 | `fn_generate_sku_code()` | UTIL FN | Generates next SKU code: SKU-0001, SKU-0002, etc. | 057 |
 | `fn_sku_set_code()` | TRIGGER FN | Auto-assigns sku_code on INSERT if not provided | 057 |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | Lazy cleanup: marks zombie receipt_jobs (processing >5min) as failed | 036 |
@@ -525,6 +525,10 @@ erDiagram
 | `fn_set_created_by()` | TRIGGER FN | Auto-fills expense_ledger.created_by with auth.uid() on INSERT | 055 |
 | `fn_generate_po_number()` | UTIL FN | Generates next PO code: PO-0001, PO-0002, etc. | 061 |
 | `fn_po_set_number()` | TRIGGER FN | Auto-assigns po_number on INSERT if not provided | 061 |
+| `fn_create_purchase_order(JSONB)` | RPC | Creates PO with lines. Auto-populates prices from supplier_catalog | 064 |
+| `fn_receive_goods(JSONB)` | RPC | Physical receiving by Admin/Cook. No inventory update. Sets partially_received/received | 064 |
+| `fn_approve_po(JSONB)` | RPC | Financial reconciliation → expense_ledger + purchase_logs + sku_balances + WAC | 064 |
+| `fn_pending_deliveries()` | RPC | Pending POs for /receive screen. No prices. Includes partial delivery aggregation | 064 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
 
 ## Views

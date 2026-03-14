@@ -12,7 +12,7 @@
 | Phase | Name | Priority | Status |
 |-------|------|----------|--------|
 | 11 | Procurement Foundation (DB Schema) | P0 | **DONE** (060-063) |
-| 12 | Procurement RPCs | P0 | PLANNED |
+| 12 | Procurement RPCs | P0 | **DONE** (064-065) |
 | 13 | Receiving Station (Frontend — Cook/Admin UX) | P1 | PLANNED |
 | 14 | Purchase Order Management (Frontend — Admin/Owner) | P2 | PLANNED |
 | 15 | Financial Reconciliation (Frontend — Owner) | P2 | PLANNED |
@@ -100,7 +100,7 @@ and destroy in-flight async state (pendingJobId, stagingData).
 | `fn_process_new_order(UUID)` | RPC | LIVE — BOM explosion for orders |
 | `fn_run_mrp(UUID)` | RPC | LIVE — v2: reads v_inventory_by_nomenclature for RAW (058) |
 | `fn_approve_plan(UUID)` | RPC | LIVE — creates production_tasks from plan |
-| `fn_approve_receipt(JSONB)` | RPC | LIVE (v10) — SKU-aware: resolves sku_id, writes purchase_logs.sku_id, UPSERTs sku_balances (058) |
+| `fn_approve_receipt(JSONB)` | RPC | LIVE (v11) — SKU-aware + receiving_records audit trail (065) |
 | `fn_update_cost_on_purchase()` | TRIGGER | LIVE — v3: WAC from v_inventory_by_nomenclature (058) |
 | `fn_is_authenticated()` | UTIL | LIVE — `auth.role() = 'authenticated'` (054) |
 | `fn_current_user_id()` | UTIL | LIVE — `auth.uid()` (054) |
@@ -108,6 +108,10 @@ and destroy in-flight async state (pendingJobId, stagingData).
 | `fn_cleanup_stale_receipt_jobs()` | RPC | LIVE — zombie job cleanup |
 | `fn_generate_po_number()` | UTIL | LIVE — Phase 11: generates PO-0001 format codes (061) |
 | `fn_po_set_number()` | TRIGGER | LIVE — auto-assigns po_number on INSERT (061) |
+| `fn_create_purchase_order(JSONB)` | RPC | LIVE — Phase 12: creates PO + lines, auto-prices from catalog (064) |
+| `fn_receive_goods(JSONB)` | RPC | LIVE — Phase 12: physical receiving, no inventory update (064) |
+| `fn_approve_po(JSONB)` | RPC | LIVE — Phase 12: reconciliation → expense_ledger + purchase_logs + sku_balances (064) |
+| `fn_pending_deliveries()` | RPC | LIVE — Phase 12: pending POs for /receive, no prices (064) |
 
 ## 3-Tier Product Architecture (Phase 10)
 
@@ -151,7 +155,7 @@ nomenclature (abstract ingredient: "Olive Oil", base_unit: L)
 
 ## Migrations Applied
 
-63 migrations total (001–063). Latest:
+65 migrations total (001–065). Latest:
 - 049: Supplier catalog SSoT merge. fn_approve_receipt v9.
 - 050: WAC costing — Weighted Average Cost trigger.
 - 051: Order modifiers — parent_item_id + modifier_type.
@@ -167,5 +171,7 @@ nomenclature (abstract ingredient: "Olive Oil", base_unit: L)
 - 061: Purchase Orders — purchase_orders + po_lines tables, auto PO-XXXX trigger, RLS, Realtime.
 - 062: Receiving — receiving_records + receiving_lines tables, immutable audit trail, RLS.
 - 063: Procurement Links — purchase_logs +po_line_id/receiving_line_id, expense_ledger +po_id.
+- 064: Procurement RPCs — fn_create_purchase_order, fn_receive_goods, fn_approve_po, fn_pending_deliveries.
+- 065: fn_approve_receipt v11 — + receiving_records/lines audit trail side effect.
 
 → Full schema: `02_Obsidian_Vault/Database Schema.md`
