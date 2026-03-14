@@ -1,10 +1,25 @@
 # Current Deployment State
 
 **Last updated:** 2026-03-14
-**Active phase:** Phase 10 — SKU Layer (3-tier product architecture: nomenclature → sku → supplier_catalog)
+**Active phase:** Phase 11 — Procurement & Receiving (Purchase Orders + Physical Receiving + Financial Reconciliation)
+**Previous phase:** Phase 10 — SKU Layer (3-tier product architecture: nomenclature → sku → supplier_catalog)
 **Error monitoring:** Sentry (`@sentry/react`) — ErrorBoundary + browserTracing + replay. Source maps: `hidden`.
 **Auth:** Supabase Auth (email/password). `persistSession: true`. ProtectedRoute + AuthProvider.
 **Branch:** `feature/phase-6-mapping-engine`
+
+## Phase 11-16 Roadmap: Procurement & Receiving
+
+| Phase | Name | Priority | Status |
+|-------|------|----------|--------|
+| 11 | Procurement Foundation (DB Schema) | P0 | PLANNED |
+| 12 | Procurement RPCs | P0 | PLANNED |
+| 13 | Receiving Station (Frontend — Cook/Admin UX) | P1 | PLANNED |
+| 14 | Purchase Order Management (Frontend — Admin/Owner) | P2 | PLANNED |
+| 15 | Financial Reconciliation (Frontend — Owner) | P2 | PLANNED |
+| 16 | MRP → PO Integration | P3 | PLANNED |
+
+→ Architecture: `02_Obsidian_Vault/Procurement & Receiving Architecture.md`
+→ Module context: `docs/context/modules/procurement.md`
 
 ## Recent Fix: Receipt Job Resilience (2026-03-14)
 
