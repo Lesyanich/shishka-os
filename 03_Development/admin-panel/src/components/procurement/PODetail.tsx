@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, Send, CheckCircle, XCircle } from 'lucide-react'
+import { ChevronLeft, Send, CheckCircle, XCircle, DollarSign } from 'lucide-react'
 import type { PurchaseOrder, POLine, POStatus } from '../../types/procurement'
 
 const NEXT_ACTIONS: Partial<Record<POStatus, { label: string; next: POStatus; color: string }>> = {
@@ -13,9 +13,10 @@ interface Props {
   onBack: () => void
   fetchLines: (poId: string) => Promise<POLine[]>
   updateStatus: (poId: string, status: POStatus) => Promise<boolean>
+  onReconcile?: (order: PurchaseOrder) => void
 }
 
-export function PODetail({ order, onBack, fetchLines, updateStatus }: Props) {
+export function PODetail({ order, onBack, fetchLines, updateStatus, onReconcile }: Props) {
   const [lines, setLines] = useState<POLine[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -146,11 +147,14 @@ export function PODetail({ order, onBack, fetchLines, updateStatus }: Props) {
           </button>
         )}
 
-        {order.status === 'received' && (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-300">
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            Ready for reconciliation in Finance
-          </div>
+        {['received', 'partially_received'].includes(order.status) && onReconcile && (
+          <button
+            onClick={() => onReconcile(order)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 active:scale-[0.99]"
+          >
+            <DollarSign className="h-4 w-4" />
+            Reconcile &amp; Approve
+          </button>
         )}
 
         {!['reconciled', 'cancelled'].includes(order.status) && (

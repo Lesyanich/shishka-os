@@ -1,7 +1,7 @@
 # Current Deployment State
 
 **Last updated:** 2026-03-14
-**Active phase:** Phase 14 — Purchase Order Management (Frontend — Admin/Owner)
+**Active phase:** Phase 15 — Financial Reconciliation (Frontend — Owner)
 **Previous phase:** Phase 10 — SKU Layer (3-tier product architecture: nomenclature → sku → supplier_catalog)
 **Error monitoring:** Sentry (`@sentry/react`) — ErrorBoundary + browserTracing + replay. Source maps: `hidden`.
 **Auth:** Supabase Auth (email/password). `persistSession: true`. ProtectedRoute + AuthProvider.
@@ -15,7 +15,7 @@
 | 12 | Procurement RPCs | P0 | **DONE** (064-065) |
 | 13 | Receiving Station (Frontend — Cook/Admin UX) | P1 | **DONE** |
 | 14 | Purchase Order Management (Frontend — Admin/Owner) | P2 | **DONE** |
-| 15 | Financial Reconciliation (Frontend — Owner) | P2 | PLANNED |
+| 15 | Financial Reconciliation (Frontend — Owner) | P2 | **DONE** |
 | 16 | MRP → PO Integration | P3 | PLANNED |
 
 → Architecture: `02_Obsidian_Vault/Procurement & Receiving Architecture.md`

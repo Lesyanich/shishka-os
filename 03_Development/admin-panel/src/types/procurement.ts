@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // Types: Procurement & Receiving
-// Phase 13–14: Receiving Station + PO Management
+// Phase 13–15: Receiving Station + PO Management + Reconciliation
 // ═══════════════════════════════════════════════════════════
 
 export type POStatus =
@@ -133,6 +133,53 @@ export interface CreatePOResult {
   po_id?: string
   po_number?: string
   line_count?: number
+}
+
+// ── Phase 15: Reconciliation ──
+
+export interface ReconciliationLine {
+  receiving_line_id: string
+  po_line_id: string | null
+  nomenclature_id: string
+  product_name: string
+  product_code: string
+  unit: string
+  qty_ordered: number
+  qty_received: number
+  qty_rejected: number
+  unit_price_expected: number | null
+  unit_price_actual: number | null
+  reject_reason: string | null
+}
+
+export interface ApprovePOPayload {
+  po_id: string
+  transaction_date?: string
+  flow_type?: string
+  amount_original: number
+  currency?: string
+  exchange_rate?: number
+  discount_total?: number
+  vat_amount?: number
+  delivery_fee?: number
+  paid_by?: string
+  payment_method?: string
+  status?: string
+  has_tax_invoice?: boolean
+  invoice_number?: string
+  details?: string
+  comments?: string
+  receipt_supplier_url?: string
+  receipt_bank_url?: string
+  tax_invoice_url?: string
+}
+
+export interface ApprovePOResult {
+  ok: boolean
+  error?: string
+  expense_id?: string
+  purchase_count?: number
+  sku_auto_created?: number
 }
 
 // ── Checklist UI state (extends PendingDeliveryLine) ──
