@@ -1,7 +1,7 @@
 # Current Deployment State
 
 **Last updated:** 2026-03-14
-**Active phase:** Phase 11 — Procurement & Receiving (Purchase Orders + Physical Receiving + Financial Reconciliation)
+**Active phase:** Phase 13 — Receiving Station (Frontend — Cook/Admin UX)
 **Previous phase:** Phase 10 — SKU Layer (3-tier product architecture: nomenclature → sku → supplier_catalog)
 **Error monitoring:** Sentry (`@sentry/react`) — ErrorBoundary + browserTracing + replay. Source maps: `hidden`.
 **Auth:** Supabase Auth (email/password). `persistSession: true`. ProtectedRoute + AuthProvider.
@@ -13,7 +13,7 @@
 |-------|------|----------|--------|
 | 11 | Procurement Foundation (DB Schema) | P0 | **DONE** (060-063) |
 | 12 | Procurement RPCs | P0 | **DONE** (064-065) |
-| 13 | Receiving Station (Frontend — Cook/Admin UX) | P1 | PLANNED |
+| 13 | Receiving Station (Frontend — Cook/Admin UX) | P1 | **DONE** |
 | 14 | Purchase Order Management (Frontend — Admin/Owner) | P2 | PLANNED |
 | 15 | Financial Reconciliation (Frontend — Owner) | P2 | PLANNED |
 | 16 | MRP → PO Integration | P3 | PLANNED |
@@ -151,6 +151,7 @@ nomenclature (abstract ingredient: "Olive Oil", base_unit: L)
 | `/sku` | SkuManagerPage.tsx | LIVE — protected (Phase 10.2) |
 | `/orders` | OrderManager.tsx | LIVE — protected |
 | `/planner` | MasterPlanner.tsx | LIVE — protected |
+| `/receive` | ReceivingStation.tsx | LIVE — protected (Phase 13) |
 | `/finance` | FinanceManager.tsx | LIVE — protected |
 
 ## Migrations Applied

@@ -12,6 +12,7 @@ import {
   Truck,
   Package,
   Bell,
+  ClipboardCheck,
   UtensilsCrossed,
   Wallet,
 } from 'lucide-react'
@@ -35,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/sku', icon: Package, label: 'SKU Manager', enabled: true },
   { path: '/orders', icon: Bell, label: 'Orders', enabled: true },
   { path: '/planner', icon: CalendarDays, label: 'Planner', enabled: true },
+  { path: '/receive', icon: ClipboardCheck, label: 'Receiving', enabled: true },
   { path: '/finance', icon: Wallet, label: 'Finance', enabled: true },
   { path: '/analytics', icon: BarChart2, label: 'Analytics', enabled: false },
 ]
