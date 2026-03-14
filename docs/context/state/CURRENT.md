@@ -1,8 +1,8 @@
 # Current Deployment State
 
 **Last updated:** 2026-03-14
-**Active phase:** Phase 16 — MRP → PO Integration (complete)
-**Previous phase:** Phase 10 — SKU Layer (3-tier product architecture: nomenclature → sku → supplier_catalog)
+**Active phase:** Phase 17 — Syrve Integration Foundation (in progress)
+**Previous phase:** Phase 16 — MRP → PO Integration (complete)
 **Error monitoring:** Sentry (`@sentry/react`) — ErrorBoundary + browserTracing + replay. Source maps: `hidden`.
 **Auth:** Supabase Auth (email/password). `persistSession: true`. ProtectedRoute + AuthProvider.
 **Branch:** `feature/phase-6-mapping-engine`
@@ -20,6 +20,18 @@
 
 → Architecture: `02_Obsidian_Vault/Procurement & Receiving Architecture.md`
 → Module context: `docs/context/modules/procurement.md`
+
+## Phase 17-20 Roadmap: Syrve Integration
+
+| Phase | Name | Priority | Status |
+|-------|------|----------|--------|
+| 17 | Syrve Foundation — Nomenclature Mapping | P0 | **IN PROGRESS** |
+| 18 | Purchase Push — Закупки → Syrve | P1 | planned |
+| 19 | Sales Pull — Продажи из Syrve | P1 | planned |
+| 20 | Waste Push + Analytics Comparison | P2 | planned |
+
+→ Integration plan: `.claude/plans/declarative-napping-chipmunk.md`
+→ Architecture: Fire-and-Forget Outbox Pattern (syrve_sync_queue), UoM conversion (syrve_uom_map), Tax mapping (syrve_tax_category_id)
 
 ## Recent Fix: Receipt Job Resilience (2026-03-14)
 
@@ -40,7 +52,7 @@ and destroy in-flight async state (pendingJobId, stagingData).
 
 | Table | PK | Status | Notes |
 |---|---|---|---|
-| `nomenclature` | `id` UUID | LIVE | Unified SSoT (Products + Sync). Migration 005. brand_id + syrve_id DROPPED (059). |
+| `nomenclature` | `id` UUID | LIVE | Unified SSoT (Products + Sync). Migration 005. brand_id + syrve_id DROPPED (059). +syrve_uuid, +syrve_tax_category_id (066). |
 | `bom_structures` | `id` UUID | LIVE | Dynamic/Proportional BOM ratios. Migration 007 & 012. |
 | `equipment` | `id` UUID | LIVE | 76 units. Refactored to UUID. |
 | ~~`recipes_flow`~~ | -- | DROPPED | Dropped in migration 056 (Phase 9). |
@@ -78,6 +90,11 @@ and destroy in-flight async state (pendingJobId, stagingData).
 | **`po_lines`** | `id` UUID | **LIVE** | **Phase 11: PO line items. qty_ordered, unit_price_expected. Migration 061.** |
 | **`receiving_records`** | `id` UUID | **LIVE** | **Phase 11: Physical receiving header. Links to PO or receipt. Migration 062.** |
 | **`receiving_lines`** | `id` UUID | **LIVE** | **Phase 11: Receiving line items. qty_expected/received/rejected. Immutable. Migration 062.** |
+| **`syrve_config`** | `key` TEXT | **LIVE** | **Phase 17: Key/value store for Syrve API credentials. Migration 066.** |
+| **`syrve_sync_queue`** | `id` UUID | **LIVE** | **Phase 17: Fire-and-Forget Outbox. Async sync decoupled from approve. Migration 066.** |
+| **`syrve_sync_log`** | `id` UUID | **LIVE** | **Phase 17: Audit trail for all sync operations. Migration 066.** |
+| **`syrve_uom_map`** | `id` UUID | **LIVE** | **Phase 17: UoM conversion (box→liters). Migration 066.** |
+| **`syrve_sales`** | `id` UUID | **LIVE** | **Phase 17: Pulled sales data from Syrve POS. Migration 066.** |
 
 ## Views
 
@@ -112,6 +129,9 @@ and destroy in-flight async state (pendingJobId, stagingData).
 | `fn_receive_goods(JSONB)` | RPC | LIVE — Phase 12: physical receiving, no inventory update (064) |
 | `fn_approve_po(JSONB)` | RPC | LIVE — Phase 12: reconciliation → expense_ledger + purchase_logs + sku_balances (064) |
 | `fn_pending_deliveries()` | RPC | LIVE — Phase 12: pending POs for /receive, no prices (064) |
+| `fn_get_syrve_config()` | RPC | LIVE — Phase 17: returns syrve_config as JSONB (066) |
+| `fn_upsert_syrve_config(TEXT, TEXT)` | RPC | LIVE — Phase 17: set config key/value (066) |
+| `fn_save_syrve_mapping(UUID, UUID, UUID)` | RPC | LIVE — Phase 17: save nomenclature→syrve_uuid mapping (066) |
 
 ## 3-Tier Product Architecture (Phase 10)
 
@@ -153,10 +173,11 @@ nomenclature (abstract ingredient: "Olive Oil", base_unit: L)
 | `/planner` | MasterPlanner.tsx | LIVE — protected |
 | `/receive` | ReceivingStation.tsx | LIVE — protected (Phase 13) |
 | `/finance` | FinanceManager.tsx | LIVE — protected |
+| `/settings` | Settings.tsx | LIVE — protected (Phase 17) |
 
 ## Migrations Applied
 
-65 migrations total (001–065). Latest:
+66 migrations total (001–066). Latest:
 - 049: Supplier catalog SSoT merge. fn_approve_receipt v9.
 - 050: WAC costing — Weighted Average Cost trigger.
 - 051: Order modifiers — parent_item_id + modifier_type.
@@ -174,5 +195,6 @@ nomenclature (abstract ingredient: "Olive Oil", base_unit: L)
 - 063: Procurement Links — purchase_logs +po_line_id/receiving_line_id, expense_ledger +po_id.
 - 064: Procurement RPCs — fn_create_purchase_order, fn_receive_goods, fn_approve_po, fn_pending_deliveries.
 - 065: fn_approve_receipt v11 — + receiving_records/lines audit trail side effect.
+- 066: Syrve Integration — syrve_config, syrve_sync_queue, syrve_sync_log, syrve_uom_map, syrve_sales tables. syrve_uuid/syrve_tax_category_id on nomenclature. syrve_uuid on suppliers. syrve_synced/syrve_doc_id on expense_ledger. 3 RPCs.
 
 → Full schema: `02_Obsidian_Vault/Database Schema.md`

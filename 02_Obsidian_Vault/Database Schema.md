@@ -607,6 +607,86 @@ erDiagram
 | `purchase_orders` | `grand_total`, `expense_id` | Financial fields managed by RPC | `fn_approve_po()` |
 | `receiving_lines` | ALL columns | Immutable audit trail | INSERT-only via `fn_receive_goods()` |
 
+## Syrve Integration Tables (Phase 17, Migration 066)
+
+### syrve_config
+Key/value store for Syrve API credentials and settings.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `key` | TEXT | PK |
+| `value` | TEXT | NOT NULL |
+| `updated_at` | TIMESTAMPTZ | DEFAULT now() |
+
+### syrve_sync_queue
+Fire-and-Forget Outbox: decouples approve transactions from Syrve API.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID | PK |
+| `sync_type` | TEXT | CHECK IN ('purchase_invoice', 'writeoff', 'nomenclature') |
+| `ref_id` | UUID | FK to source (expense_ledger, waste_logs) |
+| `payload` | JSONB | Frozen snapshot at approve time |
+| `status` | TEXT | CHECK IN ('pending', 'processing', 'synced', 'error', 'failed') |
+| `attempts` | INT | DEFAULT 0 |
+| `last_error` | TEXT | |
+| `next_retry_at` | TIMESTAMPTZ | Exponential backoff |
+| `created_at` | TIMESTAMPTZ | |
+| `synced_at` | TIMESTAMPTZ | |
+
+### syrve_sync_log
+Audit trail for all sync operations (pull/push).
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID | PK |
+| `sync_type` | TEXT | 'nomenclature', 'sales', 'purchase_push', 'writeoff_push' |
+| `direction` | TEXT | CHECK IN ('pull', 'push') |
+| `status` | TEXT | CHECK IN ('success', 'error') |
+| `records_count` | INT | |
+| `error_message` | TEXT | |
+| `payload` | JSONB | Debug info |
+| `created_at` | TIMESTAMPTZ | |
+
+### syrve_uom_map
+Unit conversion between Shishka (box, pack) and Syrve (liter, kg).
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID | PK |
+| `nomenclature_id` | UUID | FK nomenclature. UNIQUE(nomenclature_id, shishka_unit) |
+| `shishka_unit` | TEXT | NOT NULL |
+| `syrve_unit` | TEXT | NOT NULL |
+| `syrve_uom_id` | UUID | Syrve measureUnit UUID |
+| `conversion_factor` | NUMERIC | CHECK > 0 |
+| `created_at` | TIMESTAMPTZ | |
+
+### syrve_sales
+Sales data pulled from Syrve POS (Phase 19).
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID | PK |
+| `syrve_order_id` | TEXT | |
+| `nomenclature_id` | UUID | FK nomenclature |
+| `product_name` | TEXT | |
+| `quantity` | NUMERIC | |
+| `amount` | NUMERIC | Revenue |
+| `cost_amount` | NUMERIC | Syrve COGS |
+| `sale_date` | DATE | Indexed |
+| `payment_type` | TEXT | |
+| `synced_at` | TIMESTAMPTZ | |
+
+### Syrve columns on existing tables
+
+| Table | Column | Type | Purpose |
+|-------|--------|------|---------|
+| `nomenclature` | `syrve_uuid` | UUID | Syrve product UUID mapping |
+| `nomenclature` | `syrve_tax_category_id` | UUID | Syrve tax category for purchase invoices |
+| `suppliers` | `syrve_uuid` | UUID | Syrve counteragent UUID mapping |
+| `expense_ledger` | `syrve_synced` | BOOLEAN | Sync status flag |
+| `expense_ledger` | `syrve_doc_id` | TEXT | Syrve document ID after sync |
+
 ## Related
 
 - [[Shishka OS Architecture]] -- System overview and module map

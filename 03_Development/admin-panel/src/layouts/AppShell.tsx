@@ -14,6 +14,7 @@ import {
   Bell,
   ClipboardCheck,
   UtensilsCrossed,
+  Settings,
   Wallet,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -39,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/receive', icon: ClipboardCheck, label: 'Receiving', enabled: true },
   { path: '/finance', icon: Wallet, label: 'Finance', enabled: true },
   { path: '/analytics', icon: BarChart2, label: 'Analytics', enabled: false },
+  { path: '/settings', icon: Settings, label: 'Settings', enabled: true },
 ]
 
 export function AppShell() {

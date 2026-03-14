@@ -22,6 +22,7 @@ const OrderManager = lazy(() => import('./pages/OrderManager').then(m => ({ defa
 const MasterPlanner = lazy(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
 const FinanceManager = lazy(() => import('./pages/FinanceManager').then(m => ({ default: m.FinanceManager })))
 const ReceivingStation = lazy(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
+const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
 
 function PageLoader() {
   return (
@@ -70,6 +71,7 @@ function App() {
                 <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
                 <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceManager /></Suspense>} />
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
+                <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
               </Route>
             </Route>
             {/* Fallback: redirect unknown routes to Control Center */}
