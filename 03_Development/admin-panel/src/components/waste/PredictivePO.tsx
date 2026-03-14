@@ -3,11 +3,10 @@ import { ShoppingCart, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { UsePredictivePOResult } from '../../hooks/usePredictivePO'
 
-interface DailyPlan {
+interface ProductionPlan {
   id: string
-  plan_date: string
-  product_code: string
-  target_quantity: number
+  name: string
+  target_date: string
   status: string
 }
 
@@ -16,20 +15,20 @@ interface PredictivePOProps {
 }
 
 export function PredictivePO({ po }: PredictivePOProps) {
-  const [plans, setPlans] = useState<DailyPlan[]>([])
+  const [plans, setPlans] = useState<ProductionPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState('')
   const [plansLoading, setPlansLoading] = useState(true)
 
-  // Fetch available daily plans
+  // Fetch available production plans
   useEffect(() => {
     async function fetchPlans() {
       const { data } = await supabase
-        .from('daily_plan')
-        .select('id, plan_date, product_code, target_quantity, status')
-        .order('plan_date', { ascending: false })
+        .from('production_plans')
+        .select('id, name, target_date, status')
+        .order('target_date', { ascending: false })
         .limit(20)
 
-      setPlans((data ?? []) as DailyPlan[])
+      setPlans((data ?? []) as ProductionPlan[])
       setPlansLoading(false)
     }
     fetchPlans()
@@ -61,7 +60,7 @@ export function PredictivePO({ po }: PredictivePOProps) {
           </option>
           {plans.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.plan_date} — {p.product_code} × {p.target_quantity} ({p.status})
+              {p.target_date} — {p.name} ({p.status})
             </option>
           ))}
         </select>
@@ -87,9 +86,9 @@ export function PredictivePO({ po }: PredictivePOProps) {
         <div>
           {/* Summary */}
           <div className="border-b border-slate-800 px-4 py-2 text-xs text-slate-400">
-            Plan: <span className="text-slate-200">{po.result.product_code}</span> × {po.result.target_quantity}
-            {' · '}
             {po.result.items.filter((i) => i.shortage > 0).length} items need purchasing
+            {' · '}
+            {po.result.items.length} total ingredients
           </div>
 
           {/* Table */}

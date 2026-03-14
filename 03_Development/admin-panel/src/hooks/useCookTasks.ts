@@ -13,7 +13,9 @@ export interface CookTask {
   actual_weight: number | null
   theoretical_yield: number | null
   theoretical_bom_snapshot: Record<string, unknown>[] | null
-  flow_step_id: string | null
+  target_nomenclature_id: string | null
+  target_quantity: number | null
+  target_nomenclature: { name: string; product_code: string } | null
 }
 
 export interface UseCookTasksResult {
@@ -37,7 +39,7 @@ export function useCookTasks(): UseCookTasksResult {
     const { data, error: fetchError } = await supabase
       .from('production_tasks')
       .select(
-        'id, description, status, scheduled_start, duration_min, equipment_id, actual_start, actual_end, actual_weight, theoretical_yield, theoretical_bom_snapshot, flow_step_id',
+        'id, description, status, scheduled_start, duration_min, equipment_id, actual_start, actual_end, actual_weight, theoretical_yield, theoretical_bom_snapshot, target_nomenclature_id, target_quantity, nomenclature!target_nomenclature_id(name, product_code)',
       )
       .in('status', ['pending', 'in_progress'])
       .order('scheduled_start', { ascending: true, nullsFirst: false })
@@ -46,7 +48,13 @@ export function useCookTasks(): UseCookTasksResult {
       console.error('[useCookTasks] fetch error', fetchError)
       setError(fetchError.message)
     } else {
-      setTasks((data ?? []) as CookTask[])
+      // Map Supabase embedded select to flat structure
+      const mapped = (data ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        target_nomenclature: row.nomenclature as { name: string; product_code: string } | null,
+        nomenclature: undefined,
+      })) as unknown as CookTask[]
+      setTasks(mapped)
     }
 
     setIsLoading(false)

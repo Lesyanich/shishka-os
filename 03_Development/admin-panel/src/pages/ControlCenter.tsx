@@ -1,5 +1,6 @@
 import { BOMHealthBar } from '../components/control-center/BOMHealthBar'
-import { CapExMiniChart } from '../components/control-center/CapExMiniChart'
+import { lazy, Suspense } from 'react'
+const CapExMiniChart = lazy(() => import('../components/control-center/CapExMiniChart').then(m => ({ default: m.CapExMiniChart })))
 import { EquipmentAlerts } from '../components/control-center/EquipmentAlerts'
 import { HeroKPIRow } from '../components/control-center/HeroKPIRow'
 import { KitchenStatusKanban } from '../components/control-center/KitchenStatusKanban'
@@ -47,11 +48,13 @@ export function ControlCenter() {
 
       {/* Row 3: CapEx chart + Equipment alerts */}
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <CapExMiniChart
-          byCategory={capex.byCategory}
-          isLoading={capex.isLoading}
-          error={capex.error}
-        />
+        <Suspense fallback={<div className="h-48 animate-pulse rounded-xl bg-slate-800/50" />}>
+          <CapExMiniChart
+            byCategory={capex.byCategory}
+            isLoading={capex.isLoading}
+            error={capex.error}
+          />
+        </Suspense>
         <EquipmentAlerts
           equipment={equipment.equipment}
           isLoading={equipment.isLoading}

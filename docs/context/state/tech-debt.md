@@ -13,14 +13,11 @@ Consolidated from all phases. Items marked with phase of origin.
 - Migration 041 needs SQL execution in Dashboard (Supabase CLI not linked)
 - GAS needs `clasp push && npm run deploy` from `03_Development/gas/`
 
-### Phase 5: Bundle Size
-- recharts adds ~300KB to bundle → use `React.lazy()` + `Suspense` for CapExMiniChart
-- Not yet implemented
+### ~~Phase 5: Bundle Size~~ → RESOLVED (Phase 9)
+- ~~recharts adds ~300KB to bundle → use `React.lazy()` + `Suspense` for CapExMiniChart~~ → **DONE: MonthlyChart + CapExMiniChart lazy loaded**
 
-### Security: No Authentication (Phase 7+)
-- Admin panel uses `anon` key — anyone with Supabase URL + anon key can make API calls
-- Column-level REVOKE (Migration 031) mitigates worst cases
-- Recommend: add Supabase Auth
+### ~~Security: No Authentication (Phase 7+)~~ → RESOLVED (Phase 8)
+- ~~Admin panel uses `anon` key~~ → **DONE: Supabase Auth (email/password), all 30 tables auth_full_access RLS (054)**
 
 ### Security: Remaining Column-Level Risks
 - `expense_ledger.amount_original` / `exchange_rate` — admin panel's ExpenseEditModal uses direct `.update()`. Column-level REVOKE would break edit modal. Migrate to RPC-based update.

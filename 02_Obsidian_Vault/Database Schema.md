@@ -37,7 +37,6 @@ erDiagram
         NUMERIC carbs
         NUMERIC fat
         UUID category_id FK
-        UUID brand_id FK
     }
 
     product_categories {
@@ -117,10 +116,29 @@ erDiagram
         BOOLEAN is_primary
     }
 
-    inventory_balances {
-        UUID nomenclature_id PK
+    sku {
+        UUID id PK
+        TEXT sku_code "UNIQUE SKU-0001"
+        UUID nomenclature_id FK
+        TEXT barcode "UNIQUE WHERE NOT NULL"
+        TEXT product_name
+        TEXT product_name_th
+        TEXT full_title
+        UUID brand_id FK
+        TEXT brand
+        TEXT package_weight
+        NUMERIC package_qty
+        TEXT package_unit
+        TEXT package_type
+        BOOLEAN is_active
+    }
+
+    sku_balances {
+        UUID sku_id PK
+        UUID nomenclature_id FK
         NUMERIC quantity
         TIMESTAMPTZ last_counted_at
+        TIMESTAMPTZ last_received_at
     }
 
     waste_logs {
@@ -171,6 +189,7 @@ erDiagram
         UUID nomenclature_id FK
         UUID supplier_id FK
         UUID expense_id FK
+        UUID sku_id FK "Phase 10"
         NUMERIC quantity
         NUMERIC price_per_unit
         NUMERIC total_price
@@ -271,6 +290,7 @@ erDiagram
         UUID id PK
         UUID supplier_id FK
         UUID nomenclature_id FK
+        UUID sku_id FK "Phase 10"
         TEXT supplier_sku
         TEXT original_name
         INT match_count
@@ -309,7 +329,8 @@ erDiagram
 
     nomenclature ||--o{ bom_structures : "parent_id"
     nomenclature ||--o{ bom_structures : "ingredient_id"
-    nomenclature ||--o{ inventory_balances : "nomenclature_id"
+    nomenclature ||--o{ sku : "nomenclature_id"
+    nomenclature ||--o{ sku_balances : "nomenclature_id"
     nomenclature ||--o{ waste_logs : "nomenclature_id"
     nomenclature ||--o{ inventory_batches : "nomenclature_id"
     nomenclature ||--o{ purchase_logs : "nomenclature_id"
@@ -319,9 +340,13 @@ erDiagram
     nomenclature ||--o{ production_tasks : "target_nomenclature_id"
     nomenclature ||--o{ production_task_outputs : "nomenclature_id"
 
+    sku ||--o| sku_balances : "sku_id"
+    sku ||--o{ supplier_catalog : "sku_id"
+    sku ||--o{ purchase_logs : "sku_id"
+
     product_categories ||--o{ nomenclature : "category_id"
     product_categories ||--o{ product_categories : "parent_id"
-    brands ||--o{ nomenclature : "brand_id"
+    brands ||--o{ sku : "brand_id"
     brands ||--o{ supplier_catalog : "brand_id"
     tags ||--o{ nomenclature_tags : "tag_id"
     fin_sub_categories ||--o{ product_categories : "default_fin_sub_code"
@@ -361,33 +386,35 @@ erDiagram
 
 | Table | PK | Key Columns | Foreign Keys | Migration |
 |---|---|---|---|---|
-| `nomenclature` | `id` UUID | product_code, name, type, base_unit, cost_per_unit, price, slug, category_id, brand_id | category_id -> product_categories, brand_id -> brands | 005, 019, 020, 046 |
+| `nomenclature` | `id` UUID | product_code, name, type, base_unit, cost_per_unit, price, slug, category_id | category_id -> product_categories | 005, 019, 020, 046, 059 |
 | `bom_structures` | `id` UUID | parent_id, ingredient_id, quantity_per_unit | parent_id -> nomenclature, ingredient_id -> nomenclature | 007, 012 |
 | `equipment` | `id` UUID | name, category, status, last_service_date | -- | pre-existing |
 | `production_tasks` | `id` UUID | status, scheduled_start, equipment_id, order_id, target_nomenclature_id, target_quantity | equipment_id -> equipment, order_id -> orders, target_nomenclature_id -> nomenclature | 016, 022, 048 |
 | `production_task_outputs` | `id` UUID | task_id, nomenclature_id, planned_quantity, actual_quantity, is_primary, UNIQUE(task_id,nomenclature_id) | task_id -> production_tasks (CASCADE), nomenclature_id -> nomenclature | 048 |
-| `recipes_flow` | `id` UUID | DEPRECATED | -- | pre-existing, 052 |
-| `daily_plan` | `id` UUID | DEPRECATED | -- | pre-existing, 052 |
+| ~~`recipes_flow`~~ | -- | DROPPED (056) | -- | pre-existing → 056 |
+| ~~`daily_plan`~~ | -- | DROPPED (056) | -- | pre-existing → 056 |
 | `fin_categories` | `code` INT | name | -- | 003 |
 | `fin_sub_categories` | `sub_code` INT | category_code, name | category_code -> fin_categories | 003 |
 | `capex_assets` | `id` UUID | equipment FK | equipment_id -> equipment | 003 |
 | `capex_transactions` | `id` UUID | transaction_id (UNIQUE), category_code, amount_thb, expense_id | category_code -> fin_categories, expense_id -> expense_ledger | 003, 030 |
-| `inventory_balances` | `nomenclature_id` UUID | quantity, last_counted_at | nomenclature_id -> nomenclature | 017 |
+| `sku` | `id` UUID | sku_code (UNIQUE), nomenclature_id, barcode (UNIQUE WHERE NOT NULL), product_name, product_name_th, brand_id, brand, package_weight, package_qty, package_unit, package_type, is_active | nomenclature_id -> nomenclature (CASCADE), brand_id -> brands | 057 |
+| `sku_balances` | `sku_id` UUID | nomenclature_id, quantity, last_counted_at, last_received_at | sku_id -> sku (CASCADE), nomenclature_id -> nomenclature | 057 |
+| ~~`inventory_balances`~~ | -- | DROPPED (058). Replaced by sku_balances + v_inventory_by_nomenclature | -- | 017 → 058 |
 | `waste_logs` | `id` UUID | nomenclature_id, quantity, reason | nomenclature_id -> nomenclature | 017 |
 | `locations` | `id` UUID | name (UNIQUE), type | -- | 018 |
 | `inventory_batches` | `id` UUID | barcode (UNIQUE), status, expires_at | nomenclature_id -> nomenclature, location_id -> locations, production_task_id -> production_tasks | 018 |
 | `stock_transfers` | `id` UUID | from_location, to_location | batch_id -> inventory_batches, from/to -> locations | 018 |
 | `suppliers` | `id` UUID | name (UNIQUE), is_deleted, category_code, sub_category_code | category_code -> fin_categories | 021, 025, 032 |
-| `purchase_logs` | `id` UUID | quantity, price_per_unit, invoice_date, expense_id | nomenclature_id -> nomenclature, supplier_id -> suppliers, expense_id -> expense_ledger | 021, 030 |
+| `purchase_logs` | `id` UUID | quantity, price_per_unit, invoice_date, expense_id, sku_id | nomenclature_id -> nomenclature, supplier_id -> suppliers, expense_id -> expense_ledger, sku_id -> sku | 021, 030, 057 |
 | `orders` | `id` UUID | source, status, customer_name, total_amount | -- | 022 |
 | `order_items` | `id` UUID | quantity, price_at_purchase, parent_item_id, modifier_type | order_id -> orders (CASCADE), nomenclature_id -> nomenclature, parent_item_id -> order_items (self-ref CASCADE) | 022, 051 |
 | `production_plans` | `id` UUID | name, target_date, status, mrp_result | -- | 023 |
 | `plan_targets` | `id` UUID | target_qty, UNIQUE(plan_id,nomenclature_id) | plan_id -> production_plans (CASCADE), nomenclature_id -> nomenclature | 023 |
 | `expense_ledger` | `id` UUID | details, comments, invoice_number, amount_original, currency, exchange_rate, amount_thb (GENERATED), has_tax_invoice, discount_total, vat_amount, delivery_fee, created_by | category_code -> fin_categories, sub_category_code -> fin_sub_categories, supplier_id -> suppliers | 024, 026, 030, 038, 041, 052 |
 | `opex_items` | `id` UUID | description, quantity, unit, unit_price, total_price | expense_id -> expense_ledger (CASCADE) | 030 |
-| `supplier_catalog` | `id` UUID | supplier_sku, original_name, match_count, purchase_unit, conversion_factor, base_unit, barcode, product_name, product_name_th, brand, full_title, package_qty, package_unit, package_type, last_seen_price, source, brand_id | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE), category_code -> fin_categories, sub_category_code -> fin_sub_categories, brand_id -> brands | 049 |
-| `supplier_item_mapping` | VIEW | DEPRECATED backward-compat view over supplier_catalog | -- | 049 |
-| `supplier_products` | VIEW | DEPRECATED backward-compat view over supplier_catalog | -- | 049 |
+| `supplier_catalog` | `id` UUID | supplier_sku, original_name, match_count, purchase_unit, conversion_factor, base_unit, barcode, product_name, product_name_th, brand, full_title, package_qty, package_unit, package_type, last_seen_price, source, brand_id, sku_id | supplier_id -> suppliers (CASCADE), nomenclature_id -> nomenclature (CASCADE), category_code -> fin_categories, sub_category_code -> fin_sub_categories, brand_id -> brands, sku_id -> sku | 049, 057 |
+| ~~`supplier_item_mapping`~~ | VIEW | DROPPED (056). Was backward-compat view over supplier_catalog | -- | 049 → 056 |
+| ~~`supplier_products`~~ | VIEW | DROPPED (056). Was backward-compat view over supplier_catalog | -- | 049 → 056 |
 | `receipt_jobs` | `id` UUID | status, image_urls (JSONB), result (JSONB), error, ocr_text, duration_ms, model | -- (standalone, pre-approval) | 036, 037 |
 | `product_categories` | `id` UUID | code (UNIQUE), name, name_th, level (1-3), sort_order, is_active, default_fin_sub_code | parent_id -> product_categories (self-ref), default_fin_sub_code -> fin_sub_categories | 045 |
 | `brands` | `id` UUID | name (UNIQUE), name_th, country, is_active | -- | 045 |
@@ -411,22 +438,31 @@ erDiagram
 
 | Function | Type | Purpose | Migration |
 |---|---|---|---|
-| `fn_start_production_task(UUID)` | RPC | Start cook task, freeze BOM snapshot | 016 |
-| `fn_predictive_procurement(UUID)` | RPC | Recursive BOM walk, shortage calc | 017 |
+| `fn_start_production_task(UUID)` | RPC | Start cook task, freeze BOM snapshot. Reads target_nomenclature_id directly (056 rewrite, was flow_step_id→recipes_flow) | 016, 056 |
+| `fn_predictive_procurement(UUID)` | RPC | Procurement v3: reads stock from v_inventory_by_nomenclature (was inventory_balances) | 017, 056, 058 |
 | `fn_generate_barcode()` | UTIL | 8-char alphanumeric barcode | 018 |
-| `fn_create_batches_from_task(UUID, JSONB)` | RPC | Create batches + complete task | 018 |
+| `fn_create_batches_from_task(UUID, JSONB)` | RPC | Create batches + complete task. Reads target_nomenclature_id directly (056 rewrite) | 018, 056 |
 | `fn_open_batch(UUID)` | RPC | Open batch, shrink expires_at +12h | 018 |
 | `fn_transfer_batch(TEXT, TEXT)` | RPC | Move batch by barcode, log transfer | 018 |
-| `fn_update_cost_on_purchase()` | TRIGGER FN | WAC: Weighted Average Cost on purchase (replaced Last-In) | 021, 050 |
+| `fn_update_cost_on_purchase()` | TRIGGER FN | WAC v3: reads from v_inventory_by_nomenclature (was inventory_balances) | 021, 050, 058 |
 | `fn_process_new_order(UUID)` | RPC | BOM explosion: order items -> production tasks | 022 |
-| `fn_run_mrp(UUID)` | RPC | 2-level MRP engine: SALE->PF/MOD->RAW, inventory deduction | 023 |
+| `fn_run_mrp(UUID)` | RPC | MRP v2: reads stock from v_inventory_by_nomenclature (was inventory_balances) | 023, 058 |
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
 | `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter | 021 |
-| `fn_approve_receipt(JSONB)` | RPC | Atomic receipt approval: Hub (expense_ledger) + Spokes (purchase_logs, capex_transactions, opex_items). v6: UoM. v7: delivery_fee. v8: auto-derive sub_category. v9: supplier_catalog SSoT | 030, 038, 040, 041, 047, 049 |
+| `fn_approve_receipt(JSONB)` | RPC | Atomic receipt approval v10: SKU resolution (barcode→catalog→fallback→auto-create), sku_balances UPSERT, purchase_logs.sku_id | 030, 038, 040, 041, 047, 049, 058 |
+| `fn_generate_sku_code()` | UTIL FN | Generates next SKU code: SKU-0001, SKU-0002, etc. | 057 |
+| `fn_sku_set_code()` | TRIGGER FN | Auto-assigns sku_code on INSERT if not provided | 057 |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | Lazy cleanup: marks zombie receipt_jobs (processing >5min) as failed | 036 |
-| `fn_is_authenticated()` | UTIL FN | Phase 8 prep: auth gating (currently returns true) | 053 |
-| `fn_current_user_id()` | UTIL FN | Phase 8 prep: user UUID (currently returns NULL) | 053 |
+| `fn_is_authenticated()` | UTIL FN | `auth.role() = 'authenticated'`. Used by all 30 RLS policies. | 053, 054 |
+| `fn_current_user_id()` | UTIL FN | `auth.uid()`. Used by fn_set_created_by trigger. | 053, 054 |
+| `fn_set_created_by()` | TRIGGER FN | Auto-fills expense_ledger.created_by with auth.uid() on INSERT | 055 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
+
+## Views
+
+| View | Source | Purpose | Migration |
+|---|---|---|---|
+| `v_inventory_by_nomenclature` | `sku_balances` | Aggregated inventory by nomenclature (SUM quantity, MAX last_counted_at). Drop-in replacement for inventory_balances. Used by WAC trigger, MRP, procurement. | 057 |
 
 ## Storage Buckets
 
@@ -436,37 +472,45 @@ erDiagram
 
 ## RLS Policies (Row Level Security)
 
-> [!warning] Admin Panel Access (Phase 8 will fix)
-> The admin panel uses the Supabase **anon** key. All tables that the frontend reads MUST have `SELECT USING (true)` policies. **Phase 8** will migrate to Supabase Auth (`authenticated` role). Helper functions `fn_is_authenticated()` and `fn_current_user_id()` are deployed (migration 053) as prep.
+> [!success] Phase 8: Authenticated Access Only
+> All 32 tables use a single `auth_full_access` policy via `fn_is_authenticated()` = `auth.role() = 'authenticated'`. Anon users get 0 rows. SECURITY DEFINER RPCs bypass RLS by design. Migrations 054, 057.
 
-| Table | Policy Name | Command | Roles | Condition | Migration |
-|---|---|---|---|---|---|
-| `fin_categories` | `fin_categories_select` | SELECT | {public} | `USING (true)` | 028 |
-| `fin_sub_categories` | `fin_sub_categories_select` | SELECT | {public} | `USING (true)` | 028 |
-| `suppliers` | `suppliers_select` | SELECT | {public} | `USING (true)` | 029 (recreated from {authenticated}) |
-| `expense_ledger` | `expense_ledger_select` | SELECT | {public} | `USING (true)` | 024 |
-| `nomenclature` | anon full CRUD | SELECT/INSERT/UPDATE/DELETE | {anon} | `USING (true)` | 014 |
-| `bom_structures` | anon full CRUD | SELECT/INSERT/UPDATE/DELETE | {anon} | `USING (true)` | 014 |
-| `inventory_balances` | anon full CRUD | ALL | {anon, authenticated} | `USING (true)` | 017 |
-| `waste_logs` | anon full CRUD | ALL | {anon, authenticated} | `USING (true)` | 017 |
-| `inventory_batches` | anon full CRUD | ALL | {anon, authenticated} | `USING (true)` | 018 |
-| `stock_transfers` | anon full CRUD | ALL | {anon, authenticated} | `USING (true)` | 018 |
-| `purchase_logs` | `purchase_logs_select` (public) + insert (auth) | SELECT (public) + INSERT (auth) | {public, authenticated} | `USING (true)` | 021, 030 |
-| `capex_transactions` | select/insert/update | SELECT/INSERT/UPDATE | {public} | `USING (true)` | 030 |
-| `opex_items` | full CRUD | SELECT/INSERT/UPDATE/DELETE | {public} | `USING (true)` | 030 |
-| `orders` | authenticated CRUD | ALL | {authenticated} | `USING (true)` | 022 |
-| `order_items` | authenticated CRUD | ALL | {authenticated} | `USING (true)` | 022 |
-| `production_plans` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
-| `plan_targets` | CRUD | ALL | {authenticated, anon} | `USING (true)` | 023 |
-| `supplier_catalog` | `sc_select` / `sc_insert` / `sc_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 049 |
-| `supplier_item_mapping` | VIEW (no RLS) | -- | -- | backward-compat view over supplier_catalog | 049 |
-| `supplier_products` | VIEW (no RLS) | -- | -- | backward-compat view over supplier_catalog | 049 |
-| `production_task_outputs` | `pto_select` / `pto_insert` / `pto_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 048 |
-| `receipt_jobs` | `receipt_jobs_select` / `receipt_jobs_insert` | SELECT/INSERT | {public} | `USING (true)` / `WITH CHECK (true)` | 036 |
-| `product_categories` | `pc_select` / `pc_insert` / `pc_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 045 |
-| `brands` | `brands_select` / `brands_insert` / `brands_update` | SELECT/INSERT/UPDATE | {public} | `USING (true)` / `WITH CHECK (true)` | 045 |
-| `tags` | `tags_select` / `tags_insert` | SELECT/INSERT | {public} | `USING (true)` / `WITH CHECK (true)` | 045 |
-| `nomenclature_tags` | `nt_select` / `nt_insert` / `nt_delete` | SELECT/INSERT/DELETE | {public} | `USING (true)` / `WITH CHECK (true)` | 045 |
+| Table | Policy Name | Command | Condition | Migration |
+|---|---|---|---|---|
+| `nomenclature` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `bom_structures` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `equipment` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `production_tasks` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `production_task_outputs` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `fin_categories` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `fin_sub_categories` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `capex_assets` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `capex_transactions` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `expense_ledger` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `suppliers` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `purchase_logs` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `opex_items` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `receipt_jobs` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `orders` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `order_items` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `production_plans` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `plan_targets` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| ~~`inventory_balances`~~ | DROPPED (058) | -- | -- | -- |
+| `sku` | `sku_auth_full_access` | ALL | `fn_is_authenticated()` | 057 |
+| `sku_balances` | `skub_auth_full_access` | ALL | `fn_is_authenticated()` | 057 |
+| `waste_logs` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `locations` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `inventory_batches` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `stock_transfers` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `supplier_catalog` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `product_categories` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `brands` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `tags` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `nomenclature_tags` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| ~~`recipes_flow`~~ | DROPPED (056) | -- | -- | -- |
+| ~~`daily_plan`~~ | DROPPED (056) | -- | -- | -- |
+| ~~`supplier_item_mapping`~~ | DROPPED (056) | -- | Was backward-compat view | -- |
+| ~~`supplier_products`~~ | DROPPED (056) | -- | Was backward-compat view | -- |
 
 ## Column-Level Privilege Restrictions (Migration 031)
 

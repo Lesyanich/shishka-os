@@ -43,7 +43,8 @@ export function GanttTaskBar({ task, dayStartMs, isConflict, conflicts }: GanttT
         minWidth: '24px',
       }}
       title={[
-        task.description ?? 'Task',
+        task.target_nomenclature?.name ?? task.description ?? 'Task',
+        task.target_quantity ? `Target: ${task.target_quantity} kg` : '',
         `Status: ${task.status}`,
         task.duration_min ? `${task.duration_min} min` : '',
         conflictOverlap ? `Conflict: ${conflictOverlap.overlapMin} min overlap` : '',
@@ -52,7 +53,7 @@ export function GanttTaskBar({ task, dayStartMs, isConflict, conflicts }: GanttT
         .join('\n')}
     >
       <span className="truncate">
-        {task.description ?? task.id.slice(0, 8)}
+        {task.target_nomenclature?.name ?? task.description ?? task.id.slice(0, 8)}
       </span>
     </div>
   )

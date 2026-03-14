@@ -9,6 +9,8 @@ type OrderItem = {
   price_at_purchase: number
   product_code: string
   item_name: string
+  parent_item_id: string | null
+  modifier_type: string | null
 }
 
 export type Order = {
@@ -30,6 +32,14 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   cancelled: { label: 'Cancelled', color: 'bg-rose-500/15 text-rose-300 border-rose-500/40' },
 }
 
+const MODIFIER_BADGE: Record<string, string> = {
+  topping: 'bg-blue-500/15 text-blue-300',
+  extra: 'bg-emerald-500/15 text-emerald-300',
+  removal: 'bg-rose-500/15 text-rose-300',
+  side: 'bg-amber-500/15 text-amber-300',
+  modifier: 'bg-slate-500/15 text-slate-300',
+}
+
 export function OrderDetailsModal({
   order,
   onClose,
@@ -48,7 +58,7 @@ export function OrderDetailsModal({
 
       const { data: rawItems, error: itemsErr } = await supabase
         .from('order_items')
-        .select('id, nomenclature_id, quantity, price_at_purchase')
+        .select('id, nomenclature_id, quantity, price_at_purchase, parent_item_id, modifier_type')
         .eq('order_id', order.id)
 
       if (itemsErr) {
@@ -82,6 +92,8 @@ export function OrderDetailsModal({
           price_at_purchase: Number(i.price_at_purchase),
           product_code: nomMap[i.nomenclature_id as string]?.code ?? 'UNKNOWN',
           item_name: nomMap[i.nomenclature_id as string]?.name ?? 'Missing',
+          parent_item_id: (i.parent_item_id as string) ?? null,
+          modifier_type: (i.modifier_type as string) ?? null,
         })),
       )
       setIsLoading(false)
@@ -99,6 +111,17 @@ export function OrderDetailsModal({
   }
 
   const availableTransitions = nextStatuses[order.status] ?? []
+
+  // Group items: root items (no parent) and their modifiers
+  const rootItems = items.filter((i) => !i.parent_item_id)
+  const modifiersByParent = new Map<string, OrderItem[]>()
+  for (const item of items) {
+    if (item.parent_item_id) {
+      const existing = modifiersByParent.get(item.parent_item_id) ?? []
+      existing.push(item)
+      modifiersByParent.set(item.parent_item_id, existing)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -193,30 +216,65 @@ export function OrderDetailsModal({
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-slate-800/50 last:border-none"
-                  >
-                    <td className="py-1.5">
-                      <div className="font-mono text-slate-100">
-                        {item.product_code}
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        {item.item_name}
-                      </div>
-                    </td>
-                    <td className="py-1.5 text-right text-slate-200">
-                      {item.quantity}
-                    </td>
-                    <td className="py-1.5 text-right text-slate-300">
-                      {item.price_at_purchase.toFixed(2)}
-                    </td>
-                    <td className="py-1.5 text-right font-medium text-amber-300">
-                      {(item.quantity * item.price_at_purchase).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                {rootItems.map((item) => {
+                  const mods = modifiersByParent.get(item.id) ?? []
+                  return (
+                    <tr key={item.id} className="group">
+                      <td colSpan={4} className="p-0">
+                        {/* Root item row */}
+                        <div className="flex items-center border-b border-slate-800/50 py-1.5 group-last:border-none">
+                          <div className="flex-1">
+                            <div className="font-mono text-slate-100">
+                              {item.product_code}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {item.item_name}
+                            </div>
+                          </div>
+                          <div className="w-12 text-right text-slate-200">
+                            {item.quantity}
+                          </div>
+                          <div className="w-16 text-right text-slate-300">
+                            {item.price_at_purchase.toFixed(2)}
+                          </div>
+                          <div className="w-20 text-right font-medium text-amber-300">
+                            {(item.quantity * item.price_at_purchase).toFixed(2)}
+                          </div>
+                        </div>
+                        {/* Modifier rows (indented) */}
+                        {mods.map((mod) => (
+                          <div
+                            key={mod.id}
+                            className="flex items-center border-b border-slate-800/30 py-1 pl-5 last:border-none"
+                          >
+                            <div className="flex flex-1 items-center gap-1.5">
+                              <span className="text-[10px] text-slate-600">+</span>
+                              <span className="text-[10px] text-slate-400">
+                                {mod.item_name}
+                              </span>
+                              {mod.modifier_type && (
+                                <span
+                                  className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${MODIFIER_BADGE[mod.modifier_type] ?? MODIFIER_BADGE.modifier}`}
+                                >
+                                  {mod.modifier_type}
+                                </span>
+                              )}
+                            </div>
+                            <div className="w-12 text-right text-[10px] text-slate-500">
+                              {mod.quantity}
+                            </div>
+                            <div className="w-16 text-right text-[10px] text-slate-500">
+                              {mod.price_at_purchase.toFixed(2)}
+                            </div>
+                            <div className="w-20 text-right text-[10px] text-slate-400">
+                              {(mod.quantity * mod.price_at_purchase).toFixed(2)}
+                            </div>
+                          </div>
+                        ))}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}

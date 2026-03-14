@@ -1,19 +1,21 @@
-import type { ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import {
   BarChart2,
-  Bell,
   CalendarDays,
   ChefHat,
   GitBranch,
   LayoutDashboard,
+  LogOut,
   ScanLine,
   Timer,
   Trash2,
   Truck,
+  Package,
+  Bell,
   UtensilsCrossed,
   Wallet,
 } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 interface NavItem {
   path: string
@@ -30,17 +32,16 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/waste', icon: Trash2, label: 'Waste', enabled: true },
   { path: '/logistics', icon: ScanLine, label: 'Logistics', enabled: true },
   { path: '/procurement', icon: Truck, label: 'Procurement', enabled: true },
+  { path: '/sku', icon: Package, label: 'SKU Manager', enabled: true },
   { path: '/orders', icon: Bell, label: 'Orders', enabled: true },
   { path: '/planner', icon: CalendarDays, label: 'Planner', enabled: true },
   { path: '/finance', icon: Wallet, label: 'Finance', enabled: true },
   { path: '/analytics', icon: BarChart2, label: 'Analytics', enabled: false },
 ]
 
-interface AppShellProps {
-  children: ReactNode
-}
+export function AppShell() {
+  const { user, signOut } = useAuth()
 
-export function AppShell({ children }: AppShellProps) {
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'short',
     day: 'numeric',
@@ -98,7 +99,7 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Footer */}
         <div className="border-t border-slate-800 px-3 py-3">
-          <p className="hidden text-[10px] text-slate-700 lg:block">v0.5.0 · Phase 5</p>
+          <p className="hidden text-[10px] text-slate-700 lg:block">v0.6.0 · Phase 8</p>
         </div>
       </aside>
 
@@ -110,11 +111,27 @@ export function AppShell({ children }: AppShellProps) {
             <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
             <span className="text-xs text-slate-500">Supabase connected</span>
           </div>
-          <span className="text-xs text-slate-500">{today}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-slate-500">{today}</span>
+            {user && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">{user.email}</span>
+                <button
+                  onClick={signOut}
+                  title="Выйти"
+                  className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6">
+          <Outlet />
+        </main>
       </div>
     </div>
   )

@@ -61,6 +61,10 @@ export interface LineItem {
   _warning?: string
   /** Populated by frontend mapping engine (useSupplierMapping) */
   nomenclature_id?: string | null
+  /** Phase 10: Resolved SKU id */
+  sku_id?: string | null
+  /** Phase 10: Product barcode (EAN/UPC) for SKU resolution */
+  barcode?: string | null
 }
 
 /** Sum validation from Edge Function (legacy — kept for backward compat) */
@@ -118,6 +122,10 @@ export interface FoodItem {
   makro_name?: string
   /** Phase 6.8: Full product title as on Makro website */
   full_title?: string
+  /** Phase 10: Resolved SKU id */
+  sku_id?: string | null
+  /** Phase 10: Product barcode for SKU resolution */
+  barcode?: string | null
 }
 
 /** Capital equipment line item → inserts into capex_transactions */

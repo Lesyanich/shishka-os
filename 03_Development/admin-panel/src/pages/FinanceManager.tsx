@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useExpenseLedger } from '../hooks/useExpenseLedger'
 import type { ExpenseRow } from '../hooks/useExpenseLedger'
 import { useSupplierMapping } from '../hooks/useSupplierMapping'
 import { supabase } from '../lib/supabase'
 import { formatTHB } from '../components/finance/helpers'
 import { KpiCard } from '../components/finance/KpiCard'
-import { MonthlyChart } from '../components/finance/MonthlyChart'
+const MonthlyChart = lazy(() => import('../components/finance/MonthlyChart').then(m => ({ default: m.MonthlyChart })))
 import { ExpenseForm } from '../components/finance/ExpenseForm'
 import { ExpenseHistory } from '../components/finance/ExpenseHistory'
 import { ExpenseEditModal } from '../components/finance/ExpenseEditModal'
@@ -443,11 +443,13 @@ export function FinanceManager() {
           )}
         </div>
         <div className="space-y-6">
-          <MonthlyChart
-            summaries={monthlySummaries}
-            isLoading={isLoading}
-            error={error}
-          />
+          <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-slate-800/50" />}>
+            <MonthlyChart
+              summaries={monthlySummaries}
+              isLoading={isLoading}
+              error={error}
+            />
+          </Suspense>
           <ExpenseHistory
             rows={rows}
             categories={categories}
