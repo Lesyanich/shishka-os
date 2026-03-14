@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // Types: Procurement & Receiving
-// Phase 13: Receiving Station Frontend
+// Phase 13–14: Receiving Station + PO Management
 // ═══════════════════════════════════════════════════════════
 
 export type POStatus =
@@ -77,6 +77,62 @@ export interface ReceiveGoodsResult {
   full_count?: number
   issue_count?: number
   po_status?: string
+}
+
+// ── Phase 14: PO Management ──
+
+export interface PurchaseOrder {
+  id: string
+  po_number: string
+  supplier_id: string
+  supplier_name: string
+  status: POStatus
+  expected_date: string | null
+  notes: string | null
+  subtotal: number | null
+  grand_total: number | null
+  created_at: string
+  line_count: number
+}
+
+export interface POLine {
+  id: string
+  po_id: string
+  nomenclature_id: string
+  sku_id: string | null
+  product_name: string
+  product_code: string
+  base_unit: string
+  qty_ordered: number
+  unit: string
+  unit_price_expected: number | null
+  total_expected: number | null
+  sort_order: number
+  notes: string | null
+}
+
+export interface POLineInput {
+  nomenclature_id: string
+  sku_id?: string | null
+  qty_ordered: number
+  unit?: string
+  unit_price_expected?: number | null
+  notes?: string | null
+}
+
+export interface CreatePOPayload {
+  supplier_id: string
+  expected_date: string | null
+  notes: string | null
+  lines: POLineInput[]
+}
+
+export interface CreatePOResult {
+  ok: boolean
+  error?: string
+  po_id?: string
+  po_number?: string
+  line_count?: number
 }
 
 // ── Checklist UI state (extends PendingDeliveryLine) ──
