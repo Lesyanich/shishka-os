@@ -139,6 +139,11 @@ export interface CapexItem {
 /** Consumable/operational line item → inserts into opex_items */
 export interface OpexItem {
   description: string
+  supplier_sku?: string | null
+  /** Product category L2 id (e.g., NF-CLN Cleaning) */
+  category_id?: string | null
+  /** Product category L3 id (e.g., NF-CLN-DSH Dishwashing) */
+  sub_category_id?: string | null
   quantity: number
   unit: string
   unit_price: number
