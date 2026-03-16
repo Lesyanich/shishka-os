@@ -23,8 +23,20 @@ When any migration creates or alters a table/function/trigger/enum, the agent MU
 ## Rule #11: SSoT Commit Gate
 **NEVER** run `git push` until:
 1. `docs/context/state/CURRENT.md` — updated to reflect changes
-2. `02_Obsidian_Vault/Database Schema.md` — updated if any migration touched tables, policies, RPCs, or ENUMs
-3. Both files staged and included in the commit
+2. `02_Obsidian_Vault/Architecture/Database Schema.md` — updated if any migration touched tables, policies, RPCs, or ENUMs
+3. **Architecture note updated** — if an Obsidian architecture note exists for the modified module, sync it with current state (see mapping below)
+4. All files staged and included in the commit
+
+### Module → Architecture Note Mapping
+| Module worked on | Architecture note to sync |
+|------------------|--------------------------|
+| Receipts / OCR | `Architecture/Receipt Routing Architecture.md` |
+| Finance | `Architecture/Financial Ledger.md` |
+| Procurement | `Architecture/Procurement & Receiving Architecture.md` |
+| Product categories | `Architecture/Product Categorization Architecture.md` |
+| Overall system | `Architecture/Shishka OS Architecture.md` |
+
+If no architecture note exists for a module — skip (creation only at phase completion per Rule #9).
 
 ## Rule #12: Transaction Date Integrity
 **NEVER** overwrite historical `transaction_date` values. Dates come STRICTLY from source documents (receipt, invoice). `CURRENT_DATE` is only acceptable as an absolute last-resort fallback in the RPC when the frontend fails to provide a date. Migrations must NEVER set `transaction_date = CURRENT_DATE` to "fix" sorting — this violates ERP audit standards.
