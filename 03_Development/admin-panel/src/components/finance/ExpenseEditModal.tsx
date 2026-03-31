@@ -22,7 +22,7 @@ export function ExpenseEditModal({
 }: ExpenseEditModalProps) {
   // Form state — pre-filled from row
   const [txDate, setTxDate] = useState('')
-  const [flowType, setFlowType] = useState<'OpEx' | 'CapEx'>('OpEx')
+  const [flowType, setFlowType] = useState<'OpEx' | 'CapEx' | 'COGS'>('OpEx')
   const [categoryCode, setCategoryCode] = useState<number | ''>('')
   const [subCategoryCode, setSubCategoryCode] = useState<number | ''>('')
   const [supplierId, setSupplierId] = useState('')
@@ -159,7 +159,7 @@ export function ExpenseEditModal({
             <div>
               <label className="mb-1 block text-xs text-slate-400">Type</label>
               <div className="flex gap-2">
-                {(['OpEx', 'CapEx'] as const).map((ft) => (
+                {(['OpEx', 'CapEx', 'COGS'] as const).map((ft) => (
                   <button
                     key={ft}
                     type="button"
@@ -168,7 +168,9 @@ export function ExpenseEditModal({
                       flowType === ft
                         ? ft === 'OpEx'
                           ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-200'
-                          : 'border-amber-500/60 bg-amber-500/15 text-amber-200'
+                          : ft === 'CapEx'
+                            ? 'border-amber-500/60 bg-amber-500/15 text-amber-200'
+                            : 'border-blue-500/60 bg-blue-500/15 text-blue-200'
                         : 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700'
                     }`}
                   >

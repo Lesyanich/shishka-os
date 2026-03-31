@@ -176,8 +176,9 @@ export function StagingArea({
   const matchedSupplier = suppliersList.find((s) => s.id === supplierId)
   const supplierCat = matchedSupplier?.category_code
   const isCapExSupplier = supplierCat ? supplierCat >= 1000 && supplierCat < 2000 : false
-  const [flowType, setFlowType] = useState<'OpEx' | 'CapEx'>(() =>
-    isCapExSupplier ? 'CapEx' : 'OpEx',
+  const isCOGSSupplier = supplierCat ? supplierCat >= 4000 && supplierCat < 5000 : false
+  const [flowType, setFlowType] = useState<'OpEx' | 'CapEx' | 'COGS'>(() =>
+    isCOGSSupplier ? 'COGS' : isCapExSupplier ? 'CapEx' : 'OpEx',
   )
   const [categoryCode, setCategoryCode] = useState<number | ''>(() =>
     supplierCat ?? '',
@@ -736,7 +737,7 @@ export function StagingArea({
             <div>
               <label className={labelCls}>Type</label>
               <div className="flex gap-2">
-                {(['OpEx', 'CapEx'] as const).map((ft) => (
+                {(['OpEx', 'CapEx', 'COGS'] as const).map((ft) => (
                   <button
                     key={ft}
                     type="button"
@@ -745,7 +746,9 @@ export function StagingArea({
                       flowType === ft
                         ? ft === 'OpEx'
                           ? 'border-emerald-500/50 bg-emerald-500/[0.12] text-emerald-300 shadow-sm shadow-emerald-500/10'
-                          : 'border-amber-500/50 bg-amber-500/[0.12] text-amber-300 shadow-sm shadow-amber-500/10'
+                          : ft === 'CapEx'
+                            ? 'border-amber-500/50 bg-amber-500/[0.12] text-amber-300 shadow-sm shadow-amber-500/10'
+                            : 'border-blue-500/50 bg-blue-500/[0.12] text-blue-300 shadow-sm shadow-blue-500/10'
                         : 'border-slate-700/60 bg-slate-800/60 text-slate-500 hover:border-slate-600 hover:text-slate-400'
                     }`}
                   >

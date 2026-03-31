@@ -358,7 +358,9 @@ function TableRowWithSpoke({
             className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
               r.flow_type === 'OpEx'
                 ? 'bg-emerald-500/15 text-emerald-400'
-                : 'bg-amber-500/15 text-amber-400'
+                : r.flow_type === 'CapEx'
+                  ? 'bg-amber-500/15 text-amber-400'
+                  : 'bg-blue-900/30 text-blue-400'
             }`}
           >
             {r.flow_type}

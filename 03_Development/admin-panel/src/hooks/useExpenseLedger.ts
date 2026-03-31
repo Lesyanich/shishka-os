@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 export interface ExpenseRow {
   id: string
   transaction_date: string
-  flow_type: 'OpEx' | 'CapEx'
+  flow_type: 'OpEx' | 'CapEx' | 'COGS'
   category_code: number | null
   sub_category_code: number | null
   supplier_id: string | null
@@ -138,7 +138,7 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
     const mapped: ExpenseRow[] = (ledgerRes.data ?? []).map((r) => ({
       id: r.id as string,
       transaction_date: r.transaction_date as string,
-      flow_type: r.flow_type as 'OpEx' | 'CapEx',
+      flow_type: r.flow_type as 'OpEx' | 'CapEx' | 'COGS',
       category_code: r.category_code as number | null,
       sub_category_code: r.sub_category_code as number | null,
       supplier_id: r.supplier_id as string | null,
