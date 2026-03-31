@@ -23,6 +23,10 @@ const MasterPlanner = lazy(() => import('./pages/MasterPlanner').then(m => ({ de
 const FinanceManager = lazy(() => import('./pages/FinanceManager').then(m => ({ default: m.FinanceManager })))
 const ReceivingStation = lazy(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
+const KitchenDashboard = lazy(() => import('./pages/KitchenDashboard').then(m => ({ default: m.KitchenDashboard })))
+const ScheduleManager = lazy(() => import('./pages/ScheduleManager').then(m => ({ default: m.ScheduleManager })))
+const BatchPlanner = lazy(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
+const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
 
 function PageLoader() {
   return (
@@ -57,6 +61,7 @@ function App() {
         <Sentry.ErrorBoundary fallback={FallbackError}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/kitchen" element={<Suspense fallback={<PageLoader />}><KitchenDashboard /></Suspense>} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
                 <Route path="/" element={<ControlCenter />} />
@@ -69,8 +74,11 @@ function App() {
                 <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
                 <Route path="/orders" element={<Suspense fallback={<PageLoader />}><OrderManager /></Suspense>} />
                 <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
+                <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
                 <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceManager /></Suspense>} />
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
+                <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
+                <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
                 <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
               </Route>
             </Route>
