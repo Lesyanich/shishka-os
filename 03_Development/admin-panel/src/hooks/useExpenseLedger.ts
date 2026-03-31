@@ -55,7 +55,7 @@ export interface MonthlySummary {
 
 export interface ExpenseUpdatePayload {
   transaction_date?: string
-  flow_type?: 'OpEx' | 'CapEx'
+  flow_type?: 'OpEx' | 'CapEx' | 'COGS'
   category_code?: number | null
   sub_category_code?: number | null
   supplier_id?: string | null
