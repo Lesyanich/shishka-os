@@ -27,6 +27,7 @@ const KitchenDashboard = lazy(() => import('./pages/KitchenDashboard').then(m =>
 const ScheduleManager = lazy(() => import('./pages/ScheduleManager').then(m => ({ default: m.ScheduleManager })))
 const BatchPlanner = lazy(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
 const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
+const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
 
 function PageLoader() {
   return (
@@ -76,6 +77,7 @@ function App() {
                 <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
                 <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
                 <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceManager /></Suspense>} />
+                <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
                 <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
