@@ -33,6 +33,7 @@ import { makroLookup } from "./tools/makro-lookup.js";
 import { uploadReceipt } from "./tools/upload-receipt.js";
 import { checkInbox } from "./tools/check-inbox.js";
 import { updateInbox } from "./tools/update-inbox.js";
+import { updateExpense } from "./tools/update-expense.js";
 
 // ─── Server Setup ────────────────────────────────────────────────
 
@@ -249,6 +250,26 @@ server.tool(
   async (args) => jsonResult(await makroLookup(args))
 );
 
+// ─── Expense Update Tool ────────────────────────────────────────
+
+server.tool(
+  "update_expense",
+  "Partial update of an expense_ledger record. Allowed: receipt URLs, details, status, payment_method, comments, invoice_number, has_tax_invoice. Forbidden: amount, flow_type, supplier_id.",
+  {
+    expense_id: z.string().describe("UUID of the expense_ledger record"),
+    receipt_supplier_url: z.string().optional().describe("Supplier receipt image URL"),
+    receipt_bank_url: z.string().optional().describe("Bank slip image URL"),
+    tax_invoice_url: z.string().optional().describe("Tax invoice image URL"),
+    details: z.string().optional().describe("Updated description"),
+    status: z.enum(["paid", "pending", "cancelled"]).optional().describe("Payment status"),
+    payment_method: z.enum(["cash", "transfer", "card", "other"]).optional().describe("Payment method"),
+    comments: z.string().optional().describe("Additional notes"),
+    invoice_number: z.string().optional().describe("Receipt/invoice reference number"),
+    has_tax_invoice: z.boolean().optional().describe("Whether tax invoice is available"),
+  },
+  async (args) => jsonResult(await updateExpense(args))
+);
+
 // ─── Receipt Inbox Tools ────────────────────────────────────────
 
 server.tool(
@@ -279,7 +300,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Finance Agent MCP server running on stdio`);
-  console.error(`   Tools: 13 | Resources: 0 | Prompts: 0`);
+  console.error(`   Tools: 14 | Resources: 0 | Prompts: 0`);
 }
 
 main().catch((err) => {
