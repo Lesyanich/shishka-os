@@ -23,6 +23,10 @@ export interface ExpenseRow {
   tax_invoice_url: string | null
   comments: string | null
   has_tax_invoice: boolean
+  invoice_number: string | null
+  vat_amount: number
+  discount_total: number
+  delivery_fee: number
   created_at: string
   // Joined
   category_name: string | null
@@ -155,6 +159,10 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
       tax_invoice_url: r.tax_invoice_url as string | null,
       comments: (r.comments ?? null) as string | null,
       has_tax_invoice: (r.has_tax_invoice ?? false) as boolean,
+      invoice_number: (r.invoice_number ?? null) as string | null,
+      vat_amount: Number(r.vat_amount ?? 0),
+      discount_total: Number(r.discount_total ?? 0),
+      delivery_fee: Number(r.delivery_fee ?? 0),
       created_at: r.created_at as string,
       category_name: r.category_code != null ? (catMap[r.category_code as number] ?? null) : null,
       sub_category_name: r.sub_category_code != null ? (subCatMap[r.sub_category_code as number] ?? null) : null,

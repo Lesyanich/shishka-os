@@ -5,6 +5,7 @@ import {
   ArrowUpDown,
   ChevronDown,
   ChevronRight,
+  Download,
   FileCheck,
   Loader2,
   Pencil,
@@ -14,6 +15,7 @@ import type { ExpenseRow, FinCategory, Supplier } from '../../hooks/useExpenseLe
 import { ExpenseFilterPanel, EMPTY_FILTERS } from './ExpenseFilterPanel'
 import type { ExpenseFilters } from './ExpenseFilterPanel'
 import { SpokeDetail } from './SpokeDetail'
+import { exportExpenses } from './exportExpenses'
 
 /* ═══════════════════════════════════════════════════════════════
    ExpenseHistory — Phase 4.5: Analytics-Grade Expense Ledger
@@ -183,13 +185,23 @@ export function ExpenseHistory({
             )}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onRefetch}
-          className="text-[10px] text-slate-500 hover:text-slate-300"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => exportExpenses(sortedRows)}
+            className="inline-flex items-center gap-1 rounded-md bg-slate-700 px-2.5 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-slate-600"
+          >
+            <Download className="h-4 w-4" />
+            Export XLSX
+          </button>
+          <button
+            type="button"
+            onClick={onRefetch}
+            className="text-[10px] text-slate-500 hover:text-slate-300"
+          >
+            Refresh
+          </button>
+        </div>
       </header>
 
       {/* ── Filter Panel ── */}
