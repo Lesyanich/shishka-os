@@ -21,6 +21,7 @@ export interface ExpenseRow {
   receipt_supplier_url: string | null
   receipt_bank_url: string | null
   tax_invoice_url: string | null
+  receipt_pages: string[]
   comments: string | null
   has_tax_invoice: boolean
   invoice_number: string | null
@@ -73,6 +74,7 @@ export interface ExpenseUpdatePayload {
   receipt_supplier_url?: string | null
   receipt_bank_url?: string | null
   tax_invoice_url?: string | null
+  receipt_pages?: string[]
   comments?: string | null
   has_tax_invoice?: boolean
 }
@@ -157,6 +159,7 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
       receipt_supplier_url: r.receipt_supplier_url as string | null,
       receipt_bank_url: r.receipt_bank_url as string | null,
       tax_invoice_url: r.tax_invoice_url as string | null,
+      receipt_pages: (r.receipt_pages ?? []) as string[],
       comments: (r.comments ?? null) as string | null,
       has_tax_invoice: (r.has_tax_invoice ?? false) as boolean,
       invoice_number: (r.invoice_number ?? null) as string | null,

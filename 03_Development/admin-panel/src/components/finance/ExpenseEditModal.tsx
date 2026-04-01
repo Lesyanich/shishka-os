@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Save, X } from 'lucide-react'
+import { Loader2, Receipt, Save, Upload, X } from 'lucide-react'
 import type { ExpenseRow, ExpenseUpdatePayload } from '../../hooks/useExpenseLedger'
 import { CURRENCY_OPTIONS, PAYMENT_METHODS } from './helpers'
+import { ReceiptGallery } from './ReceiptGallery'
+import { supabase } from '../../lib/supabase'
 
 export interface ExpenseEditModalProps {
   row: ExpenseRow | null
@@ -10,6 +12,7 @@ export interface ExpenseEditModalProps {
   suppliers: { id: string; name: string }[]
   onSave: (id: string, payload: ExpenseUpdatePayload) => Promise<string | null>
   onClose: () => void
+  onRefetch?: () => void
 }
 
 export function ExpenseEditModal({
@@ -19,6 +22,7 @@ export function ExpenseEditModal({
   suppliers,
   onSave,
   onClose,
+  onRefetch,
 }: ExpenseEditModalProps) {
   // Form state — pre-filled from row
   const [txDate, setTxDate] = useState('')
@@ -28,6 +32,7 @@ export function ExpenseEditModal({
   const [supplierId, setSupplierId] = useState('')
   const [details, setDetails] = useState('')
   const [comments, setComments] = useState('')
+  const [invoiceNumber, setInvoiceNumber] = useState('')
   const [hasTaxInvoice, setHasTaxInvoice] = useState(false)
   const [amountOriginal, setAmountOriginal] = useState<number | ''>('')
   const [currency, setCurrency] = useState('THB')
@@ -36,8 +41,27 @@ export function ExpenseEditModal({
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [status, setStatus] = useState<'pending' | 'paid' | 'cancelled'>('paid')
 
+  // Receipt URLs (local state for display; saved via separate handler)
+  const [receiptSupplierUrl, setReceiptSupplierUrl] = useState<string | null>(null)
+  const [receiptBankUrl, setReceiptBankUrl] = useState<string | null>(null)
+  const [taxInvoiceUrl, setTaxInvoiceUrl] = useState<string | null>(null)
+
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Gallery state
+  const [galleryPages, setGalleryPages] = useState<string[]>([])
+  const [galleryStart, setGalleryStart] = useState(0)
+
+  const openGallery = (clickedUrl: string) => {
+    const allUrls = [receiptSupplierUrl, receiptBankUrl, taxInvoiceUrl].filter(
+      (u): u is string => !!u,
+    )
+    const idx = allUrls.indexOf(clickedUrl)
+    setGalleryPages(allUrls)
+    setGalleryStart(idx >= 0 ? idx : 0)
+  }
 
   // Pre-fill from row when it changes
   useEffect(() => {
@@ -49,6 +73,7 @@ export function ExpenseEditModal({
     setSupplierId(row.supplier_id ?? '')
     setDetails(row.details)
     setComments(row.comments ?? '')
+    setInvoiceNumber(row.invoice_number ?? '')
     setHasTaxInvoice(row.has_tax_invoice)
     setAmountOriginal(row.amount_original)
     setCurrency(row.currency)
@@ -56,6 +81,9 @@ export function ExpenseEditModal({
     setPaidBy(row.paid_by)
     setPaymentMethod(row.payment_method)
     setStatus(row.status as 'pending' | 'paid' | 'cancelled')
+    setReceiptSupplierUrl(row.receipt_supplier_url)
+    setReceiptBankUrl(row.receipt_bank_url)
+    setTaxInvoiceUrl(row.tax_invoice_url)
     setError(null)
   }, [row])
 
@@ -104,7 +132,13 @@ export function ExpenseEditModal({
       paid_by: paidBy.trim(),
       payment_method: paymentMethod,
       status,
+      receipt_supplier_url: receiptSupplierUrl,
+      receipt_bank_url: receiptBankUrl,
+      tax_invoice_url: taxInvoiceUrl,
     }
+
+    // Add invoice_number (it's in the allowed fields of update_expense MCP)
+    ;(payload as Record<string, unknown>).invoice_number = invoiceNumber.trim() || null
 
     const errMsg = await onSave(row.id, payload)
     setIsSaving(false)
@@ -116,18 +150,72 @@ export function ExpenseEditModal({
     }
   }
 
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    slot: 'supplier' | 'bank' | 'tax',
+  ) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploading(true)
+    try {
+      let uploadFile: File | Blob = file
+      if (file.type.startsWith('image/')) {
+        const bitmap = await createImageBitmap(file)
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(bitmap, 0, 0)
+        uploadFile = await canvas.convertToBlob({ type: 'image/webp', quality: 0.7 })
+      }
+
+      const ts = Date.now()
+      const ext = file.type.startsWith('image/') ? 'webp' : file.name.split('.').pop() || 'pdf'
+      const path = `${ts}_${Math.random().toString(36).slice(2, 6)}.${ext}`
+
+      const { error: uploadErr } = await supabase.storage
+        .from('receipts')
+        .upload(path, uploadFile, {
+          contentType: file.type.startsWith('image/') ? 'image/webp' : file.type,
+        })
+      if (uploadErr) throw uploadErr
+
+      const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
+      const publicUrl = urlData.publicUrl
+
+      if (slot === 'supplier') setReceiptSupplierUrl(publicUrl)
+      else if (slot === 'bank') setReceiptBankUrl(publicUrl)
+      else setTaxInvoiceUrl(publicUrl)
+    } catch (err) {
+      console.error('Upload failed:', err)
+      setError('File upload failed')
+    } finally {
+      setIsUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const receiptSlots = [
+    { label: 'Supplier receipt', url: receiptSupplierUrl, slot: 'supplier' as const, color: 'emerald' },
+    { label: 'Bank slip', url: receiptBankUrl, slot: 'bank' as const, color: 'sky' },
+    { label: 'Tax invoice', url: taxInvoiceUrl, slot: 'tax' as const, color: 'amber' },
+  ]
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="mx-4 w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 shadow-2xl"
+        className="mx-4 w-full max-w-2xl rounded-xl border border-slate-700 bg-slate-900 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
-          <h2 className="text-sm font-semibold text-slate-100">Edit Expense</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-100">Edit Expense</h2>
+            <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[9px] text-slate-500" title={row.id}>
+              {row.id.slice(0, 8)}
+            </span>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -138,7 +226,7 @@ export function ExpenseEditModal({
         </div>
 
         {/* Body */}
-        <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4">
+        <div className="max-h-[75vh] space-y-4 overflow-y-auto px-5 py-4">
           {error && (
             <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
               {error}
@@ -239,16 +327,28 @@ export function ExpenseEditModal({
             </select>
           </div>
 
-          {/* Details */}
-          <div>
-            <label className="mb-1 block text-xs text-slate-400">Details</label>
-            <input
-              type="text"
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              placeholder="What was the payment for..."
-              className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
-            />
+          {/* Details + Invoice # */}
+          <div className="grid grid-cols-[1fr_140px] gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-slate-400">Details</label>
+              <input
+                type="text"
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+                placeholder="What was the payment for..."
+                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-400">Invoice #</label>
+              <input
+                type="text"
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                placeholder="INV-001"
+                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs font-mono text-slate-100 outline-none focus:border-emerald-500"
+              />
+            </div>
           </div>
 
           {/* Comments */}
@@ -258,7 +358,7 @@ export function ExpenseEditModal({
               type="text"
               value={comments}
               onChange={(e) => setComments(e.target.value)}
-              placeholder="Additional notes (prepayment, invoice #, etc.)..."
+              placeholder="Additional notes..."
               className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
             />
           </div>
@@ -318,7 +418,7 @@ export function ExpenseEditModal({
                 Total in THB (auto)
               </div>
               <div className="mt-0.5 text-sm font-semibold text-amber-300">
-                {computedTHB.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {Math.round(computedTHB).toLocaleString()}
               </div>
             </div>
           )}
@@ -372,6 +472,47 @@ export function ExpenseEditModal({
             />
             <span className="text-xs text-slate-400">Has Tax Invoice</span>
           </label>
+
+          {/* ── Documents section ── */}
+          <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
+            <div className="mb-2 text-xs font-medium text-slate-400">Documents</div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {receiptSlots.map(({ label, url, slot, color }) => (
+                <div key={slot} className="flex items-center gap-2 rounded-md border border-slate-700/40 bg-slate-900/50 px-2.5 py-2">
+                  {url ? (
+                    <>
+                      <button type="button" onClick={() => openGallery(url)} title={`View ${label}`} className="hover:opacity-70">
+                        <Receipt className={`h-4 w-4 text-${color}-400`} />
+                      </button>
+                      <span className="flex-1 truncate text-[10px] text-slate-300">{label}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (slot === 'supplier') setReceiptSupplierUrl(null)
+                          else if (slot === 'bank') setReceiptBankUrl(null)
+                          else setTaxInvoiceUrl(null)
+                        }}
+                        title="Remove"
+                        className="text-slate-500 hover:text-rose-400"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Receipt className="h-4 w-4 text-slate-600" />
+                      <span className="flex-1 text-[10px] text-slate-500">{label}</span>
+                      <label className={`inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[9px] text-slate-400 transition hover:bg-slate-700 hover:text-slate-200 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <Upload className="h-3 w-3" />
+                        {isUploading ? '...' : 'Upload'}
+                        <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, slot)} />
+                      </label>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
@@ -398,6 +539,15 @@ export function ExpenseEditModal({
           </button>
         </div>
       </div>
+
+      {/* Receipt Gallery (renders on top of modal) */}
+      {galleryPages.length > 0 && (
+        <ReceiptGallery
+          pages={galleryPages}
+          startIndex={galleryStart}
+          onClose={() => setGalleryPages([])}
+        />
+      )}
     </div>
   )
 }

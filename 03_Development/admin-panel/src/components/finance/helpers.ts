@@ -5,9 +5,9 @@ export function formatTHB(v: number) {
   return `${v.toFixed(0)}`
 }
 
-/** Format Thai Baht with full precision (no abbreviation), thousands separator */
+/** Format Thai Baht with full precision (no abbreviation), thousands separator, no decimals */
 export function formatTHBFull(v: number) {
-  return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return Math.round(v).toLocaleString('en-US')
 }
 
 export const CATEGORY_COLORS = [
