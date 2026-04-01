@@ -91,6 +91,7 @@ server.tool(
           original_name: z.string().optional(),
           brand: z.string().optional(),
           package_weight: z.string().optional(),
+          barcode: z.string().optional(),
         })
       )
       .optional()

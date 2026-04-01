@@ -106,6 +106,7 @@ async function resolveJobToSessionStorage(jobId: string) {
           original_name: li.original_name ?? null,
           brand: li.brand ?? undefined,
           package_weight: li.package_weight ?? undefined,
+          barcode: li.barcode ?? li.supplier_sku ?? null,
           makro_name: li.makro_name ?? undefined,
           full_title: li.full_title ?? undefined,
         } as FoodItem))
@@ -346,6 +347,7 @@ export function FinanceEntry() {
           original_name: li.original_name ?? null,
           brand: li.brand ?? undefined,
           package_weight: li.package_weight ?? undefined,
+          barcode: li.barcode ?? li.supplier_sku ?? null,
           makro_name: li.makro_name ?? undefined,
           full_title: li.full_title ?? undefined,
         } as FoodItem))
