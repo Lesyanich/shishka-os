@@ -1,5 +1,5 @@
 {
   "installCommand": "npm install --force",
-  "buildCommand": "npm run build",
+  "buildCommand": "rm -rf tsconfig.tsbuildinfo tsconfig.app.tsbuildinfo && npm run build",
   "outputDirectory": "dist"
 }
