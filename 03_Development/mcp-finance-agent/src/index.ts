@@ -9,10 +9,10 @@
  *
  * Table access (Finance domain):
  *   READ+WRITE: expense_ledger, purchase_logs, capex_transactions,
- *               opex_items, suppliers, receiving_records
+ *               opex_items, suppliers, receiving_records,
+ *               supplier_catalog (learning loop), sku (barcode backfill),
+ *               receipt_inbox, capex_assets, equipment
  *   READ ONLY:  nomenclature, fin_categories, fin_sub_categories
- *
- * Does NOT access: bom_structures, recipes_flow, equipment (Chef domain)
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -29,11 +29,14 @@ import { checkDuplicate } from "./tools/check-duplicate.js";
 import { searchExpenses } from "./tools/search-expenses.js";
 import { expenseSummary } from "./tools/expense-summary.js";
 import { manageSuppliers } from "./tools/manage-suppliers.js";
-import { makroLookup } from "./tools/makro-lookup.js";
+// makro_lookup removed — Lesia verifies barcodes manually when needed
 import { uploadReceipt } from "./tools/upload-receipt.js";
 import { checkInbox } from "./tools/check-inbox.js";
+import { createInbox } from "./tools/create-inbox.js";
 import { updateInbox } from "./tools/update-inbox.js";
 import { updateExpense } from "./tools/update-expense.js";
+import { readGuideline } from "./tools/read-guideline.js";
+import { manageCapexAssets } from "./tools/manage-capex-assets.js";
 
 // ─── Server Setup ────────────────────────────────────────────────
 
@@ -103,6 +106,7 @@ server.tool(
           quantity: z.number(),
           unit_price: z.number(),
           total_price: z.number(),
+          asset_id: z.string().optional().describe("UUID of capex_asset to link (create via manage_capex_assets first)"),
         })
       )
       .optional()
@@ -119,6 +123,10 @@ server.tool(
       )
       .optional()
       .describe("Operational items → opex_items spoke"),
+    raw_parse: z
+      .record(z.string(), z.any())
+      .optional()
+      .describe("Full parsed receipt data as JSON — stored for future data mining. Include ALL extracted fields: barcodes, addresses, phone numbers, article numbers, etc."),
   },
   async (args) => jsonResult(await approveReceipt(args))
 );
@@ -238,19 +246,6 @@ server.tool(
   async (args) => jsonResult(await uploadReceipt(args))
 );
 
-// ─── External Lookup Tools ───────────────────────────────────────
-
-server.tool(
-  "makro_lookup",
-  "Search products on makro.pro by barcode or name. Use to identify unknown items from Makro receipts. Supports single barcode, product name, or batch lookup of multiple barcodes.",
-  {
-    barcode: z.string().optional().describe("Single barcode to look up (e.g., '8850144074038')"),
-    name: z.string().optional().describe("Product name to search (e.g., 'Knorr Cornstarch')"),
-    barcodes: z.array(z.string()).optional().describe("Array of barcodes for batch lookup (max 20)"),
-  },
-  async (args) => jsonResult(await makroLookup(args))
-);
-
 // ─── Expense Update Tool ────────────────────────────────────────
 
 server.tool(
@@ -267,6 +262,7 @@ server.tool(
     comments: z.string().optional().describe("Additional notes"),
     invoice_number: z.string().optional().describe("Receipt/invoice reference number"),
     has_tax_invoice: z.boolean().optional().describe("Whether tax invoice is available"),
+    raw_parse: z.record(z.string(), z.any()).optional().describe("Full parsed receipt data as JSON — stored for future data mining. Include ALL extracted fields."),
   },
   async (args) => jsonResult(await updateExpense(args))
 );
@@ -288,11 +284,78 @@ server.tool(
   "Update receipt_inbox item status after processing. Use to mark a receipt as processed (with expense_id link) or errored.",
   {
     inbox_id: z.string().describe("UUID of the receipt_inbox record"),
-    status: z.enum(["pending", "processing", "processed", "error", "skipped"]).describe("New status"),
+    status: z.enum(["pending", "processing", "parsed", "processed", "error", "skipped"]).describe("New status. Use 'parsed' when agent finishes parsing (saves JSON for UI review)"),
     expense_id: z.string().optional().describe("UUID of linked expense_ledger record (when status=processed)"),
     error_message: z.string().optional().describe("Error description (when status=error)"),
+    parsed_payload: z.record(z.string(), z.any()).optional().describe("Full approve_receipt payload JSON — saved when status=parsed for human review in Admin UI"),
   },
   async (args) => jsonResult(await updateInbox(args))
+);
+
+server.tool(
+  "create_inbox",
+  "Create a receipt_inbox entry when starting to process a new receipt. Returns inbox_id for tracking through the processing lifecycle.",
+  {
+    uploaded_by: z.string().optional().describe("Who uploaded (e.g., 'Bas', 'Lesia')"),
+    receipt_date: z.string().optional().describe("Receipt date YYYY-MM-DD if known"),
+    supplier_hint: z.string().optional().describe("Supplier name hint from filename or user comment"),
+    amount_hint: z.number().optional().describe("Approximate total if known"),
+    photo_urls: z.array(z.string()).optional().describe("Supabase Storage URLs of receipt images"),
+    file_paths: z.array(z.string()).optional().describe("Local file paths of receipt files"),
+    notes: z.string().optional().describe("User comments about this receipt"),
+  },
+  async (args) => jsonResult(await createInbox(args))
+);
+
+// ─── Guideline Tools ────────────────────────────────────────
+
+server.tool(
+  "read_guideline",
+  "Load a receipt processing guideline or payload example on demand. Use to dynamically fetch parsing instructions for a supplier type (e.g., 'makro', 'market-small') or payload format examples. Part of the Stateless Agent v2 architecture — load only what you need.",
+  {
+    guideline_id: z
+      .enum([
+        "image-reading-protocol",
+        "makro",
+        "market-small",
+        "delivery",
+        "tax-invoice",
+        "capex",
+        "classification",
+        "arithmetic-check",
+        "payload-cogs",
+        "payload-capex",
+      ])
+      .describe(
+        "ID of guideline to load. Supplier-specific: makro, market-small, delivery. Protocols: image-reading-protocol, arithmetic-check, classification, capex, tax-invoice. Examples: payload-cogs, payload-capex"
+      ),
+  },
+  async (args) => jsonResult(await readGuideline(args))
+);
+
+// ─── CapEx Asset Management ─────────────────────────────────
+
+server.tool(
+  "manage_capex_assets",
+  "Create, update, or list CapEx assets. Use after approve_receipt for equipment purchases to register on balance sheet. Can auto-create equipment entries.",
+  {
+    action: z.enum(["create", "update", "list"]).describe("Action: create new asset, update existing, or list/search"),
+    asset_name: z.string().optional().describe("Asset name (required for create)"),
+    vendor: z.string().optional().describe("Vendor/supplier name"),
+    initial_value: z.number().optional().describe("Purchase price in THB (required for create)"),
+    residual_value: z.number().optional().describe("Residual value after depreciation (default: 0)"),
+    useful_life_months: z.number().optional().describe("Useful life in months (default: 60 = 5 years)"),
+    purchase_date: z.string().optional().describe("Purchase date YYYY-MM-DD"),
+    category_code: z.number().optional().describe("Financial category code"),
+    equipment_id: z.string().optional().describe("UUID of existing equipment to link"),
+    equipment_name: z.string().optional().describe("Name for auto-creating equipment entry (if equipment_id not provided)"),
+    equipment_category: z.string().optional().describe("Equipment category: oven, refrigeration, cooking, prep, beverage, fermentation, storage, service, infrastructure"),
+    asset_id: z.string().optional().describe("UUID of asset (required for update)"),
+    date_from: z.string().optional().describe("Filter: purchase date from YYYY-MM-DD (for list)"),
+    date_to: z.string().optional().describe("Filter: purchase date to YYYY-MM-DD (for list)"),
+    limit: z.number().optional().describe("Max results for list (default: 20)"),
+  },
+  async (args) => jsonResult(await manageCapexAssets(args))
 );
 
 // ─── Start ───────────────────────────────────────────────────────
@@ -301,7 +364,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Finance Agent MCP server running on stdio`);
-  console.error(`   Tools: 14 | Resources: 0 | Prompts: 0`);
+  console.error(`   Tools: 17 | Resources: 0 | Prompts: 0`);
 }
 
 main().catch((err) => {

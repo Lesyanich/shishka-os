@@ -1,0 +1,77 @@
+{
+  "transaction_date": "2026-02-27",
+  "flow_type": "COGS",
+  "category_code": 4100,
+  "supplier_name": "Makro",
+  "details": "Makro Rawai — weekly grocery",
+  "amount_original": 4222.25,
+  "discount_total": -40,
+  "vat_amount": 276.22,
+  "has_tax_invoice": true,
+  "invoice_number": "062501118002",
+  "currency": "THB",
+  "payment_method": "cash",
+  "paid_by": "Bas",
+  "raw_parse": {
+    "supplier": {
+      "name_en": "SIAM MAKRO PUBLIC COMPANY LIMITED",
+      "name_th": "บริษัท สยามแม็คโคร จำกัด (มหาชน)",
+      "tax_id": "0107536000269",
+      "branch": "062 Rawai",
+      "address": "...",
+      "phone": "..."
+    },
+    "header": {
+      "invoice_number": "062501118002",
+      "date_raw": "27/02/2569",
+      "date_parsed": "2026-02-27",
+      "time": "10:45",
+      "cashier": "K. Somchai"
+    },
+    "items": [
+      {
+        "line": 1,
+        "article": "214259",
+        "barcode": "5740900405332",
+        "name_th": "เนยลูร์แพค 2กก.",
+        "name_en": "Lurpak Butter 2kg",
+        "qty": 1,
+        "price": 419.00,
+        "amount": 419.00,
+        "taxable": true
+      }
+    ],
+    "footer": {
+      "subtotal": 4262.25,
+      "discount": -40.00,
+      "total": 4222.25,
+      "vat_amount": 276.22,
+      "payment_method": "cash"
+    },
+    "member_card": "..."
+  },
+  "food_items": [
+    {
+      "name": "Lurpak Butter 2kg",
+      "original_name": "เนยลูร์แพค 2กก.",
+      "barcode": "5740900405332",
+      "supplier_sku": "214259",
+      "brand": "Lurpak",
+      "package_weight": "2kg",
+      "nomenclature_id": "0e5f28e0-...",
+      "quantity": 1,
+      "unit": "pcs",
+      "unit_price": 419,
+      "total_price": 419
+    }
+  ],
+  "opex_items": [
+    {
+      "description": "Dish Soap 3.2L",
+      "quantity": 1,
+      "unit": "pcs",
+      "unit_price": 149,
+      "total_price": 149
+    }
+  ]
+}
