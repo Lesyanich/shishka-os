@@ -1,0 +1,88 @@
+{
+  "transaction_date": "2026-04-02",
+  "flow_type": "CapEx",
+  "category_code": 1100,
+  "supplier_name": "Makro",
+  "details": "Makro Samui — fans for kitchen",
+  "amount_original": 4336,
+  "discount_total": -134,
+  "vat_amount": 283.55,
+  "has_tax_invoice": false,
+  "currency": "THB",
+  "payment_method": "card",
+  "paid_by": "Lesia",
+  "raw_parse": {
+    "supplier": {
+      "name_en": "SIAM MAKRO PUBLIC COMPANY LIMITED",
+      "name_th": "บริษัท สยามแม็คโคร จำกัด (มหาชน)",
+      "tax_id": "0107536000269",
+      "branch": "048 Samui"
+    },
+    "header": {
+      "invoice_number": "048-2026-04-0012345",
+      "date_raw": "02/04/2569",
+      "date_parsed": "2026-04-02",
+      "time": "14:23"
+    },
+    "items": [
+      {
+        "line": 1,
+        "article": "246823",
+        "barcode": "8858651601357",
+        "name_th": "พัดลมตั้งพื้น SHARP",
+        "name_en": "SHARP Fan PJ-BL161-BK",
+        "qty": 1,
+        "price": 890.00,
+        "amount": 890.00
+      },
+      {
+        "line": 2,
+        "article": "373901",
+        "barcode": "8859486903742",
+        "name_th": "พัดลมอุตสาหกรรม HATARI",
+        "name_en": "HATARI Fan HF-T21M2",
+        "qty": 1,
+        "price": 1790.00,
+        "amount": 1790.00
+      },
+      {
+        "line": 3,
+        "article": "373901",
+        "barcode": "8859486903742",
+        "name_th": "พัดลมอุตสาหกรรม HATARI",
+        "name_en": "HATARI Fan HF-T21M2",
+        "qty": 1,
+        "price": 1790.00,
+        "amount": 1790.00
+      }
+    ],
+    "footer": {
+      "subtotal": 4470.00,
+      "discount": -134.00,
+      "total": 4336.00,
+      "vat_amount": 283.55,
+      "payment_method": "card"
+    }
+  },
+  "capex_items": [
+    {
+      "name": "SHARP Fan PJ-BL161-BK",
+      "quantity": 1,
+      "unit_price": 890,
+      "total_price": 890
+    },
+    {
+      "name": "HATARI Industrial Fan HF-T21M2",
+      "quantity": 1,
+      "unit_price": 1790,
+      "total_price": 1790
+    },
+    {
+      "name": "HATARI Industrial Fan HF-T21M2",
+      "quantity": 1,
+      "unit_price": 1790,
+      "total_price": 1790
+    }
+  ],
+  "_capex_note": "После approve рекомендуется: manage_capex_assets(create) для постановки на баланс"
+}

@@ -6,7 +6,7 @@ tags:
   - supabase
   - architecture
   - schema
-date: 2026-03-13
+date: 2026-03-14
 status: active
 aliases:
   - DB Schema
@@ -327,6 +327,55 @@ erDiagram
         TEXT model "gcv+gpt-4o-mini"
     }
 
+    purchase_orders {
+        UUID id PK
+        TEXT po_number "UNIQUE PO-0001"
+        UUID supplier_id FK
+        po_status status
+        DATE expected_date
+        TEXT notes
+        NUMERIC subtotal
+        NUMERIC grand_total
+        UUID source_plan_id FK
+        UUID expense_id FK
+        UUID created_by
+    }
+
+    po_lines {
+        UUID id PK
+        UUID po_id FK
+        UUID nomenclature_id FK
+        UUID sku_id FK
+        NUMERIC qty_ordered
+        TEXT unit
+        NUMERIC unit_price_expected
+        NUMERIC total_expected "GENERATED"
+        SMALLINT sort_order
+    }
+
+    receiving_records {
+        UUID id PK
+        UUID po_id FK
+        UUID expense_id FK
+        receiving_source source
+        UUID received_by
+        TIMESTAMPTZ received_at
+        TEXT status
+    }
+
+    receiving_lines {
+        UUID id PK
+        UUID receiving_id FK
+        UUID po_line_id FK
+        UUID nomenclature_id FK
+        UUID sku_id FK
+        NUMERIC qty_expected
+        NUMERIC qty_received
+        NUMERIC qty_rejected
+        reject_reason reject_reason
+        NUMERIC unit_price_actual
+    }
+
     nomenclature ||--o{ bom_structures : "parent_id"
     nomenclature ||--o{ bom_structures : "ingredient_id"
     nomenclature ||--o{ sku : "nomenclature_id"
@@ -380,6 +429,17 @@ erDiagram
     nomenclature ||--o{ supplier_catalog : "nomenclature_id"
     fin_categories ||--o{ supplier_catalog : "category_code"
     fin_sub_categories ||--o{ supplier_catalog : "sub_category_code"
+
+    suppliers ||--o{ purchase_orders : "supplier_id"
+    purchase_orders ||--o{ po_lines : "po_id"
+    purchase_orders ||--o{ receiving_records : "po_id"
+    nomenclature ||--o{ po_lines : "nomenclature_id"
+    sku ||--o{ po_lines : "sku_id"
+    receiving_records ||--o{ receiving_lines : "receiving_id"
+    po_lines ||--o{ receiving_lines : "po_line_id"
+    nomenclature ||--o{ receiving_lines : "nomenclature_id"
+    production_plans ||--o{ purchase_orders : "source_plan_id"
+    expense_ledger ||--o{ purchase_orders : "expense_id"
 ```
 
 ## Tables Index
@@ -420,6 +480,10 @@ erDiagram
 | `brands` | `id` UUID | name (UNIQUE), name_th, country, is_active | -- | 045 |
 | `tags` | `id` UUID | slug (UNIQUE), name, name_th, tag_group (ENUM), color, sort_order | -- | 045 |
 | `nomenclature_tags` | `(nomenclature_id, tag_id)` composite | -- | nomenclature_id -> nomenclature (CASCADE), tag_id -> tags (CASCADE) | 045 |
+| `purchase_orders` | `id` UUID | po_number (UNIQUE), status (po_status), expected_date, subtotal, discount_total, vat_amount, delivery_fee, grand_total, created_by | supplier_id -> suppliers, source_plan_id -> production_plans, expense_id -> expense_ledger | 061 |
+| `po_lines` | `id` UUID | qty_ordered, unit, unit_price_expected, total_expected (GENERATED), sort_order, UNIQUE(po_id, nomenclature_id, sku_id) | po_id -> purchase_orders (CASCADE), nomenclature_id -> nomenclature, sku_id -> sku | 061 |
+| `receiving_records` | `id` UUID | source (receiving_source), received_by, received_at, status ('received'/'reconciled') | po_id -> purchase_orders, expense_id -> expense_ledger | 062 |
+| `receiving_lines` | `id` UUID | qty_expected, qty_received, qty_rejected, reject_reason (reject_reason), unit_price_actual | receiving_id -> receiving_records (CASCADE), po_line_id -> po_lines, nomenclature_id -> nomenclature, sku_id -> sku | 062 |
 
 ## Custom ENUM Types
 
@@ -433,6 +497,9 @@ erDiagram
 | `order_status` | new, preparing, ready, delivered, cancelled | orders.status |
 | `plan_status` | draft, active, completed | production_plans.status |
 | `tag_group` | dietary, allergen, functional, storage, quality, cuisine, technique | tags.tag_group |
+| `po_status` | draft, submitted, confirmed, shipped, partially_received, received, reconciled, cancelled | purchase_orders.status |
+| `receiving_source` | purchase_order, receipt | receiving_records.source |
+| `reject_reason` | short_delivery, damaged, wrong_item, quality_reject, expired | receiving_lines.reject_reason |
 
 ## RPCs & Triggers
 
@@ -449,13 +516,19 @@ erDiagram
 | `fn_run_mrp(UUID)` | RPC | MRP v2: reads stock from v_inventory_by_nomenclature (was inventory_balances) | 023, 058 |
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
 | `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter | 021 |
-| `fn_approve_receipt(JSONB)` | RPC | Atomic receipt approval v10: SKU resolution (barcode→catalog→fallback→auto-create), sku_balances UPSERT, purchase_logs.sku_id | 030, 038, 040, 041, 047, 049, 058 |
+| `fn_approve_receipt(JSONB)` | RPC | Receipt approval v11: SKU resolution + sku_balances UPSERT + receiving_records audit trail | 030, 038, 040, 041, 047, 049, 058, 065 |
 | `fn_generate_sku_code()` | UTIL FN | Generates next SKU code: SKU-0001, SKU-0002, etc. | 057 |
 | `fn_sku_set_code()` | TRIGGER FN | Auto-assigns sku_code on INSERT if not provided | 057 |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | Lazy cleanup: marks zombie receipt_jobs (processing >5min) as failed | 036 |
 | `fn_is_authenticated()` | UTIL FN | `auth.role() = 'authenticated'`. Used by all 30 RLS policies. | 053, 054 |
 | `fn_current_user_id()` | UTIL FN | `auth.uid()`. Used by fn_set_created_by trigger. | 053, 054 |
 | `fn_set_created_by()` | TRIGGER FN | Auto-fills expense_ledger.created_by with auth.uid() on INSERT | 055 |
+| `fn_generate_po_number()` | UTIL FN | Generates next PO code: PO-0001, PO-0002, etc. | 061 |
+| `fn_po_set_number()` | TRIGGER FN | Auto-assigns po_number on INSERT if not provided | 061 |
+| `fn_create_purchase_order(JSONB)` | RPC | Creates PO with lines. Auto-populates prices from supplier_catalog | 064 |
+| `fn_receive_goods(JSONB)` | RPC | Physical receiving by Admin/Cook. No inventory update. Sets partially_received/received | 064 |
+| `fn_approve_po(JSONB)` | RPC | Financial reconciliation → expense_ledger + purchase_logs + sku_balances + WAC | 064 |
+| `fn_pending_deliveries()` | RPC | Pending POs for /receive screen. No prices. Includes partial delivery aggregation | 064 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
 
 ## Views
@@ -473,7 +546,7 @@ erDiagram
 ## RLS Policies (Row Level Security)
 
 > [!success] Phase 8: Authenticated Access Only
-> All 32 tables use a single `auth_full_access` policy via `fn_is_authenticated()` = `auth.role() = 'authenticated'`. Anon users get 0 rows. SECURITY DEFINER RPCs bypass RLS by design. Migrations 054, 057.
+> All 36 tables use a single `auth_full_access` policy via `fn_is_authenticated()` = `auth.role() = 'authenticated'`. Anon users get 0 rows. SECURITY DEFINER RPCs bypass RLS by design. Migrations 054, 057, 061, 062.
 
 | Table | Policy Name | Command | Condition | Migration |
 |---|---|---|---|---|
@@ -507,6 +580,10 @@ erDiagram
 | `brands` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
 | `tags` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
 | `nomenclature_tags` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
+| `purchase_orders` | `auth_full_access` | ALL | `fn_is_authenticated()` | 061 |
+| `po_lines` | `auth_full_access` | ALL | `fn_is_authenticated()` | 061 |
+| `receiving_records` | `auth_full_access` | ALL | `fn_is_authenticated()` | 062 |
+| `receiving_lines` | `auth_full_access` | ALL | `fn_is_authenticated()` | 062 |
 | ~~`recipes_flow`~~ | DROPPED (056) | -- | -- | -- |
 | ~~`daily_plan`~~ | DROPPED (056) | -- | -- | -- |
 | ~~`supplier_item_mapping`~~ | DROPPED (056) | -- | Was backward-compat view | -- |
@@ -527,6 +604,88 @@ erDiagram
 | `stock_transfers` | ALL columns | Immutable audit trail | INSERT-only |
 | `waste_logs` | `quantity`, `financial_liability` | Audit integrity | Corrections via new entries |
 | `purchase_logs` | ALL columns | Immutable audit trail | INSERT-only |
+| `purchase_orders` | `grand_total`, `expense_id` | Financial fields managed by RPC | `fn_approve_po()` |
+| `receiving_lines` | ALL columns | Immutable audit trail | INSERT-only via `fn_receive_goods()` |
+
+## Syrve Integration Tables (Phase 17, Migration 066)
+
+### syrve_config
+Key/value store for Syrve API credentials and settings.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `key` | TEXT | PK |
+| `value` | TEXT | NOT NULL |
+| `updated_at` | TIMESTAMPTZ | DEFAULT now() |
+
+### syrve_sync_queue
+Fire-and-Forget Outbox: decouples approve transactions from Syrve API.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID | PK |
+| `sync_type` | TEXT | CHECK IN ('purchase_invoice', 'writeoff', 'nomenclature') |
+| `ref_id` | UUID | FK to source (expense_ledger, waste_logs) |
+| `payload` | JSONB | Frozen snapshot at approve time |
+| `status` | TEXT | CHECK IN ('pending', 'processing', 'synced', 'error', 'failed') |
+| `attempts` | INT | DEFAULT 0 |
+| `last_error` | TEXT | |
+| `next_retry_at` | TIMESTAMPTZ | Exponential backoff |
+| `created_at` | TIMESTAMPTZ | |
+| `synced_at` | TIMESTAMPTZ | |
+
+### syrve_sync_log
+Audit trail for all sync operations (pull/push).
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID | PK |
+| `sync_type` | TEXT | 'nomenclature', 'sales', 'purchase_push', 'writeoff_push' |
+| `direction` | TEXT | CHECK IN ('pull', 'push') |
+| `status` | TEXT | CHECK IN ('success', 'error') |
+| `records_count` | INT | |
+| `error_message` | TEXT | |
+| `payload` | JSONB | Debug info |
+| `created_at` | TIMESTAMPTZ | |
+
+### syrve_uom_map
+Unit conversion between Shishka (box, pack) and Syrve (liter, kg).
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID | PK |
+| `nomenclature_id` | UUID | FK nomenclature. UNIQUE(nomenclature_id, shishka_unit) |
+| `shishka_unit` | TEXT | NOT NULL |
+| `syrve_unit` | TEXT | NOT NULL |
+| `syrve_uom_id` | UUID | Syrve measureUnit UUID |
+| `conversion_factor` | NUMERIC | CHECK > 0 |
+| `created_at` | TIMESTAMPTZ | |
+
+### syrve_sales
+Sales data pulled from Syrve POS (Phase 19).
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID | PK |
+| `syrve_order_id` | TEXT | |
+| `nomenclature_id` | UUID | FK nomenclature |
+| `product_name` | TEXT | |
+| `quantity` | NUMERIC | |
+| `amount` | NUMERIC | Revenue |
+| `cost_amount` | NUMERIC | Syrve COGS |
+| `sale_date` | DATE | Indexed |
+| `payment_type` | TEXT | |
+| `synced_at` | TIMESTAMPTZ | |
+
+### Syrve columns on existing tables
+
+| Table | Column | Type | Purpose |
+|-------|--------|------|---------|
+| `nomenclature` | `syrve_uuid` | UUID | Syrve product UUID mapping |
+| `nomenclature` | `syrve_tax_category_id` | UUID | Syrve tax category for purchase invoices |
+| `suppliers` | `syrve_uuid` | UUID | Syrve counteragent UUID mapping |
+| `expense_ledger` | `syrve_synced` | BOOLEAN | Sync status flag |
+| `expense_ledger` | `syrve_doc_id` | TEXT | Syrve document ID after sync |
 
 ## Related
 
@@ -534,3 +693,4 @@ erDiagram
 - [[Financial Ledger]] -- Finance module details
 - [[STATE]] -- Migration deployment history
 - [[Receipt Routing Architecture]] -- Hub & Spoke receipt routing (Phase 4.4)
+- [[Procurement & Receiving Architecture]] -- PO lifecycle, receiving, reconciliation (Phase 11)

@@ -3,7 +3,7 @@ import { useExpenseLedger } from '../hooks/useExpenseLedger'
 import type { ExpenseRow } from '../hooks/useExpenseLedger'
 import { useSupplierMapping } from '../hooks/useSupplierMapping'
 import { supabase } from '../lib/supabase'
-import { formatTHB } from '../components/finance/helpers'
+import { formatTHB, formatTHBFull } from '../components/finance/helpers'
 import { KpiCard } from '../components/finance/KpiCard'
 const MonthlyChart = lazy(() => import('../components/finance/MonthlyChart').then(m => ({ default: m.MonthlyChart })))
 import { ExpenseForm } from '../components/finance/ExpenseForm'
@@ -56,6 +56,128 @@ function fuzzyMatchSupplier(
   return partial?.id ?? ''
 }
 
+/* ── Module-level job resolver — survives HMR remounts ── */
+let _activeResolveJobId: string | null = null
+
+async function resolveJobToSessionStorage(jobId: string) {
+  // Prevent duplicate resolves for the same job
+  if (_activeResolveJobId === jobId) return
+  _activeResolveJobId = jobId
+
+  try {
+    console.log('[ReceiptJob] Resolving job:', jobId)
+    const { data: job, error: fetchErr } = await supabase
+      .from('receipt_jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single()
+
+    if (fetchErr) {
+      console.error('[ReceiptJob] DB fetch error:', fetchErr.message)
+      _activeResolveJobId = null
+      return
+    }
+
+    console.log('[ReceiptJob] Job status:', job?.status, 'has result:', !!job?.result)
+
+    if (!job || job.status !== 'completed' || !job.result) {
+      if (job?.status === 'failed') {
+        console.error('[ReceiptJob] Job failed:', job.error)
+        sessionStorage.removeItem('pendingReceiptJobId')
+        window.dispatchEvent(new CustomEvent('receipt-job-failed', { detail: job.error || 'AI parsing failed' }))
+      }
+      _activeResolveJobId = null
+      return
+    }
+
+    const result = job.result as ParsedReceipt
+    const imageUrls = (job.image_urls as string[]) || []
+
+    // Build receiptUrls from AI document classification
+    const urls: ReceiptUrls = {}
+    const docs = result.documents
+    if (docs) {
+      if (docs.supplier_receipt_index != null && imageUrls[docs.supplier_receipt_index])
+        urls.supplier = imageUrls[docs.supplier_receipt_index]
+      if (docs.bank_slip_index != null && imageUrls[docs.bank_slip_index])
+        urls.bank = imageUrls[docs.bank_slip_index]
+      if (docs.tax_invoice_index != null && imageUrls[docs.tax_invoice_index])
+        urls.tax = imageUrls[docs.tax_invoice_index]
+    } else {
+      if (imageUrls[0]) urls.supplier = imageUrls[0]
+      if (imageUrls[1]) urls.bank = imageUrls[1]
+      if (imageUrls[2]) urls.tax = imageUrls[2]
+    }
+
+    // Reclassify line_items into food/capex/opex (without applyMappings for now)
+    if (result.line_items?.length) {
+      result.food_items = result.line_items
+        .filter((li) => li.category === 'food')
+        .map((li) => ({
+          name: li.makro_name || li.translated_name || li.original_name || '',
+          quantity: sanitizeNum(li.quantity),
+          unit: li.unit || 'pcs',
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
+          nomenclature_id: li.nomenclature_id ?? undefined,
+          supplier_sku: li.supplier_sku ?? null,
+          original_name: li.original_name ?? null,
+          brand: li.brand ?? undefined,
+          package_weight: li.package_weight ?? undefined,
+          makro_name: li.makro_name ?? undefined,
+          full_title: li.full_title ?? undefined,
+        } as FoodItem))
+
+      result.capex_items = result.line_items
+        .filter((li) => li.category === 'capex')
+        .map((li) => ({
+          name: li.translated_name || li.original_name || '',
+          quantity: sanitizeNum(li.quantity),
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
+        }))
+
+      result.opex_items = result.line_items
+        .filter((li) => li.category === 'opex' || li.category === 'uncategorized')
+        .map((li) => ({
+          description: li.translated_name || li.original_name || '',
+          quantity: sanitizeNum(li.quantity),
+          unit: li.unit || 'pcs',
+          unit_price: sanitizeNum(li.unit_price),
+          total_price: sanitizeNum(li.total_price),
+        }))
+    }
+
+    // Sanitize totals
+    result.total_amount = sanitizeNum(result.total_amount)
+    if (result.footer) {
+      result.footer = {
+        subtotal: sanitizeNum(result.footer.subtotal),
+        discount_total: sanitizeSigned(result.footer.discount_total),
+        vat_amount: sanitizeNum(result.footer.vat_amount),
+        delivery_fee: sanitizeNum(result.footer.delivery_fee),
+        grand_total: sanitizeNum(result.footer.grand_total),
+      }
+    }
+
+    // Write to sessionStorage — React will pick it up on next mount/effect
+    const stagingPayload = { receipt: result, urls, imageUrls }
+    const payloadJson = JSON.stringify(stagingPayload)
+    console.log('[ReceiptJob] Writing stagingData to sessionStorage:', payloadJson.length, 'bytes,', result.line_items?.length ?? 0, 'items, total:', result.total_amount)
+    sessionStorage.setItem('stagingData', payloadJson)
+    sessionStorage.removeItem('pendingReceiptJobId')
+    sessionStorage.removeItem('pendingReceiptImageUrls')
+
+    // Signal to any listening component
+    console.log('[ReceiptJob] Dispatching receipt-job-resolved event')
+    window.dispatchEvent(new Event('receipt-job-resolved'))
+  } catch (err) {
+    console.error('[ReceiptJob] Module-level resolve error:', err)
+  } finally {
+    _activeResolveJobId = null
+  }
+}
+
 export function FinanceManager() {
   const {
     rows,
@@ -70,7 +192,7 @@ export function FinanceManager() {
     updateExpense,
   } = useExpenseLedger()
 
-  const { applyMappings, saveMapping, lookupMappings, updateConversion } = useSupplierMapping()
+  const { applyMappings, saveMapping, lookupMappings, updateConversion, lookupByBarcodes } = useSupplierMapping()
 
   /* Receipt URLs injected from MagicDropzone */
   const [receiptUrls, setReceiptUrls] = useState<ReceiptUrls>({})
@@ -85,37 +207,133 @@ export function FinanceManager() {
   const [quickText, setQuickText] = useState<string | undefined>(undefined)
 
   /* ── Phase 4.14: Async job tracking ── */
-  const [pendingJobId, setPendingJobId] = useState<string | null>(null)
-  const [pendingImageUrls, setPendingImageUrls] = useState<string[]>([])
+  /* Persist pendingJobId in sessionStorage so it survives HMR/reload */
+  const [pendingJobId, _setPendingJobId] = useState<string | null>(
+    () => sessionStorage.getItem('pendingReceiptJobId'),
+  )
+  const setPendingJobId = (id: string | null) => {
+    if (id) sessionStorage.setItem('pendingReceiptJobId', id)
+    else sessionStorage.removeItem('pendingReceiptJobId')
+    _setPendingJobId(id)
+  }
+  const [pendingImageUrls, setPendingImageUrls] = useState<string[]>(
+    () => {
+      const stored = sessionStorage.getItem('pendingReceiptImageUrls')
+      return stored ? JSON.parse(stored) : []
+    },
+  )
   const [jobError, setJobError] = useState<string | null>(null)
 
   /* ── Staging Area state (Phase 4.4 + 4.6: added imageUrls) ── */
-  const [stagingData, setStagingData] = useState<{
+  /* Initialize from sessionStorage to survive HMR remounts */
+  const [stagingData, _setStagingData] = useState<{
     receipt: ParsedReceipt
     urls: ReceiptUrls
     imageUrls: string[]
-  } | null>(null)
+  } | null>(() => {
+    const stored = sessionStorage.getItem('stagingData')
+    if (stored) {
+      try { return JSON.parse(stored) } catch { /* ignore */ }
+    }
+    return null
+  })
+  const setStagingData = (data: typeof stagingData) => {
+    if (data) {
+      sessionStorage.setItem('stagingData', JSON.stringify(data))
+    } else {
+      sessionStorage.removeItem('stagingData')
+    }
+    _setStagingData(data)
+  }
+
+  // Listen for module-level resolver completing
+  useEffect(() => {
+    const onResolved = () => {
+      console.log('[FinanceManager] receipt-job-resolved event received (global listener)')
+      const stored = sessionStorage.getItem('stagingData')
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          console.log('[FinanceManager] Setting stagingData from sessionStorage, items:', parsed?.receipt?.line_items?.length)
+          _setStagingData(parsed)
+          _setPendingJobId(null)
+        } catch (e) { console.error('[FinanceManager] Failed to parse stagingData:', e) }
+      } else {
+        console.warn('[FinanceManager] receipt-job-resolved fired but no stagingData in sessionStorage')
+      }
+    }
+    const onFailed = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      console.error('[FinanceManager] receipt-job-failed:', detail)
+      setJobError(detail || 'AI parsing failed')
+      _setPendingJobId(null)
+    }
+    window.addEventListener('receipt-job-resolved', onResolved)
+    window.addEventListener('receipt-job-failed', onFailed)
+    return () => {
+      window.removeEventListener('receipt-job-resolved', onResolved)
+      window.removeEventListener('receipt-job-failed', onFailed)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* Lazy-loaded nomenclature for staging area food item mapping */
   const [nomenclature, setNomenclature] = useState<
-    { id: string; name: string; product_code: string }[]
+    { id: string; name: string; product_code: string; category_id: string | null }[]
   >([])
 
-  // Fetch RAW nomenclature only when staging area opens (CLAUDE.md rule #3: separate query)
+  /* Product categories for category column in food items table */
+  const [productCategories, setProductCategories] = useState<
+    { id: string; code: string; name: string; parent_id: string | null; level: number }[]
+  >([])
+
+  // Fetch RAW nomenclature + product_categories only when staging area opens
   useEffect(() => {
     if (!stagingData) return
+    // CLAUDE.md rule #3: separate queries, no INNER JOIN
     supabase
       .from('nomenclature')
-      .select('id, name, product_code')
+      .select('id, name, product_code, category_id')
       .ilike('product_code', 'RAW-%')
       .order('name')
       .then(({ data }) => setNomenclature(data ?? []))
+    supabase
+      .from('product_categories')
+      .select('id, code, name, parent_id, level')
+      .eq('is_active', true)
+      .order('sort_order')
+      .then(({ data }) => setProductCategories(data ?? []))
   }, [stagingData])
 
-  // Phase 4.14: Realtime subscription — listen for receipt_jobs completion
+  // Phase 4.14: Realtime subscription + module-level resolver
+  // Module-level resolver writes to sessionStorage (survives HMR)
+  // This effect: (1) kicks off resolver, (2) Realtime subscription, (3) listens for resolution
   useEffect(() => {
     if (!pendingJobId) return
 
+    console.log('[FinanceManager] pendingJobId effect fired:', pendingJobId)
+
+    // Kick off module-level resolve (idempotent — won't duplicate)
+    resolveJobToSessionStorage(pendingJobId)
+
+    // Listen for resolution signal from module-level resolver
+    const onResolved = () => {
+      console.log('[FinanceManager] receipt-job-resolved event received (job-specific listener)')
+      const stored = sessionStorage.getItem('stagingData')
+      if (stored) {
+        try {
+          _setStagingData(JSON.parse(stored))
+        } catch (e) {
+          console.error('[FinanceManager] Failed to parse stagingData:', e)
+        }
+        _setPendingJobId(null)
+        setPendingImageUrls([])
+        setJobError(null)
+      }
+    }
+    window.addEventListener('receipt-job-resolved', onResolved)
+
+    // Realtime subscription as primary channel
     const channel = supabase
       .channel(`receipt-job-${pendingJobId}`)
       .on(
@@ -128,43 +346,34 @@ export function FinanceManager() {
         },
         (payload) => {
           const job = payload.new as ReceiptJob
-          if (job.status === 'completed' && job.result) {
-            handleAiResult(job.result, pendingImageUrls)
-            setPendingJobId(null)
-            setPendingImageUrls([])
-            setJobError(null)
+          console.log('[FinanceManager] Realtime UPDATE:', job.status)
+          if (job.status === 'completed') {
+            resolveJobToSessionStorage(pendingJobId!)
           } else if (job.status === 'failed') {
             setJobError(job.error || 'AI parsing failed')
             setPendingJobId(null)
-            setPendingImageUrls([])
           }
         },
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('[FinanceManager] Realtime subscription status:', status)
+      })
 
-    // Fallback poll: check once after 90s in case Realtime missed the event
-    const fallbackTimer = setTimeout(async () => {
-      const { data } = await supabase
-        .from('receipt_jobs')
-        .select('*')
-        .eq('id', pendingJobId)
-        .single()
-
-      if (data?.status === 'completed' && data.result) {
-        handleAiResult(data.result as ParsedReceipt, data.image_urls as string[])
-        setPendingJobId(null)
-        setPendingImageUrls([])
-        setJobError(null)
-      } else if (data?.status === 'failed') {
-        setJobError(data.error || 'AI parsing failed (timeout)')
-        setPendingJobId(null)
-        setPendingImageUrls([])
+    // Fallback poll every 5s (was 10s — more aggressive for Google Drive HMR environments)
+    const fallbackTimer = setInterval(() => {
+      if (!sessionStorage.getItem('pendingReceiptJobId')) {
+        console.log('[FinanceManager] Poll: no pendingReceiptJobId, clearing timer')
+        clearInterval(fallbackTimer)
+        return
       }
-    }, 90_000)
+      console.log('[FinanceManager] Poll: checking job status...')
+      resolveJobToSessionStorage(pendingJobId!)
+    }, 5_000)
 
     return () => {
+      window.removeEventListener('receipt-job-resolved', onResolved)
       supabase.removeChannel(channel)
-      clearTimeout(fallbackTimer)
+      clearInterval(fallbackTimer)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingJobId])
@@ -271,6 +480,9 @@ export function FinanceManager() {
     supplierSku: string | null
     originalName: string
     nomenclatureId: string
+    purchaseUnit?: string
+    conversionFactor?: number
+    baseUnit?: string
   }) => {
     await saveMapping(params)
   }
@@ -315,7 +527,7 @@ export function FinanceManager() {
     // Refresh nomenclature list for staging area
     const { data: freshNom } = await supabase
       .from('nomenclature')
-      .select('id, name, product_code')
+      .select('id, name, product_code, category_id')
       .ilike('product_code', 'RAW-%')
       .order('name')
     if (freshNom) setNomenclature(freshNom)
@@ -365,13 +577,13 @@ export function FinanceManager() {
       <div className="grid gap-4 sm:grid-cols-3">
         <KpiCard
           label="This Month"
-          value={formatTHB(monthTotal)}
+          value={`฿${formatTHBFull(monthTotal)}`}
           delta={monthDelta}
           isLoading={isLoading}
         />
         <KpiCard
           label="All-time Total"
-          value={formatTHB(grandTotal)}
+          value={`฿${formatTHBFull(grandTotal)}`}
           isLoading={isLoading}
         />
         <KpiCard
@@ -390,6 +602,7 @@ export function FinanceManager() {
         onJobCreated={(jobId, imageUrls) => {
           setPendingJobId(jobId)
           setPendingImageUrls(imageUrls)
+          sessionStorage.setItem('pendingReceiptImageUrls', JSON.stringify(imageUrls))
           setJobError(null)
         }}
         isPending={!!pendingJobId}
@@ -412,26 +625,33 @@ export function FinanceManager() {
         </div>
       )}
 
-      {/* Main grid: Form OR StagingArea (left) | Chart + History (right) */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)]">
+      {/* When StagingArea is active — full-width layout for invoice precision */}
+      {stagingData && (
         <div className="space-y-6">
-          {stagingData ? (
-            <StagingArea
-              receipt={stagingData.receipt}
-              receiptUrls={stagingData.urls}
-              imageUrls={stagingData.imageUrls}
-              nomenclatureList={nomenclature}
-              suppliersList={suppliers}
-              categories={categories}
-              subCategories={subCategories}
-              onApprove={handleApprove}
-              onCancel={() => setStagingData(null)}
-              onSaveMapping={handleSaveMapping}
-              onCreateNomenclature={handleCreateNomenclature}
-              onLookupMappings={lookupMappings}
-              onUpdateConversion={updateConversion}
-            />
-          ) : (
+          <StagingArea
+            receipt={stagingData.receipt}
+            receiptUrls={stagingData.urls}
+            imageUrls={stagingData.imageUrls}
+            nomenclatureList={nomenclature}
+            productCategories={productCategories}
+            suppliersList={suppliers}
+            categories={categories}
+            subCategories={subCategories}
+            onApprove={handleApprove}
+            onCancel={() => setStagingData(null)}
+            onSaveMapping={handleSaveMapping}
+            onCreateNomenclature={handleCreateNomenclature}
+            onLookupMappings={lookupMappings}
+            onLookupBarcodes={lookupByBarcodes}
+            onUpdateConversion={updateConversion}
+          />
+        </div>
+      )}
+
+      {/* Main grid: Form (left) | Chart + History (right) — hidden when staging */}
+      <div className={`grid gap-6 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] ${stagingData ? 'hidden' : ''}`}>
+        <div className="space-y-6">
+          {!stagingData && (
             <ExpenseForm
               categories={categories}
               subCategories={subCategories}
@@ -445,6 +665,7 @@ export function FinanceManager() {
         <div className="space-y-6">
           <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-slate-800/50" />}>
             <MonthlyChart
+
               summaries={monthlySummaries}
               isLoading={isLoading}
               error={error}
@@ -453,12 +674,14 @@ export function FinanceManager() {
           <ExpenseHistory
             rows={rows}
             categories={categories}
+            subCategories={subCategories}
             suppliers={suppliers}
             isLoading={isLoading}
             error={error}
             onRefetch={refetch}
             onReceiptClick={setLightboxUrl}
             onEditClick={setEditingRow}
+            onUpdateExpense={updateExpense}
           />
         </div>
       </div>

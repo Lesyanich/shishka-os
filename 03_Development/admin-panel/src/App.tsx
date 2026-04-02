@@ -20,7 +20,17 @@ const Procurement = lazy(() => import('./pages/Procurement').then(m => ({ defaul
 const SkuManagerPage = lazy(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
 const OrderManager = lazy(() => import('./pages/OrderManager').then(m => ({ default: m.OrderManager })))
 const MasterPlanner = lazy(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
-const FinanceManager = lazy(() => import('./pages/FinanceManager').then(m => ({ default: m.FinanceManager })))
+const FinanceLayout = lazy(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
+const FinanceLedger = lazy(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
+const FinanceEntry = lazy(() => import('./pages/FinanceEntry').then(m => ({ default: m.FinanceEntry })))
+const FinanceAnalytics = lazy(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
+const ReceivingStation = lazy(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
+const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
+const KitchenDashboard = lazy(() => import('./pages/KitchenDashboard').then(m => ({ default: m.KitchenDashboard })))
+const ScheduleManager = lazy(() => import('./pages/ScheduleManager').then(m => ({ default: m.ScheduleManager })))
+const BatchPlanner = lazy(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
+const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
+const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
 
 function PageLoader() {
   return (
@@ -55,6 +65,7 @@ function App() {
         <Sentry.ErrorBoundary fallback={FallbackError}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/kitchen" element={<Suspense fallback={<PageLoader />}><KitchenDashboard /></Suspense>} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
                 <Route path="/" element={<ControlCenter />} />
@@ -67,7 +78,18 @@ function App() {
                 <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
                 <Route path="/orders" element={<Suspense fallback={<PageLoader />}><OrderManager /></Suspense>} />
                 <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
-                <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceManager /></Suspense>} />
+                <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
+                <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
+                  <Route index element={<Navigate to="ledger" replace />} />
+                  <Route path="ledger" element={<FinanceLedger />} />
+                  <Route path="entry" element={<FinanceEntry />} />
+                  <Route path="analytics" element={<FinanceAnalytics />} />
+                </Route>
+                <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
+                <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
+                <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
+                <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
+                <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
               </Route>
             </Route>
             {/* Fallback: redirect unknown routes to Control Center */}
