@@ -78,7 +78,6 @@ export function DishSelector({ dishes, onChange }: DishSelectorProps) {
       {dishes.length > 0 && (
         <div className="space-y-1">
           {dishes.map((d) => {
-            const item = items.find((i) => i.id === d.id)
             const isSale = d.product_code.startsWith('SALE-')
             return (
               <div

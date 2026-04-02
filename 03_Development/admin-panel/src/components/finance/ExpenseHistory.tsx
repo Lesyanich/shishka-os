@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
-  FileCheck,
   Loader2,
   Pencil,
   Receipt,
@@ -482,9 +481,9 @@ function TableRowWithSpoke({
 
 function ExpandedExpensePanel({
   row,
-  categories,
-  subCategories,
-  suppliers,
+  categories: _categories,
+  subCategories: _subCategories,
+  suppliers: _suppliers,
   onUpdateExpense,
   onReceiptClick,
   onRefetch,

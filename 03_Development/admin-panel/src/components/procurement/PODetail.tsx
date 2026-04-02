@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, Send, CheckCircle, XCircle, DollarSign } from 'lucide-react'
+import { ChevronLeft, Send, XCircle, DollarSign } from 'lucide-react'
 import type { PurchaseOrder, POLine, POStatus } from '../../types/procurement'
 
 const NEXT_ACTIONS: Partial<Record<POStatus, { label: string; next: POStatus; color: string }>> = {

@@ -21,7 +21,7 @@ import type { MappingMatch, BarcodeMatch } from '../../hooks/useSupplierMapping'
 import { normalizeForMatch } from '../../hooks/useSupplierMapping'
 import { CURRENCY_OPTIONS, PAYMENT_METHODS, formatTHB, formatTHBFull, parseWeight, formatNetWeight } from './helpers'
 import { ReceiptImageViewer } from './ReceiptImageViewer'
-import { nomenclatureOptionText } from './NomenclatureLabel'
+// nomenclatureOptionText removed — not currently used
 import { SearchableNomenclatureSelect } from './SearchableNomenclatureSelect'
 import type {
   ParsedReceipt,
@@ -1824,7 +1824,7 @@ function ReconciliationPanel({
   vatAmount,
   deliveryFee,
   onDiscountChange,
-  onVatChange,
+  onVatChange: _onVatChange,
   onDeliveryFeeChange,
 }: {
   footer: ReceiptFooter

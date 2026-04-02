@@ -101,8 +101,7 @@ export function CategoryBreakdown({ rows, isLoading }: CategoryBreakdownProps) {
                 innerRadius={50}
                 outerRadius={75}
                 paddingAngle={2}
-                activeIndex={activeIndex}
-                activeShape={renderActiveShape}
+                activeShape={activeIndex != null ? renderActiveShape : undefined}
                 onMouseEnter={(_, index) => setActiveIndex(index)}
                 onMouseLeave={() => setActiveIndex(undefined)}
               >
