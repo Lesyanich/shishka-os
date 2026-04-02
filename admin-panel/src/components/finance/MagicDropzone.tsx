@@ -24,7 +24,14 @@ export interface MagicDropzoneProps {
 
 // Phase 4.16b: WebP byte compression — preserve 100% pixel resolution, reduce file weight only
 const MAX_FILE_SIZE = 15 * 1024 * 1024  // 15 MB — raw camera photos (before processing)
-const WEBP_QUALITY = 0.3                // micro-files for 60s Edge Function limit
+const WEBP_QUALITY = 0.65               // balanced quality for OCR readability + fast upload
+
+/** Gemini model options: Pro for complex receipts (many items), Flash for simple ones */
+const MODEL_OPTIONS = [
+  { value: 'gemini-2.5-pro', label: 'Pro', desc: 'Complex receipts', icon: '🧠' },
+  { value: 'gemini-2.5-flash', label: 'Flash', desc: 'Simple & fast', icon: '⚡' },
+] as const
+type GeminiModel = typeof MODEL_OPTIONS[number]['value']
 
 /* ────────────── WebP Byte Compression (Phase 4.16b) ─────────── */
 
@@ -94,6 +101,9 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [model, setModel] = useState<GeminiModel>(() => {
+    return (localStorage.getItem('receiptModel') as GeminiModel) || 'gemini-2.5-pro'
+  })
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Phase 4.14: beforeunload guard while async job is active
@@ -173,10 +183,10 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
       }
 
       if (onJobCreated) {
-        // Step 2: INSERT receipt_jobs row → get job ID
+        // Step 2: INSERT receipt_jobs row → get job ID (with model choice)
         const { data: job, error: insertErr } = await supabase
           .from('receipt_jobs')
-          .insert({ image_urls: imageUrls })
+          .insert({ image_urls: imageUrls, model })
           .select('id')
           .single()
 
@@ -189,7 +199,7 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
         // Raw fetch() broke auth (401 Invalid JWT). Edge Function reads
         // job_id from URL params, image_urls from DB. Zero body parsing.
         supabase.functions.invoke(
-          `parse-receipts?job_id=${encodeURIComponent(job.id)}`
+          `parse-receipts?job_id=${encodeURIComponent(job.id)}&model=${encodeURIComponent(model)}`
         ).catch((err) => {
           // Phase 4.14 Resilience: catch AbortError / network failures silently.
           // The Edge Function may still complete — DB has the job row.
@@ -386,25 +396,52 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
         </div>
       )}
 
-      {/* ── Analyze Button ── */}
+      {/* ── Model selector + Analyze Button ── */}
       {hasFiles && !isUploading && !isPending && (
-        <button
-          type="button"
-          onClick={handleAnalyze}
-          disabled={isUploading || isPending}
-          className="animate-fade-in-up group/btn relative w-full overflow-hidden rounded-xl border border-indigo-500/40 bg-gradient-to-r from-indigo-500/[0.12] via-violet-500/[0.12] to-indigo-500/[0.12] px-4 py-2.5 text-sm font-medium tracking-wide text-indigo-200 shadow-sm transition-all duration-300 hover:border-indigo-400/60 hover:from-indigo-500/20 hover:via-violet-500/20 hover:to-indigo-500/20 hover:shadow-md hover:shadow-indigo-500/10 disabled:opacity-50"
-        >
-          {/* Shimmer effect on hover */}
-          <div className="absolute inset-0 translate-x-[-200%] bg-gradient-to-r from-transparent via-white/[0.04] to-transparent transition-transform duration-700 group-hover/btn:translate-x-[200%]" />
+        <div className="animate-fade-in-up flex gap-2">
+          {/* Model toggle */}
+          <div className="flex shrink-0 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/60">
+            {MODEL_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  setModel(opt.value)
+                  localStorage.setItem('receiptModel', opt.value)
+                }}
+                className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-all duration-200 ${
+                  model === opt.value
+                    ? opt.value.includes('pro')
+                      ? 'bg-violet-500/15 text-violet-300 shadow-inner shadow-violet-500/10'
+                      : 'bg-amber-500/15 text-amber-300 shadow-inner shadow-amber-500/10'
+                    : 'text-slate-500 hover:bg-slate-800/60 hover:text-slate-300'
+                }`}
+                title={opt.desc}
+              >
+                <span>{opt.icon}</span>
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
-          <span className="relative inline-flex items-center gap-2">
-            <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover/btn:rotate-12" />
-            Analyze with AI
-            <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs tabular-nums text-indigo-300">
-              {files.length} file{files.length !== 1 ? 's' : ''}
+          {/* Analyze button */}
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={isUploading || isPending}
+            className="group/btn relative flex-1 overflow-hidden rounded-xl border border-indigo-500/40 bg-gradient-to-r from-indigo-500/[0.12] via-violet-500/[0.12] to-indigo-500/[0.12] px-4 py-2.5 text-sm font-medium tracking-wide text-indigo-200 shadow-sm transition-all duration-300 hover:border-indigo-400/60 hover:from-indigo-500/20 hover:via-violet-500/20 hover:to-indigo-500/20 hover:shadow-md hover:shadow-indigo-500/10 disabled:opacity-50"
+          >
+            <div className="absolute inset-0 translate-x-[-200%] bg-gradient-to-r from-transparent via-white/[0.04] to-transparent transition-transform duration-700 group-hover/btn:translate-x-[200%]" />
+
+            <span className="relative inline-flex items-center gap-2">
+              <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover/btn:rotate-12" />
+              Analyze with AI
+              <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs tabular-nums text-indigo-300">
+                {files.length} file{files.length !== 1 ? 's' : ''}
+              </span>
             </span>
-          </span>
-        </button>
+          </button>
+        </div>
       )}
 
       {/* ── Toast Messages ── */}

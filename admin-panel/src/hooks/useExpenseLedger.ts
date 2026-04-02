@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 export interface ExpenseRow {
   id: string
   transaction_date: string
-  flow_type: 'OpEx' | 'CapEx'
+  flow_type: 'OpEx' | 'CapEx' | 'COGS'
   category_code: number | null
   sub_category_code: number | null
   supplier_id: string | null
@@ -21,8 +21,13 @@ export interface ExpenseRow {
   receipt_supplier_url: string | null
   receipt_bank_url: string | null
   tax_invoice_url: string | null
+  receipt_pages: string[]
   comments: string | null
   has_tax_invoice: boolean
+  invoice_number: string | null
+  vat_amount: number
+  discount_total: number
+  delivery_fee: number
   created_at: string
   // Joined
   category_name: string | null
@@ -55,7 +60,7 @@ export interface MonthlySummary {
 
 export interface ExpenseUpdatePayload {
   transaction_date?: string
-  flow_type?: 'OpEx' | 'CapEx'
+  flow_type?: 'OpEx' | 'CapEx' | 'COGS'
   category_code?: number | null
   sub_category_code?: number | null
   supplier_id?: string | null
@@ -69,6 +74,7 @@ export interface ExpenseUpdatePayload {
   receipt_supplier_url?: string | null
   receipt_bank_url?: string | null
   tax_invoice_url?: string | null
+  receipt_pages?: string[]
   comments?: string | null
   has_tax_invoice?: boolean
 }
@@ -138,7 +144,7 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
     const mapped: ExpenseRow[] = (ledgerRes.data ?? []).map((r) => ({
       id: r.id as string,
       transaction_date: r.transaction_date as string,
-      flow_type: r.flow_type as 'OpEx' | 'CapEx',
+      flow_type: r.flow_type as 'OpEx' | 'CapEx' | 'COGS',
       category_code: r.category_code as number | null,
       sub_category_code: r.sub_category_code as number | null,
       supplier_id: r.supplier_id as string | null,
@@ -153,8 +159,13 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
       receipt_supplier_url: r.receipt_supplier_url as string | null,
       receipt_bank_url: r.receipt_bank_url as string | null,
       tax_invoice_url: r.tax_invoice_url as string | null,
+      receipt_pages: (r.receipt_pages ?? []) as string[],
       comments: (r.comments ?? null) as string | null,
       has_tax_invoice: (r.has_tax_invoice ?? false) as boolean,
+      invoice_number: (r.invoice_number ?? null) as string | null,
+      vat_amount: Number(r.vat_amount ?? 0),
+      discount_total: Number(r.discount_total ?? 0),
+      delivery_fee: Number(r.delivery_fee ?? 0),
       created_at: r.created_at as string,
       category_name: r.category_code != null ? (catMap[r.category_code as number] ?? null) : null,
       sub_category_name: r.sub_category_code != null ? (subCatMap[r.sub_category_code as number] ?? null) : null,

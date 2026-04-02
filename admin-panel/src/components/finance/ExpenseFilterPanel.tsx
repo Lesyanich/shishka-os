@@ -12,7 +12,7 @@ export interface ExpenseFilters {
   dateTo: string
   categoryCode: number | null
   supplierId: string | null
-  flowType: 'OpEx' | 'CapEx' | null
+  flowType: 'OpEx' | 'CapEx' | 'COGS' | null
 }
 
 export const EMPTY_FILTERS: ExpenseFilters = {
@@ -171,8 +171,14 @@ export function ExpenseFilterPanel({
             Type
           </label>
           <div className="flex gap-1.5">
-            {(['OpEx', 'CapEx'] as const).map((ft) => {
+            {(['OpEx', 'CapEx', 'COGS'] as const).map((ft) => {
               const active = filters.flowType === ft
+              const activeStyle =
+                ft === 'OpEx'
+                  ? 'border-emerald-500/50 bg-emerald-500/[0.12] text-emerald-300 shadow-sm shadow-emerald-500/10'
+                  : ft === 'CapEx'
+                    ? 'border-amber-500/50 bg-amber-500/[0.12] text-amber-300 shadow-sm shadow-amber-500/10'
+                    : 'border-blue-500/50 bg-blue-500/[0.12] text-blue-300 shadow-sm shadow-blue-500/10'
               return (
                 <button
                   key={ft}
@@ -180,9 +186,7 @@ export function ExpenseFilterPanel({
                   onClick={() => patch({ flowType: active ? null : ft })}
                   className={`h-8 flex-1 rounded-lg border text-[11px] font-semibold tracking-wide transition-all duration-200 ${
                     active
-                      ? ft === 'OpEx'
-                        ? 'border-emerald-500/50 bg-emerald-500/[0.12] text-emerald-300 shadow-sm shadow-emerald-500/10'
-                        : 'border-amber-500/50 bg-amber-500/[0.12] text-amber-300 shadow-sm shadow-amber-500/10'
+                      ? activeStyle
                       : 'border-slate-700/60 bg-slate-800/60 text-slate-500 hover:border-slate-600 hover:text-slate-400'
                   }`}
                 >

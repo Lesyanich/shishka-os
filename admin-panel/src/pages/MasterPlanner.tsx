@@ -13,6 +13,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 /* ─── Types ──────────────────────────────────────────────── */
@@ -80,6 +81,11 @@ export function MasterPlanner() {
   const [isCalculating, setIsCalculating] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
   const [approveResult, setApproveResult] = useState<string | null>(null)
+
+  /* ─── MRP → PO state ─── */
+  const [isCreatingPOs, setIsCreatingPOs] = useState(false)
+  const [poResult, setPOResult] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   /* ─── Selected plan (derived) ─── */
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null
@@ -274,6 +280,108 @@ export function MasterPlanner() {
 
     if (selectedPlanId === planId) setSelectedPlanId(null)
     fetchPlans()
+  }
+
+  /* ─── Create POs from MRP procurement list ─── */
+
+  const createPOsFromMRP = async () => {
+    if (!selectedPlan || procurementList.length === 0) return
+    const shortageItems = procurementList.filter((p) => p.net_qty > 0)
+    if (shortageItems.length === 0) {
+      setPOResult('No shortages — nothing to order!')
+      return
+    }
+
+    setIsCreatingPOs(true)
+    setPOResult(null)
+
+    try {
+      // 1. Find preferred supplier for each nomenclature via supplier_catalog
+      const nomIds = shortageItems.map((p) => p.nomenclature_id)
+      const { data: catalogData } = await supabase
+        .from('supplier_catalog')
+        .select('supplier_id, nomenclature_id')
+        .in('nomenclature_id', nomIds)
+        .order('match_count', { ascending: false })
+
+      // Build map: nomenclature_id → preferred supplier_id
+      const nomToSupplier = new Map<string, string>()
+      for (const row of (catalogData ?? []) as { supplier_id: string; nomenclature_id: string }[]) {
+        if (!nomToSupplier.has(row.nomenclature_id)) {
+          nomToSupplier.set(row.nomenclature_id, row.supplier_id)
+        }
+      }
+
+      // 2. Group items by supplier
+      const supplierGroups = new Map<string, typeof shortageItems>()
+      const unmatchedKey = '__unmatched__'
+
+      for (const item of shortageItems) {
+        const suppId = nomToSupplier.get(item.nomenclature_id) ?? unmatchedKey
+        const group = supplierGroups.get(suppId) ?? []
+        group.push(item)
+        supplierGroups.set(suppId, group)
+      }
+
+      // 3. If all items are unmatched, get the first supplier as default
+      let defaultSupplierId: string | null = null
+      if (supplierGroups.has(unmatchedKey)) {
+        const { data: firstSupplier } = await supabase
+          .from('suppliers')
+          .select('id')
+          .eq('is_deleted', false)
+          .order('name')
+          .limit(1)
+          .single()
+        defaultSupplierId = (firstSupplier as { id: string } | null)?.id ?? null
+      }
+
+      // 4. Create POs
+      let poCount = 0
+      let totalItems = 0
+
+      for (const [suppId, items] of supplierGroups) {
+        const actualSuppId = suppId === unmatchedKey ? defaultSupplierId : suppId
+        if (!actualSuppId) continue
+
+        const payload = {
+          supplier_id: actualSuppId,
+          expected_date: selectedPlan.target_date,
+          notes: `Auto-generated from MRP: ${selectedPlan.name}`,
+          source_plan_id: selectedPlan.id,
+          lines: items.map((item) => ({
+            nomenclature_id: item.nomenclature_id,
+            qty_ordered: item.net_qty,
+          })),
+        }
+
+        const { data, error } = await supabase.rpc('fn_create_purchase_order', {
+          p_payload: payload,
+        })
+
+        if (error) {
+          console.error('[MRP→PO] RPC error:', error)
+          continue
+        }
+
+        const result = data as { ok: boolean; po_number?: string; line_count?: number }
+        if (result.ok) {
+          poCount++
+          totalItems += result.line_count ?? 0
+        }
+      }
+
+      if (poCount > 0) {
+        setPOResult(`Created ${poCount} PO${poCount > 1 ? 's' : ''} with ${totalItems} items total`)
+      } else {
+        setPOResult('No POs created — check supplier catalog mappings')
+      }
+    } catch (err) {
+      console.error('[MRP→PO] error:', err)
+      setPOResult('Error creating POs')
+    } finally {
+      setIsCreatingPOs(false)
+    }
   }
 
   /* ─── Helpers ─── */
@@ -737,14 +845,68 @@ export function MasterPlanner() {
                         </table>
 
                         {/* Total cost */}
-                        <div className="mt-3 flex items-center justify-end border-t border-slate-800 pt-2">
-                          <span className="text-[10px] text-slate-500 mr-2">
-                            Estimated Total:
-                          </span>
-                          <span className="text-sm font-bold text-emerald-300">
-                            {totalCost.toFixed(0)} THB
-                          </span>
+                        <div className="mt-3 flex items-center justify-between border-t border-slate-800 pt-2">
+                          <div>
+                            <span className="text-[10px] text-slate-500 mr-2">
+                              Estimated Total:
+                            </span>
+                            <span className="text-sm font-bold text-emerald-300">
+                              {totalCost.toFixed(0)} THB
+                            </span>
+                          </div>
+
+                          {/* Create POs button */}
+                          {selectedPlan.status === 'draft' && (
+                            <button
+                              type="button"
+                              onClick={createPOsFromMRP}
+                              disabled={isCreatingPOs || procurementList.filter(p => p.net_qty > 0).length === 0}
+                              className="inline-flex h-7 items-center rounded-md border border-sky-500/60 bg-sky-500/10 px-3 text-[11px] font-medium text-sky-200 hover:bg-sky-500/20 disabled:opacity-50"
+                            >
+                              {isCreatingPOs ? (
+                                <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                              ) : (
+                                <ShoppingCart className="mr-1.5 h-3 w-3" />
+                              )}
+                              Create Purchase Orders
+                            </button>
+                          )}
                         </div>
+
+                        {/* PO creation result */}
+                        {poResult && (
+                          <div
+                            className={`mt-2 rounded-lg px-3 py-2 text-xs ${
+                              poResult.startsWith('Created')
+                                ? 'bg-sky-500/10 text-sky-300'
+                                : poResult.startsWith('No shortages')
+                                  ? 'bg-emerald-500/10 text-emerald-300'
+                                  : 'bg-red-500/10 text-red-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                {poResult.startsWith('Created') ? (
+                                  <Check className="h-3.5 w-3.5" />
+                                ) : poResult.startsWith('No shortages') ? (
+                                  <Check className="h-3.5 w-3.5" />
+                                ) : (
+                                  <X className="h-3.5 w-3.5" />
+                                )}
+                                {poResult}
+                              </div>
+                              {poResult.startsWith('Created') && (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate('/procurement')}
+                                  className="rounded border border-sky-500/30 px-2 py-0.5 text-[10px] text-sky-300 hover:bg-sky-500/10"
+                                >
+                                  View POs →
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>

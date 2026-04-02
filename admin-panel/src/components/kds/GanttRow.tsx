@@ -1,6 +1,7 @@
 import type { GanttTask, GanttConflict } from '../../hooks/useGanttTasks'
 import type { EquipmentItem } from '../../hooks/useEquipmentCategories'
 import { GanttTaskBar } from './GanttTaskBar'
+import { EquipmentLocationBadge } from './EquipmentLocationBadge'
 
 interface GanttRowProps {
   equipment: EquipmentItem
@@ -25,6 +26,7 @@ export function GanttRow({ equipment, tasks, conflicts, dayStartMs }: GanttRowPr
           <p className="text-[10px] text-slate-500">
             {equipment.category ?? 'Uncategorized'}
           </p>
+          <EquipmentLocationBadge zone={equipment.location_zone} wall={equipment.location_wall} />
         </div>
       </div>
 
