@@ -9,9 +9,9 @@ export function ReceiptInbox() {
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-lg font-bold text-slate-100">Receipt Inbox</h1>
+        <h1 className="text-lg font-bold text-slate-100">Загрузка чеков</h1>
         <p className="mt-1 text-xs text-slate-500">
-          Upload receipts for later processing. No AI — just photo + metadata.
+          Загрузите фото чеков для обработки агентом. Без AI — только фото + метаданные.
         </p>
       </div>
 

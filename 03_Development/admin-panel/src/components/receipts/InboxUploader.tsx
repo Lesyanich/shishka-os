@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { ImagePlus, Loader2, Send, Trash2, Upload } from 'lucide-react'
+import { AlertCircle, ImagePlus, Loader2, Send, Trash2, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { InboxInsert } from '../../hooks/useReceiptInbox'
 
@@ -18,8 +18,8 @@ interface DroppedFile {
   id: string
 }
 
-async function compressToWebP(file: File): Promise<File> {
-  // PDFs can't be compressed to WebP — return as-is
+async function compressImage(file: File): Promise<File> {
+  // PDFs can't be compressed — return as-is
   if (file.type === 'application/pdf') return file
 
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -37,19 +37,31 @@ async function compressToWebP(file: File): Promise<File> {
   const ctx = canvas.getContext('2d')!
   ctx.drawImage(img, 0, 0)
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (b) => b ? resolve(b) : reject(new Error('toBlob failed')),
-      'image/webp',
-      WEBP_QUALITY,
-    )
+  // Try WebP first, fallback to JPEG if unsupported
+  let blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/webp', WEBP_QUALITY)
   })
+  let ext = 'webp'
+  let mime = 'image/webp'
+
+  if (!blob || blob.type !== 'image/webp') {
+    blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', WEBP_QUALITY)
+    })
+    ext = 'jpg'
+    mime = 'image/jpeg'
+  }
+
+  if (!blob) throw new Error(`Compression failed: ${file.name}`)
 
   const baseName = file.name.replace(/\.[^.]+$/, '')
-  return new File([blob], `${baseName}.webp`, { type: 'image/webp' })
+  return new File([blob], `${baseName}.${ext}`, { type: mime })
 }
 
-async function uploadToStorage(file: File, index: number): Promise<string | null> {
+async function uploadToStorage(
+  file: File,
+  index: number,
+): Promise<{ url: string } | { error: string }> {
   const ext = file.name.split('.').pop() ?? 'webp'
   const filePath = `inbox/${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}.${ext}`
 
@@ -59,11 +71,11 @@ async function uploadToStorage(file: File, index: number): Promise<string | null
 
   if (error) {
     console.error('[InboxUploader] upload error', error)
-    return null
+    return { error: error.message }
   }
 
   const { data } = supabase.storage.from('receipts').getPublicUrl(filePath)
-  return data.publicUrl
+  return { url: data.publicUrl }
 }
 
 /* ────────────────────────── Props ────────────────────────── */
@@ -156,12 +168,13 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
     setToast(null)
 
     try {
-      const compressed = await Promise.all(files.map((f) => compressToWebP(f.file)))
-      const uploadedUrls = await Promise.all(compressed.map((f, i) => uploadToStorage(f, i)))
-      const photoUrls = uploadedUrls.filter((u): u is string => u !== null)
+      const compressed = await Promise.all(files.map((f) => compressImage(f.file)))
+      const results = await Promise.all(compressed.map((f, i) => uploadToStorage(f, i)))
+      const photoUrls = results.filter((r): r is { url: string } => 'url' in r).map((r) => r.url)
+      const errors = results.filter((r): r is { error: string } => 'error' in r)
 
       if (photoUrls.length === 0) {
-        setToast({ type: 'err', msg: 'Upload failed — no files uploaded' })
+        setToast({ type: 'err', msg: `Ошибка загрузки: ${errors[0]?.error ?? 'unknown'}` })
         return
       }
 
@@ -198,7 +211,7 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed transition-all ${
+        className={`flex min-h-[96px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-all ${
           isDragging
             ? 'border-blue-500 bg-blue-500/[0.07]'
             : 'border-slate-600 bg-slate-900/40 hover:border-blue-500/60 hover:bg-slate-900/60'
@@ -257,11 +270,11 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
       )}
 
       {/* ── Form fields ── */}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3">
         {/* Who */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-            Кто загружает *
+            Кто загружает <span className="text-rose-400">*</span>
           </label>
           <select
             value={uploadedBy}
@@ -297,7 +310,7 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
             type="text"
             value={supplierHint}
             onChange={(e) => setSupplierHint(e.target.value)}
-            placeholder="Makro, Tops, Villa Market..."
+            placeholder="Makro, Tops..."
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 outline-none focus:border-blue-500"
           />
         </div>
@@ -305,30 +318,30 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
         {/* Amount */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-            Примерная сумма
+            Сумма, ฿
           </label>
           <input
             type="number"
             value={amountHint}
             onChange={(e) => setAmountHint(e.target.value)}
-            placeholder="0.00"
+            placeholder="฿"
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 outline-none focus:border-blue-500"
           />
         </div>
-      </div>
 
-      {/* Notes — full width */}
-      <div>
-        <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-          Комментарий
-        </label>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          placeholder="Любые заметки..."
-          className="w-full resize-none rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 outline-none focus:border-blue-500"
-        />
+        {/* Notes — full width */}
+        <div className="col-span-2">
+          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
+            Комментарий
+          </label>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Любые заметки..."
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 outline-none focus:border-blue-500"
+          />
+        </div>
       </div>
 
       {/* ── Submit ── */}
@@ -349,13 +362,14 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
       {/* ── Toast ── */}
       {toast && (
         <div
-          className={`rounded-lg border px-3 py-2 text-xs ${
+          className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${
             toast.type === 'ok'
               ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
               : 'border-rose-500/20 bg-rose-500/10 text-rose-300'
           }`}
         >
-          {toast.msg}
+          {toast.type === 'err' && <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+          <span>{toast.msg}</span>
         </div>
       )}
     </div>
