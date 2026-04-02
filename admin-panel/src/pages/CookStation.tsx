@@ -1,14 +1,97 @@
-import { useCookTasks } from '../hooks/useCookTasks'
+import { useCallback, useState } from 'react'
+import { useCookTasks, type CookTask } from '../hooks/useCookTasks'
 import { useBatches } from '../hooks/useBatches'
+import { useRecipeSteps, type RecipeStep } from '../hooks/useRecipeSteps'
 import { TaskExecutionCard } from '../components/kds/TaskExecutionCard'
-import { ChefHat } from 'lucide-react'
+import { RecipeStepCard } from '../components/kds/RecipeStepCard'
+import { ChefHat, ArrowLeft } from 'lucide-react'
 
 export function CookStation() {
   const { tasks, isLoading, error, startTask } = useCookTasks()
   const { createBatchesFromTask } = useBatches()
+  const { steps: _steps, isLoading: stepsLoading, fetchSteps } = useRecipeSteps()
+
+  const [activeTask, setActiveTask] = useState<CookTask | null>(null)
+  const [currentStepIdx, setCurrentStepIdx] = useState(0)
+  const [recipeSteps, setRecipeSteps] = useState<RecipeStep[]>([])
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending')
   const activeTasks = tasks.filter((t) => t.status === 'in_progress')
+
+  const openRecipe = useCallback(async (task: CookTask) => {
+    if (!task.target_nomenclature_id) return
+    const loaded = await fetchSteps(task.target_nomenclature_id)
+    if (loaded.length > 0) {
+      setRecipeSteps(loaded)
+      setActiveTask(task)
+      setCurrentStepIdx(0)
+    }
+  }, [fetchSteps])
+
+  const closeRecipe = useCallback(() => {
+    setActiveTask(null)
+    setRecipeSteps([])
+    setCurrentStepIdx(0)
+  }, [])
+
+  // ─── Recipe step-by-step view ──────────────────────────────────
+
+  if (activeTask && recipeSteps.length > 0) {
+    const currentStep = recipeSteps[currentStepIdx]
+    return (
+      <div className="mx-auto max-w-lg space-y-4">
+        {/* Back + progress */}
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={closeRecipe}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to tasks
+          </button>
+          <span className="text-xs text-slate-500">
+            {activeTask.target_nomenclature?.name}
+          </span>
+        </div>
+
+        {/* Progress bar */}
+        <div className="flex gap-1">
+          {recipeSteps.map((_, i) => (
+            <div
+              key={i}
+              className={`h-1 flex-1 rounded-full transition-colors ${
+                i < currentStepIdx
+                  ? 'bg-emerald-500'
+                  : i === currentStepIdx
+                    ? 'bg-amber-500'
+                    : 'bg-slate-800'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Step card */}
+        {currentStep && (
+          <RecipeStepCard
+            step={currentStep}
+            stepIndex={currentStepIdx}
+            totalSteps={recipeSteps.length}
+            onPrev={() => setCurrentStepIdx((i) => Math.max(0, i - 1))}
+            onNext={() => setCurrentStepIdx((i) => Math.min(recipeSteps.length - 1, i + 1))}
+            onDone={() => {
+              if (currentStepIdx < recipeSteps.length - 1) {
+                setCurrentStepIdx((i) => i + 1)
+              } else {
+                closeRecipe()
+              }
+            }}
+          />
+        )}
+      </div>
+    )
+  }
+
+  // ─── Task list view ────────────────────────────────────────────
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -46,12 +129,23 @@ export function CookStation() {
             In Progress
           </h2>
           {activeTasks.map((task) => (
-            <TaskExecutionCard
-              key={task.id}
-              task={task}
-              onStart={startTask}
-              onCompleteBatches={createBatchesFromTask}
-            />
+            <div key={task.id} className="space-y-1">
+              <TaskExecutionCard
+                task={task}
+                onStart={startTask}
+                onCompleteBatches={createBatchesFromTask}
+              />
+              {task.target_nomenclature_id && (
+                <button
+                  type="button"
+                  onClick={() => openRecipe(task)}
+                  disabled={stepsLoading}
+                  className="w-full rounded-lg border border-sky-500/20 bg-sky-500/5 py-1.5 text-[11px] text-sky-400 hover:bg-sky-500/10 transition-colors"
+                >
+                  Open Recipe Steps
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

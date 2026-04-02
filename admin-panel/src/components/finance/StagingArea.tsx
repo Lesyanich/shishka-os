@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   AlertTriangle,
   ArrowUpRight,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -16,10 +17,12 @@ import {
   Wrench,
   X,
 } from 'lucide-react'
-import type { MappingMatch } from '../../hooks/useSupplierMapping'
-import { CURRENCY_OPTIONS, PAYMENT_METHODS, formatTHB } from './helpers'
+import type { MappingMatch, BarcodeMatch } from '../../hooks/useSupplierMapping'
+import { normalizeForMatch } from '../../hooks/useSupplierMapping'
+import { CURRENCY_OPTIONS, PAYMENT_METHODS, formatTHB, formatTHBFull, parseWeight, formatNetWeight } from './helpers'
 import { ReceiptImageViewer } from './ReceiptImageViewer'
-import { nomenclatureOptionText } from './NomenclatureLabel'
+// nomenclatureOptionText removed — not currently used
+import { SearchableNomenclatureSelect } from './SearchableNomenclatureSelect'
 import type {
   ParsedReceipt,
   ReceiptFooter,
@@ -38,7 +41,9 @@ export interface StagingAreaProps {
   receiptUrls: ReceiptUrls
   /** All uploaded image URLs for split-screen viewer (Phase 4.6) */
   imageUrls: string[]
-  nomenclatureList: { id: string; name: string; product_code: string }[]
+  nomenclatureList: { id: string; name: string; product_code: string; category_id?: string | null }[]
+  /** Product categories for category column display */
+  productCategories?: { id: string; code: string; name: string; parent_id: string | null; level: number }[]
   suppliersList: { id: string; name: string; category_code?: number | null }[]
   categories: { code: number; name: string }[]
   subCategories: { sub_code: number; category_code: number; name: string }[]
@@ -50,6 +55,9 @@ export interface StagingAreaProps {
     supplierSku: string | null
     originalName: string
     nomenclatureId: string
+    purchaseUnit?: string
+    conversionFactor?: number
+    baseUnit?: string
   }) => Promise<void>
   /** Phase 6.3: Create new nomenclature item and return its ID */
   onCreateNomenclature?: (params: {
@@ -58,6 +66,8 @@ export interface StagingAreaProps {
   }) => Promise<string>
   /** Phase 6.5: Lookup all mappings for a supplier → Map of MappingMatch */
   onLookupMappings?: (supplierId: string) => Promise<Map<string, MappingMatch>>
+  /** Phase 6.6: Global barcode lookup against SKU table */
+  onLookupBarcodes?: (barcodes: string[]) => Promise<Map<string, BarcodeMatch>>
   /** Phase 6.5: Update conversion_factor for a supplier+nomenclature pair */
   onUpdateConversion?: (params: {
     supplierId: string
@@ -91,9 +101,44 @@ function fuzzyMatchSupplier(
 /* Shared field styles */
 const inputCls =
   'h-8 w-full rounded-lg border border-slate-700/60 bg-slate-800/80 px-2.5 text-xs text-slate-100 outline-none transition-all duration-200 focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20 placeholder:text-slate-600'
+/** Number input: no spinner arrows, proper text handling */
+const numInputCls =
+  'h-8 w-full rounded-lg border border-slate-700/60 bg-slate-800/80 px-2.5 text-xs text-slate-100 outline-none transition-all duration-200 focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20 placeholder:text-slate-600 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 const selectCls =
   'h-8 w-full rounded-lg border border-slate-700/60 bg-slate-800/80 px-1.5 text-xs text-slate-100 outline-none transition-all duration-200 focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20'
 const labelCls = 'mb-1.5 block text-[11px] font-medium tracking-wide text-slate-400/80 uppercase'
+
+/** Handle numeric input: use text mode to prevent leading-zero bug.
+ *  Returns string value for controlled input, with parseFloat for state update. */
+function handleNumericChange(value: string): number {
+  if (value === '' || value === '-') return 0
+  const parsed = parseFloat(value)
+  return isNaN(parsed) ? 0 : parsed
+}
+
+/** Normalize OCR package_weight to consistent metric format.
+ *  "100กรัม" → "100 g", "1 กก." → "1 kg", "500 มล" → "500 ml", "5 ลิตร" → "5 L" */
+function normalizeWeight(raw: string | undefined | null): string {
+  if (!raw) return ''
+  let s = raw.trim()
+  // Thai → metric
+  s = s.replace(/กิโลกรัม|กก\.?/g, 'kg')
+  s = s.replace(/กรัม/g, 'g')
+  s = s.replace(/มิลลิลิตร|มล\.?/g, 'ml')
+  s = s.replace(/ลิตร/g, 'L')
+  s = s.replace(/ชิ้น/g, 'pcs')
+  s = s.replace(/ฟอง/g, 'pcs')
+  s = s.replace(/ลูก/g, 'pcs')
+  s = s.replace(/แพค|แพ็ค/g, 'pack')
+  s = s.replace(/ถุง/g, 'bag')
+  // CC → ml (Thai receipts often use CC for ml)
+  s = s.replace(/\bCC\b/gi, 'ml')
+  // Ensure space between number and unit: "100g" → "100 g"
+  s = s.replace(/(\d)\s*(g|kg|ml|L|pcs|pack|bag)\b/gi, '$1 $2')
+  // Capitalize L (liter), lowercase others
+  s = s.replace(/\bl\b/g, 'L')
+  return s
+}
 
 /* ────────────────────────── Component ────────────────────────── */
 
@@ -102,6 +147,7 @@ export function StagingArea({
   receiptUrls,
   imageUrls,
   nomenclatureList,
+  productCategories = [],
   suppliersList,
   categories,
   subCategories,
@@ -110,6 +156,7 @@ export function StagingArea({
   onSaveMapping,
   onCreateNomenclature,
   onLookupMappings,
+  onLookupBarcodes,
   onUpdateConversion,
 }: StagingAreaProps) {
   // ── Header state (editable) ──
@@ -129,8 +176,9 @@ export function StagingArea({
   const matchedSupplier = suppliersList.find((s) => s.id === supplierId)
   const supplierCat = matchedSupplier?.category_code
   const isCapExSupplier = supplierCat ? supplierCat >= 1000 && supplierCat < 2000 : false
-  const [flowType, setFlowType] = useState<'OpEx' | 'CapEx'>(() =>
-    isCapExSupplier ? 'CapEx' : 'OpEx',
+  const isCOGSSupplier = supplierCat ? supplierCat >= 4000 && supplierCat < 5000 : false
+  const [flowType, setFlowType] = useState<'OpEx' | 'CapEx' | 'COGS'>(() =>
+    isCOGSSupplier ? 'COGS' : isCapExSupplier ? 'CapEx' : 'OpEx',
   )
   const [categoryCode, setCategoryCode] = useState<number | ''>(() =>
     supplierCat ?? '',
@@ -164,7 +212,10 @@ export function StagingArea({
 
   // ── Line items state (editable) ──
   const [foodItems, setFoodItems] = useState<FoodItem[]>(
-    () => receipt.food_items.map((f) => ({ ...f })),
+    () => receipt.food_items.map((f) => ({
+      ...f,
+      package_weight: normalizeWeight(f.package_weight),
+    })),
   )
   const [capexItems, setCapexItems] = useState<CapexItem[]>(
     () => receipt.capex_items.map((c) => ({ ...c })),
@@ -195,11 +246,136 @@ export function StagingArea({
   const [uomFactor, setUomFactor] = useState('')
   const [uomBaseUnit, setUomBaseUnit] = useState<'kg' | 'L' | 'pcs'>('kg')
 
-  // Load mapping data on mount (if supplier is resolved)
-  useEffect(() => {
-    if (supplierId && onLookupMappings) {
-      onLookupMappings(supplierId).then(setUomMap)
+  // Phase 6.6: Mapping status tracking (auto/manual/unmapped)
+  const [mappingStatus, setMappingStatus] = useState<Map<number, 'auto' | 'manual' | 'unmapped'>>(new Map())
+
+  // Verified checkbox per row (for physical reconciliation)
+  const [verifiedFood, setVerifiedFood] = useState<Set<number>>(new Set())
+  const [verifiedOpex, setVerifiedOpex] = useState<Set<number>>(new Set())
+  const toggleVerifiedFood = (i: number) =>
+    setVerifiedFood((prev) => { const next = new Set(prev); next.has(i) ? next.delete(i) : next.add(i); return next })
+  const toggleVerifiedOpex = (i: number) =>
+    setVerifiedOpex((prev) => { const next = new Set(prev); next.has(i) ? next.delete(i) : next.add(i); return next })
+
+  // Category lookup: categoryId → { cat: L2 name, sub: L3 name }
+  const categoryLookup = useMemo(() => {
+    const map = new Map<string, { cat: string; sub: string }>()
+    for (const cat of productCategories) {
+      if (cat.level === 3) {
+        const parent = cat.parent_id
+          ? productCategories.find((c) => c.id === cat.parent_id)
+          : null
+        map.set(cat.id, { cat: parent?.name || '—', sub: cat.name })
+      } else if (cat.level === 2) {
+        map.set(cat.id, { cat: cat.name, sub: '—' })
+      } else {
+        map.set(cat.id, { cat: cat.name, sub: '' })
+      }
     }
+    return map
+  }, [productCategories])
+
+  // Load mapping data on mount (if supplier is resolved) + auto-map food items
+  useEffect(() => {
+    if (!onLookupMappings) return
+    if (!supplierId) {
+      // No supplier — only try global barcode lookup
+      if (onLookupBarcodes) {
+        const barcodes = foodItems
+          .filter((f) => !f.nomenclature_id && f.supplier_sku)
+          .map((f) => f.supplier_sku!)
+        if (barcodes.length > 0) {
+          onLookupBarcodes(barcodes).then((barcodeMap) => {
+            if (barcodeMap.size === 0) return
+            const newStatus = new Map(mappingStatus)
+            setFoodItems((prev) =>
+              prev.map((item, i) => {
+                if (item.nomenclature_id || newStatus.get(i) === 'manual') return item
+                if (item.supplier_sku) {
+                  const bc = barcodeMap.get(item.supplier_sku)
+                  if (bc) {
+                    newStatus.set(i, 'auto')
+                    return { ...item, nomenclature_id: bc.nomenclatureId, sku_id: bc.skuId, brand: bc.brandName || item.brand }
+                  }
+                }
+                newStatus.set(i, 'unmapped')
+                return item
+              }),
+            )
+            setMappingStatus(newStatus)
+          })
+        }
+      }
+      return
+    }
+
+    onLookupMappings(supplierId).then(async (mappings) => {
+      setUomMap(mappings)
+
+      // Collect barcodes from items not matched by supplier_catalog
+      const unmatchedBarcodes: string[] = []
+      const preMatched = new Map<number, MappingMatch>()
+
+      foodItems.forEach((item, i) => {
+        if (item.nomenclature_id || mappingStatus.get(i) === 'manual') return
+        // Try SKU match
+        if (item.supplier_sku) {
+          const skuMatch = mappings.get(`sku:${item.supplier_sku}`)
+          if (skuMatch) { preMatched.set(i, skuMatch); return }
+        }
+        // Try name match (normalized)
+        if (item.original_name) {
+          const nameMatch = mappings.get(`name:${normalizeForMatch(item.original_name)}`)
+          if (nameMatch) { preMatched.set(i, nameMatch); return }
+        }
+        // Collect barcode for fallback
+        if (item.supplier_sku) unmatchedBarcodes.push(item.supplier_sku)
+      })
+
+      // Global barcode lookup (fallback)
+      let barcodeMap = new Map<string, BarcodeMatch>()
+      if (unmatchedBarcodes.length > 0 && onLookupBarcodes) {
+        barcodeMap = await onLookupBarcodes(unmatchedBarcodes)
+      }
+
+      // Apply auto-mappings
+      const newStatus = new Map(mappingStatus)
+      setFoodItems((prev) =>
+        prev.map((item, i) => {
+          if (item.nomenclature_id || newStatus.get(i) === 'manual') {
+            if (!newStatus.has(i)) newStatus.set(i, item.nomenclature_id ? 'auto' : 'unmapped')
+            return item
+          }
+          // Priority 1: supplier_catalog match
+          const match = preMatched.get(i)
+          if (match) {
+            newStatus.set(i, 'auto')
+            return {
+              ...item,
+              nomenclature_id: match.nomenclatureId,
+              sku_id: match.skuId,
+              brand: match.brandName || item.brand,
+            }
+          }
+          // Priority 2: global barcode
+          if (item.supplier_sku) {
+            const bc = barcodeMap.get(item.supplier_sku)
+            if (bc) {
+              newStatus.set(i, 'auto')
+              return {
+                ...item,
+                nomenclature_id: bc.nomenclatureId,
+                sku_id: bc.skuId,
+                brand: bc.brandName || item.brand,
+              }
+            }
+          }
+          newStatus.set(i, 'unmapped')
+          return item
+        }),
+      )
+      setMappingStatus(newStatus)
+    })
   }, [supplierId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Helper: find UoM data for a food item
@@ -211,7 +387,7 @@ export function StagingArea({
         if (skuMatch) return skuMatch
       }
       if (item.original_name) {
-        const nameMatch = uomMap.get(`name:${item.original_name.toLowerCase()}`)
+        const nameMatch = uomMap.get(`name:${normalizeForMatch(item.original_name)}`)
         if (nameMatch) return nameMatch
       }
       return null
@@ -245,20 +421,16 @@ export function StagingArea({
   const updateFood = (i: number, patch: Partial<FoodItem>) => {
     setFoodItems((prev) => prev.map((f, idx) => (idx === i ? { ...f, ...patch } : f)))
 
-    // Phase 4.6: Save mapping when user manually maps nomenclature
-    if (
-      patch.nomenclature_id &&
-      patch.nomenclature_id !== '' &&
-      patch.nomenclature_id !== '__NEW__' &&
-      supplierId &&
-      onSaveMapping
-    ) {
-      const item = foodItems[i]
-      onSaveMapping({
-        supplierId,
-        supplierSku: item.supplier_sku ?? null,
-        originalName: item.original_name ?? item.name,
-        nomenclatureId: patch.nomenclature_id,
+    // Track manual mapping status when user changes nomenclature_id
+    if (patch.nomenclature_id !== undefined) {
+      setMappingStatus((prev) => {
+        const next = new Map(prev)
+        if (patch.nomenclature_id && patch.nomenclature_id !== '' && patch.nomenclature_id !== '__NEW__') {
+          next.set(i, 'manual')
+        } else {
+          next.set(i, 'unmapped')
+        }
+        return next
       })
     }
   }
@@ -310,6 +482,36 @@ export function StagingArea({
     setError(null)
 
     try {
+      // Phase 6.6: Save manual mappings to supplier_catalog (self-learning)
+      if (supplierId && onSaveMapping) {
+        const manualItems = foodItems.filter((item, i) =>
+          mappingStatus.get(i) === 'manual' &&
+          item.nomenclature_id &&
+          item.nomenclature_id !== '' &&
+          item.nomenclature_id !== '__NEW__',
+        )
+        if (manualItems.length > 0) {
+          try {
+            await Promise.all(
+              manualItems.map((item) => {
+                const uom = getUomForItem(item)
+                return onSaveMapping({
+                  supplierId,
+                  supplierSku: item.supplier_sku ?? null,
+                  originalName: item.original_name ?? item.name,
+                  nomenclatureId: item.nomenclature_id!,
+                  purchaseUnit: uom?.purchaseUnit || item.unit || undefined,
+                  conversionFactor: uom?.conversionFactor ?? undefined,
+                  baseUnit: uom?.baseUnit || undefined,
+                })
+              }),
+            )
+          } catch (e) {
+            console.warn('[StagingArea] Failed to save manual mappings (non-blocking):', e)
+          }
+        }
+      }
+
       const payload: ApprovePayload = {
         transaction_date: txDate,
         flow_type: flowType,
@@ -333,9 +535,11 @@ export function StagingArea({
         receipt_bank_url: receiptUrls.bank ?? null,
         tax_invoice_url: receiptUrls.tax ?? null,
         // Transform __NEW__ sentinel → null so RPC auto-creates nomenclature
+        // Propagate barcode: Gemini puts it in supplier_sku, RPC reads from barcode field
         food_items: foodItems.map((f) => ({
           ...f,
           nomenclature_id: f.nomenclature_id === '__NEW__' ? null : f.nomenclature_id,
+          barcode: f.barcode || f.supplier_sku || null,
         })),
         capex_items: capexItems,
         opex_items: opexItems,
@@ -352,7 +556,7 @@ export function StagingArea({
   const totalItems = foodItems.length + capexItems.length + opexItems.length
 
   return (
-    <section className="animate-fade-in-up overflow-hidden rounded-2xl border border-indigo-500/30 bg-gradient-to-b from-slate-900/90 to-slate-950/90 shadow-xl shadow-indigo-500/[0.04]">
+    <section className="animate-fade-in-up rounded-2xl border border-indigo-500/30 bg-gradient-to-b from-slate-900/90 to-slate-950/90 shadow-xl shadow-indigo-500/[0.04]">
       {/* ═══ Header ═══ */}
       <header className="relative border-b border-slate-800/60 px-5 py-4">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-indigo-500/[0.04] via-transparent to-violet-500/[0.04]" />
@@ -380,16 +584,19 @@ export function StagingArea({
         </div>
       </header>
 
-      {/* ═══ Split-Screen: Image Viewer (top) + Data (bottom) ═══ */}
+      {/* ═══ Top: Image + Reconciliation + Form side-by-side ═══ */}
       <div className="px-5 py-5">
-        {/* Phase 4.6: Receipt Image Viewer */}
-        {imageUrls.length > 0 && (
-          <div className="mb-5">
-            <ReceiptImageViewer imageUrls={imageUrls} />
+        <div className="grid gap-5 lg:grid-cols-[minmax(280px,0.35fr)_minmax(0,0.65fr)]">
+          {/* Left column: Image viewer */}
+          <div className="space-y-4">
+            {imageUrls.length > 0 && (
+              <ReceiptImageViewer imageUrls={imageUrls} />
+            )}
           </div>
-        )}
 
-        {/* Phase 6.6c: Reconciliation Panel — ALWAYS rendered (footer fallback if GAS didn't send one) */}
+          {/* Right column: Reconciliation + Form fields */}
+          <div className="space-y-4">
+        {/* Phase 6.6c: Reconciliation Panel */}
         <ReconciliationPanel
           footer={receipt.footer ?? {
             subtotal: 0,
@@ -530,7 +737,7 @@ export function StagingArea({
             <div>
               <label className={labelCls}>Type</label>
               <div className="flex gap-2">
-                {(['OpEx', 'CapEx'] as const).map((ft) => (
+                {(['OpEx', 'CapEx', 'COGS'] as const).map((ft) => (
                   <button
                     key={ft}
                     type="button"
@@ -539,7 +746,9 @@ export function StagingArea({
                       flowType === ft
                         ? ft === 'OpEx'
                           ? 'border-emerald-500/50 bg-emerald-500/[0.12] text-emerald-300 shadow-sm shadow-emerald-500/10'
-                          : 'border-amber-500/50 bg-amber-500/[0.12] text-amber-300 shadow-sm shadow-amber-500/10'
+                          : ft === 'CapEx'
+                            ? 'border-amber-500/50 bg-amber-500/[0.12] text-amber-300 shadow-sm shadow-amber-500/10'
+                            : 'border-blue-500/50 bg-blue-500/[0.12] text-blue-300 shadow-sm shadow-blue-500/10'
                         : 'border-slate-700/60 bg-slate-800/60 text-slate-500 hover:border-slate-600 hover:text-slate-400'
                     }`}
                   >
@@ -624,6 +833,11 @@ export function StagingArea({
             </div>
           </div>
 
+        </div>{/* end stagger-children inside right column */}
+          </div>{/* end right column */}
+        </div>{/* end 2-col grid */}
+
+        <div className="space-y-5 mt-5">
           {/* Document classification banner */}
           {receipt.documents && (
             <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-slate-700/40 bg-slate-800/30 px-4 py-2.5">
@@ -662,7 +876,7 @@ export function StagingArea({
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-700/50 to-transparent" />
           </div>
 
-          {/* ═══ Food Items (Spoke 1) ═══ */}
+          {/* ═══ Food Items (Spoke 1) — Redesigned Table ═══ */}
           <ItemSection
             title="Food Items"
             icon={<ShoppingCart className="h-3.5 w-3.5" />}
@@ -671,8 +885,15 @@ export function StagingArea({
             open={foodOpen}
             onToggle={() => setFoodOpen(!foodOpen)}
             color="emerald"
-            headers={['Item', 'Brand', 'Wt', 'Qty', 'Unit', 'Price', 'Total', 'Nomenclature', '']}
-            colWidths={['', 'w-20', 'w-16', 'w-14', 'w-14', 'w-18', 'w-18', 'w-36', 'w-8']}
+            badge={(() => {
+              const autoCount = Array.from(mappingStatus.values()).filter((v) => v === 'auto').length
+              const manualCount = Array.from(mappingStatus.values()).filter((v) => v === 'manual').length
+              const unmappedCount = foodItems.length - autoCount - manualCount
+              if (foodItems.length === 0) return undefined
+              return `${autoCount} auto · ${manualCount} manual · ${unmappedCount} unmapped`
+            })()}
+            headers={['', '#', 'SKU', 'Item', 'Mapping', 'Cat', 'Sub', 'Pkg', 'Qty', 'Unit', 'Price', 'Total', '']}
+            colWidths={['w-8', 'w-9', 'w-32', 'min-w-[140px]', 'min-w-[170px]', 'w-28', 'w-28', 'w-32', 'w-16', 'w-14', 'w-20', 'w-20', 'w-9']}
           >
             {foodItems.map((item, i) => {
               // Phase 6.2: Find matching line_item for confidence/warning data
@@ -691,10 +912,13 @@ export function StagingArea({
                     ? 'border-l-2 border-l-amber-500'
                     : ''
               const isUnreadable = item.name === '[UNREADABLE]'
-              // Phase 6.6: Math validation — qty × unit_price ≈ total_price
+              // Math validation — qty × unit_price ≈ total_price
               const expectedTotal = Math.round(item.quantity * item.unit_price * 100) / 100
               const hasMathError = item.quantity > 0 && item.unit_price > 0 && item.total_price > 0
                 && Math.abs(expectedTotal - item.total_price) > 2
+              // Mapping status
+              const isMapped = !!item.nomenclature_id && item.nomenclature_id !== '' && item.nomenclature_id !== '__NEW__'
+              const mappedNom = isMapped ? nomenclatureList.find(n => n.id === item.nomenclature_id) : null
 
               return (
               <tr
@@ -702,14 +926,43 @@ export function StagingArea({
                 className={`group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20 ${confidenceBorder} ${isUnreadable ? 'bg-slate-800/40' : ''}`}
                 title={warning || undefined}
               >
-                <td className="px-1.5 py-1.5">
-                  {/* Line number + editable name */}
+                {/* ── Verified checkbox ── */}
+                <td className="w-8 px-1 py-1.5 text-center">
+                  <button
+                    type="button"
+                    onClick={() => toggleVerifiedFood(i)}
+                    className={`inline-flex h-5 w-5 items-center justify-center rounded border transition-all duration-150 ${
+                      verifiedFood.has(i)
+                        ? 'border-emerald-500/60 bg-emerald-500/20 text-emerald-400'
+                        : 'border-slate-700/60 bg-slate-800/40 text-transparent hover:border-slate-600 hover:text-slate-700'
+                    }`}
+                  >
+                    <Check className="h-3 w-3" />
+                  </button>
+                </td>
+
+                {/* ── # (line number) ── */}
+                <td className="w-9 px-2 py-1.5 text-center">
+                  <span className="font-mono text-[10px] text-slate-600">
+                    {lineNumber || i + 1}
+                  </span>
+                </td>
+
+                {/* ── SKU (editable) ── */}
+                <td className="w-32 px-2 py-1.5">
+                  <input
+                    type="text"
+                    value={item.supplier_sku || ''}
+                    onChange={(e) => updateFood(i, { supplier_sku: e.target.value || null })}
+                    placeholder="—"
+                    className={`${inputCls} font-mono text-[11px]`}
+                    title="Supplier SKU / barcode"
+                  />
+                </td>
+
+                {/* ── Item name + original Thai ── */}
+                <td className="min-w-[140px] px-2 py-1.5">
                   <div className="flex items-center gap-1.5">
-                    {lineNumber && (
-                      <span className="shrink-0 rounded bg-slate-700/60 px-1 py-0.5 font-mono text-[9px] text-slate-500">
-                        #{lineNumber}
-                      </span>
-                    )}
                     <input
                       type="text"
                       value={item.name}
@@ -717,133 +970,87 @@ export function StagingArea({
                       className={`${inputCls} flex-1 ${isUnreadable ? 'italic text-slate-500' : ''}`}
                       title={item.full_title || ''}
                     />
-                    {/* Phase 6.7: Makro verification badge */}
                     {item.makro_name && (
-                      <span className="ml-1 shrink-0 text-[9px] text-emerald-400" title={item.full_title ? `Makro: ${item.full_title}` : `Verified: ${item.makro_name}`}>
+                      <span className="shrink-0 text-[9px] text-emerald-400" title={item.full_title ? `Makro: ${item.full_title}` : `Verified: ${item.makro_name}`}>
                         ✓
                       </span>
                     )}
                   </div>
-                  {/* Metadata chips row — UNDER the name */}
-                  <div className="mt-1 flex flex-wrap items-center gap-1">
-                    {/* Thai original (always show for CEO verification) */}
-                    {item.original_name && (
-                      <span
-                        className="truncate rounded bg-slate-700/40 px-1 py-0.5 text-[9px] text-slate-500 max-w-[180px]"
-                        title={item.original_name}
-                      >
-                        {item.original_name}
-                      </span>
-                    )}
-                    {/* SKU chip */}
-                    {item.supplier_sku && (
-                      <button
-                        type="button"
-                        onClick={() => navigator.clipboard.writeText(item.supplier_sku!)}
-                        title={`Copy SKU: ${item.supplier_sku}`}
-                        className="shrink-0 rounded bg-slate-600/30 px-1 py-0.5 font-mono text-[9px] text-slate-400 hover:bg-slate-600/50"
-                      >
-                        SKU:{item.supplier_sku}
-                      </button>
-                    )}
-                  </div>
-                  {/* Warning tooltip */}
+                  {item.original_name && (
+                    <p className="mt-0.5 truncate text-[9px] text-slate-500" title={item.original_name}>
+                      {item.original_name}
+                    </p>
+                  )}
                   {warning && (
                     <p className="mt-0.5 text-[9px] text-rose-400/70">{warning}</p>
                   )}
                 </td>
-                {/* Phase 6.7: Brand column */}
-                <td className="w-20 px-1 py-1.5">
-                  {item.brand && (
-                    <span className="text-xs text-purple-400">{item.brand}</span>
-                  )}
-                </td>
-                {/* Phase 6.7: Weight column */}
-                <td className="w-16 px-1 py-1.5">
-                  {item.package_weight && (
-                    <span className="text-xs text-orange-400">{item.package_weight}</span>
-                  )}
-                </td>
-                <td className="w-14 px-1.5 py-1.5">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.quantity}
-                    onChange={(e) => updateFood(i, { quantity: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
-                  />
-                </td>
-                <td className="w-14 px-1.5 py-1.5">
-                  <input
-                    type="text"
-                    value={item.unit}
-                    onChange={(e) => updateFood(i, { unit: e.target.value })}
-                    className={inputCls}
-                  />
-                </td>
-                <td className="w-18 px-1.5 py-1.5">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.unit_price}
-                    onChange={(e) => updateFood(i, { unit_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono ${hasMathError ? 'text-rose-400 border-rose-500/50' : ''}`}
-                  />
-                </td>
-                <td className="w-18 px-1.5 py-1.5">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.total_price}
-                    onChange={(e) => updateFood(i, { total_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono ${hasMathError ? 'text-rose-400 border-rose-500/50' : ''}`}
-                  />
-                  {hasMathError && (
-                    <p className="mt-0.5 flex items-center gap-0.5 text-[9px] text-rose-400">
-                      <AlertTriangle className="h-2.5 w-2.5" />
-                      Math: {item.quantity}&times;{item.unit_price}={expectedTotal}
+
+                {/* ── Mapping (nomenclature + status indicator) ── */}
+                <td className="min-w-[170px] px-2 py-1.5">
+                  {/* Status indicator dot + label */}
+                  <div className="flex items-center gap-1.5">
+                    {(() => {
+                      const status = mappingStatus.get(i)
+                      if (status === 'auto') return (
+                        <span className="flex items-center gap-1" title="Auto-mapped from supplier catalog">
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+                          <span className="text-[8px] font-medium tracking-wide text-emerald-400/70 uppercase">Auto</span>
+                        </span>
+                      )
+                      if (status === 'manual' && isMapped) return (
+                        <span className="flex items-center gap-1" title="Manually mapped by user">
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-blue-400 shadow-sm shadow-blue-400/50" />
+                        </span>
+                      )
+                      if (isMapped) return (
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" title={`Mapped: ${mappedNom?.name || 'linked'}`} />
+                      )
+                      return (
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 animate-pulse shadow-sm shadow-amber-400/50" title="Not mapped — select from DB" />
+                      )
+                    })()}
+                    <SearchableNomenclatureSelect
+                      value={item.nomenclature_id}
+                      options={nomenclatureList}
+                      itemName={item.name}
+                      isMapped={isMapped}
+                      onChange={(val) => {
+                        if (val === '__CREATE__') {
+                          setCreateModalIndex(i)
+                          setCreateName(item.name || '')
+                          setCreateUnit('kg')
+                        } else {
+                          updateFood(i, { nomenclature_id: val })
+                        }
+                      }}
+                    />
+                    {/* Unlink button — clear erroneous mapping */}
+                    {isMapped && (
+                      <button
+                        type="button"
+                        title="Clear mapping"
+                        onClick={() => updateFood(i, { nomenclature_id: null, sku_id: null })}
+                        className="shrink-0 rounded p-0.5 text-slate-600 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                  {/* If unmapped — show AI translation as hint */}
+                  {!isMapped && item.name && item.original_name && item.name !== item.original_name && (
+                    <p className="mt-0.5 ml-3.5 text-[9px] text-indigo-400/70" title="AI translation">
+                      AI: {item.name}
                     </p>
                   )}
-                </td>
-                <td className="w-36 px-1.5 py-1.5">
-                  <select
-                    value={item.nomenclature_id || ''}
-                    onChange={(e) => {
-                      if (e.target.value === '__CREATE__') {
-                        setCreateModalIndex(i)
-                        setCreateName(item.name || '')
-                        setCreateUnit('kg')
-                      } else {
-                        updateFood(i, { nomenclature_id: e.target.value })
-                      }
-                    }}
-                    className={`${selectCls} ${
-                      !item.nomenclature_id
-                        ? 'border-amber-500/40 ring-1 ring-amber-500/10'
-                        : 'border-emerald-500/30'
-                    }`}
-                  >
-                    <option value="">Map to item...</option>
-                    {item.name && (
-                      <option value="__CREATE__">
-                        + Create new: &quot;{item.name}&quot;
-                      </option>
-                    )}
-                    {nomenclatureList.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {nomenclatureOptionText(n.product_code, n.name)}
-                      </option>
-                    ))}
-                  </select>
-                  {/* ── Phase 6.5: UoM Badge + Inline Editor ── */}
-                  {item.nomenclature_id && item.nomenclature_id !== '' && item.nomenclature_id !== '__NEW__' && (() => {
+                  {/* UoM Badge + Inline Editor */}
+                  {isMapped && (() => {
                     const uom = getUomForItem(item)
                     const hasUom = uom?.conversionFactor != null && uom.conversionFactor > 0
 
                     if (uomEditIdx === i) {
-                      // Inline UoM editor
                       return (
-                        <div className="mt-1 flex items-center gap-1 rounded-md border border-indigo-500/30 bg-slate-800/60 px-1.5 py-1">
+                        <div className="mt-1 ml-3.5 flex items-center gap-1 rounded-md border border-indigo-500/30 bg-slate-800/60 px-1.5 py-1">
                           <input
                             type="text"
                             value={uomPurchaseUnit}
@@ -884,7 +1091,6 @@ export function StagingArea({
                                   conversionFactor: factor,
                                   baseUnit: uomBaseUnit,
                                 })
-                                // Refresh mapping data
                                 if (onLookupMappings) {
                                   const fresh = await onLookupMappings(supplierId)
                                   setUomMap(fresh)
@@ -908,7 +1114,6 @@ export function StagingArea({
                       )
                     }
 
-                    // UoM display badge (clickable to edit)
                     return (
                       <button
                         type="button"
@@ -918,7 +1123,7 @@ export function StagingArea({
                           setUomFactor(uom?.conversionFactor?.toString() || '1')
                           setUomBaseUnit((uom?.baseUnit as 'kg' | 'L' | 'pcs') || 'kg')
                         }}
-                        className={`mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] transition-colors ${
+                        className={`mt-1 ml-3.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] transition-colors ${
                           hasUom
                             ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'
                             : 'bg-slate-700/30 text-slate-500 hover:bg-slate-700/50'
@@ -939,7 +1144,125 @@ export function StagingArea({
                     )
                   })()}
                 </td>
-                <td className="w-8 px-1.5 py-1.5">
+
+                {/* ── Cat (L2 — derived from nomenclature mapping) ── */}
+                <td className="w-28 px-1.5 py-1.5">
+                  {(() => {
+                    const nomEntry = isMapped ? nomenclatureList.find((n) => n.id === item.nomenclature_id) : null
+                    const catInfo = nomEntry?.category_id ? categoryLookup.get(nomEntry.category_id) : null
+                    return catInfo ? (
+                      <span className="inline-block max-w-full truncate rounded-md bg-teal-500/10 px-1.5 py-0.5 text-[9px] text-teal-400/80 ring-1 ring-teal-500/20" title={catInfo.cat}>
+                        {catInfo.cat}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-700">—</span>
+                    )
+                  })()}
+                </td>
+
+                {/* ── Sub (L3 — derived from nomenclature mapping) ── */}
+                <td className="w-28 px-1.5 py-1.5">
+                  {(() => {
+                    const nomEntry = isMapped ? nomenclatureList.find((n) => n.id === item.nomenclature_id) : null
+                    const catInfo = nomEntry?.category_id ? categoryLookup.get(nomEntry.category_id) : null
+                    return catInfo && catInfo.sub !== '—' ? (
+                      <span className="inline-block max-w-full truncate rounded-md bg-slate-800/60 px-1.5 py-0.5 text-[9px] text-teal-300/60 ring-1 ring-slate-700/30" title={catInfo.sub}>
+                        {catInfo.sub}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-700">—</span>
+                    )
+                  })()}
+                </td>
+
+                {/* ── Packaging (brand + weight — inline) ── */}
+                <td className="w-32 px-2 py-1.5">
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={item.brand || ''}
+                      onChange={(e) => updateFood(i, { brand: e.target.value || undefined })}
+                      placeholder="brand"
+                      className={`${inputCls} h-6 w-16 text-[10px] !px-1.5 text-purple-400 placeholder:text-slate-700`}
+                    />
+                    <input
+                      type="text"
+                      value={item.package_weight || ''}
+                      onChange={(e) => updateFood(i, { package_weight: e.target.value || undefined })}
+                      placeholder="wt"
+                      className={`${inputCls} h-6 w-14 text-[10px] !px-1.5 text-orange-400/90 placeholder:text-slate-700`}
+                    />
+                  </div>
+                  {/* Net weight: qty × package_weight */}
+                  {(() => {
+                    const pw = parseWeight(item.package_weight)
+                    if (!pw || !item.quantity || item.quantity <= 0) return null
+                    const total = item.quantity * pw.value
+                    return (
+                      <span className="mt-0.5 block text-[9px] tabular-nums text-orange-400/50">
+                        Σ {formatNetWeight(total, pw.unit)}
+                      </span>
+                    )
+                  })()}
+                </td>
+
+                {/* ── Qty ── */}
+                <td className="w-16 px-2 py-1.5">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={item.quantity || ''}
+                    onChange={(e) => updateFood(i, { quantity: handleNumericChange(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    className={`${numInputCls} font-mono text-right tabular-nums`}
+                    placeholder="0"
+                  />
+                </td>
+
+                {/* ── Unit ── */}
+                <td className="w-14 px-2 py-1.5">
+                  <input
+                    type="text"
+                    value={item.unit}
+                    onChange={(e) => updateFood(i, { unit: e.target.value })}
+                    className={`${inputCls} text-center text-[11px]`}
+                  />
+                </td>
+
+                {/* ── Unit Price ── */}
+                <td className="w-20 px-2 py-1.5">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={item.unit_price || ''}
+                    onChange={(e) => updateFood(i, { unit_price: handleNumericChange(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    className={`${numInputCls} font-mono text-right tabular-nums ${hasMathError ? '!text-rose-400 !border-rose-500/50' : ''}`}
+                    placeholder="0"
+                  />
+                </td>
+
+                {/* ── Total ── */}
+                <td className="w-20 px-2 py-1.5">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={item.total_price || ''}
+                    onChange={(e) => updateFood(i, { total_price: handleNumericChange(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    className={`${numInputCls} font-mono text-right tabular-nums ${hasMathError ? '!text-rose-400 !border-rose-500/50' : ''}`}
+                    placeholder="0"
+                  />
+                  {hasMathError && (
+                    <p className="mt-0.5 flex items-center justify-end gap-0.5 text-[8px] text-rose-400/80">
+                      <AlertTriangle className="h-2 w-2" />
+                      {item.quantity}&times;{item.unit_price}={expectedTotal}
+                    </p>
+                  )}
+                </td>
+
+                {/* ── Actions ── */}
+                <td className="w-9 px-2 py-1.5">
                   <button
                     type="button"
                     onClick={() => removeFood(i)}
@@ -952,13 +1275,186 @@ export function StagingArea({
               )
             })}
             <tr>
-              <td colSpan={7} className="px-1.5 py-2">
+              <td colSpan={13} className="px-1.5 py-2">
                 <button
                   type="button"
                   onClick={addFood}
                   className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium text-emerald-400/80 transition-all duration-200 hover:bg-emerald-500/10 hover:text-emerald-300"
                 >
                   <Plus className="h-3 w-3" /> Add food item
+                </button>
+              </td>
+            </tr>
+          </ItemSection>
+
+          {/* ═══ OpEx Items (Spoke 3) — mirrors Food Items layout ═══ */}
+          <ItemSection
+            title="OpEx Items"
+            icon={<Package className="h-3.5 w-3.5" />}
+            count={opexItems.length}
+            total={opexTotal}
+            open={opexOpen}
+            onToggle={() => setOpexOpen(!opexOpen)}
+            color="cyan"
+            headers={['', '#', 'SKU', 'Description', '', 'Cat', 'Sub', '', 'Qty', 'Unit', 'Price', 'Total', '', '']}
+            colWidths={['w-8', 'w-9', 'w-32', 'min-w-[140px]', 'min-w-[170px]', 'w-28', 'w-28', 'w-32', 'w-16', 'w-14', 'w-20', 'w-20', 'w-9', 'w-9']}
+          >
+            {opexItems.map((item, i) => (
+              <tr
+                key={i}
+                className="group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20"
+              >
+                {/* ── Verified checkbox ── */}
+                <td className="w-8 px-1 py-1.5 text-center">
+                  <button
+                    type="button"
+                    onClick={() => toggleVerifiedOpex(i)}
+                    className={`inline-flex h-5 w-5 items-center justify-center rounded border transition-all duration-150 ${
+                      verifiedOpex.has(i)
+                        ? 'border-cyan-500/60 bg-cyan-500/20 text-cyan-400'
+                        : 'border-slate-700/60 bg-slate-800/40 text-transparent hover:border-slate-600 hover:text-slate-700'
+                    }`}
+                  >
+                    <Check className="h-3 w-3" />
+                  </button>
+                </td>
+                {/* ── # ── */}
+                <td className="w-9 px-2 py-1.5 text-center">
+                  <span className="font-mono text-[10px] text-slate-600">{i + 1}</span>
+                </td>
+                {/* ── SKU ── */}
+                <td className="w-32 px-2 py-1.5">
+                  <input
+                    type="text"
+                    value={item.supplier_sku || ''}
+                    onChange={(e) => updateOpex(i, { supplier_sku: e.target.value || null })}
+                    placeholder="—"
+                    className={`${inputCls} font-mono text-[11px]`}
+                    title="Supplier SKU / barcode"
+                  />
+                </td>
+                {/* ── Description ── */}
+                <td className="min-w-[140px] px-2 py-1.5">
+                  <input
+                    type="text"
+                    value={item.description}
+                    onChange={(e) => updateOpex(i, { description: e.target.value })}
+                    className={inputCls}
+                  />
+                </td>
+                {/* ── Spacer (aligned with Mapping) ── */}
+                <td className="min-w-[170px]" />
+                {/* ── Cat (L2 product_category — manual dropdown) ── */}
+                <td className="w-28 px-1.5 py-1.5">
+                  <select
+                    value={item.category_id ?? ''}
+                    onChange={(e) => {
+                      updateOpex(i, { category_id: e.target.value || null, sub_category_id: null })
+                    }}
+                    className={`${selectCls} !h-7 !text-[9px]`}
+                  >
+                    <option value="">—</option>
+                    {productCategories
+                      .filter((c) => c.level === 2)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                  </select>
+                </td>
+                {/* ── Sub (L3 product_category — filtered by L2 parent) ── */}
+                <td className="w-28 px-1.5 py-1.5">
+                  <select
+                    value={item.sub_category_id ?? ''}
+                    onChange={(e) => updateOpex(i, { sub_category_id: e.target.value || null })}
+                    disabled={!item.category_id}
+                    className={`${selectCls} !h-7 !text-[9px] disabled:opacity-30`}
+                  >
+                    <option value="">—</option>
+                    {productCategories
+                      .filter((c) => c.level === 3 && c.parent_id === item.category_id)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                  </select>
+                </td>
+                {/* ── Spacer (aligned with Pkg) ── */}
+                <td className="w-32" />
+                {/* ── Qty ── */}
+                <td className="w-16 px-2 py-1.5">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={item.quantity || ''}
+                    onChange={(e) => updateOpex(i, { quantity: handleNumericChange(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    className={`${numInputCls} font-mono text-right tabular-nums`}
+                    placeholder="0"
+                  />
+                </td>
+                {/* ── Unit ── */}
+                <td className="w-14 px-2 py-1.5">
+                  <input
+                    type="text"
+                    value={item.unit}
+                    onChange={(e) => updateOpex(i, { unit: e.target.value })}
+                    className={`${inputCls} text-center text-[11px]`}
+                  />
+                </td>
+                {/* ── Price ── */}
+                <td className="w-20 px-2 py-1.5">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={item.unit_price || ''}
+                    onChange={(e) => updateOpex(i, { unit_price: handleNumericChange(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    className={`${numInputCls} font-mono text-right tabular-nums`}
+                    placeholder="0"
+                  />
+                </td>
+                {/* ── Total ── */}
+                <td className="w-20 px-2 py-1.5">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={item.total_price || ''}
+                    onChange={(e) => updateOpex(i, { total_price: handleNumericChange(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    className={`${numInputCls} font-mono text-right tabular-nums`}
+                    placeholder="0"
+                  />
+                </td>
+                {/* ── Move to Food ── */}
+                <td className="w-9 px-2 py-1.5">
+                  <button
+                    type="button"
+                    onClick={() => moveOpexToFood(i)}
+                    title="Move to Food items"
+                    className="rounded-lg p-1 text-slate-600 opacity-0 transition-all duration-150 hover:bg-emerald-500/10 hover:text-emerald-400 group-hover/row:opacity-100"
+                  >
+                    <ArrowUpRight className="h-3 w-3" />
+                  </button>
+                </td>
+                {/* ── Delete ── */}
+                <td className="w-9 px-2 py-1.5">
+                  <button
+                    type="button"
+                    onClick={() => removeOpex(i)}
+                    className="rounded-lg p-1 text-slate-600 opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400 group-hover/row:opacity-100"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            <tr>
+              <td colSpan={14} className="px-1.5 py-2">
+                <button
+                  type="button"
+                  onClick={addOpex}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium text-cyan-400/80 transition-all duration-200 hover:bg-cyan-500/10 hover:text-cyan-300"
+                >
+                  <Plus className="h-3 w-3" /> Add opex item
                 </button>
               </td>
             </tr>
@@ -991,29 +1487,32 @@ export function StagingArea({
                 </td>
                 <td className="w-16 px-1.5 py-1.5">
                   <input
-                    type="number"
-                    step="1"
-                    value={item.quantity}
-                    onChange={(e) => updateCapex(i, { quantity: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
+                    type="text"
+                    inputMode="numeric"
+                    value={item.quantity || ''}
+                    onChange={(e) => updateCapex(i, { quantity: handleNumericChange(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    className={`${numInputCls} font-mono`}
                   />
                 </td>
                 <td className="w-20 px-1.5 py-1.5">
                   <input
-                    type="number"
-                    step="0.01"
-                    value={item.unit_price}
-                    onChange={(e) => updateCapex(i, { unit_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
+                    type="text"
+                    inputMode="decimal"
+                    value={item.unit_price || ''}
+                    onChange={(e) => updateCapex(i, { unit_price: handleNumericChange(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    className={`${numInputCls} font-mono`}
                   />
                 </td>
                 <td className="w-20 px-1.5 py-1.5">
                   <input
-                    type="number"
-                    step="0.01"
-                    value={item.total_price}
-                    onChange={(e) => updateCapex(i, { total_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
+                    type="text"
+                    inputMode="decimal"
+                    value={item.total_price || ''}
+                    onChange={(e) => updateCapex(i, { total_price: handleNumericChange(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    className={`${numInputCls} font-mono`}
                   />
                 </td>
                 <td className="w-8 px-1.5 py-1.5">
@@ -1040,126 +1539,38 @@ export function StagingArea({
             </tr>
           </ItemSection>
 
-          {/* ═══ OpEx Items (Spoke 3) ═══ */}
-          <ItemSection
-            title="OpEx Items"
-            icon={<Package className="h-3.5 w-3.5" />}
-            count={opexItems.length}
-            total={opexTotal}
-            open={opexOpen}
-            onToggle={() => setOpexOpen(!opexOpen)}
-            color="cyan"
-            headers={['Description', 'Qty', 'Unit', 'Price', 'Total', '', '']}
-            colWidths={['', 'w-16', 'w-16', 'w-20', 'w-20', 'w-8', 'w-8']}
-          >
-            {opexItems.map((item, i) => (
-              <tr
-                key={i}
-                className="group/row border-b border-slate-800/30 transition-colors duration-150 hover:bg-slate-800/20"
-              >
-                <td className="px-1.5 py-1.5">
-                  <input
-                    type="text"
-                    value={item.description}
-                    onChange={(e) => updateOpex(i, { description: e.target.value })}
-                    className={inputCls}
-                  />
-                </td>
-                <td className="w-16 px-1.5 py-1.5">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.quantity}
-                    onChange={(e) => updateOpex(i, { quantity: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
-                  />
-                </td>
-                <td className="w-16 px-1.5 py-1.5">
-                  <input
-                    type="text"
-                    value={item.unit}
-                    onChange={(e) => updateOpex(i, { unit: e.target.value })}
-                    className={inputCls}
-                  />
-                </td>
-                <td className="w-20 px-1.5 py-1.5">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.unit_price}
-                    onChange={(e) => updateOpex(i, { unit_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
-                  />
-                </td>
-                <td className="w-20 px-1.5 py-1.5">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.total_price}
-                    onChange={(e) => updateOpex(i, { total_price: Number(e.target.value) })}
-                    className={`${inputCls} font-mono`}
-                  />
-                </td>
-                <td className="w-8 px-1.5 py-1.5">
-                  <button
-                    type="button"
-                    onClick={() => moveOpexToFood(i)}
-                    title="Move to Food items"
-                    className="rounded-lg p-1 text-slate-600 opacity-0 transition-all duration-150 hover:bg-emerald-500/10 hover:text-emerald-400 group-hover/row:opacity-100"
-                  >
-                    <ArrowUpRight className="h-3 w-3" />
-                  </button>
-                </td>
-                <td className="w-8 px-1.5 py-1.5">
-                  <button
-                    type="button"
-                    onClick={() => removeOpex(i)}
-                    className="rounded-lg p-1 text-slate-600 opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400 group-hover/row:opacity-100"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            <tr>
-              <td colSpan={7} className="px-1.5 py-2">
-                <button
-                  type="button"
-                  onClick={addOpex}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium text-cyan-400/80 transition-all duration-200 hover:bg-cyan-500/10 hover:text-cyan-300"
-                >
-                  <Plus className="h-3 w-3" /> Add opex item
-                </button>
-              </td>
-            </tr>
-          </ItemSection>
-
-          {/* ═══ Category Breakdown + Warnings ═══ */}
-          <div className="overflow-hidden rounded-xl border border-slate-700/40 bg-slate-800/30">
-            <div className="flex divide-x divide-slate-700/30">
+          {/* ═══ Sticky Totals Bar ═══ */}
+          <div className="sticky bottom-0 z-20 rounded-xl border border-slate-700/40 bg-slate-900/95 shadow-lg shadow-black/30 backdrop-blur-sm">
+            <div className="flex items-center divide-x divide-slate-700/30">
               {[
                 { label: 'Food', value: foodTotal, color: 'text-emerald-400' },
-                { label: 'CapEx', value: capexTotal, color: 'text-amber-400' },
                 { label: 'OpEx', value: opexTotal, color: 'text-cyan-400' },
+                { label: 'CapEx', value: capexTotal, color: 'text-amber-400' },
               ].map((item) => (
                 <div key={item.label} className="flex-1 px-3 py-2 text-center">
                   <p className="text-[10px] tracking-wider text-slate-500 uppercase">
                     {item.label}
                   </p>
-                  <p className={`font-mono text-xs font-medium ${item.color}`}>
-                    {formatTHB(item.value)}
+                  <p className={`font-mono text-xs tabular-nums font-medium ${item.color}`}>
+                    {formatTHBFull(item.value)}
                   </p>
                 </div>
               ))}
+              <div className="flex-1 px-4 py-2 text-center">
+                <p className="text-[10px] tracking-wider text-slate-400 uppercase font-semibold">
+                  Items Total
+                </p>
+                <p className="font-mono text-sm tabular-nums font-bold text-slate-100">
+                  {formatTHBFull(computedTotal)}
+                </p>
+              </div>
             </div>
 
             {!allFoodMapped && foodItems.length > 0 && (
-              <div className="border-t border-slate-700/30 px-4 py-3">
-                <div className="flex items-start gap-2 rounded-lg bg-amber-500/[0.06] px-3 py-2">
-                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
-                  <p className="text-[11px] leading-relaxed text-amber-300/80">
-                    All food items must be mapped to nomenclature or marked &quot;Create new&quot; before approval
-                  </p>
+              <div className="border-t border-slate-700/30 px-4 py-2">
+                <div className="flex items-center gap-2 text-[11px] text-amber-300/80">
+                  <AlertTriangle className="h-3 w-3 shrink-0 text-amber-400/80" />
+                  All food items must be mapped before approval
                 </div>
               </div>
             )}
@@ -1309,6 +1720,7 @@ function ItemSection({
   open,
   onToggle,
   color,
+  badge,
   headers,
   colWidths,
   children,
@@ -1320,6 +1732,8 @@ function ItemSection({
   open: boolean
   onToggle: () => void
   color: 'emerald' | 'amber' | 'cyan'
+  /** Optional mapping stats badge, e.g., "18 auto · 3 manual · 4 unmapped" */
+  badge?: string
   headers: string[]
   colWidths: string[]
   children: React.ReactNode
@@ -1348,7 +1762,7 @@ function ItemSection({
   const c = colorMap[color]
 
   return (
-    <div className={`overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/40 ${open ? c.border : ''}`}>
+    <div className={`rounded-xl border border-slate-800/60 bg-slate-900/40 ${open ? c.border : ''}`}>
       <button
         type="button"
         onClick={onToggle}
@@ -1368,20 +1782,25 @@ function ItemSection({
         <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${c.badge}`}>
           {count}
         </span>
+        {badge && (
+          <span className="rounded-md bg-slate-800/60 px-2 py-0.5 text-[9px] text-slate-400/80 ring-1 ring-slate-700/40">
+            {badge}
+          </span>
+        )}
         <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-500">
           {formatTHB(total)}
         </span>
       </button>
 
       {open && (
-        <div className="animate-expand overflow-x-auto border-t border-slate-800/40">
-          <table className="w-full text-xs">
-            <thead>
+        <div className="max-h-[60vh] overflow-auto border-t border-slate-800/40">
+          <table className="w-full min-w-[900px] text-xs">
+            <thead className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur-sm">
               <tr className="border-b border-slate-800/30">
                 {headers.map((h, i) => (
                   <th
                     key={i}
-                    className={`px-1.5 py-2 text-left text-[10px] font-medium tracking-wider text-slate-500/70 uppercase ${colWidths[i] || ''}`}
+                    className={`px-2 py-2 text-left text-[10px] font-medium tracking-wider text-slate-500/70 uppercase ${colWidths[i] || ''}`}
                   >
                     {h}
                   </th>
@@ -1405,7 +1824,7 @@ function ReconciliationPanel({
   vatAmount,
   deliveryFee,
   onDiscountChange,
-  onVatChange,
+  onVatChange: _onVatChange,
   onDeliveryFeeChange,
 }: {
   footer: ReceiptFooter
@@ -1418,9 +1837,13 @@ function ReconciliationPanel({
   onVatChange: (v: number) => void
   onDeliveryFeeChange: (v: number) => void
 }) {
-  const grandTotal = itemsSum + discountTotal + vatAmount + deliveryFee
+  // Thai receipts: VAT-inclusive pricing. VAT is already included in item prices/subtotal.
+  // Formula: subtotal + discount + delivery = grand_total (VAT is informational only)
+  const grandTotal = itemsSum + discountTotal + deliveryFee
   const declaredTotal = footer.grand_total
-  const isBalanced = Math.abs(grandTotal - declaredTotal) <= 2
+  // OCR tolerance: per-item discounts (DISC column on Makro) and rounding
+  // can cause diffs between computed and declared totals
+  const isBalanced = Math.abs(grandTotal - declaredTotal) <= 100
 
   return (
     <div
@@ -1468,16 +1891,10 @@ function ReconciliationPanel({
             />
           </div>
 
-          {/* ── VAT row (editable) ── */}
+          {/* ── VAT row (informational — already included in prices) ── */}
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] text-slate-400">VAT</span>
-            <input
-              type="number"
-              step="1"
-              value={vatAmount}
-              onChange={(e) => onVatChange(Number(e.target.value))}
-              className="h-6 w-24 rounded border border-slate-700/60 bg-slate-800/80 px-2 text-right font-mono text-xs text-slate-300 outline-none focus:border-indigo-500/60"
-            />
+            <span className="text-[11px] text-slate-500">VAT <span className="text-[9px] text-slate-600">(included)</span></span>
+            <span className="font-mono text-xs text-slate-500">{formatTHB(vatAmount)}</span>
           </div>
 
           {/* ── Delivery row (editable, blue) ── */}
