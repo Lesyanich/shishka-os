@@ -15,6 +15,24 @@ import { useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { LineItem } from '../types/receipt'
 
+/**
+ * Normalize a string for fuzzy matching:
+ * lowercase, trim, collapse multiple spaces → single space.
+ * Used both when building lookup keys and when searching in StagingArea.
+ */
+export function normalizeForMatch(s: string | null | undefined): string {
+  if (!s) return ''
+  return s.toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
+/** Barcode lookup result from the global SKU table */
+export interface BarcodeMatch {
+  nomenclatureId: string
+  skuId: string
+  brandName: string | null
+  productName: string | null
+}
+
 interface SaveMappingParams {
   supplierId: string
   supplierSku: string | null
@@ -83,8 +101,8 @@ export function useSupplierMapping() {
           const skuKey = `sku:${row.supplier_sku}`
           if (!map.has(skuKey)) map.set(skuKey, match)
         }
-        // Name-based key (fallback)
-        const nameKey = `name:${row.original_name.toLowerCase()}`
+        // Name-based key (fallback) — normalized for fuzzy OCR matching
+        const nameKey = `name:${normalizeForMatch(row.original_name)}`
         if (!map.has(nameKey)) map.set(nameKey, match)
       }
 
@@ -201,8 +219,8 @@ export function useSupplierMapping() {
           if (skuMatch) return { ...li, nomenclature_id: skuMatch.nomenclatureId }
         }
 
-        // Fallback: name match (case-insensitive)
-        const nameMatch = mappings.get(`name:${li.original_name.toLowerCase()}`)
+        // Fallback: name match (normalized for OCR quirks)
+        const nameMatch = mappings.get(`name:${normalizeForMatch(li.original_name)}`)
         if (nameMatch) return { ...li, nomenclature_id: nameMatch.nomenclatureId }
 
         return li
@@ -261,5 +279,42 @@ export function useSupplierMapping() {
     [],
   )
 
-  return { lookupMappings, saveMapping, applyMappings, updateConversion }
+  /**
+   * Phase 6.6: Global barcode lookup against the `sku` table.
+   * Fallback when supplier_catalog doesn't have a match —
+   * tries to find any SKU in the system with a matching barcode.
+   * Returns Map<barcode, BarcodeMatch>.
+   */
+  const lookupByBarcodes = useCallback(
+    async (barcodes: string[]): Promise<Map<string, BarcodeMatch>> => {
+      const map = new Map<string, BarcodeMatch>()
+      const valid = barcodes.filter((b) => b && b.trim())
+      if (valid.length === 0) return map
+
+      const { data, error } = await supabase
+        .from('sku')
+        .select('id, barcode, brand, product_name, nomenclature_id')
+        .in('barcode', valid)
+
+      if (error) {
+        console.error('[useSupplierMapping] barcode lookup error:', error.message)
+        return map
+      }
+
+      for (const row of data ?? []) {
+        if (row.barcode && !map.has(row.barcode)) {
+          map.set(row.barcode, {
+            nomenclatureId: row.nomenclature_id,
+            skuId: row.id,
+            brandName: row.brand ?? null,
+            productName: row.product_name ?? null,
+          })
+        }
+      }
+      return map
+    },
+    [],
+  )
+
+  return { lookupMappings, saveMapping, applyMappings, updateConversion, lookupByBarcodes }
 }

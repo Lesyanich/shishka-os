@@ -9,7 +9,7 @@ import { ChefHat, ArrowLeft } from 'lucide-react'
 export function CookStation() {
   const { tasks, isLoading, error, startTask } = useCookTasks()
   const { createBatchesFromTask } = useBatches()
-  const { steps, isLoading: stepsLoading, fetchSteps } = useRecipeSteps()
+  const { steps: _steps, isLoading: stepsLoading, fetchSteps } = useRecipeSteps()
 
   const [activeTask, setActiveTask] = useState<CookTask | null>(null)
   const [currentStepIdx, setCurrentStepIdx] = useState(0)

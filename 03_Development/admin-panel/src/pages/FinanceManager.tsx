@@ -3,7 +3,7 @@ import { useExpenseLedger } from '../hooks/useExpenseLedger'
 import type { ExpenseRow } from '../hooks/useExpenseLedger'
 import { useSupplierMapping } from '../hooks/useSupplierMapping'
 import { supabase } from '../lib/supabase'
-import { formatTHB, formatTHBFull } from '../components/finance/helpers'
+import { formatTHBFull } from '../components/finance/helpers'
 import { KpiCard } from '../components/finance/KpiCard'
 const MonthlyChart = lazy(() => import('../components/finance/MonthlyChart').then(m => ({ default: m.MonthlyChart })))
 import { ExpenseForm } from '../components/finance/ExpenseForm'
@@ -216,7 +216,7 @@ export function FinanceManager() {
     else sessionStorage.removeItem('pendingReceiptJobId')
     _setPendingJobId(id)
   }
-  const [pendingImageUrls, setPendingImageUrls] = useState<string[]>(
+  const [_pendingImageUrls, setPendingImageUrls] = useState<string[]>(
     () => {
       const stored = sessionStorage.getItem('pendingReceiptImageUrls')
       return stored ? JSON.parse(stored) : []
@@ -385,7 +385,8 @@ export function FinanceManager() {
   }
 
   /* ── AI result handler — Phase 4.14: receives ParsedReceipt + imageUrls ── */
-  const handleAiResult = async (
+  // @ts-expect-error — will be wired in Phase 7
+  const _handleAiResult = async (
     receipt: ParsedReceipt,
     imageUrls: string[],
   ) => {

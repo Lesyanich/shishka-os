@@ -22,7 +22,7 @@ export function ExpenseEditModal({
   suppliers,
   onSave,
   onClose,
-  onRefetch,
+  onRefetch: _onRefetch,
 }: ExpenseEditModalProps) {
   // Form state — pre-filled from row
   const [txDate, setTxDate] = useState('')

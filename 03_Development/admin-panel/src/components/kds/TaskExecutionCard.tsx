@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Play, CheckCircle2, FileText, Clock, Plus, Minus, Package } from 'lucide-react'
+import { Play, CheckCircle2, FileText, Clock, Plus, Minus, Package, AlertTriangle } from 'lucide-react'
 import type { CookTask } from '../../hooks/useCookTasks'
 import type { BatchCreationResult } from '../../hooks/useBatches'
 import { DeviationBadge } from './DeviationBadge'
@@ -182,12 +182,20 @@ export function TaskExecutionCard({ task, onStart, onCompleteBatches }: TaskExec
           {task.status === 'in_progress' && (
             <button
               onClick={() => setShowCompleteModal(true)}
-              disabled={isActioning}
+              disabled={isActioning || !task.target_nomenclature_id}
+              title={!task.target_nomenclature_id ? 'No target product assigned' : undefined}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-sky-600 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 active:scale-[0.98] disabled:opacity-50"
             >
               <CheckCircle2 className="h-5 w-5" />
               Complete
             </button>
+          )}
+
+          {task.status === 'in_progress' && !task.target_nomenclature_id && (
+            <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-300">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              No target product assigned
+            </div>
           )}
 
           {task.theoretical_bom_snapshot && (

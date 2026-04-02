@@ -311,7 +311,8 @@ export function FinanceEntry() {
     refetch()
   }
 
-  const handleAiResult = async (receipt: ParsedReceipt, imageUrls: string[]) => {
+  // @ts-expect-error — will be wired in Phase 7
+  const _handleAiResult = async (receipt: ParsedReceipt, imageUrls: string[]) => {
     const urls: ReceiptUrls = {}
     const docs = receipt.documents
     if (docs) {
