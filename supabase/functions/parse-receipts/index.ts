@@ -45,6 +45,7 @@ Deno.serve(async (req: Request) => {
     // ── Read job_id from URL query param — NO BODY PARSING ──
     const url = new URL(req.url)
     const job_id = url.searchParams.get("job_id")?.trim()
+    const model = url.searchParams.get("model")?.trim() || "gemini-2.5-pro"
 
     if (!job_id) {
       console.error("[parse-receipts] ERROR: job_id missing from URL params")
@@ -105,6 +106,7 @@ Deno.serve(async (req: Request) => {
     const gasPayload = JSON.stringify({
       job_id,
       image_urls,
+      model,
       supabase_url: supabaseUrl,
     })
     console.log(`[parse-receipts] PROXY: GAS payload ${gasPayload.length} bytes`)

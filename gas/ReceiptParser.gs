@@ -23,7 +23,7 @@
 //      with --no-verify-jwt
 // ═══════════════════════════════════════════════════════════
 
-var GEMINI_MODEL = "gemini-2.5-flash";
+var GEMINI_MODEL = "gemini-2.5-pro";
 
 // ── Debug log accumulator ──
 var debugLog = [];
@@ -133,6 +133,12 @@ function doPost(e) {
     jobId = (json.job_id || "").trim();
     imageUrls = json.image_urls;
     supabaseUrl = (json.supabase_url || "").trim();
+
+    // Model selection from frontend (default: gemini-2.5-pro)
+    if (json.model) {
+      GEMINI_MODEL = json.model;
+      log_("Model override: " + GEMINI_MODEL);
+    }
 
     config = getConfig_();
 
@@ -538,8 +544,8 @@ function callGemini_(imageParts, apiKey) {
       responseMimeType: "application/json",
       temperature: 0,
       maxOutputTokens: 65536,
-      // Gemini 2.5 Flash: disable "thinking" for clean JSON output
-      thinkingConfig: { thinkingBudget: 0 },
+      // Both 2.5 Pro and Flash support thinking; budget differs for cost
+      thinkingConfig: { thinkingBudget: GEMINI_MODEL.indexOf("flash") !== -1 ? 4096 : 16384 },
     },
   };
 
@@ -561,12 +567,20 @@ function callGemini_(imageParts, apiKey) {
   var geminiResponse = JSON.parse(response.getContentText());
   var content = "";
   try {
-    content = geminiResponse.candidates[0].content.parts[0].text;
+    // With thinking enabled, parts may be [thinking_part, text_part].
+    // Find the LAST part with a "text" field (skip thinking parts).
+    var parts = geminiResponse.candidates[0].content.parts;
+    for (var p = parts.length - 1; p >= 0; p--) {
+      if (parts[p].text) {
+        content = parts[p].text;
+        break;
+      }
+    }
   } catch (ex) {
     throw new Error("Bad Gemini response structure: " + JSON.stringify(geminiResponse).substring(0, 500));
   }
 
-  if (!content) throw new Error("Empty Gemini response");
+  if (!content) throw new Error("Empty Gemini response (no text part found in " + (geminiResponse.candidates?.[0]?.content?.parts?.length || 0) + " parts)");
   log_("Gemini text length: " + content.length);
 
   try {
@@ -752,6 +766,25 @@ function validateAndPostProcess_(parsed) {
   // Sync total_amount with footer.grand_total
   parsed.total_amount = parsed.footer.grand_total;
 
+  // ── Dedup: remove items with same supplier_sku + same total_price (multi-image overlap) ──
+  if (parsed.line_items.length > 1) {
+    var seen = {};
+    var deduped = [];
+    for (var d = 0; d < parsed.line_items.length; d++) {
+      var di = parsed.line_items[d];
+      var dedupKey = (di.supplier_sku || "") + "|" + (di.total_price || 0);
+      if (di.supplier_sku && seen[dedupKey]) {
+        warnings.push("Dedup: removed duplicate SKU " + di.supplier_sku + " (total=" + di.total_price + ")");
+      } else {
+        seen[dedupKey] = true;
+        deduped.push(di);
+      }
+    }
+    if (deduped.length < parsed.line_items.length) {
+      parsed.line_items = deduped;
+    }
+  }
+
   var lineSum = 0;
   for (var s = 0; s < parsed.line_items.length; s++) {
     lineSum += (parsed.line_items[s].total_price || 0);
@@ -760,15 +793,30 @@ function validateAndPostProcess_(parsed) {
   var declared = parsed.total_amount || 0;
 
   // Reconciliation: check if items sum ≈ footer.subtotal, and formula balances
-  // Phase 6.6: formula includes delivery_fee
+  // Thai receipts: VAT-inclusive pricing → formula = subtotal + discount_total + delivery_fee = grand_total
+  // VAT is informational only (already included in subtotal and item prices)
   var footerSubtotal = parsed.footer.subtotal;
   var deliveryFee = parsed.footer.delivery_fee || 0;
-  var footerFormula = parsed.footer.subtotal + parsed.footer.discount_total + parsed.footer.vat_amount + deliveryFee;
+  // VAT-inclusive formula: subtotal + discount + delivery = grand_total (VAT NOT added)
+  var footerFormula = parsed.footer.subtotal + parsed.footer.discount_total + deliveryFee;
   footerFormula = Math.round(footerFormula * 100) / 100;
 
   var reconStatus = "balanced";
-  if (footerSubtotal > 0 && Math.abs(lineSum - footerSubtotal) > 2) {
-    reconStatus = "items_mismatch";
+  // Compare items_sum against grand_total (not subtotal), because on Makro receipts
+  // subtotal = sum(PRICE×QTY) which is BEFORE per-item DISC,
+  // while total_price = ORDER PRICE = AFTER per-item DISC.
+  // The receipt's "discount" IS the sum of per-item DISCs, so sum(ORDER PRICE) ≈ grand_total.
+  // items_sum ≈ subtotal (before discount), grand_total = subtotal + discount.
+  // Compare against subtotal first; fall back to grand_total.
+  var reconTarget = footerSubtotal > 0 ? footerSubtotal : (parsed.footer.grand_total || 0);
+  if (reconTarget > 0 && Math.abs(lineSum - reconTarget) > 5) {
+    // Also accept if items_sum ≈ grand_total (Makro: discount pre-distributed)
+    var altTarget = parsed.footer.grand_total || 0;
+    if (altTarget > 0 && Math.abs(lineSum - altTarget) <= 5) {
+      reconStatus = "balanced";
+    } else {
+      reconStatus = "items_mismatch";
+    }
   }
   if (parsed.footer.grand_total > 0 && Math.abs(footerFormula - parsed.footer.grand_total) > 2) {
     reconStatus = reconStatus === "items_mismatch" ? "items_mismatch" : "footer_mismatch";
@@ -782,7 +830,10 @@ function validateAndPostProcess_(parsed) {
   parsed._reconciliation = {
     status: reconStatus,
     items_sum: lineSum,
-    formula: parsed.footer.subtotal + " + (" + parsed.footer.discount_total + ") + " + parsed.footer.vat_amount + " + " + deliveryFee + " = " + parsed.footer.grand_total,
+    expected: reconTarget,
+    difference: Math.round((lineSum - reconTarget) * 100) / 100,
+    formula: parsed.footer.subtotal + " + (" + parsed.footer.discount_total + ") + " + deliveryFee + " = " + parsed.footer.grand_total,
+    vat_amount_included: parsed.footer.vat_amount,
   };
 
   // Legacy _sum_mismatch (keep for backward compat with existing UI)
@@ -916,13 +967,14 @@ ZONE 3 — FOOTER (financial summary — extract as structured data):\n\
   Starts at first line containing: รวม, ยอดรวม, Subtotal, Total, ส่วนลด, Discount, VAT, ภาษี, สุทธิ, Net\n\
   Everything at and below = NOT products.\n\
   → Extract into a "footer" object with these fields:\n\
-    - subtotal: sum before discounts (รวม, Subtotal) — should equal sum of line_item prices\n\
-    - discount_total: total receipt discount as NEGATIVE number (ส่วนลด, Discount, e.g., -500). 0 if no discount.\n\
-    - vat_amount: VAT amount (ภาษี, VAT). 0 if VAT-inclusive pricing or no VAT shown.\n\
+    - subtotal: sum before discounts (รวม, Subtotal, ราคารวมสินค้า, ราคาสินค้าทั้งหมด). On Makro receipts this is sum of PRICE × QTY (before per-item DISC). May NOT equal sum of line_item total_prices if per-item discounts exist.\n\
+    - discount_total: total discount as NEGATIVE number (ส่วนลด, Discount, e.g., -40). This may include per-item DISC values distributed across items. 0 if no discount.\n\
+    - vat_amount: VAT amount shown (ภาษี, VAT). This is INFORMATIONAL ONLY — Thai receipts use VAT-inclusive pricing, so VAT is already included in subtotal and item prices. Extract the number but do NOT add it to the formula.\n\
     - delivery_fee: delivery/shipping charge (positive number). 0 if no delivery fee.\n\
     - grand_total: final amount paid (ยอดสุทธิ, Net, Grand Total)\n\
   → Also set total_amount = grand_total (for backward compatibility)\n\
-  → Formula: subtotal + discount_total + vat_amount + delivery_fee = grand_total\n\
+  → Formula: subtotal + discount_total + delivery_fee = grand_total (VAT is already INCLUDED in subtotal)\n\
+  → IMPORTANT: In Thailand, all prices on receipts INCLUDE VAT. The VAT line in the footer is just showing the VAT portion for tax reporting. Do NOT add vat_amount on top of subtotal.\n\
 \n\
 ## BLACKLIST — NEVER add as line_items\n\
 Total, Subtotal, Grand Total, Net, VAT, Tax, Discount, Change, Cash, Card, Credit, Debit, Points, Member, Bag fee, Rounding, Delivery, Shipping,\n\
@@ -976,7 +1028,7 @@ Brand names: put brand into the separate "brand" field, NOT into translated_name
 \n\
 ## COLUMN ALIGNMENT — CRITICAL for Makro receipts\n\
 Makro receipts have a strict table layout:\n\
-  QUANTITY | ARTICLE NUMBER | ARTICLE DESCRIPTION (Thai) | UNIT | PACKS | PRICE | DISCOUNT | ORDER PRICE\n\
+  QUANTITY/UN | ARTICLE (barcode) | ARTICLE DESCRIPTION (Thai) | PACKS | PRICE | DISC | ORDER PRICE\n\
 Rules:\n\
 - Each ARTICLE NUMBER (barcode) and its ARTICLE DESCRIPTION are on the SAME physical row\n\
 - NEVER associate a barcode from one row with a description from another row\n\
@@ -985,6 +1037,11 @@ Rules:\n\
 - Read the Thai text in ARTICLE DESCRIPTION column ONLY and translate THAT text\n\
 - If you cannot read the ARTICLE DESCRIPTION for a row, set translated_name to "[UNREADABLE]"\n\
   but STILL extract the barcode as supplier_sku, and extract quantity/price if readable\n\
+- PRICE column = unit price per item\n\
+- DISC column = per-item discount (may be empty). If present, ORDER PRICE = (PRICE × QUANTITY) - DISC\n\
+- ORDER PRICE = final price for this line item. Use this as total_price.\n\
+- If a line has a DISC value, the total_price should reflect the discounted amount (ORDER PRICE column), NOT PRICE × QUANTITY\n\
+- Per-item discounts in the DISC column are DIFFERENT from the receipt-level discount in the footer\n\
 \n\
 ## THAI RECEIPT ABBREVIATIONS — Common thermal receipt shorthand\n\
 Thai receipts truncate product names to fit ~20 characters on thermal paper.\n\
@@ -1118,6 +1175,8 @@ Return ONLY valid JSON with this structure:\n\
 \n\
 4. PRICE SANITY: Thai grocery items typically cost 10-2000 THB per line.\n\
    If a line_item total_price > 5000 THB, double-check — it might be a subtotal row.\n\
+\n\
+\
 \n\
 5. NO EXTRAPOLATION: If the receipt image is cut off or blurry at the bottom,\n\
    STOP extracting. Do not guess what items might follow.\n\
