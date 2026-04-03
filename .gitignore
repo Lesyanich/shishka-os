@@ -32,6 +32,7 @@ pnpm-debug.log*
 .cursorrules
 
 # Credentials & Tokens (NEVER commit)
+.secrets/
 credentials.json
 gcp-oauth.keys.json
 token.json
@@ -58,4 +59,4 @@ Menu design/
 Photo (Locations & Renovations)/
 POSsystem/
 Инструкции ИИ/
-03_Development/supabase/.temp/
+services/supabase/.temp/
