@@ -2,7 +2,7 @@
  * read-guideline — Load receipt processing guidelines on demand
  *
  * Reads markdown guidelines or JSON payload examples from
- * 02_Finance/_config/guidelines/ and 02_Finance/_config/examples/.
+ * agents/finance/guidelines/ and agents/finance/examples/.
  *
  * This enables the Stateless Agent v2 architecture:
  * instead of loading a 550-line monolithic prompt, the agent
@@ -18,8 +18,8 @@ import { fileURLToPath } from "node:url";
 // dist/tools/read-guideline.js → ../../ = mcp-finance-agent/ → ../../ = Shishka healthy kitchen/
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "..", "..", "..", "..");
-const GUIDELINES_DIR = join(PROJECT_ROOT, "02_Finance", "_config", "guidelines");
-const EXAMPLES_DIR = join(PROJECT_ROOT, "02_Finance", "_config", "examples");
+const GUIDELINES_DIR = join(PROJECT_ROOT, "agents", "finance", "guidelines");
+const EXAMPLES_DIR = join(PROJECT_ROOT, "agents", "finance", "examples");
 
 const GUIDELINE_IDS = new Set([
   "image-reading-protocol",
