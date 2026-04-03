@@ -23,14 +23,19 @@ import {
   CheckCircle2,
   Calendar,
   User,
+  List,
+  Columns3,
 } from 'lucide-react'
 import {
   useBusinessTasks,
+  type BusinessTask,
   type TaskDomain,
   type TaskStatus,
   type TaskPriority,
   type NewBusinessTask,
 } from '../hooks/useBusinessTasks'
+import { KanbanBoard } from '../components/mission-control/KanbanBoard'
+import { TaskDetailPanel } from '../components/mission-control/TaskDetailPanel'
 
 // ── Domain config ──
 
@@ -72,6 +77,8 @@ const PRIORITY_CONFIG: Record<TaskPriority, { label: string; icon: typeof AlertT
   medium: { label: 'Medium', icon: Minus, color: 'bg-slate-500/15 text-slate-400' },
   low: { label: 'Low', icon: ArrowDown, color: 'bg-slate-600/15 text-slate-500' },
 }
+
+type ViewMode = 'list' | 'kanban'
 
 // ── Quick Add Form ──
 
@@ -197,16 +204,107 @@ function QuickAddForm({
   )
 }
 
+// ── Task List Item ──
+
+function TaskListItem({
+  task,
+  onOpenDetail,
+}: {
+  task: BusinessTask
+  onOpenDetail: (task: BusinessTask) => void
+}) {
+  const domainCfg = DOMAIN_COLORS[task.domain]
+  const statusCfg = STATUS_CONFIG[task.status]
+  const priorityCfg = PRIORITY_CONFIG[task.priority]
+  const StatusIcon = statusCfg.icon
+  const PriorityIcon = priorityCfg.icon
+  const domainObj = DOMAINS.find((d) => d.id === task.domain)
+  const DomainIcon = domainObj?.icon ?? Wrench
+
+  return (
+    <div
+      onClick={() => onOpenDetail(task)}
+      className="group flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800/50 bg-slate-900/60 px-4 py-3 hover:border-slate-700/60 hover:bg-slate-900/80 transition"
+    >
+      {/* Priority indicator */}
+      <div className={`mt-0.5 rounded-md p-1 ${priorityCfg.color}`}>
+        <PriorityIcon className="h-3.5 w-3.5" />
+      </div>
+
+      {/* Content */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-100 truncate">{task.title}</span>
+        </div>
+
+        {task.description && (
+          <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{task.description}</p>
+        )}
+
+        {/* Badges row */}
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${domainCfg}`}>
+            <DomainIcon className="h-2.5 w-2.5" />
+            {domainObj?.label}
+          </span>
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusCfg.color}`}>
+            <StatusIcon className="h-2.5 w-2.5" />
+            {statusCfg.label}
+          </span>
+          {task.assigned_to && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-400">
+              <User className="h-2.5 w-2.5" />
+              {task.assigned_to}
+            </span>
+          )}
+          {task.due_date && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-400">
+              <Calendar className="h-2.5 w-2.5" />
+              {new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+            </span>
+          )}
+          {task.tags?.map((tag) => (
+            <span key={tag} className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Timestamp */}
+      <span className="shrink-0 text-[10px] text-slate-600">
+        {new Date(task.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+      </span>
+    </div>
+  )
+}
+
 // ── Main Page ──
 
 export function MissionControl() {
   const [activeDomain, setActiveDomain] = useState<TaskDomain | 'all'>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
-  const { tasks, isLoading, error, refetch, addTask } = useBusinessTasks(activeDomain)
+  const [selectedTask, setSelectedTask] = useState<BusinessTask | null>(null)
+  const { tasks, isLoading, error, refetch, addTask, updateTask } = useBusinessTasks(activeDomain)
 
   const handleAddTask = async (task: NewBusinessTask) => {
     const ok = await addTask(task)
     if (ok) setShowQuickAdd(false)
+  }
+
+  const handleMoveTask = async (id: string, newStatus: TaskStatus) => {
+    await updateTask(id, { status: newStatus })
+  }
+
+  const handleUpdateTask = async (id: string, updates: Partial<BusinessTask>): Promise<boolean> => {
+    const ok = await updateTask(id, updates)
+    if (ok) setSelectedTask(null)
+    return ok
+  }
+
+  const handleOpenDetail = (task: BusinessTask) => {
+    setSelectedTask(task)
   }
 
   // Count tasks by status for the summary bar
@@ -226,13 +324,43 @@ export function MissionControl() {
           </h1>
           <p className="text-sm text-slate-500">Cross-domain task tracker</p>
         </div>
-        <button
-          onClick={() => setShowQuickAdd(!showQuickAdd)}
-          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-500 transition"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Quick Add
-        </button>
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex rounded-lg border border-slate-800 bg-slate-900/50">
+            <button
+              onClick={() => setViewMode('list')}
+              className={[
+                'flex items-center gap-1 rounded-l-lg px-2.5 py-1.5 text-xs transition',
+                viewMode === 'list'
+                  ? 'bg-slate-800 text-emerald-300'
+                  : 'text-slate-500 hover:text-slate-300',
+              ].join(' ')}
+            >
+              <List className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">List</span>
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={[
+                'flex items-center gap-1 rounded-r-lg px-2.5 py-1.5 text-xs transition',
+                viewMode === 'kanban'
+                  ? 'bg-slate-800 text-emerald-300'
+                  : 'text-slate-500 hover:text-slate-300',
+              ].join(' ')}
+            >
+              <Columns3 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Kanban</span>
+            </button>
+          </div>
+
+          <button
+            onClick={() => setShowQuickAdd(!showQuickAdd)}
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-500 transition"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Quick Add
+          </button>
+        </div>
       </div>
 
       {/* Quick Add Form */}
@@ -319,88 +447,31 @@ export function MissionControl() {
         </div>
       )}
 
-      {/* Task List */}
-      {!isLoading && tasks.length > 0 && (
+      {/* Content: List or Kanban */}
+      {!isLoading && tasks.length > 0 && viewMode === 'list' && (
         <div className="space-y-2">
-          {tasks.map((task) => {
-            const domainCfg = DOMAIN_COLORS[task.domain]
-            const statusCfg = STATUS_CONFIG[task.status]
-            const priorityCfg = PRIORITY_CONFIG[task.priority]
-            const StatusIcon = statusCfg.icon
-            const PriorityIcon = priorityCfg.icon
-            const domainObj = DOMAINS.find((d) => d.id === task.domain)
-            const DomainIcon = domainObj?.icon ?? Wrench
-
-            return (
-              <div
-                key={task.id}
-                className="group flex items-start gap-3 rounded-xl border border-slate-800/50 bg-slate-900/60 px-4 py-3 hover:border-slate-700/60 hover:bg-slate-900/80 transition"
-              >
-                {/* Priority indicator */}
-                <div className={`mt-0.5 rounded-md p-1 ${priorityCfg.color}`}>
-                  <PriorityIcon className="h-3.5 w-3.5" />
-                </div>
-
-                {/* Content */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-100 truncate">{task.title}</span>
-                  </div>
-
-                  {task.description && (
-                    <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{task.description}</p>
-                  )}
-
-                  {/* Badges row */}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    {/* Domain badge */}
-                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${domainCfg}`}>
-                      <DomainIcon className="h-2.5 w-2.5" />
-                      {domainObj?.label}
-                    </span>
-
-                    {/* Status badge */}
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusCfg.color}`}>
-                      <StatusIcon className="h-2.5 w-2.5" />
-                      {statusCfg.label}
-                    </span>
-
-                    {/* Assigned to */}
-                    {task.assigned_to && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-400">
-                        <User className="h-2.5 w-2.5" />
-                        {task.assigned_to}
-                      </span>
-                    )}
-
-                    {/* Due date */}
-                    {task.due_date && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-400">
-                        <Calendar className="h-2.5 w-2.5" />
-                        {new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                      </span>
-                    )}
-
-                    {/* Tags */}
-                    {task.tags?.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Timestamp */}
-                <span className="shrink-0 text-[10px] text-slate-600">
-                  {new Date(task.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                </span>
-              </div>
-            )
-          })}
+          {tasks.map((task) => (
+            <TaskListItem key={task.id} task={task} onOpenDetail={handleOpenDetail} />
+          ))}
         </div>
+      )}
+
+      {!isLoading && tasks.length > 0 && viewMode === 'kanban' && (
+        <KanbanBoard
+          tasks={tasks}
+          isLoading={isLoading}
+          onMoveTask={handleMoveTask}
+          onOpenDetail={handleOpenDetail}
+        />
+      )}
+
+      {/* Task Detail Panel */}
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onUpdate={handleUpdateTask}
+        />
       )}
     </div>
   )
