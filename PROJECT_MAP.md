@@ -28,6 +28,7 @@ shishka-os/
 | **SSoT** | Supabase PostgreSQL is the single source of truth |
 | **SYRVE** | External POS system of record (inventory, BOM, sales) |
 | **MCP** | Model Context Protocol — how AI agents interact with the system |
+| **Mission Control** | Cross-domain business task management (8 domains: kitchen, procurement, finance, marketing, ops, sales, strategy, tech) |
 
 ## Active Projects
 
@@ -44,6 +45,19 @@ shishka-os/
 | Chef | `agents/chef/` | `services/mcp-chef/` |
 | Finance | `agents/finance/` | `services/mcp-finance/` |
 | Invoice Parser | `agents/invoice-parser/` | (uses Finance MCP) |
+| Dispatcher | `docs/business/DISPATCH_RULES.md` | (planned: `services/mcp-dispatcher/`) |
+
+## Business Domains (Mission Control)
+
+| Domain | Context | Scope |
+|--------|---------|-------|
+| Kitchen & R&D | `docs/business/domains/kitchen.md` | Recipes, BOM, nutrition, food safety |
+| Procurement | `docs/business/domains/procurement.md` | Suppliers, purchasing, inventory |
+| Finance | `docs/business/domains/finance.md` | Receipts, P&L, budget, taxes |
+| Marketing | `docs/business/domains/marketing.md` | Content, branding, campaigns |
+| Operations | `docs/business/domains/ops.md` | Staff, SOPs, equipment, training |
+| Sales | `docs/business/domains/sales.md` | Pricing, platforms, reviews |
+| Strategy | `docs/business/domains/strategy.md` | Vision, locations, growth |
 
 ## Next Steps
 

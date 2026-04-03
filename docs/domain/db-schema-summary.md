@@ -29,6 +29,13 @@
 | `inventory_levels` | Current stock by product |
 | `waste_log` | Waste tracking entries |
 
+## Mission Control Tables
+
+| Table | Purpose |
+|-------|---------|
+| `business_tasks` | Cross-domain backlog items (kanban: inbox→backlog→in_progress→done) |
+| `business_initiatives` | Cross-domain projects grouping related tasks |
+
 ## Infrastructure
 
 - **Database:** Supabase PostgreSQL 17.6 (ap-south-1)
