@@ -53,6 +53,17 @@ If ambiguous — ASK: "Which project? admin, web, or app?"
 | Supplier / SKU model | `docs/domain/supplier-domain.md` |
 | DB Schema (lightweight) | `docs/domain/db-schema-summary.md` |
 
+## Business Context (load when user shares a business idea or task)
+
+| Resource | File |
+|----------|------|
+| Dispatch rules (routing matrix) | `docs/business/DISPATCH_RULES.md` |
+| Domain context (per department) | `docs/business/domains/{domain}.md` |
+| Initiative template | `docs/business/initiatives/_template.md` |
+
+When user shares a business idea → read `DISPATCH_RULES.md` → create task(s) in Supabase `business_tasks`.
+When idea spans 3+ domains → create `business_initiative` + linked tasks.
+
 ## Agent Context (load when working with an agent)
 
 | Agent | Brains | Hands (MCP) |
@@ -60,6 +71,7 @@ If ambiguous — ASK: "Which project? admin, web, or app?"
 | Chef | `agents/chef/AGENT.md` | `services/mcp-chef/` |
 | Finance | `agents/finance/AGENT.md` | `services/mcp-finance/` |
 | Invoice Parser | `agents/invoice-parser/AGENT.md` | (uses Finance MCP) |
+| Dispatcher | `docs/business/DISPATCH_RULES.md` | (planned: `services/mcp-dispatcher/`) |
 
 ## L3: On-demand (load only when explicitly needed)
 
