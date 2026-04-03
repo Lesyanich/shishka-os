@@ -6,6 +6,7 @@
  */
 
 import { getSupabase } from "../lib/supabase.js";
+import { emitBusinessTask } from "../lib/emit-task.js";
 
 interface FoodItem {
   name: string;
@@ -137,15 +138,34 @@ export async function approveReceipt(args: ApproveReceiptArgs) {
 
   // data is the RPC response — { expense_id, food_count, capex_count, opex_count, ... }
   const expenseId = data?.expense_id;
+  const foodCount = data?.food_count ?? payload.food_items.length;
+  const capexCount = data?.capex_count ?? payload.capex_items.length;
+  const opexCount = data?.opex_count ?? payload.opex_items.length;
+
+  // Tier 1: emit business task for approved receipt
+  await emitBusinessTask({
+    title: `Approved: ${payload.supplier_name || "receipt"} | ${payload.amount_original} ${payload.currency}`,
+    domain: "finance",
+    created_by: "finance-agent",
+    status: "done",
+    tags: ["receipt", "approved", payload.flow_type.toLowerCase()],
+    related_ids: {
+      expense_id: expenseId,
+      batch_total_thb: payload.amount_original,
+      food_count: foodCount,
+      capex_count: capexCount,
+      opex_count: opexCount,
+    },
+  });
 
   return {
     ok: true,
     result: data,
     summary: {
       expense_id: expenseId,
-      food_count: data?.food_count ?? payload.food_items.length,
-      capex_count: data?.capex_count ?? payload.capex_items.length,
-      opex_count: data?.opex_count ?? payload.opex_items.length,
+      food_count: foodCount,
+      capex_count: capexCount,
+      opex_count: opexCount,
       supplier_catalog_updated: data?.supplier_catalog_updated ?? 0,
       total: payload.amount_original,
       currency: payload.currency,

@@ -3,6 +3,7 @@
  */
 
 import { getSupabase } from "../lib/supabase.js";
+import { emitBusinessTask } from "../lib/emit-task.js";
 
 export interface UpdateInboxArgs {
   inbox_id: string;
@@ -41,6 +42,34 @@ export async function updateInbox(args: UpdateInboxArgs) {
     .single();
 
   if (error) return { ok: false, error: error.message };
+
+  // Tier 1: emit business task when receipt is parsed
+  if (args.status === "parsed" && args.parsed_payload) {
+    const payload = args.parsed_payload;
+    const supplier = payload.supplier_name || "Unknown supplier";
+    const amount = payload.amount_original || 0;
+    const itemCount =
+      (payload.food_items?.length || 0) +
+      (payload.capex_items?.length || 0) +
+      (payload.opex_items?.length || 0);
+
+    await emitBusinessTask({
+      title: `Parsed receipt: ${supplier} | ${amount} THB | ${itemCount} items`,
+      domain: "finance",
+      created_by: "finance-agent",
+      status: payload._duplicate_warning ? "inbox" : "done",
+      priority: payload._duplicate_warning ? "high" : "medium",
+      tags: ["receipt", payload.supplier_type || "unknown"],
+      related_ids: {
+        inbox_id: args.inbox_id,
+        receipt_date: payload.transaction_date,
+        batch_total_thb: amount,
+      },
+      description: payload._duplicate_warning
+        ? `Possible duplicate detected. Review required.`
+        : undefined,
+    });
+  }
 
   return {
     ok: true,

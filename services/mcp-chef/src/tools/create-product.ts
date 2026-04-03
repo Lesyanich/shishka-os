@@ -1,4 +1,5 @@
 import { getSupabase } from "../lib/supabase.js";
+import { emitBusinessTask } from "../lib/emit-task.js";
 import {
   validateProductCode,
   validateBaseUnit,
@@ -218,6 +219,24 @@ export async function createProduct(args: {
       .single();
 
     if (error) return { error: `DB error: ${error.message}` };
+
+    // Tier 1: emit business task for SALE and PF products (not RAW — too noisy)
+    if (prefix === "SALE" || prefix === "PF") {
+      await emitBusinessTask({
+        title: `New ${prefix === "SALE" ? "dish" : "semi-finished"}: ${args.product_code}`,
+        domain: "kitchen",
+        created_by: "chef-agent",
+        status: "done",
+        tags: ["product", prefix.toLowerCase()],
+        related_ids: {
+          nomenclature_id: data.id,
+          product_code: data.product_code,
+        },
+        description: data.price
+          ? `${data.name} — price: ${data.price} THB`
+          : `${data.name} — price not set yet`,
+      });
+    }
 
     return {
       success: true,

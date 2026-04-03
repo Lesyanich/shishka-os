@@ -1,4 +1,5 @@
 import { getSupabase } from "../lib/supabase.js";
+import { emitBusinessTask } from "../lib/emit-task.js";
 import {
   getBomTree,
   calculateTreeCost,
@@ -169,6 +170,28 @@ export async function auditAllDishes(args: {
               10
           ) / 10
         : null;
+
+    // Tier 1: emit audit summary as business task
+    await emitBusinessTask({
+      title: `Audited ${totalDishes} dishes — ${withIssues} with issues`,
+      domain: "kitchen",
+      created_by: "chef-agent",
+      status: withIssues > 0 ? "inbox" : "done",
+      priority: withIssues > 0 ? "high" : "medium",
+      tags: ["audit", "menu"],
+      related_ids: {
+        total_dishes: totalDishes,
+        dishes_with_issues: withIssues,
+        avg_margin_pct: avgMargin,
+      },
+      description: withIssues > 0
+        ? `Issues found: ${results
+            .filter((r) => r.issues.length > 0)
+            .map((r) => `${r.code}: ${r.issues.join(", ")}`)
+            .slice(0, 5)
+            .join("; ")}${withIssues > 5 ? ` (+${withIssues - 5} more)` : ""}`
+        : `All dishes healthy. Avg margin: ${avgMargin}%`,
+    });
 
     return {
       summary: {
