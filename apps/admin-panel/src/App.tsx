@@ -31,6 +31,7 @@ const ScheduleManager = lazy(() => import('./pages/ScheduleManager').then(m => (
 const BatchPlanner = lazy(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
 const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
 const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
+const MissionControl = lazy(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
 
 function PageLoader() {
   return (
@@ -88,6 +89,7 @@ function App() {
                 <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
+                <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
                 <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
                 <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
               </Route>
