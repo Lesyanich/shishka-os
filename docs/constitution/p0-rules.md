@@ -34,6 +34,19 @@ Ask 2-3 specific architectural questions focusing on:
 
 *Only proceed with code generation after the user answers.*
 
+## Backlog First Protocol
+
+If while working on task A the agent discovers missing functionality B or has an idea for improving another agent/module — **do NOT start implementing it immediately**.
+
+The agent MUST:
+1. **Formulate** the task clearly (what, why, expected outcome).
+2. **Assess priority** (HIGH / MEDIUM / LOW).
+3. **Log it** in `docs/tech-debt.md` (if technical) or `STATUS.md` Backlog section (if feature/business).
+4. **Report** to the user: "Discovered [X], logged as [priority] in [file]. Continue with current task?"
+5. **Wait for confirmation** before planning or executing the new task.
+
+This preserves focus, saves tokens, and prevents scope creep during active sessions.
+
 ## Compound Engineering (The Boris Rule)
 
 If you make a mistake and the user corrects you, you MUST update the relevant file in `docs/` to ensure you NEVER make this mistake again.
