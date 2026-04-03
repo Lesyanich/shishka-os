@@ -24,6 +24,14 @@ Consolidated from all phases. Items marked with phase of origin.
 - `nomenclature.price` — sale price updateable via admin panel. Add audit log for price changes.
 - `inventory_balances.quantity` — legitimately updated for stocktake. Move to RPC-based stocktake.
 
+### Finance Agent: Google Drive Receipt Backup (organize_receipt)
+- Tool `organize_receipt` referenced in SKILL.md but **never implemented**
+- Current flow: agent uploads photos to Supabase Storage only
+- Needed: after `approve_receipt`, copy receipt photo to `01_Business/Receipts/processed/{YYYY-MM}/` on Google Drive
+- Must also write the GDrive path back to DB (e.g. `expense_ledger.gdrive_path`)
+- Enables: offline access to receipts, human-friendly folder browsing, audit trail on shared drive
+- Priority: HIGH (owner relies on GDrive as receipt archive)
+
 ### Finance: SmartTextInput NLP
 - Quick-log input exists as UI stub — NLP parser not yet connected
 - Future: extract amount, supplier, category from natural language
