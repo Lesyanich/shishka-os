@@ -17,6 +17,7 @@
 3. **Lego-Architecture (BOM):** Menu modules: RAW (Raw) → PF (Semi) → MOD (Topping) → SALE (Dish).
 4. **No Direct DB Edits:** All DB schema changes must be written as SQL migrations in `services/supabase/migrations/`.
 5. **State Management:** Always read `STATUS.md` before starting a task and update it after completion.
+6. **Agent Tracking Protocol:** Агенты пишут бизнес-результаты в `business_tasks` (Tier 1) и ведут технические шаги в `agents/{name}/session-log.md` (Tier 2). Полный протокол: `docs/constitution/agent-tracking.md`. Засорять Mission Control техническим мусором ЗАПРЕЩЕНО.
 
 ## Data Integrity Rules
 

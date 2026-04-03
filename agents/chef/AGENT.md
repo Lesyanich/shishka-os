@@ -76,6 +76,18 @@ AI Chef Agent — MCP-сервер, подключающий Claude Desktop к S
 - `equipment` — кухонное оборудование (76 единиц, enriched post-migration 070)
 - `supplier_catalog` — каталог поставщиков
 
+## Tracking Protocol
+See `docs/constitution/agent-tracking.md` for full protocol.
+
+**Tier 1 (write to `business_tasks`):**
+- After `create_product` (SALE/PF only): `"New dish: {code} (margin {X}%)"` — domain: kitchen, status: done
+- After `audit_all_dishes`: `"Audited {N} dishes — {M} issues found"` — domain: kitchen, status: done
+- On discovery (cost alert, missing BOM): `"BOM alert: {description}"` — domain: kitchen, status: inbox
+- Related_ids: always include `nomenclature_id` or relevant entity IDs
+
+**Tier 2 (local `agents/chef/session-log.md` only):**
+- search_products, calculate_cost, calculate_nutrition, validate_bom, individual add_bom_line
+
 ## Critical Rules
 - **NEVER write to `cost_per_unit`** — это WAC, рассчитывается триггером `fn_update_cost_on_purchase`
 - **Lego chain is IMMUTABLE** — SALE→PF/MOD, PF→RAW/PF, MOD→RAW, RAW→∅

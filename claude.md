@@ -66,6 +66,8 @@ When idea spans 3+ domains → create `business_initiative` + linked tasks.
 
 ## Agent Context (load when working with an agent)
 
+> **Before any agent work:** read `docs/constitution/agent-tracking.md`
+
 | Agent | Brains | Hands (MCP) |
 |-------|--------|-------------|
 | Chef | `agents/chef/AGENT.md` | `services/mcp-chef/` |

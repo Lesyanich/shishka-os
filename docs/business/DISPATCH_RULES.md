@@ -57,6 +57,20 @@
 | Seasonal/calendar trigger | `seasonal` |
 | Competitor observation | `market_intel` |
 
+## Agent-Created Tasks
+
+When an AI agent creates a business_task (not the Dispatcher):
+- `source` = `agent_discovery`
+- `created_by` = `{agent-name}-agent` (e.g. `finance-agent`, `chef-agent`)
+- `status` = `inbox` (default — Lesia triages) or `done` (if work already completed)
+- `assigned_to` = `null` (agents don't assign work to humans)
+- `related_ids` MUST include at least one entity ID
+
+When the Dispatcher creates tasks:
+- `source` = inherited from the original idea (e.g. `owner`, `chef_idea`)
+- `created_by` = `dispatcher`
+- Follows the full Trigger Matrix above
+
 ## Response Template
 
 After dispatching, the agent MUST respond:

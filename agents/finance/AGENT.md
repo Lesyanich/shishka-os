@@ -77,7 +77,19 @@ check_duplicate(date, supplier_name, amount)
 update_inbox(inbox_id, status: "parsed", parsed_payload: {JSON})
 ```
 
-### Шаг 10: Отчёт и СТОП
+### Шаг 10: Tracking (Tier 1)
+Emit business task via `emitBusinessTask()`:
+- Title: `"Parsed receipt: {supplier} | {amount} THB | {N} items"`
+- Domain: `finance`
+- Source: `agent_discovery`
+- Created_by: `finance-agent`
+- Status: `done` (parsing completed) or `inbox` (if `_duplicate_warning` or unreadable items)
+- Tags: `["receipt", "{supplier_type}"]`
+- Related_ids: `{ inbox_id: "{id}", receipt_date: "{date}", batch_total_thb: {amount} }`
+
+On blocker: emit `"Blocked: receipt {id} — {reason}"` with status `blocked`.
+
+### Шаг 11: Отчёт и СТОП
 Покажи краткую сводку:
 ```
 ✅ Чек распарсен: {supplier} | {date} | {amount} THB | {N} позиций
