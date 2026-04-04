@@ -264,9 +264,10 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       capex_items: capexItems,
       opex_items: opexItems,
       // Map inbox photos to expense_ledger receipt columns
+      // Only assign distinct photos — don't duplicate the same URL across columns
       receipt_supplier_url: p.receipt_supplier_url || photos[0] || null,
-      receipt_bank_url: p.receipt_bank_url || photos[1] || null,
-      tax_invoice_url: p.tax_invoice_url || (p.has_tax_invoice ? (photos[1] || photos[0]) : null),
+      receipt_bank_url: p.receipt_bank_url || (photos[1] && photos[1] !== photos[0] ? photos[1] : null),
+      tax_invoice_url: p.tax_invoice_url || (p.has_tax_invoice && photos.length > 1 ? photos[1] : null),
     }
     const res = await onApprove(row.id, editedPayload)
     setIsApproving(false)
