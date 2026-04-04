@@ -3,7 +3,7 @@ import { InboxUploader } from '../components/receipts/InboxUploader'
 import { InboxList } from '../components/receipts/InboxList'
 
 export function ReceiptInbox() {
-  const { rows, isLoading, error, refetch, insert } = useReceiptInbox()
+  const { rows, isLoading, error, refetch, insert, approve, skip, reopen, deleteRow } = useReceiptInbox()
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -19,7 +19,16 @@ export function ReceiptInbox() {
       <InboxUploader onSubmit={insert} />
 
       {/* List */}
-      <InboxList rows={rows} isLoading={isLoading} error={error} onRefetch={refetch} />
+      <InboxList
+        rows={rows}
+        isLoading={isLoading}
+        error={error}
+        onRefetch={refetch}
+        onApprove={approve}
+        onSkip={skip}
+        onReopen={reopen}
+        onDelete={deleteRow}
+      />
     </div>
   )
 }
