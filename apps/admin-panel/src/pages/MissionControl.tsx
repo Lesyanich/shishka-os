@@ -72,10 +72,10 @@ const STATUS_CONFIG: Record<TaskStatus, { label: string; icon: typeof Inbox; col
 }
 
 const PRIORITY_CONFIG: Record<TaskPriority, { label: string; icon: typeof AlertTriangle; color: string }> = {
-  critical: { label: 'Critical', icon: AlertTriangle, color: 'bg-red-500/15 text-red-400' },
-  high: { label: 'High', icon: ArrowUp, color: 'bg-orange-500/15 text-orange-400' },
-  medium: { label: 'Medium', icon: Minus, color: 'bg-slate-500/15 text-slate-400' },
-  low: { label: 'Low', icon: ArrowDown, color: 'bg-slate-600/15 text-slate-500' },
+  critical: { label: 'Critical', icon: AlertTriangle, color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
+  high: { label: 'High', icon: ArrowUp, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
+  medium: { label: 'Medium', icon: Minus, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+  low: { label: 'Low', icon: ArrowDown, color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
 }
 
 type ViewMode = 'list' | 'kanban'
@@ -283,10 +283,12 @@ function TaskListItem({
 
 export function MissionControl() {
   const [activeDomain, setActiveDomain] = useState<TaskDomain | 'all'>('all')
+  const [activeStatus, setActiveStatus] = useState<TaskStatus | null>(null)
+  const [showDone, setShowDone] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [selectedTask, setSelectedTask] = useState<BusinessTask | null>(null)
-  const { tasks, isLoading, error, refetch, addTask, updateTask } = useBusinessTasks(activeDomain)
+  const { tasks: allTasks, isLoading, error, refetch, addTask, updateTask } = useBusinessTasks(activeDomain)
 
   const handleAddTask = async (task: NewBusinessTask) => {
     const ok = await addTask(task)
@@ -307,11 +309,32 @@ export function MissionControl() {
     setSelectedTask(task)
   }
 
-  // Count tasks by status for the summary bar
-  const statusCounts = tasks.reduce<Record<string, number>>((acc, t) => {
+  // Count tasks by status from ALL tasks (before filtering)
+  const statusCounts = allTasks.reduce<Record<string, number>>((acc, t) => {
     acc[t.status] = (acc[t.status] ?? 0) + 1
     return acc
   }, {})
+
+  // Filter tasks: hide done/cancelled by default, apply active status filter
+  const tasks = allTasks.filter((t) => {
+    if (!showDone && (t.status === 'done' || t.status === 'cancelled')) return false
+    if (activeStatus && t.status !== activeStatus) return false
+    return true
+  })
+
+  const handleStatusToggle = (status: TaskStatus) => {
+    if (status === 'done' || status === 'cancelled') {
+      if (activeStatus === status) {
+        setActiveStatus(null)
+        setShowDone(false)
+      } else {
+        setShowDone(true)
+        setActiveStatus(status)
+      }
+    } else {
+      setActiveStatus(activeStatus === status ? null : status)
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -374,46 +397,74 @@ export function MissionControl() {
 
       {/* Domain Tabs */}
       <div className="flex gap-1 rounded-xl bg-slate-900/50 p-1 overflow-x-auto">
-        {DOMAINS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActiveDomain(id)}
-            className={[
-              'flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition',
-              activeDomain === id
-                ? 'bg-slate-800 text-emerald-300 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200',
-            ].join(' ')}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-            {id === 'all' && tasks.length > 0 && (
-              <span className="ml-1 rounded-full bg-slate-700 px-1.5 text-[10px] text-slate-300">
-                {tasks.length}
-              </span>
-            )}
-          </button>
-        ))}
+        {DOMAINS.map(({ id, label, icon: Icon }) => {
+          // Count tasks per domain, respecting status filter but not domain filter
+          const domainCount = allTasks.filter((t) => {
+            if (!showDone && (t.status === 'done' || t.status === 'cancelled')) return false
+            if (activeStatus && t.status !== activeStatus) return false
+            if (id !== 'all' && t.domain !== id) return false
+            return true
+          }).length
+          return (
+            <button
+              key={id}
+              onClick={() => setActiveDomain(id)}
+              className={[
+                'flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition',
+                activeDomain === id
+                  ? 'bg-slate-800 text-emerald-300 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200',
+              ].join(' ')}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+              {domainCount > 0 && (
+                <span className="ml-1 rounded-full bg-slate-700 px-1.5 text-[10px] text-slate-300">
+                  {domainCount}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
-      {/* Status summary bar */}
-      {!isLoading && tasks.length > 0 && (
+      {/* Status summary bar — clickable filters */}
+      {!isLoading && allTasks.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {(['inbox', 'backlog', 'in_progress', 'blocked', 'done'] as TaskStatus[]).map((status) => {
+          {(['inbox', 'backlog', 'in_progress', 'blocked', 'done', 'cancelled'] as TaskStatus[]).map((status) => {
             const count = statusCounts[status] ?? 0
             if (count === 0) return null
             const cfg = STATUS_CONFIG[status]
             const Icon = cfg.icon
+            const isActive = activeStatus === status
+            const isDoneish = status === 'done' || status === 'cancelled'
             return (
-              <span
+              <button
                 key={status}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${cfg.color}`}
+                onClick={() => handleStatusToggle(status)}
+                className={[
+                  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all',
+                  isActive
+                    ? `${cfg.color} ring-1 ring-current`
+                    : isDoneish && !showDone
+                      ? 'bg-slate-800/50 text-slate-600'
+                      : cfg.color,
+                ].join(' ')}
               >
                 <Icon className="h-3 w-3" />
                 {cfg.label}: {count}
-              </span>
+              </button>
             )
           })}
+          {activeStatus && (
+            <button
+              onClick={() => { setActiveStatus(null); setShowDone(false) }}
+              className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 transition"
+            >
+              <X className="h-3 w-3" />
+              Clear
+            </button>
+          )}
         </div>
       )}
 
@@ -434,7 +485,7 @@ export function MissionControl() {
       )}
 
       {/* Empty state */}
-      {!isLoading && !error && tasks.length === 0 && (
+      {!isLoading && !error && allTasks.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-slate-500">
           <Rocket className="h-10 w-10 mb-3 text-slate-700" />
           <p className="text-sm">No tasks yet</p>
@@ -448,20 +499,26 @@ export function MissionControl() {
       )}
 
       {/* Content: List or Kanban */}
-      {!isLoading && tasks.length > 0 && viewMode === 'list' && (
-        <div className="space-y-2">
-          {tasks.map((task) => (
-            <TaskListItem key={task.id} task={task} onOpenDetail={handleOpenDetail} />
-          ))}
-        </div>
+      {!isLoading && allTasks.length > 0 && viewMode === 'list' && (
+        tasks.length > 0 ? (
+          <div className="space-y-2">
+            {tasks.map((task) => (
+              <TaskListItem key={task.id} task={task} onOpenDetail={handleOpenDetail} />
+            ))}
+          </div>
+        ) : (
+          <p className="py-10 text-center text-sm text-slate-600">No tasks match this filter</p>
+        )
       )}
 
-      {!isLoading && tasks.length > 0 && viewMode === 'kanban' && (
+      {!isLoading && allTasks.length > 0 && viewMode === 'kanban' && (
         <KanbanBoard
           tasks={tasks}
           isLoading={isLoading}
           onMoveTask={handleMoveTask}
           onOpenDetail={handleOpenDetail}
+          showDone={showDone}
+          activeStatus={activeStatus}
         />
       )}
 

@@ -22,6 +22,16 @@ import {
 } from 'lucide-react'
 import type { BusinessTask, TaskDomain, TaskStatus, TaskPriority } from '../../hooks/useBusinessTasks'
 
+// ── Tag colors ──
+
+const TAG_COLORS: Record<string, string> = {
+  'has-spec': 'bg-emerald-900/40 text-emerald-400 border-emerald-500/30',
+  'blocked': 'bg-red-900/40 text-red-400 border-red-500/30',
+  'needs-hardware': 'bg-yellow-900/40 text-yellow-400 border-yellow-500/30',
+  'quick-win': 'bg-blue-900/40 text-blue-400 border-blue-500/30',
+}
+const DEFAULT_TAG_COLOR = 'bg-slate-800 text-slate-500 border-slate-700/50'
+
 // ── Column config ──
 
 interface ColumnDef {
@@ -98,11 +108,11 @@ const DOMAIN_DOT_COLORS: Record<TaskDomain, string> = {
   tech: 'bg-slate-400',
 }
 
-const PRIORITY_ICONS: Record<TaskPriority, { icon: typeof AlertTriangle; color: string }> = {
-  critical: { icon: AlertTriangle, color: 'text-red-400' },
-  high: { icon: ArrowUp, color: 'text-orange-400' },
-  medium: { icon: Minus, color: 'text-slate-500' },
-  low: { icon: ArrowDown, color: 'text-slate-600' },
+const PRIORITY_ICONS: Record<TaskPriority, { icon: typeof AlertTriangle; color: string; badgeColor: string }> = {
+  critical: { icon: AlertTriangle, color: 'text-red-400', badgeColor: 'bg-red-900/30 text-red-400' },
+  high: { icon: ArrowUp, color: 'text-orange-400', badgeColor: 'bg-orange-900/30 text-orange-400' },
+  medium: { icon: Minus, color: 'text-blue-400', badgeColor: 'bg-blue-900/30 text-blue-400' },
+  low: { icon: ArrowDown, color: 'text-gray-400', badgeColor: 'bg-gray-800 text-gray-400' },
 }
 
 // ── Status transition: next logical status ──
@@ -128,7 +138,6 @@ function KanbanCard({
   onOpenDetail: (task: BusinessTask) => void
 }) {
   const PriorityIcon = PRIORITY_ICONS[task.priority].icon
-  const priorityColor = PRIORITY_ICONS[task.priority].color
   const DomainIcon = DOMAIN_ICONS[task.domain]
   const domainDot = DOMAIN_DOT_COLORS[task.domain]
   const nextStatus = STATUS_FLOW[task.status]
@@ -138,15 +147,36 @@ function KanbanCard({
       onClick={() => onOpenDetail(task)}
       className="group cursor-pointer rounded-lg border border-slate-800 bg-slate-900/60 p-3 transition hover:border-slate-700 hover:bg-slate-900/90"
     >
-      {/* Top row: priority + title */}
+      {/* Top row: priority badge + title */}
       <div className="flex items-start gap-2">
-        <PriorityIcon className={`mt-0.5 h-3 w-3 shrink-0 ${priorityColor}`} />
+        <span className={`mt-0.5 inline-flex shrink-0 rounded p-0.5 ${PRIORITY_ICONS[task.priority].badgeColor}`}>
+          <PriorityIcon className="h-3 w-3" />
+        </span>
         <p className="text-xs font-medium leading-snug text-slate-200 line-clamp-2">{task.title}</p>
       </div>
 
       {/* Description */}
       {task.description && (
         <p className="mt-1 pl-5 text-[11px] text-slate-500 line-clamp-1">{task.description}</p>
+      )}
+
+      {/* Tags */}
+      {task.tags && task.tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1 pl-5">
+          {task.tags.slice(0, 3).map((tag) => (
+            <span
+              key={tag}
+              className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium ${TAG_COLORS[tag] ?? DEFAULT_TAG_COLOR}`}
+            >
+              {tag}
+            </span>
+          ))}
+          {task.tags.length > 3 && (
+            <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-500">
+              +{task.tags.length - 3}
+            </span>
+          )}
+        </div>
       )}
 
       {/* Bottom row: domain + assigned + move button */}
@@ -206,9 +236,11 @@ interface KanbanBoardProps {
   isLoading: boolean
   onMoveTask: (id: string, newStatus: TaskStatus) => void
   onOpenDetail: (task: BusinessTask) => void
+  showDone?: boolean
+  activeStatus?: TaskStatus | null
 }
 
-export function KanbanBoard({ tasks, isLoading, onMoveTask, onOpenDetail }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, isLoading, onMoveTask, onOpenDetail, showDone, activeStatus }: KanbanBoardProps) {
   const byStatus: Record<string, BusinessTask[]> = {}
   for (const task of tasks) {
     const s = task.status
@@ -216,9 +248,22 @@ export function KanbanBoard({ tasks, isLoading, onMoveTask, onOpenDetail }: Kanb
     byStatus[s].push(task)
   }
 
+  // Filter visible columns: hide done/cancelled unless showDone, respect activeStatus
+  const visibleColumns = KANBAN_COLUMNS.filter((col) => {
+    if (activeStatus) return col.status === activeStatus
+    if (!showDone && (col.status === 'done' || col.status === 'cancelled')) return false
+    return true
+  })
+
+  const gridCols = visibleColumns.length <= 3
+    ? 'md:grid-cols-3'
+    : visibleColumns.length === 4
+      ? 'md:grid-cols-2 lg:grid-cols-4'
+      : 'md:grid-cols-3 lg:grid-cols-5'
+
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-5">
-      {KANBAN_COLUMNS.map((col) => {
+    <div className={`grid grid-cols-1 gap-3 ${gridCols}`}>
+      {visibleColumns.map((col) => {
         const colTasks = byStatus[col.status] ?? []
         const Icon = col.icon
 
