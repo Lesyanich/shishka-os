@@ -29,7 +29,8 @@
 ## Mission Control (Business Task Management)
 
 - **DB tables**: `business_tasks` + `business_initiatives` (migration 091, applied 2026-04-03)
-- **MCP tools**: `emit_business_task`, `list_tasks`, `get_task`, `update_task` in mcp-chef (live, 2026-04-04)
+- **MCP server**: `services/mcp-mission-control/` — standalone MCP with 4 tools (extracted from mcp-chef, 2026-04-04)
+- **MCP tools**: `emit_business_task`, `list_tasks`, `get_task`, `update_task`
 - **Task queue**: `docs/plans/QUEUE.md` (file-based backup, agents use `list_tasks` MCP)
 - **Dispatch rules**: `docs/business/DISPATCH_RULES.md`
 - **Domain contexts**: `docs/business/domains/` (7 domains)
