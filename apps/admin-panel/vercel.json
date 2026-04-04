@@ -1,5 +1,6 @@
 {
   "installCommand": "npm install --force",
   "buildCommand": "rm -rf tsconfig.tsbuildinfo tsconfig.app.tsbuildinfo && npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
