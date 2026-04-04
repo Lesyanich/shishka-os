@@ -1,0 +1,156 @@
+#!/usr/bin/env node
+
+/**
+ * Shishka Mission Control — MCP Server
+ *
+ * Shared task management for all Shishka OS agents.
+ * Provides tools for creating, listing, reading, and updating
+ * business tasks in Supabase business_tasks table.
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+// Tool handlers
+import { emitBusinessTask } from "./tools/emit-business-task.js";
+import { listTasks } from "./tools/list-tasks.js";
+import { getTask } from "./tools/get-task.js";
+import { updateTask } from "./tools/update-task.js";
+
+// ─── Server Setup ────────────────────────────────────────────────
+
+const server = new McpServer({
+  name: "shishka-mission-control",
+  version: "1.0.0",
+});
+
+// ─── Helper ──────────────────────────────────────────────────────
+
+function jsonResult(data: any) {
+  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+}
+
+// ─── Tools ───────────────────────────────────────────────────────
+
+server.tool(
+  "emit_business_task",
+  "Create a business task in Mission Control (Supabase business_tasks). " +
+  "Use for completed business outcomes, discoveries, or blockers — NOT for technical sub-steps.",
+  {
+    title: z.string().min(5).max(200).describe(
+      "Task title. Concise, business-readable. Example: 'New dish created: SALE-PUMPKIN-SOUP (margin 68%)'"
+    ),
+    description: z.string().max(1000).optional().describe(
+      "Optional details. Price, quantities, what was found, why it's blocked."
+    ),
+    domain: z.enum([
+      "kitchen", "procurement", "finance", "marketing",
+      "ops", "sales", "strategy", "tech"
+    ]).describe("Business domain. See DISPATCH_RULES.md for scope of each domain."),
+    status: z.enum(["inbox", "done"]).default("inbox").describe(
+      "'inbox' = needs Lesia's triage (default). 'done' = work already completed, just logging."
+    ),
+    priority: z.enum(["critical", "high", "medium", "low"]).default("medium").describe(
+      "Follow DISPATCH_RULES.md priority algorithm. Default: medium."
+    ),
+    source: z.enum([
+      "agent_discovery", "owner", "chef_idea",
+      "customer_review", "seasonal", "market_intel"
+    ]).default("agent_discovery").describe(
+      "How the task was discovered. Agents use 'agent_discovery'."
+    ),
+    created_by: z.string().describe(
+      "Who created: 'chef-agent', 'finance-agent', 'dispatcher', 'lesia', 'coo'"
+    ),
+    tags: z.array(z.string()).optional().describe(
+      "Freeform tags for filtering. Example: ['product', 'sale', 'audit']"
+    ),
+    related_ids: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).describe(
+      "MUST include at least one entity ID. Keys: snake_case. " +
+      "Standard keys: nomenclature_id, expense_id, inbox_id, agent_session, batch_count, batch_total_thb, git_branch, pr_number, spec_file"
+    ),
+    initiative_id: z.string().uuid().optional().describe(
+      "Link to a business_initiative if this task is part of a cross-domain project."
+    ),
+    parent_task_id: z.string().uuid().optional().describe(
+      "Link to parent task for subtasks (e.g. cascade domain tasks from Dispatcher)."
+    ),
+    due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
+      "Due date in YYYY-MM-DD format."
+    ),
+    notes: z.string().max(500).optional().describe(
+      "Free-text notes for human triagers. Agents rarely need this — use description instead."
+    ),
+  },
+  async (args) => jsonResult(await emitBusinessTask({
+    ...args,
+    related_ids: args.related_ids as Record<string, string | number | boolean>,
+  }))
+);
+
+server.tool(
+  "list_tasks",
+  "List business tasks from Mission Control with filters. Use to find tasks by domain, status, priority.",
+  {
+    domain: z.enum([
+      "kitchen", "procurement", "finance", "marketing",
+      "ops", "sales", "strategy", "tech"
+    ]).optional().describe("Filter by domain"),
+    status: z.enum([
+      "inbox", "backlog", "in_progress", "blocked", "done", "cancelled"
+    ]).optional().describe("Filter by status (default: shows all non-done)"),
+    priority: z.enum(["critical", "high", "medium", "low"]).optional()
+      .describe("Filter by priority"),
+    created_by: z.string().optional().describe("Filter by creator (e.g. 'chef-agent')"),
+    limit: z.number().min(1).max(50).default(20).describe("Max results"),
+    include_done: z.boolean().default(false)
+      .describe("Include done/cancelled tasks (excluded by default)"),
+  },
+  async (args) => jsonResult(await listTasks(args))
+);
+
+server.tool(
+  "get_task",
+  "Get full details of a specific business task by ID.",
+  {
+    task_id: z.string().uuid().describe("UUID of the task"),
+  },
+  async (args) => jsonResult(await getTask(args))
+);
+
+server.tool(
+  "update_task",
+  "Update a business task's status, priority, or other fields. Use to move tasks through the workflow.",
+  {
+    task_id: z.string().uuid().describe("UUID of the task to update"),
+    status: z.enum([
+      "inbox", "backlog", "in_progress", "blocked", "done", "cancelled"
+    ]).optional().describe("New status"),
+    priority: z.enum(["critical", "high", "medium", "low"]).optional()
+      .describe("New priority"),
+    description: z.string().max(1000).optional()
+      .describe("Update description (e.g. add result summary)"),
+    notes: z.string().max(500).optional()
+      .describe("Add notes (e.g. why blocked, what was done)"),
+    due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+      .describe("Set or update due date (YYYY-MM-DD)"),
+    tags: z.array(z.string()).optional()
+      .describe("Replace tags array"),
+  },
+  async (args) => jsonResult(await updateTask(args))
+);
+
+// ─── Start ───────────────────────────────────────────────────────
+
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error(`Shishka Mission Control MCP server running on stdio`);
+  console.error(`   Tools: 4 (emit_business_task, list_tasks, get_task, update_task)`);
+}
+
+main().catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
