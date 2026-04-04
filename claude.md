@@ -7,6 +7,7 @@ Language: Russian for documentation, English for code and variables.
 ## L0: Always Load (every session)
 1. Read `docs/constitution/p0-rules.md` before any task.
 2. Read `STATUS.md` for global state.
+3. Read `docs/plans/QUEUE.md` for active task queue.
 
 ## Project Detection
 Determine the active project before loading module context:

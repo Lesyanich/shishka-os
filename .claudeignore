@@ -1,0 +1,25 @@
+# Obsidian Archive — 60+ historical files, never needed in active development
+02_Obsidian_Vault/_Archive/
+
+# Build artifacts
+03_Development/admin-panel/node_modules/
+03_Development/admin-panel/dist/
+03_Development/gas/node_modules/
+
+# Git internals
+.git/
+
+# Large one-time artifacts (archived)
+02_Obsidian_Vault/_Archive/CLAUDE_TASK.md
+02_Obsidian_Vault/_Archive/CLAUDE_COMMANDS.md
+
+# Binary / media files
+*.webp
+*.png
+*.jpg
+*.jpeg
+*.heic
+*.ico
+
+# Gemini context (irrelevant for Claude Code)
+gemini.md

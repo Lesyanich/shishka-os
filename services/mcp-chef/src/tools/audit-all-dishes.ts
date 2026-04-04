@@ -182,7 +182,7 @@ export async function auditAllDishes(args: {
       related_ids: {
         total_dishes: totalDishes,
         dishes_with_issues: withIssues,
-        avg_margin_pct: avgMargin,
+        avg_margin_pct: avgMargin ?? 0,
       },
       description: withIssues > 0
         ? `Issues found: ${results

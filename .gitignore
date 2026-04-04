@@ -49,8 +49,11 @@ token.json
 *.mp4
 
 # Non-code folders (Google Drive content, not source code)
+01_Business/
 01_Source_Data/
+04_Knowledge/
 04_Financial_Control/
+_archive/
 Bills/
 Cooking lessons /
 Graphics & Branding/
@@ -60,3 +63,4 @@ Photo (Locations & Renovations)/
 POSsystem/
 Инструкции ИИ/
 services/supabase/.temp/
+services/supabase/supabase/

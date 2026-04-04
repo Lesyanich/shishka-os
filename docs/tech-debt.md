@@ -36,6 +36,11 @@ Consolidated from all phases. Items marked with phase of origin.
 - Quick-log input exists as UI stub — NLP parser not yet connected
 - Future: extract amount, supplier, category from natural language
 
+### Chef Agent: Kitchen Staff Input Workflow
+- Vision: kitchen staff sends voice/text feedback (e.g. "too little salt in dough test #3") → inbox table → Chef Agent processes end-of-day → suggests corrections to process cards / recipes
+- Requires: (1) inbox DB table + migration, (2) quick-input UI in admin-panel (text + speech-to-text), (3) WF-8 in AGENT.md "Process daily kitchen inbox", (4) scheduled Cowork task for end-of-day processing
+- Priority: LOW (design later, implement after Mission Control UI is built)
+
 ## Resolved Debt
 
 - ~~No auto-refresh~~ → Supabase Realtime (Phase 2)
