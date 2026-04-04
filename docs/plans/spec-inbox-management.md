@@ -1,113 +1,189 @@
-# Spec: Receipt Inbox Management — UI Improvements
+# Spec: Receipt Inbox Management — восстановление и интеграция
 
-> **Author:** COO (Cowork)
-> **Date:** 2026-04-04
+> **MC Task:** `f2d26205` | Priority: CRITICAL
+> **Author:** COO (Cowork) | **Date:** 2026-04-04
 > **For:** Admin Panel Dev (Claude Code)
-> **Priority:** HIGH — блокирует ежедневную работу с чеками
+> **Branch:** `feature/admin/receipt-review-recovery`
 
 ---
 
-## 1. Контекст
+## 0. TL;DR для Claude Code
 
-Receipt inbox (`receipt_inbox` table) — входная точка для всех чеков. Фото загружается через Telegram бот или admin panel, Finance Agent парсит чек и сохраняет `parsed_payload`, Леся ревьюит и аппрувит через admin panel.
+Полная реализация receipt review UI существует в worktree `great-swartz`.
+Нужно: перенести 4 файла в main, адаптировать imports, применить миграцию, интегрировать в page.
+**Не нужно:** писать с нуля. Код ревьюен COO, логика корректная.
 
-Текущие проблемы:
-- В списке чеков поставщик и сумма показывают прочерки (берутся из `supplier_hint`/`amount_hint`, а не из `parsed_payload`)
-- Нет кнопки удаления чека
-- Нет кнопки редактирования содержимого чека
-- Медленная загрузка фото (~1 минута) — слишком большие файлы
-- Тестовый чек от 02.04 невозможно удалить (нет RLS policy на DELETE, нет RPC)
+---
 
-## 2. Existing code (worktree reference)
+## 1. Контекст проблемы
 
-В worktree `great-swartz` (`03_Development/`) уже есть частичная реализация. Код можно использовать как reference, но нужно адаптировать под основную структуру проекта (`apps/admin-panel/`, `services/supabase/`).
+Receipt inbox — входная точка для чеков. Полный workflow:
 
-Файлы в worktree:
 ```
-.claude/worktrees/great-swartz/03_Development/
-├── supabase/migrations/092_inbox_management.sql    — RPC для delete + sync
-├── admin-panel/src/hooks/useReceiptInbox.ts        — hook с delete, approve, sync
-├── admin-panel/src/components/receipts/
-│   ├── InboxList.tsx                                — таблица с parsed data
-│   └── InboxReviewPanel.tsx                         — панель ревью/аппрува
+Фото чека → Telegram/Admin Upload → receipt_inbox (pending)
+  → Finance Agent парсит → update_inbox(status:"parsed", parsed_payload:{...})
+  → Admin Panel: Леся видит детали, редактирует, подтверждает → approve_receipt
+  → expense_ledger + purchase_logs (Hub-and-Spoke)
 ```
 
-**Качество кода:** ревью пройден COO. Логика корректная, RPC безопасные. Нужна адаптация путей и доработки (см. ниже).
+**Что сломано:** шаг "Admin Panel: Леся видит детали, редактирует, подтверждает" — отсутствует в main. Код был разработан в worktree `great-swartz` но никогда не замержен. Текущий main имеет урезанный InboxList без expand, без parsed данных, без approve/skip/reopen.
 
-## 3. Задачи
+---
 
-### 3.1 Migration: Delete RPC + Status Sync
+## 2. Источники (worktree → main)
 
-**Файл:** `services/supabase/migrations/092_inbox_management.sql`
+| Worktree файл | Целевой путь в main | Действие |
+|---|---|---|
+| `.claude/worktrees/great-swartz/03_Development/admin-panel/src/hooks/useReceiptInbox.ts` | `apps/admin-panel/src/hooks/useReceiptInbox.ts` | **REPLACE** целиком |
+| `.claude/worktrees/great-swartz/03_Development/admin-panel/src/components/receipts/InboxList.tsx` | `apps/admin-panel/src/components/receipts/InboxList.tsx` | **REPLACE** целиком |
+| `.claude/worktrees/great-swartz/03_Development/admin-panel/src/components/receipts/InboxReviewPanel.tsx` | `apps/admin-panel/src/components/receipts/InboxReviewPanel.tsx` | **NEW** (создать) |
+| `.claude/worktrees/great-swartz/03_Development/supabase/migrations/092_inbox_management.sql` | `services/supabase/migrations/092_inbox_management.sql` | **NEW** (создать + применить) |
 
-Создать две RPC функции:
+---
 
-**`fn_delete_inbox_row(p_inbox_id UUID)`**
-- SECURITY DEFINER (обход RLS)
-- Запретить удаление если `expense_id IS NOT NULL`
-- Вернуть `{ok: true/false, error?}`
-- Reference: worktree `great-swartz` → `092_inbox_management.sql`
+## 3. Что именно менять
 
-**`fn_sync_inbox_status(p_inbox_id UUID)`**
-- Если `expense_id IS NOT NULL` и `status != 'processed'` → автоисправление
-- Вернуть `{ok, fixed, old_status?, new_status?}`
+### 3.1 Migration: `services/supabase/migrations/092_inbox_management.sql`
 
-GRANT EXECUTE TO authenticated, anon.
+Скопировать из worktree as-is. Содержит:
+- `fn_delete_inbox_row(UUID)` — SECURITY DEFINER, запрещает удаление если expense_id NOT NULL
+- `fn_sync_inbox_status(UUID)` — автоисправление статуса если expense_id есть но status != 'processed'
+- GRANT EXECUTE для authenticated, anon
 
-### 3.2 Hook: useReceiptInbox — дополнить
+**Применить:** `supabase db push` или через Dashboard SQL Editor.
 
-**Файл:** `apps/admin-panel/src/hooks/useReceiptInbox.ts`
+### 3.2 Hook: `apps/admin-panel/src/hooks/useReceiptInbox.ts`
 
-Добавить (если ещё нет):
-- `deleteRow(inboxId)` → вызов `fn_delete_inbox_row` RPC
-- `syncStatus(inboxId)` → вызов `fn_sync_inbox_status` RPC
-- Тип `InboxRow` должен включать `parsed_payload: Record<string, unknown> | null`
+**REPLACE** текущий файл версией из worktree. Diff:
 
-Reference: worktree hook полностью покрывает эти требования.
+Текущий main (урезанный):
+```typescript
+// InboxRow: нет parsed_payload, parsed_at, gdrive_paths
+// status enum: нет 'parsed'
+// UseReceiptInboxResult: только rows, isLoading, error, refetch, insert
+```
 
-### 3.3 InboxList: показ parsed data + кнопка удаления
+Worktree (полный):
+```typescript
+// InboxRow: + parsed_payload, parsed_at, gdrive_paths
+// status enum: + 'parsed'
+// UseReceiptInboxResult: + approve, skip, reopen, deleteRow, syncStatus
+```
 
-**Файл:** `apps/admin-panel/src/components/receipts/InboxList.tsx`
+Новые методы:
+- `approve(inboxId, payload)` — вызывает `fn_approve_receipt` RPC, ставит status: 'processed'
+- `skip(inboxId)` — status: 'skipped'
+- `reopen(inboxId)` — status: 'parsed' (назад на ревью)
+- `deleteRow(inboxId)` — вызывает `fn_delete_inbox_row` RPC
+- `syncStatus(inboxId)` — вызывает `fn_sync_inbox_status` RPC
 
-1. **Поставщик:** показывать `parsed_payload.supplier_name` если `supplier_hint` пустой
-2. **Сумма:** показывать `parsed_payload.amount_original` если `amount_hint` пустой
-3. **Кнопка удаления:** иконка Trash2, с confirm dialog. Скрыть если `expense_id` есть (чек уже привязан).
-4. **Статус "parsed":** добавить бейдж (фиолетовый/индиго) "Ревью"
+### 3.3 Component: `apps/admin-panel/src/components/receipts/InboxList.tsx`
 
-### 3.4 Edit Modal: редактирование чека
+**REPLACE** текущий. Новая версия добавляет:
+- `STATUS_BADGE` с 'parsed' (индиго "Ревью")
+- Props: `onApprove`, `onSkip`, `onReopen`, `onDelete`
+- Expand-строки: клик по чеку со статусом parsed/processed/skipped → раскрывает `InboxReviewPanel`
+- Supplier fallback: `parsed_payload.supplier_name || supplier_hint`
+- Amount fallback: `parsed_payload.amount_original || amount_hint`
+- Кнопка Delete (Trash2) с confirm — скрыта если expense_id есть
+- Превью фото (до 3 thumbnail)
 
-**Новый файл:** `apps/admin-panel/src/components/receipts/InboxEditModal.tsx`
+### 3.4 Component: `apps/admin-panel/src/components/receipts/InboxReviewPanel.tsx`
 
-Модальное окно для редактирования полей inbox-записи:
-- `supplier_hint` — text input
-- `amount_hint` — number input
-- `receipt_date` — date picker
-- `notes` — textarea
-- Если `parsed_payload` есть — показать JSON в readonly блоке (collapsible)
-- Сохранение через `supabase.from('receipt_inbox').update({...}).eq('id', inboxId)`
-- Кнопка открытия: иконка Pencil в строке таблицы
+**NEW** — ~500+ строк. Детальная панель ревью чека:
 
-### 3.5 Upload optimization: resize перед отправкой
+**Header section:**
+- Поставщик, дата, сумма, номер чека — editable
+- Flow type badge (COGS/OpEx/CapEx)
+- Invoice number
 
-**Файл:** `apps/admin-panel/src/components/receipts/InboxUploader.tsx`
+**Items section (3 табы):**
+- Food items: name, original_name, qty, unit, unit_price, total_price, barcode, supplier_sku, nomenclature_id
+- CapEx items: name, qty, unit_price, total_price
+- OpEx items: description, qty, unit, unit_price, total_price
+- Каждая строка: inline edit, delete, checkbox
+- Add new item button
+- Auto-recalc: qty × unit_price = total_price
 
-Перед загрузкой в Supabase Storage:
-1. Resize изображение до max 2048px по большей стороне (Canvas API)
-2. Compress в WebP, quality 0.65
-3. Добавить визуальный прогресс (даже простой spinner с текстом "Сжатие..." → "Загрузка...")
+**Footer section:**
+- Calculated total vs receipt total (mismatch warning)
+- Discount amount
+- Checked items counter
 
-Ожидаемый результат: файл ~200-400KB вместо 5-15MB, upload за 5-15 секунд вместо минуты.
+**Actions:**
+- Approve — строит payload и вызывает `onApprove` → `fn_approve_receipt` RPC
+- Skip — `onSkip`
+- Reopen — `onReopen` (только для skipped)
+- Read-only mode для processed чеков
 
-## 4. Приёмка
+**Nomenclature lookup:**
+- При mount загружает nomenclature names для всех nomenclature_id в items
+- Показывает код + название рядом с каждым товаром
 
+### 3.5 Page: `apps/admin-panel/src/pages/ReceiptInbox.tsx`
+
+**UPDATE** — прокинуть новые props:
+
+```typescript
+// ТЕКУЩИЙ (урезанный):
+const { rows, isLoading, error, refetch, insert } = useReceiptInbox()
+<InboxList rows={rows} isLoading={isLoading} error={error} onRefetch={refetch} />
+
+// НУЖНО:
+const { rows, isLoading, error, refetch, insert, approve, skip, reopen, deleteRow } = useReceiptInbox()
+<InboxList
+  rows={rows}
+  isLoading={isLoading}
+  error={error}
+  onRefetch={refetch}
+  onApprove={approve}
+  onSkip={skip}
+  onReopen={reopen}
+  onDelete={deleteRow}
+/>
+```
+
+### 3.6 Cleanup
+
+- Удалить `ReceiptEditModal.tsx` (сирота, заменён InboxReviewPanel)
+- Проверить что `receipt.ts` types не конфликтуют с InboxReviewPanel
+
+---
+
+## 4. Порядок выполнения
+
+```
+1. git checkout -b feature/admin/receipt-review-recovery
+2. Применить миграцию 092 (SQL)
+3. Скопировать useReceiptInbox.ts из worktree → заменить main
+4. Скопировать InboxList.tsx из worktree → заменить main
+5. Скопировать InboxReviewPanel.tsx из worktree → создать
+6. Обновить ReceiptInbox.tsx page (прокинуть props)
+7. Удалить ReceiptEditModal.tsx
+8. npm run build — должен пройти без ошибок
+9. Проверить на localhost: upload → parsed → expand → approve flow
+10. Коммит + PR
+```
+
+---
+
+## 5. Приёмка
+
+- [ ] Чек со статусом "parsed" показывает поставщика и сумму из parsed_payload
+- [ ] Клик по parsed чеку раскрывает InboxReviewPanel с детальной информацией
+- [ ] Строки чека (food/capex/opex) отображаются с баркодами и маппингом
+- [ ] Строки можно редактировать inline (qty, price, name)
+- [ ] Approve через UI вызывает fn_approve_receipt и создаёт expense_ledger запись
+- [ ] Skip ставит status: 'skipped', Reopen возвращает в 'parsed'
+- [ ] Delete удаляет чек (только если нет expense_id)
+- [ ] Build проходит без ошибок
 - [ ] Тестовый чек от 02.04 удаляется через UI
-- [ ] Новый чек загружается быстрее (< 15 сек на хорошем WiFi)
-- [ ] После парсинга агентом — поставщик и сумма отображаются в списке
-- [ ] Чек можно отредактировать (supplier_hint, amount, date, notes)
-- [ ] Build проходит без ошибок (`npm run build`)
 
-## 5. Не в scope
+---
 
-- Approve workflow (InboxReviewPanel) — уже реализован в worktree, но это отдельная задача
-- RLS policies для authenticated-only — пока нет аутентификации
+## 6. Не в scope этой задачи
+
+- Upload optimization (WebP compression) — отдельная задача, уже работает
+- Google Drive дублирование — отдельный трек
+- RLS policies — пока нет аутентификации
 - Realtime subscriptions — в будущем

@@ -48,6 +48,15 @@ The agent MUST:
 
 This preserves focus, saves tokens, and prevents scope creep during active sessions.
 
+## Worktree Discipline (Boris Rule #12)
+
+Code in worktrees is INVISIBLE to main. Before ending a session that used worktrees:
+1. **Commit or cherry-pick** finished work into the target branch.
+2. **If not ready** — create MC task (status: inbox) with worktree path and file list.
+3. **NEVER** leave code only in a worktree without a trail in MC or git log.
+
+Violation of this rule caused loss of the full Receipt Review UI (InboxReviewPanel, ~1000 LOC) on 2026-04-04.
+
 ## Compound Engineering (The Boris Rule)
 
 If you make a mistake and the user corrects you, you MUST update the relevant file in `docs/` to ensure you NEVER make this mistake again.
