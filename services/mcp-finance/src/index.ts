@@ -31,6 +31,7 @@ import { expenseSummary } from "./tools/expense-summary.js";
 import { manageSuppliers } from "./tools/manage-suppliers.js";
 // makro_lookup removed — Lesia verifies barcodes manually when needed
 import { uploadReceipt } from "./tools/upload-receipt.js";
+import { downloadReceipt } from "./tools/download-receipt.js";
 import { checkInbox } from "./tools/check-inbox.js";
 import { createInbox } from "./tools/create-inbox.js";
 import { updateInbox } from "./tools/update-inbox.js";
@@ -246,6 +247,21 @@ server.tool(
   async (args) => jsonResult(await uploadReceipt(args))
 );
 
+// ─── Receipt Download Tool ───────────────────────────────────────
+
+server.tool(
+  "download_receipt",
+  "Download receipt image from Supabase Storage by storage path or public URL. Returns base64-encoded content for agent to read/parse. Use after check_inbox to read receipt photos.",
+  {
+    storage_path: z
+      .string()
+      .describe(
+        "Storage path (e.g. 'receipts/inbox/1775302732437_0_rrdarx.jpg' or 'img/...'). Also accepts full public URL — path will be extracted automatically."
+      ),
+  },
+  async (args) => jsonResult(await downloadReceipt(args))
+);
+
 // ─── Expense Update Tool ────────────────────────────────────────
 
 server.tool(
@@ -364,7 +380,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Finance Agent MCP server running on stdio`);
-  console.error(`   Tools: 17 | Resources: 0 | Prompts: 0`);
+  console.error(`   Tools: 18 | Resources: 0 | Prompts: 0`);
 }
 
 main().catch((err) => {

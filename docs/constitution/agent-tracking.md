@@ -140,3 +140,46 @@ Other agents use it as a side-effect of their main workflow.
 At session end, the agent's session-log.md should reflect all work done.
 Any Tier 1 tasks should already be in Supabase.
 No additional "session summary" task is needed.
+
+---
+
+## Mandatory Checklists (Boris Rules)
+
+### Task Completion Checklist (Boris Rule #13)
+
+When an agent completes a task from Mission Control, the cycle is NOT done until:
+
+```
+code → build → commit → PR → merge → update_task(status="done", notes="...") → report to user
+```
+
+**The MC update step is MANDATORY.** A merged PR with a stale MC task is a tracking failure.
+Task notes MUST include: what was done, PR number, and any follow-up needed.
+
+Violation: task f2d26205 was left in_progress after PR was merged (2026-04-04).
+
+### Spec-Task Binding (Boris Rule #14)
+
+Every spec file in `docs/plans/spec-*.md` MUST be linked to a MC task.
+
+When creating a spec:
+1. Create the MC task FIRST (or find existing one)
+2. Put the task ID in the spec header: `> MC Task: {full-uuid}`
+3. Put the spec path in task's `related_ids.spec_file`
+
+A spec with `MC Task: TBD` is a violation. No TBD — create the task immediately.
+
+Violation: spec-gdrive-receipt-archive.md was created without MC task (2026-04-04).
+
+### MCP Server Identity (Boris Rule #15)
+
+Each MCP server has a specific domain. Use the correct server:
+
+| MCP Server | Domain | Tools |
+|------------|--------|-------|
+| `shishka-mission-control` | Task management, sprints, comments | emit_task, list_tasks, get_task, update_task |
+| `shishka-finance` | Receipts, expenses, suppliers | approve_receipt, check_inbox, etc. |
+| `shishka-chef` | Kitchen, BOM, recipes | (chef-domain tools) |
+
+**NEVER** use chef MCP for MC operations or finance MCP for chef tasks.
+If the correct MCP is not connected — report to user, do not use a wrong one.

@@ -54,8 +54,8 @@
 
 Finance Agent подключает **два** MCP-сервера:
 
-### 1. `shishka-finance` (17 tools) — доменный
-Receipt inbox, expenses, suppliers, nomenclature search, guidelines.
+### 1. `shishka-finance` (18 tools) — доменный
+Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt download.
 
 ### 2. `shishka-mission-control` (4 tools) — общий для всех агентов
 `emit_business_task`, `list_tasks`, `get_task`, `update_task` — работа с Mission Control.
@@ -101,6 +101,7 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines.
 | `manage_suppliers` | Создание/обновление поставщиков |
 | `manage_capex_assets` | Управление капитальными активами (оборудование, амортизация) |
 | `upload_receipt` | Загрузка фото чека в Supabase Storage |
+| `download_receipt` | Скачать фото чека из Storage по storage_path или URL → base64 для парсинга |
 
 ### Mission Control MCP (4 tools — общие)
 | Tool | Когда использовать |
@@ -119,13 +120,18 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines.
 ```
 1. ПОЛУЧЕНИЕ
    ├─ check_inbox(status: "pending", limit: 1)
-   ├─ Если пусто → "Нет чеков в очереди." → СТОП
+   ├─ Если пусто → check_inbox(status: "processing", limit: 1)
+   │   └─ Если есть processing чеки → это зависшие от прошлой неудачной попытки → подхвати их
+   ├─ Если оба пусты → "Нет чеков в очереди." → СТОП
    └─ Запомни inbox_id, photo_urls, подсказки (supplier_hint, amount_hint, receipt_date)
 
 2. БЛОКИРОВКА
    └─ update_inbox(inbox_id, status: "processing")
 
-3. ЧТЕНИЕ ФОТО
+3. СКАЧИВАНИЕ И ЧТЕНИЕ ФОТО
+   ├─ download_receipt(storage_path: photo_urls[0])  ← ОБЯЗАТЕЛЬНО! Скачивает из Storage через API
+   │   ⚠️ НЕ используй WebFetch/curl для Supabase URLs — egress заблокирован
+   │   Инструмент вернёт base64 изображения — ты увидишь чек
    ├─ read_guideline("image-reading-protocol")
    ├─ Определи тип поставщика (см. таблицу ниже)
    └─ read_guideline("{supplier_type}") — makro, market-small, delivery, etc.
