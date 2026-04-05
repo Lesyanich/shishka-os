@@ -23,6 +23,8 @@ export type TaskStatus =
 
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low'
 
+export type ExecutorType = 'human' | 'code' | 'agent'
+
 export interface BusinessTask {
   id: string
   title: string
@@ -30,6 +32,7 @@ export interface BusinessTask {
   domain: TaskDomain
   status: TaskStatus
   priority: TaskPriority
+  executor_type: ExecutorType
   initiative_id: string | null
   parent_task_id: string | null
   source: string | null

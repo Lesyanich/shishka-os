@@ -36,6 +36,8 @@ import {
 } from '../hooks/useBusinessTasks'
 import { KanbanBoard } from '../components/mission-control/KanbanBoard'
 import { TaskDetailPanel } from '../components/mission-control/TaskDetailPanel'
+import { useRole } from '../contexts/RoleContext'
+import type { ExecutorType } from '../hooks/useBusinessTasks'
 
 // ── Domain config ──
 
@@ -79,6 +81,7 @@ const PRIORITY_CONFIG: Record<TaskPriority, { label: string; icon: typeof AlertT
 }
 
 type ViewMode = 'list' | 'kanban'
+type ExecutorFilter = 'all' | 'human' | 'code_agent' | 'my'
 
 // ── Quick Add Form ──
 
@@ -281,9 +284,19 @@ function TaskListItem({
 
 // ── Main Page ──
 
+// Role-based default executor filter
+const ROLE_DEFAULTS: Record<string, { executorFilter: ExecutorFilter; domain: TaskDomain | 'all' }> = {
+  lesia: { executorFilter: 'all', domain: 'all' },
+  bas: { executorFilter: 'my', domain: 'all' },
+  chef: { executorFilter: 'human', domain: 'kitchen' },
+}
+
 export function MissionControl() {
-  const [activeDomain, setActiveDomain] = useState<TaskDomain | 'all'>('all')
+  const { role } = useRole()
+  const defaults = ROLE_DEFAULTS[role] ?? ROLE_DEFAULTS.lesia
+  const [activeDomain, setActiveDomain] = useState<TaskDomain | 'all'>(defaults.domain)
   const [activeStatus, setActiveStatus] = useState<TaskStatus | null>(null)
+  const [executorFilter, setExecutorFilter] = useState<ExecutorFilter>(defaults.executorFilter)
   const [showDone, setShowDone] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
@@ -315,10 +328,13 @@ export function MissionControl() {
     return acc
   }, {})
 
-  // Filter tasks: hide done/cancelled by default, apply active status filter
+  // Filter tasks: hide done/cancelled by default, apply active status + executor filter
   const tasks = allTasks.filter((t) => {
     if (!showDone && (t.status === 'done' || t.status === 'cancelled')) return false
     if (activeStatus && t.status !== activeStatus) return false
+    if (executorFilter === 'human' && t.executor_type !== 'human') return false
+    if (executorFilter === 'code_agent' && t.executor_type !== 'code' && t.executor_type !== 'agent') return false
+    if (executorFilter === 'my' && t.assigned_to !== role) return false
     return true
   })
 
@@ -426,6 +442,29 @@ export function MissionControl() {
             </button>
           )
         })}
+      </div>
+
+      {/* Executor filter */}
+      <div className="flex gap-1.5">
+        {([
+          { id: 'all' as const, label: 'All Tasks' },
+          { id: 'my' as const, label: 'My Tasks' },
+          { id: 'human' as const, label: 'Human' },
+          { id: 'code_agent' as const, label: 'Code / Agent' },
+        ]).map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => setExecutorFilter(id)}
+            className={[
+              'rounded-lg px-3 py-1.5 text-xs font-medium transition',
+              executorFilter === id
+                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+                : 'bg-slate-800/50 text-slate-400 hover:text-slate-200',
+            ].join(' ')}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Status summary bar — clickable filters */}

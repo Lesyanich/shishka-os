@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import * as Sentry from '@sentry/react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { RoleProvider } from './contexts/RoleContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppShell } from './layouts/AppShell'
 import { Loader2 } from 'lucide-react'
@@ -63,6 +64,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <RoleProvider>
         <Sentry.ErrorBoundary fallback={FallbackError}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -98,6 +100,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Sentry.ErrorBoundary>
+        </RoleProvider>
       </AuthProvider>
     </BrowserRouter>
   )

@@ -12,6 +12,9 @@ interface ListTasksArgs {
   status?: string;
   priority?: string;
   created_by?: string;
+  sprint_id?: string;
+  executor_type?: string;
+  assigned_to?: string;
   limit?: number;
   include_done?: boolean;
 }
@@ -22,7 +25,7 @@ export async function listTasks(args: ListTasksArgs) {
   let query = sb
     .from("business_tasks")
     .select(
-      "id, title, description, domain, status, priority, source, created_by, due_date, tags, related_ids, created_at, updated_at"
+      "id, title, description, domain, status, priority, source, created_by, assigned_to, executor_type, due_date, tags, related_ids, created_at, updated_at"
     )
     .order("created_at", { ascending: false })
     .limit(args.limit ?? 20);
@@ -31,6 +34,9 @@ export async function listTasks(args: ListTasksArgs) {
   if (args.status) query = query.eq("status", args.status);
   if (args.priority) query = query.eq("priority", args.priority);
   if (args.created_by) query = query.eq("created_by", args.created_by);
+  if (args.sprint_id) query = query.eq("sprint_id", args.sprint_id);
+  if (args.executor_type) query = query.eq("executor_type", args.executor_type);
+  if (args.assigned_to) query = query.eq("assigned_to", args.assigned_to);
 
   if (!args.include_done) {
     query = query.not("status", "in", '("done","cancelled")');
@@ -54,7 +60,9 @@ export async function listTasks(args: ListTasksArgs) {
       domain: t.domain,
       status: t.status,
       priority: t.priority,
+      executor_type: t.executor_type,
       created_by: t.created_by,
+      assigned_to: t.assigned_to,
       due_date: t.due_date,
       tags: t.tags,
       spec_file: (t.related_ids as Record<string, any>)?.spec_file ?? null,

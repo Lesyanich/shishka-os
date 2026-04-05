@@ -14,6 +14,7 @@ interface EmitBusinessTaskArgs {
   parent_task_id?: string;
   due_date?: string;
   notes?: string;
+  executor_type?: string;
 }
 
 export async function emitBusinessTask(args: EmitBusinessTaskArgs) {
@@ -82,6 +83,7 @@ export async function emitBusinessTask(args: EmitBusinessTaskArgs) {
     parent_task_id: args.parent_task_id ?? null,
     due_date:       args.due_date ?? null,
     notes:          args.notes ?? null,
+    executor_type:  args.executor_type ?? "human",
   };
 
   const { data, error } = await sb
