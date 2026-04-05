@@ -26,10 +26,23 @@ export function TaskExecutionCard({ task, onStart, onCompleteBatches }: TaskExec
   const [elapsedSec, setElapsedSec] = useState(0)
   const [isActioning, setIsActioning] = useState(false)
   const [showCompleteModal, setShowCompleteModal] = useState(false)
-  const [containers, setContainers] = useState<string[]>([''])
+  const [containers, setContainers] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(`batch-weights-${task.id}`)
+      return saved ? JSON.parse(saved) : ['']
+    } catch { return [''] }
+  })
   const [showBOM, setShowBOM] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [batchResult, setBatchResult] = useState<BatchCreationResult | null>(null)
+
+  // Persist container weights to sessionStorage
+  useEffect(() => {
+    const hasData = containers.some((c) => c !== '')
+    if (hasData) {
+      sessionStorage.setItem(`batch-weights-${task.id}`, JSON.stringify(containers))
+    }
+  }, [containers, task.id])
 
   // Timer for in_progress tasks
   useEffect(() => {
@@ -97,8 +110,13 @@ export function TaskExecutionCard({ task, onStart, onCompleteBatches }: TaskExec
 
   const closeModal = () => {
     setShowCompleteModal(false)
+    if (batchResult) {
+      // Success — clear persisted weights
+      sessionStorage.removeItem(`batch-weights-${task.id}`)
+      setContainers([''])
+    }
+    // On cancel without success — keep weights in sessionStorage for next open
     setBatchResult(null)
-    setContainers([''])
     setActionError(null)
   }
 

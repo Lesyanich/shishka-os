@@ -39,6 +39,7 @@ export function CreateOrderModal({ open, onClose, onCreate }: CreateOrderModalPr
   const [schedulePreview, setSchedulePreview] = useState<ScheduledStep[] | null>(null)
   const [isCalculating, setIsCalculating] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const { fetchSteps } = useRecipeSteps()
 
@@ -133,6 +134,7 @@ export function CreateOrderModal({ open, onClose, onCreate }: CreateOrderModalPr
     setNotes('')
     setSchedulePreview(null)
     setIsCreating(false)
+    setShowConfirm(false)
     onClose()
   }, [selectedId, targetQty, targetUnit, deadlineDate, deadlineTime, priority, notes, schedulePreview, onCreate, onClose])
 
@@ -310,15 +312,52 @@ export function CreateOrderModal({ open, onClose, onCreate }: CreateOrderModalPr
           </button>
           <button
             type="button"
-            onClick={handleCreate}
+            onClick={() => setShowConfirm(true)}
             disabled={!selectedId || !deadlineDate || isCreating}
             className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-500 transition-colors disabled:opacity-40"
           >
-            {isCreating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Create Order
           </button>
         </div>
       </div>
+
+      {/* Confirmation dialog */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-xs rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+            <h3 className="mb-2 text-sm font-semibold text-slate-100">Confirm Order</h3>
+            <p className="mb-1 text-xs text-slate-400">
+              Create production order for:
+            </p>
+            <p className="mb-3 text-sm text-slate-200">
+              {items.find((i) => i.id === selectedId)?.name ?? 'Product'} — {targetQty} {targetUnit}
+            </p>
+            <p className="mb-4 text-xs text-slate-500">
+              Deadline: {deadlineDate} {deadlineTime}
+              {schedulePreview && schedulePreview.length > 0 && (
+                <> · {schedulePreview.length} step{schedulePreview.length > 1 ? 's' : ''}</>
+              )}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 rounded-lg border border-slate-700 py-2 text-xs text-slate-300 hover:bg-slate-800 transition"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={isCreating}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-xs font-medium text-white hover:bg-emerald-500 transition disabled:opacity-50"
+              >
+                {isCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
