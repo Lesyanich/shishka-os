@@ -3,6 +3,7 @@ import { useGanttTasks } from '../hooks/useGanttTasks'
 import { useEquipmentCategories } from '../hooks/useEquipmentCategories'
 import { GanttTimeline } from '../components/kds/GanttTimeline'
 import { EquipmentFilter } from '../components/kds/EquipmentFilter'
+import { KitchenNav } from '../components/KitchenNav'
 
 export function KDSBoard() {
   const { tasks, conflicts, isLoading: tasksLoading, error: tasksError, refetch } = useGanttTasks()
@@ -22,6 +23,7 @@ export function KDSBoard() {
 
   return (
     <div className="space-y-4">
+      <KitchenNav />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

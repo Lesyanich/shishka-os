@@ -13,9 +13,8 @@ function useIsMobile(breakpoint = 640) {
   return isMobile
 }
 
-const HOUR_START = 6
-const HOUR_END = 23
-const TOTAL_HOURS = HOUR_END - HOUR_START // 17 hours
+const DEFAULT_HOUR_START = 6
+const DEFAULT_HOUR_END = 23
 
 function timeToMinutes(timeStr: string): number {
   const [h, m] = timeStr.split(':').map(Number)
@@ -67,6 +66,17 @@ export function EquipmentTimeline({ slots }: EquipmentTimelineProps) {
       }
     }
   }
+
+  // Adaptive time window: expand beyond defaults if slots fall outside 6am-11pm
+  let HOUR_START = DEFAULT_HOUR_START
+  let HOUR_END = DEFAULT_HOUR_END
+  for (const slot of slots) {
+    const sH = Math.floor(timeToMinutes(slot.start_time) / 60)
+    const eH = Math.ceil(timeToMinutes(slot.end_time) / 60)
+    if (sH < HOUR_START) HOUR_START = sH
+    if (eH > HOUR_END) HOUR_END = eH
+  }
+  const TOTAL_HOURS = HOUR_END - HOUR_START
 
   const startMin = HOUR_START * 60
   const totalMin = TOTAL_HOURS * 60

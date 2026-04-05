@@ -3,7 +3,7 @@ import type { GanttTask, GanttConflict } from '../../hooks/useGanttTasks'
 import type { EquipmentItem } from '../../hooks/useEquipmentCategories'
 import { TimeHeader } from './TimeHeader'
 import { GanttRow } from './GanttRow'
-import { AlertTriangle, Clock, Wrench } from 'lucide-react'
+import { AlertTriangle, Clock, Wrench, ChevronDown, ChevronUp } from 'lucide-react'
 
 function useIsMobile(breakpoint = 640) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint)
@@ -31,6 +31,9 @@ export function GanttTimeline({
   isLoading,
   error,
 }: GanttTimelineProps) {
+  const isMobile = useIsMobile()
+  const [showConflictDetails, setShowConflictDetails] = useState(false)
+
   // Day start = today 00:00 local
   const now = new Date()
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -50,6 +53,12 @@ export function GanttTimeline({
   )
   const displayEquipment = activeEquipment.length > 0 ? activeEquipment : equipment.slice(0, 5)
 
+  // Build task name lookup for conflict details
+  const taskNameMap = new Map<string, string>()
+  for (const t of tasks) {
+    taskNameMap.set(t.id, t.nomenclature_name ?? t.operation_name ?? t.id.slice(0, 8))
+  }
+
   if (error) {
     return (
       <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-6 text-center text-sm text-rose-300">
@@ -68,15 +77,38 @@ export function GanttTimeline({
     )
   }
 
-  const isMobile = useIsMobile()
-
-  // Conflict banner (shared between views)
+  // Conflict banner with expandable details
   const conflictBanner = conflicts.length > 0 && (
-    <div className="flex items-center gap-2 border-b border-rose-500/30 bg-rose-500/10 px-4 py-2">
-      <AlertTriangle className="h-4 w-4 text-rose-400" />
-      <span className="text-xs font-medium text-rose-300">
-        {conflicts.length} scheduling conflict{conflicts.length > 1 ? 's' : ''} detected
-      </span>
+    <div className="border-b border-rose-500/30 bg-rose-500/10">
+      <button
+        type="button"
+        onClick={() => setShowConflictDetails(!showConflictDetails)}
+        className="flex w-full items-center gap-2 px-4 py-2"
+      >
+        <AlertTriangle className="h-4 w-4 text-rose-400" />
+        <span className="flex-1 text-left text-xs font-medium text-rose-300">
+          {conflicts.length} scheduling conflict{conflicts.length > 1 ? 's' : ''} detected
+        </span>
+        {showConflictDetails
+          ? <ChevronUp className="h-3.5 w-3.5 text-rose-400" />
+          : <ChevronDown className="h-3.5 w-3.5 text-rose-400" />}
+      </button>
+      {showConflictDetails && (
+        <div className="space-y-1 px-4 pb-2">
+          {conflicts.map((c, i) => {
+            const eqName = equipment.find((e) => e.id === c.equipment_id)?.name ?? 'Unknown'
+            return (
+              <div key={i} className="flex items-center gap-2 rounded bg-rose-500/5 px-2 py-1.5 text-[11px]">
+                <Wrench className="h-3 w-3 shrink-0 text-rose-400" />
+                <span className="text-rose-200">{eqName}:</span>
+                <span className="text-slate-300 truncate">
+                  {taskNameMap.get(c.taskA) ?? '?'} / {taskNameMap.get(c.taskB) ?? '?'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 
