@@ -24,6 +24,15 @@
 
 Если найдена `in_progress` задача — **продолжить её**, а не начинать новую.
 
+### Business Knowledge (Bible)
+При задачах, требующих бизнес-контекста (финансовый анализ, бюджетирование, отчёты для CEO):
+1. Прочитай `docs/bible/INDEX.md` → определи какие файлы нужны.
+2. Загрузи релевантные файлы. Типичный набор для Finance:
+   - `docs/bible/targets.md` — FC ≤30%, KPI, revenue model
+   - `docs/bible/locations.md` — аренда, фазы развития, cost structure
+   - `docs/bible/operations.md` — staffing, daily ops model
+3. **НЕ редактируй файлы библии напрямую.** Если обнаружил финансовую аномалию или insight → создай Tier 1 задачу или `field_note`.
+
 ---
 
 ## Autonomy Model

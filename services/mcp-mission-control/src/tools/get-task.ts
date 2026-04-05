@@ -33,9 +33,18 @@ export async function getTask(args: { task_id: string }) {
     parent_task = parent;
   }
 
+  // Fetch recent comments
+  const { data: comments } = await sb
+    .from("task_comments")
+    .select("*")
+    .eq("task_id", args.task_id)
+    .order("created_at", { ascending: true })
+    .limit(10);
+
   return {
     task: data,
     initiative,
     parent_task,
+    comments: comments ?? [],
   };
 }

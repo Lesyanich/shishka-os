@@ -57,6 +57,13 @@ Code in worktrees is INVISIBLE to main. Before ending a session that used worktr
 
 Violation of this rule caused loss of the full Receipt Review UI (InboxReviewPanel, ~1000 LOC) on 2026-04-04.
 
+## Migration Tracking (Boris Rule #16)
+
+Every migration file MUST end with a self-register INSERT into `migration_log`.
+Before applying a migration manually, run `check_migrations()` to see the pending list.
+After applying, verify the migration registered itself: `check_migrations()` should show it as 'applied'.
+If migration crashed mid-way — INSERT manually with `status='failed'` and `error_msg`.
+
 ## Compound Engineering (The Boris Rule)
 
 If you make a mistake and the user corrects you, you MUST update the relevant file in `docs/` to ensure you NEVER make this mistake again.

@@ -36,6 +36,7 @@ pnpm-debug.log*
 credentials.json
 gcp-oauth.keys.json
 token.json
+.mcp.json
 
 # Media & Docs (heavy files excluded from code repo)
 *.jpg

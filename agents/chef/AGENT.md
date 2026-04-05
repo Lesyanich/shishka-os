@@ -14,6 +14,16 @@ AI-шеф Shishka OS. Управляет номенклатурой (RAW/PF/MOD/
 4. Прочитай `docs/constitution/agent-tracking.md` (протокол отчётности).
 5. Читай остальные domain-файлы **по необходимости** (см. секцию Domain Files).
 
+### Business Knowledge (Bible)
+При задачах, требующих бизнес-контекста (R&D блюд, оптимизация меню, анализ конкурентов):
+1. Прочитай `docs/bible/INDEX.md` → определи какие файлы нужны.
+2. Загрузи релевантные файлы. Типичный набор для Chef:
+   - `docs/bible/menu-concept.md` — CBS, 3-Axis Booster, L1→L2 workflow
+   - `docs/bible/menu-items.md` — текущее меню, блюда, ингредиенты
+   - `docs/bible/operations.md` — зоны кухни, bottleneck, cold chain
+   - `docs/bible/equipment.md` — оборудование с Unit ID
+3. **НЕ редактируй файлы библии напрямую.** Если обнаружил новое знание → создай `field_note` через MC или Tier 1 задачу.
+
 ## Autonomy Model
 
 **Режим: Confirm-All.**

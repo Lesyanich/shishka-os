@@ -1,9 +1,10 @@
 # Global Deployment State
 
-**Last updated:** 2026-04-04
+**Last updated:** 2026-04-05 (Grand Triage)
 **Database:** Supabase PostgreSQL 17.6 (ap-south-1, project: qcqgtcsjoacuktcewpvo)
 **Latest migration:** 091 (business_tasks — applied 2026-04-03)
 **Active branch:** `feature/phase-6-mapping-engine`
+**Strategic focus:** PATH TO OPENING — все приоритеты пересмотрены 2026-04-05
 
 ## Active Projects
 
@@ -36,6 +37,39 @@
 - **Domain contexts**: `docs/business/domains/` (7 domains)
 - **UI**: `apps/admin-panel` MissionControl page — **NEXT** (spec: `docs/plans/mission-control-ui-spec.md`)
 
+## Knowledge System (Bible)
+
+- **Bible files**: `docs/bible/` — 9 thematic files + INDEX.md router (created 2026-04-05)
+- **Protocol**: `docs/constitution/bible-protocol.md` — who reads, who writes, input flows
+- **CLAUDE.md**: Updated with LK level (Knowledge Base routing table)
+- **Agent integration**: Chef + Finance AGENT.md updated with bible loading instructions
+- **field_notes table**: PLANNED (MC task: `11fd307b`, spec: `docs/plans/spec-field-notes.md`)
+- **Knowledge Hub UI**: PLANNED — 5 phases (MC tasks: `b2c93d14`→`5997ec22`, spec: `docs/plans/spec-knowledge-hub.md`)
+  - Phase 1: bible_pages + field_notes DB tables (high)
+  - Phase 2: Read-only Wiki UI (high)
+  - Phase 3: Inline editor + version history (medium)
+  - Phase 4: Field Notes UI + full-text search (medium)
+  - Phase 5: MCP tools + agent integration (medium)
+- **Source**: Migrated from Notion SHISHKA CORE HUB (14-page PDF)
+
+## Execution Priority (Grand Triage 2026-04-05)
+
+Критерий: **"Приближает ли к открытию?"**
+
+| Tier | Priority | Task | MC ID | Status |
+|------|----------|------|-------|--------|
+| 1 | CRITICAL | Chef Agent: BOM data entry | `fa01b2d4` | in_progress |
+| 1 | CRITICAL | Receipt Inbox Management UI | `68af7dc1` | backlog → ready |
+| 1 | CRITICAL | UX Audit: Kitchen Pages | `26a8ec5b` | backlog → ready |
+| 2 | HIGH | Kitchen Production System | `9563ea4e` | backlog |
+| 2 | HIGH | HR & Payroll System | `4c029fc0` | backlog |
+| 3 | MEDIUM | MC UI Filters | `7b52314e` | backlog |
+| 3 | MEDIUM | POS Barcode | `a4c76318` | blocked (hardware) |
+| 3 | MEDIUM | Barcode Printer | `04a67a19` | blocked (hardware) |
+| 4 | LOW | 16 tasks (Knowledge Hub, MC Agile, etc.) | — | after opening |
+
+Full queue: `docs/plans/QUEUE.md`
+
 ## Cross-Project Blockers
 
 None.
@@ -46,3 +80,4 @@ None.
 - Full DB Schema: `vault/Architecture/Database Schema.md`
 - Keys & Secrets: `docs/keys-config.md`
 - Constitution: `docs/constitution/`
+- **Knowledge Base (Bible)**: `docs/bible/INDEX.md` → 9 files

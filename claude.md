@@ -43,6 +43,24 @@ If ambiguous — ASK: "Which project? admin, web, or app?"
 | BOM / Nomenclature | `docs/modules/bom.md` |
 | Procurement | `docs/modules/procurement.md` |
 
+## LK: Knowledge Base / Bible (load for business-context tasks)
+
+> **Routing manifest**: `docs/bible/INDEX.md` — load this first, then only the files relevant to your domain/task.
+
+| Topic | File | Domains |
+|-------|------|---------|
+| Brand & Identity | `docs/bible/identity.md` | all |
+| Menu Concept & CBS | `docs/bible/menu-concept.md` | kitchen, marketing |
+| Menu Items (dishes) | `docs/bible/menu-items.md` | kitchen, procurement, sales |
+| Operations (L1→L2) | `docs/bible/operations.md` | kitchen, ops |
+| Locations & Phases | `docs/bible/locations.md` | ops, strategy, finance |
+| Equipment Registry | `docs/bible/equipment.md` | kitchen, ops, procurement |
+| Benchmarks | `docs/bible/benchmarks.md` | strategy, marketing |
+| Financial Targets | `docs/bible/targets.md` | finance, strategy |
+| External Sources | `docs/bible/sources.md` | all |
+
+**Protocol**: Agents read INDEX.md → load only their files → if they discover new knowledge, create `field_note` in Supabase (NOT edit bible directly). Only CEO-approved content lands in bible files.
+
 ## Shared Domain (cross-project business logic)
 
 | Domain | File |
