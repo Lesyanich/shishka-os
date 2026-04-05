@@ -24,6 +24,13 @@ import {
   Settings,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useRole, type AppRole } from '../contexts/RoleContext'
+
+const ROLE_LABELS: Record<AppRole, string> = {
+  lesia: 'Lesia',
+  bas: 'Bas',
+  chef: 'Chef',
+}
 
 interface NavItem {
   path: string
@@ -57,6 +64,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function AppShell() {
   const { user, signOut } = useAuth()
+  const { role, setRole } = useRole()
 
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'short',
@@ -129,6 +137,15 @@ export function AppShell() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-xs text-slate-500">{today}</span>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as AppRole)}
+              className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-emerald-500/50 focus:outline-none"
+            >
+              {(Object.keys(ROLE_LABELS) as AppRole[]).map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              ))}
+            </select>
             {user && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">{user.email}</span>

@@ -345,6 +345,14 @@ export function TaskDetailPanel({ task, onClose, onUpdate }: TaskDetailPanelProp
                 Created by: <span className="text-slate-400">{task.created_by}</span>
               </div>
             )}
+            {task.executor_type && (
+              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                Executor: <span className={
+                  task.executor_type === 'human' ? 'text-emerald-400' :
+                  task.executor_type === 'code' ? 'text-blue-400' : 'text-violet-400'
+                }>{task.executor_type}</span>
+              </div>
+            )}
             <div className="flex items-center gap-2 text-[11px] text-slate-600 font-mono">
               ID: {task.id.slice(0, 8)}...
             </div>

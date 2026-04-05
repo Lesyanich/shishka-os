@@ -17,6 +17,13 @@ import { emitBusinessTask } from "./tools/emit-business-task.js";
 import { listTasks } from "./tools/list-tasks.js";
 import { getTask } from "./tools/get-task.js";
 import { updateTask } from "./tools/update-task.js";
+import { createSprint } from "./tools/create-sprint.js";
+import { listSprints } from "./tools/list-sprints.js";
+import { updateSprint } from "./tools/update-sprint.js";
+import { assignToSprint } from "./tools/assign-to-sprint.js";
+import { addComment } from "./tools/add-comment.js";
+import { listComments } from "./tools/list-comments.js";
+import { checkMigrations } from "./tools/check-migrations.js";
 
 // ─── Server Setup ────────────────────────────────────────────────
 
@@ -82,6 +89,9 @@ server.tool(
     notes: z.string().max(500).optional().describe(
       "Free-text notes for human triagers. Agents rarely need this — use description instead."
     ),
+    executor_type: z.enum(["human", "code", "agent"]).default("human").describe(
+      "Who executes: 'human' (person), 'code' (Claude Code), 'agent' (autonomous agent)."
+    ),
   },
   async (args) => jsonResult(await emitBusinessTask({
     ...args,
@@ -103,6 +113,10 @@ server.tool(
     priority: z.enum(["critical", "high", "medium", "low"]).optional()
       .describe("Filter by priority"),
     created_by: z.string().optional().describe("Filter by creator (e.g. 'chef-agent')"),
+    executor_type: z.enum(["human", "code", "agent"]).optional()
+      .describe("Filter by executor type"),
+    assigned_to: z.string().optional().describe("Filter by assignee (e.g. 'lesia', 'bas')"),
+    sprint_id: z.string().uuid().optional().describe("Filter by sprint UUID"),
     limit: z.number().min(1).max(50).default(20).describe("Max results"),
     include_done: z.boolean().default(false)
       .describe("Include done/cancelled tasks (excluded by default)"),
@@ -141,13 +155,95 @@ server.tool(
   async (args) => jsonResult(await updateTask(args))
 );
 
+// ─── Sprint Tools ───────────────────────────────────────────────
+
+server.tool(
+  "create_sprint",
+  "Create a new sprint in Mission Control.",
+  {
+    name: z.string().min(3).max(100).describe("Sprint name, e.g. 'Sprint 2026-W15'"),
+    goal: z.string().max(500).optional().describe("Sprint goal"),
+    start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("Start date (YYYY-MM-DD)"),
+    end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("End date (YYYY-MM-DD)"),
+  },
+  async (args) => jsonResult(await createSprint(args))
+);
+
+server.tool(
+  "list_sprints",
+  "List sprints with optional status filter and task counts.",
+  {
+    status: z.enum(["planning", "active", "review", "closed"]).optional()
+      .describe("Filter by sprint status"),
+    limit: z.number().min(1).max(50).default(10).describe("Max results"),
+  },
+  async (args) => jsonResult(await listSprints(args))
+);
+
+server.tool(
+  "update_sprint",
+  "Update a sprint's status, name, goal, or end date.",
+  {
+    sprint_id: z.string().uuid().describe("UUID of the sprint"),
+    status: z.enum(["planning", "active", "review", "closed"]).optional()
+      .describe("New status. Only one sprint can be 'active' at a time."),
+    name: z.string().min(3).max(100).optional().describe("New name"),
+    goal: z.string().max(500).optional().describe("New goal"),
+    end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+      .describe("New end date (YYYY-MM-DD)"),
+  },
+  async (args) => jsonResult(await updateSprint(args))
+);
+
+server.tool(
+  "assign_to_sprint",
+  "Assign a task to a sprint, or unassign by passing empty sprint_id.",
+  {
+    task_id: z.string().uuid().describe("UUID of the task"),
+    sprint_id: z.string().describe("Sprint UUID. Pass empty string or 'null' to unassign."),
+  },
+  async (args) => jsonResult(await assignToSprint(args))
+);
+
+// ─── Comment Tools ──────────────────────────────────────────────
+
+server.tool(
+  "add_comment",
+  "Add a comment to a business task. Use for status updates, decisions, blockers.",
+  {
+    task_id: z.string().uuid().describe("UUID of the task"),
+    author: z.string().describe("Who is commenting: 'coo', 'finance-agent', 'chef-agent', 'lesia'"),
+    body: z.string().min(1).max(2000).describe("Comment text"),
+  },
+  async (args) => jsonResult(await addComment(args))
+);
+
+server.tool(
+  "list_comments",
+  "List comments for a business task, ordered chronologically.",
+  {
+    task_id: z.string().uuid().describe("UUID of the task"),
+    limit: z.number().min(1).max(100).default(20).describe("Max results"),
+  },
+  async (args) => jsonResult(await listComments(args))
+);
+
+// ─── Infrastructure Tools ──────────────────────────────────────────
+
+server.tool(
+  "check_migrations",
+  "Compare migration files on disk vs migration_log in DB. Returns: applied, pending, failed, checksum mismatches.",
+  {},
+  async () => jsonResult(await checkMigrations())
+);
+
 // ─── Start ───────────────────────────────────────────────────────
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Mission Control MCP server running on stdio`);
-  console.error(`   Tools: 4 (emit_business_task, list_tasks, get_task, update_task)`);
+  console.error(`   Tools: 11 (emit_business_task, list_tasks, get_task, update_task, create_sprint, list_sprints, update_sprint, assign_to_sprint, add_comment, list_comments, check_migrations)`);
 }
 
 main().catch((err) => {
