@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Rocket,
   Plus,
@@ -25,6 +25,8 @@ import {
   User,
   List,
   Columns3,
+  Search,
+  ArrowUpDown,
 } from 'lucide-react'
 import {
   useBusinessTasks,
@@ -82,6 +84,10 @@ const PRIORITY_CONFIG: Record<TaskPriority, { label: string; icon: typeof AlertT
 
 type ViewMode = 'list' | 'kanban'
 type ExecutorFilter = 'all' | 'human' | 'code_agent' | 'my'
+type SortField = 'priority' | 'created' | 'updated'
+type PriorityFilter = TaskPriority | 'all'
+
+const PRIORITY_ORDER: Record<TaskPriority, number> = { critical: 0, high: 1, medium: 2, low: 3 }
 
 // ── Quick Add Form ──
 
@@ -297,6 +303,9 @@ export function MissionControl() {
   const [activeDomain, setActiveDomain] = useState<TaskDomain | 'all'>(defaults.domain)
   const [activeStatus, setActiveStatus] = useState<TaskStatus | null>(null)
   const [executorFilter, setExecutorFilter] = useState<ExecutorFilter>(defaults.executorFilter)
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortField, setSortField] = useState<SortField>('priority')
   const [showDone, setShowDone] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
@@ -328,15 +337,31 @@ export function MissionControl() {
     return acc
   }, {})
 
-  // Filter tasks: hide done/cancelled by default, apply active status + executor filter
-  const tasks = allTasks.filter((t) => {
-    if (!showDone && (t.status === 'done' || t.status === 'cancelled')) return false
-    if (activeStatus && t.status !== activeStatus) return false
-    if (executorFilter === 'human' && t.executor_type !== 'human') return false
-    if (executorFilter === 'code_agent' && t.executor_type !== 'code' && t.executor_type !== 'agent') return false
-    if (executorFilter === 'my' && t.assigned_to !== role) return false
-    return true
-  })
+  // Filter tasks: hide done/cancelled by default, apply all filters + sort
+  const searchLower = searchQuery.toLowerCase()
+  const tasks = useMemo(() => {
+    const filtered = allTasks.filter((t) => {
+      if (!showDone && (t.status === 'done' || t.status === 'cancelled')) return false
+      if (activeStatus && t.status !== activeStatus) return false
+      if (executorFilter === 'human' && t.executor_type !== 'human') return false
+      if (executorFilter === 'code_agent' && t.executor_type !== 'code' && t.executor_type !== 'agent') return false
+      if (executorFilter === 'my' && t.assigned_to !== role) return false
+      if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false
+      if (searchLower) {
+        const inTitle = t.title.toLowerCase().includes(searchLower)
+        const inDesc = t.description?.toLowerCase().includes(searchLower)
+        const inTags = t.tags?.some((tag) => tag.toLowerCase().includes(searchLower))
+        if (!inTitle && !inDesc && !inTags) return false
+      }
+      return true
+    })
+    filtered.sort((a, b) => {
+      if (sortField === 'priority') return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
+      if (sortField === 'created') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    })
+    return filtered
+  }, [allTasks, showDone, activeStatus, executorFilter, priorityFilter, searchLower, sortField, role])
 
   const handleStatusToggle = (status: TaskStatus) => {
     if (status === 'done' || status === 'cancelled') {
@@ -444,27 +469,87 @@ export function MissionControl() {
         })}
       </div>
 
-      {/* Executor filter */}
-      <div className="flex gap-1.5">
-        {([
-          { id: 'all' as const, label: 'All Tasks' },
-          { id: 'my' as const, label: 'My Tasks' },
-          { id: 'human' as const, label: 'Human' },
-          { id: 'code_agent' as const, label: 'Code / Agent' },
-        ]).map(({ id, label }) => (
-          <button
-            key={id}
-            onClick={() => setExecutorFilter(id)}
-            className={[
-              'rounded-lg px-3 py-1.5 text-xs font-medium transition',
-              executorFilter === id
-                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
-                : 'bg-slate-800/50 text-slate-400 hover:text-slate-200',
-            ].join(' ')}
+      {/* Search + Sort row */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tasks by title, description, or tag..."
+            className="w-full rounded-lg border border-slate-800 bg-slate-900/60 pl-9 pr-8 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2">
+          <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" />
+          <select
+            value={sortField}
+            onChange={(e) => setSortField(e.target.value as SortField)}
+            className="bg-transparent py-2 pr-1 text-xs text-slate-300 focus:outline-none"
           >
-            {label}
-          </button>
-        ))}
+            <option value="priority">Priority</option>
+            <option value="updated">Last updated</option>
+            <option value="created">Newest first</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Executor + Priority filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1.5">
+          {([
+            { id: 'all' as const, label: 'All Tasks' },
+            { id: 'my' as const, label: 'My Tasks' },
+            { id: 'human' as const, label: 'Human' },
+            { id: 'code_agent' as const, label: 'Code / Agent' },
+          ]).map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setExecutorFilter(id)}
+              className={[
+                'rounded-lg px-3 py-1.5 text-xs font-medium transition',
+                executorFilter === id
+                  ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+                  : 'bg-slate-800/50 text-slate-400 hover:text-slate-200',
+              ].join(' ')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="h-4 w-px bg-slate-800" />
+
+        <div className="flex gap-1.5">
+          {([
+            { id: 'all' as PriorityFilter, label: 'Any priority' },
+            { id: 'critical' as PriorityFilter, label: 'Critical', color: 'text-red-400' },
+            { id: 'high' as PriorityFilter, label: 'High', color: 'text-orange-400' },
+            { id: 'medium' as PriorityFilter, label: 'Medium', color: 'text-blue-400' },
+            { id: 'low' as PriorityFilter, label: 'Low', color: 'text-gray-400' },
+          ]).map(({ id, label, color }) => (
+            <button
+              key={id}
+              onClick={() => setPriorityFilter(id)}
+              className={[
+                'rounded-lg px-2.5 py-1.5 text-xs font-medium transition',
+                priorityFilter === id
+                  ? `bg-slate-800 ${color ?? 'text-emerald-300'} ring-1 ring-slate-700`
+                  : 'text-slate-500 hover:text-slate-300',
+              ].join(' ')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Status summary bar — clickable filters */}
