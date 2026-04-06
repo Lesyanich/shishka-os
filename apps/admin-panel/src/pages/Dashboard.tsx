@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { LayoutDashboard, RefreshCw, ChefHat, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { LayoutDashboard, RefreshCw, ChefHat, Clock, AlertTriangle, CheckCircle2, MessageCircle, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { KitchenNav } from '../components/KitchenNav'
 
@@ -23,10 +23,20 @@ interface Alert {
   taskId?: string
 }
 
+interface FeedbackItem {
+  id: string
+  staff_name: string | null
+  type: string
+  raw_text: string
+  is_processed: boolean
+  created_at: string
+}
+
 export function Dashboard() {
   const [summary, setSummary] = useState<TaskSummary>({ total: 0, pending: 0, in_progress: 0, completed: 0 })
   const [staff, setStaff] = useState<StaffOnDuty[]>([])
   const [alerts, setAlerts] = useState<Alert[]>([])
+  const [feedback, setFeedback] = useState<FeedbackItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -101,6 +111,23 @@ export function Dashboard() {
         }
       }
       setStaff(Array.from(staffMap.values()))
+
+      // Fetch recent feedback (last 10, unprocessed first)
+      const { data: fbData } = await supabase
+        .from('cook_feedback')
+        .select('id, staff_id, type, raw_text, is_processed, created_at, staff:staff_id(name)')
+        .order('is_processed', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      setFeedback((fbData ?? []).map((f: Record<string, unknown>) => ({
+        id: f.id as string,
+        staff_name: (f.staff as { name: string } | null)?.name ?? null,
+        type: f.type as string,
+        raw_text: f.raw_text as string,
+        is_processed: f.is_processed as boolean,
+        created_at: f.created_at as string,
+      })))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard')
     } finally {
@@ -251,6 +278,60 @@ export function Dashboard() {
                 </div>
               )}
             </div>
+
+            {/* Cook Feedback */}
+            {feedback.length > 0 && (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
+                <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <MessageCircle className="h-3.5 w-3.5" /> Cook Feedback ({feedback.filter(f => !f.is_processed).length} new)
+                </h2>
+                <div className="space-y-2">
+                  {feedback.map(f => (
+                    <div
+                      key={f.id}
+                      className={`flex items-start gap-3 rounded-xl p-3 ${
+                        f.is_processed ? 'bg-slate-800/30' : 'bg-slate-800/60 border border-slate-700'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            f.type === 'problem' ? 'bg-rose-500/20 text-rose-300'
+                            : f.type === 'suggestion' ? 'bg-emerald-500/20 text-emerald-300'
+                            : f.type === 'question' ? 'bg-sky-500/20 text-sky-300'
+                            : 'bg-slate-500/20 text-slate-400'
+                          }`}>
+                            {f.type}
+                          </span>
+                          {f.staff_name && (
+                            <span className="text-[10px] text-slate-500">{f.staff_name}</span>
+                          )}
+                          <span className="text-[10px] text-slate-600">
+                            {new Date(f.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className={`text-xs ${f.is_processed ? 'text-slate-500' : 'text-slate-200'}`}>
+                          {f.raw_text}
+                        </p>
+                      </div>
+                      {!f.is_processed && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await supabase.from('cook_feedback').update({ is_processed: true, processed_by: 'manager' }).eq('id', f.id)
+                            setFeedback(prev => prev.map(x => x.id === f.id ? { ...x, is_processed: true } : x))
+                          }}
+                          className="shrink-0 rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-700 hover:text-emerald-400"
+                          title="Mark as processed"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Quick links */}
             <div className="grid grid-cols-2 gap-3">

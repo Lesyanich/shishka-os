@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useRecipeSteps, type RecipeStep } from '../hooks/useRecipeSteps'
 import { RecipeStepCard } from '../components/kds/RecipeStepCard'
 import { KitchenNav } from '../components/KitchenNav'
+import { FeedbackFAB } from '../components/kitchen/FeedbackFAB'
 import {
   ChefHat, ArrowLeft, Play, Clock, Camera, SkipForward,
   CheckCircle2, Package, Tag,
@@ -637,6 +638,12 @@ export function MyTasks() {
           <p className="text-xs text-slate-600">Tasks appear when scheduled by the manager</p>
         </div>
       )}
+
+      {/* Feedback FAB — always visible */}
+      <FeedbackFAB
+        staffId={cookId}
+        activeTaskId={activeTask?.id ?? null}
+      />
     </div>
   )
 }

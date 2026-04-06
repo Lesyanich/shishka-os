@@ -8,10 +8,10 @@
 ## Primer
 <!-- AUTO-REWRITTEN by Claude at session end. Do not edit manually. -->
 - **Session date:** 2026-04-06
-- **Last completed:** Kitchen UX v2 Phase A+B. Phase A: Dashboard, MyTasks (photo+label), CookLogin (PIN), KitchenLive, Schedule 6/1+custom, migration 096. Phase B: BackwardScheduler enhanced with configurable shift start + working hours warning, batch multiplier (x1/x2/x3) in DishSelector, skill-based staff assignment with auto-suggest and color-coded match indicators (green/yellow/red), save with assigned_to. backwardSchedule.ts extended with ScheduleResult type and shift constraint validation.
-- **Next step:** 1) Create batch-photos Storage bucket in Supabase. 2) Test planner: deadline → dishes → calculate → assign staff → confirm plan. 3) Phase C: Cook Feedback (voice input, FAB button).
-- **Blockers:** batch-photos storage bucket not yet created.
-- **Modified files:** (Phase B) src/components/planner/BackwardScheduler.tsx, src/components/planner/DishSelector.tsx, src/lib/backwardSchedule.ts
+- **Last completed:** Kitchen UX v2 Phases A+B+C. Phase C: FeedbackFAB component with Web Speech API voice input (TH/EN/RU/AR), text fallback, type tags (problem/suggestion/question/other), context-aware task linking. Floating action button on MyTasks. Dashboard: feedback list with type badges, mark-as-processed. Speech type declarations added.
+- **Next step:** 1) Create batch-photos Storage bucket in Supabase. 2) Test full flow end-to-end. 3) Phase D: Kitchen Live + Dashboard enhancements (after WiFi at L1). 4) Phase E: BOM Hub enhancements.
+- **Blockers:** batch-photos storage bucket not yet created. Phase D blocked on WiFi at L1.
+- **Modified files:** (Phase C) src/components/kitchen/FeedbackFAB.tsx (new), src/types/speech.d.ts (new), src/pages/MyTasks.tsx, src/pages/Dashboard.tsx
 
 ## Tech Stack
 
