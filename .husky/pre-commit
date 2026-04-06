@@ -35,7 +35,21 @@ if git diff --cached --name-only | grep -q "^apps/admin-panel/.*\.\(ts\|tsx\)$";
   echo "[eslint] OK"
 fi
 
-# --- 3. AI-TDD gate (HC-3) ---
+# --- 3. Migration canary (Boris Rule #16) ---
+if git diff --cached --name-only | grep -q "^services/supabase/migrations/.*\.sql$"; then
+  echo "[migration-canary] Validating staged migrations..."
+  for f in $(git diff --cached --name-only | grep "^services/supabase/migrations/.*\.sql$"); do
+    sh scripts/migration-canary.sh "$f"
+    CANARY_EXIT=$?
+    if [ $CANARY_EXIT -ne 0 ]; then
+      echo "BLOCKED: Migration canary failed for $f. Fix before committing."
+      exit 1
+    fi
+  done
+  echo "[migration-canary] OK"
+fi
+
+# --- 4. AI-TDD gate (HC-3) ---
 echo "[ai-tdd] Checking test pairs..."
 sh scripts/check-test-pair.sh
 TDD_EXIT=$?
