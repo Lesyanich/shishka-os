@@ -24,6 +24,8 @@ import { assignToSprint } from "./tools/assign-to-sprint.js";
 import { addComment } from "./tools/add-comment.js";
 import { listComments } from "./tools/list-comments.js";
 import { checkMigrations } from "./tools/check-migrations.js";
+import { generateStatus } from "./tools/generate-status.js";
+import { getProjectState } from "./tools/get-project-state.js";
 
 // ─── Server Setup ────────────────────────────────────────────────
 
@@ -237,13 +239,37 @@ server.tool(
   async () => jsonResult(await checkMigrations())
 );
 
+// ─── Computed State Tools (Phase B) ──────────────────────────────
+
+server.tool(
+  "generate_status",
+  "Generate STATUS.md from MC tasks + git state (HC-1). Called by post-commit hook. " +
+  "Returns markdown or writes to STATUS.md if repo_root is provided.",
+  {
+    repo_root: z.string().optional().describe(
+      "Absolute path to repo root. If provided, writes STATUS.md there. If omitted, returns markdown as text."
+    ),
+  },
+  async (args) => jsonResult(await generateStatus(args))
+);
+
+server.tool(
+  "get_project_state",
+  "Get structured state for a specific project (admin/web/app). " +
+  "Replaces manual reading of CURRENT.md. Returns tasks, branches, migrations as JSON.",
+  {
+    project: z.enum(["admin", "web", "app"]).describe("Project name"),
+  },
+  async (args) => jsonResult(await getProjectState(args))
+);
+
 // ─── Start ───────────────────────────────────────────────────────
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Mission Control MCP server running on stdio`);
-  console.error(`   Tools: 11 (emit_business_task, list_tasks, get_task, update_task, create_sprint, list_sprints, update_sprint, assign_to_sprint, add_comment, list_comments, check_migrations)`);
+  console.error(`   Tools: 13 (emit_business_task, list_tasks, get_task, update_task, create_sprint, list_sprints, update_sprint, assign_to_sprint, add_comment, list_comments, check_migrations, generate_status, get_project_state)`);
 }
 
 main().catch((err) => {

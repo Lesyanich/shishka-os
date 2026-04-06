@@ -22,7 +22,7 @@ fi
 for SRC_FILE in $NEW_SRC_FILES; do
   # Extract base name without extension
   DIR=$(dirname "$SRC_FILE")
-  BASENAME=$(basename "$SRC_FILE" | sed 's/\.\(ts\|tsx\)$//')
+  BASENAME=$(basename "$SRC_FILE" | sed -E 's/\.(ts|tsx)$//')
 
   # Search for corresponding test file in staged files
   # Patterns: same-dir/*.test.ts, __tests__/*.test.ts

@@ -6,15 +6,13 @@
 #
 # HC-1: STATUS.md is auto-generated on commit.
 # Manual editing of STATUS.md is PROHIBITED.
-#
-# STUB: Phase B will replace this with actual MCP call to
-# generate_status (shishka-mission-control).
+# Runs async (background) so it doesn't block git workflow.
 # ============================================================
 
-echo "[post-commit] HC-1 stub: generate_status will run here after Phase B."
-echo "[post-commit] Commit recorded: $(git log --oneline -1)"
+echo "[post-commit] Commit: $(git log --oneline -1)"
 
-# Phase B will add:
-# claude-code --tool mcp__shishka-mission-control__generate_status
-# or equivalent MCP invocation to regenerate STATUS.md from
-# Supabase tasks + git state.
+# Run generate-status asynchronously (non-blocking)
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/scripts/generate-status.sh" ]; then
+  sh "$REPO_ROOT/scripts/generate-status.sh" &
+fi
