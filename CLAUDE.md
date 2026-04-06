@@ -1,4 +1,4 @@
-# CLAUDE.md — Shishka OS Context Router v4.0
+# CLAUDE.md — Shishka OS Context Router v5.0
 
 ## Identity
 Shishka Healthy Kitchen ERP. Multiple projects, one Supabase backend.
@@ -15,6 +15,28 @@ Russian for docs, English for code.
 
 > **Workflow skill:** Read `.claude/skills/task-lifecycle/SKILL.md` for complete
 > session start → work → test → PR → MC update protocol.
+
+## Dispatcher: Agent Routing
+
+**Slash commands** — user explicitly selects agent mode:
+
+| Command | Agent | What it loads |
+|---------|-------|--------------|
+| `/chef` | Chef Agent | `agents/chef/AGENT.md` + kitchen MCP tools + MC tasks (domain=kitchen) |
+| `/finance` | Finance Agent | `agents/finance/AGENT.md` + finance MCP tools + receipt inbox |
+| `/coo` | COO Agent | `DISPATCH_RULES.md` + MC dashboard + all-domain tasks |
+
+**Auto-routing** — if user sends free text without selecting an agent, classify intent:
+
+| Signal in text | Domain | Agent |
+|----------------|--------|-------|
+| receipt, invoice, expense, supplier, cost report, spending | finance | `/finance` |
+| dish, menu, BOM, recipe, ingredient, nutrition, product, calorie | kitchen | `/chef` |
+| bug, feature, UI, page, component, deploy, PR, merge, migration | tech | code (default CLAUDE.md routing) |
+| queue, inbox, triage, priority, initiative, sprint, coordination | ops | `/coo` |
+| ambiguous | — | ASK: "This is for Chef, Finance, or Code?" |
+
+**After routing:** load the agent's AGENT.md, check MC tasks for that domain, report status, ask what to do.
 
 ## Project Detection
 Determine the active project before loading module context:
