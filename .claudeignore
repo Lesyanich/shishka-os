@@ -23,3 +23,9 @@
 
 # Gemini context (irrelevant for Claude Code)
 gemini.md
+
+# Claude-flow artifacts (prevent re-pollution)
+.claude-flow/
+
+# Python venv
+venv/
