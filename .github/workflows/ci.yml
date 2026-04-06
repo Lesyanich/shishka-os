@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Admin Panel: TypeScript + ESLint ──────────────────────────
+  admin-panel:
+    name: Admin Panel (tsc + lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin-panel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/admin-panel/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run lint
+
+  # ─── MCP Mission Control: TypeScript + Tests ───────────���───────
+  mcp-mission-control:
+    name: MCP Mission Control (tsc + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp-mission-control
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/mcp-mission-control/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Run tests
+        run: npm test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        continue-on-error: ${{ secrets.SUPABASE_URL == '' }}
+
+  # ─── MCP Chef: TypeScript ──────────────────────────────────────
+  mcp-chef:
+    name: MCP Chef (tsc)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp-chef
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/mcp-chef/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  # ─── MCP Finance: TypeScript ───────────────────────────────────
+  mcp-finance:
+    name: MCP Finance (tsc)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp-finance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/mcp-finance/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  # ─── Migration Lint ────────────────────────────────────────────
+  migration-lint:
+    name: Migration Lint (self-register check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check all migrations have self-register INSERT
+        run: |
+          failed=0
+          for f in services/supabase/migrations/*.sql; do
+            if ! grep -q 'INSERT INTO migration_log' "$f"; then
+              echo "::error file=$f::Missing self-register INSERT INTO migration_log (Boris Rule #16)"
+              failed=1
+            fi
+          done
+          exit $failed
