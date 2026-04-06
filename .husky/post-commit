@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# ============================================================
+# Shishka OS — Post-commit: Reactive Status (HC-1)
+# Spec: docs/plans/spec-ai-native-ops.md
+#
+# HC-1: STATUS.md is auto-generated on commit.
+# Manual editing of STATUS.md is PROHIBITED.
+# Runs async (background) so it doesn't block git workflow.
+# ============================================================
+
+echo "[post-commit] Commit: $(git log --oneline -1)"
+
+# Run generate-status asynchronously (non-blocking)
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/scripts/generate-status.sh" ]; then
+  sh "$REPO_ROOT/scripts/generate-status.sh" &
+fi

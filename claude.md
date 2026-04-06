@@ -1,4 +1,4 @@
-# CLAUDE.md — Shishka OS Context Router v3.0
+# CLAUDE.md — Shishka OS Context Router v3.1
 
 ## Identity
 Shishka Healthy Kitchen ERP ecosystem. Multiple projects, one Supabase backend.
@@ -6,7 +6,7 @@ Language: Russian for documentation, English for code and variables.
 
 ## L0: Always Load (every session)
 1. Read `docs/constitution/p0-rules.md` before any task.
-2. Read `STATUS.md` for global state.
+2. Call `generate_status` to refresh `STATUS.md` from MC + git (HC-1). Then read `STATUS.md` for global state.
 3. Read `docs/plans/QUEUE.md` for active task queue.
 
 ## Project Detection
@@ -17,7 +17,8 @@ Determine the active project before loading module context:
 | Path contains `apps/admin-panel` | admin |
 | Path contains `apps/web` | web |
 | Path contains `apps/app` | app |
-| Path contains `services/supabase` or `services/gas` | backend (shared) |
+| Path contains `services/supabase` or `services/mcp-*` | backend (shared) |
+| Path contains `services/gas` | **DEPRECATED** — legacy GAS pipeline, do not modify |
 | Branch: `feature/admin/*` | admin |
 | Branch: `feature/web/*` | web |
 | Branch: `feature/app/*` | app |
@@ -37,11 +38,13 @@ If ambiguous — ASK: "Which project? admin, web, or app?"
 | Module | File |
 |--------|------|
 | Finance | `docs/modules/finance.md` |
-| Receipts / OCR | `docs/modules/receipts.md` |
+| Receipts / OCR | `docs/modules/receipts.md` (**LEGACY** — see disclaimer inside) |
 | Inventory | `docs/modules/inventory.md` |
 | Kitchen / KDS | `docs/modules/kitchen.md` |
 | BOM / Nomenclature | `docs/modules/bom.md` |
 | Procurement | `docs/modules/procurement.md` |
+
+> **Task-scoped context override:** If the MC task has `context_files` (non-empty array), load ONLY those files + p0-rules + AGENT.md. Skip L2 module scan. Fallback to L2 routing if `context_files` is empty.
 
 ## LK: Knowledge Base / Bible (load for business-context tasks)
 
@@ -94,6 +97,17 @@ When idea spans 3+ domains → create `business_initiative` + linked tasks.
 | Invoice Parser | `agents/invoice-parser/AGENT.md` | (uses Finance MCP) |
 | Dispatcher | `docs/business/DISPATCH_RULES.md` | (planned: `services/mcp-dispatcher/`) |
 
+## LR: Reference Knowledge (human knowledge + RAG source)
+
+> Consolidated 2026-04-06 from `04_Knowledge/` (now removed). Unique content only — no duplicates with docs/ or vault/.
+
+| Topic | Location | Domains |
+|-------|----------|---------|
+| AI / Agent Research | `knowledge/ai-learning/` | tech, strategy |
+| Culinary Library (193 books, 1.9GB) | `knowledge/cooking/` | kitchen |
+| Industry / Market Reports | `knowledge/industry/` | strategy, marketing |
+| Phase History (7–10) | `knowledge/phases/` | all |
+
 ## L3: On-demand (load only when explicitly needed)
 
 | Resource | File |
@@ -101,11 +115,22 @@ When idea spans 3+ domains → create `business_initiative` + linked tasks.
 | Full DB Schema (30KB) | `vault/Architecture/Database Schema.md` |
 | Handover history | `vault/Handover/HANDOVER.md` |
 | Architecture notes | `vault/Architecture/*.md` |
-| Phase history | `docs/phases/phase-N-*.md` |
+| Phase history (early) | `docs/phases/phase-N-*.md` |
+| Phase history (7–10) | `knowledge/phases/` |
 | Boris Rules | `docs/constitution/boris-rules.md` |
 | Keys & Secrets | `docs/keys-config.md` |
 | Frontend blueprint | `docs/plans/dashboard-blueprint.md` |
 | Tech debt | `docs/tech-debt.md` |
+
+## Dead Zones (DO NOT load, DO NOT reference for new work)
+
+| Path | Why |
+|------|-----|
+| `services/gas/` | DEPRECATED — legacy GAS+Gemini receipt parser, replaced by Finance Agent |
+| `services/supabase/functions/parse-receipts/` | DEPRECATED — proxy to GAS, dead |
+| `services/supabase/functions/update-receipt-job/` | DEPRECATED — GAS callback, dead |
+| `_archive/` | Global archive — historical snapshots, old menu/equipment .md files, vault leftovers |
+| `04_Knowledge/` | **REMOVED** — consolidated into `knowledge/` and `_archive/` (2026-04-06) |
 
 ## Context Switching Protocol
 
@@ -122,7 +147,7 @@ file in `docs/constitution/`, `docs/domain/`, or `docs/projects/`.
 
 ## Commit Gate (Boris Rule #11)
 NEVER `git push` until:
-1. Global `STATUS.md` updated (if cross-project change)
+1. MC task updated (`update_task` with status/notes). STATUS.md auto-generates on commit (HC-1) — do NOT edit manually.
 2. Project `docs/projects/{project}/CURRENT.md` updated
 3. `vault/Architecture/Database Schema.md` updated (if schema changed)
 4. **Architecture note synced** for each modified module (if note exists):
@@ -136,7 +161,8 @@ NEVER `git push` until:
 ## Obsidian Protocol (Boris Rule #9)
 After each major phase, create/update an architecture note in
 `vault/Architecture/` with YAML frontmatter, wikilinks, Mermaid diagrams.
-Archive obsolete content to `vault/_Archive/`.
+Archive obsolete content to `_archive/` (root-level global archive).
+Note: `vault/` now contains ONLY `Architecture/`, `Handover/`, and `_Archive/(Blueprints,Logs)`.
 
 ## Git Workflow
 Branch naming: `feature/{project}/description` or `feature/shared/description`.

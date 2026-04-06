@@ -1,0 +1,14 @@
+{
+  "name": "shishka-os",
+  "private": true,
+  "description": "Shishka Healthy Kitchen — monorepo root",
+  "scripts": {
+    "prepare": "husky",
+    "lint:admin": "cd apps/admin-panel && npx eslint .",
+    "build:admin": "cd apps/admin-panel && npx tsc -b && npx vite build",
+    "typecheck:admin": "cd apps/admin-panel && npx tsc --noEmit"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
