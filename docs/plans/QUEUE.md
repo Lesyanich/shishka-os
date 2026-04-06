@@ -22,7 +22,7 @@
 - [x] `done` 2026-04-05 **CRITICAL** Receipt Inbox Management UI — `docs/plans/spec-receipt-inbox-ui.md` (`68af7dc1`)
   - Реализовано на feature/admin/receipt-review-recovery. Follow-up: валидация + confirm dialog.
 
-- [ ] `in_progress` **CRITICAL** UX Audit: Kitchen Pages — `docs/plans/spec-kitchen-ux-v2.md` (`26a8ec5b`)
+- [ ] `in_progress` **CRITICAL** UX Audit: Kitchen Pages — `docs/projects/app/plans/spec-kitchen-ux-v2.md` (`26a8ec5b`)
   - Phase A (Foundation) done: Dashboard, MyTasks, CookLogin, KitchenLive, Schedule fix, migration 096.
   - Next: apply migration, test, then Phase B (Planner + Assignment).
 
@@ -103,7 +103,7 @@ Tech & Infrastructure:
 7. **Не прыгать через Tier** — сначала все CRITICAL, потом HIGH.
 
 ### Для COO (Cowork):
-1. Создать спеку в `docs/plans/`
+1. Создать спеку в `docs/plans/` (shared) или `docs/projects/{project}/plans/` (project-specific)
 2. Создать задачу в Mission Control через `emit_business_task`
 3. Добавить строку в QUEUE.md со ссылкой на спеку и MC task id
 4. Пересматривать приоритеты еженедельно

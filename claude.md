@@ -44,7 +44,18 @@ If ambiguous — ASK: "Which project? admin, web, or app?"
 | BOM / Nomenclature | `docs/modules/bom.md` |
 | Procurement | `docs/modules/procurement.md` |
 
-> **Task-scoped context override:** If the MC task has `context_files` (non-empty array), load ONLY those files + p0-rules + AGENT.md. Skip L2 module scan. Fallback to L2 routing if `context_files` is empty.
+> **Task-scoped context override:** When working on an MC task, call `get_task(id)` first.
+> If the task has `context_files` (non-empty array) — load ONLY those files + `p0-rules.md` + relevant `AGENT.md`. **Skip L2 module scan entirely.**
+> If `context_files` is empty or null — fall back to L2 module routing above.
+
+### Spec file locations
+
+| Scope | Path | Example |
+|-------|------|---------|
+| Project-specific | `docs/projects/{project}/plans/spec-*.md` | `docs/projects/admin/plans/spec-inbox-management.md` |
+| Cross-project / shared | `docs/plans/spec-*.md` | `docs/plans/spec-ai-native-ops.md` |
+
+When creating or moving specs, use project-specific path if the spec targets a single project (admin, web, app). Use shared path for backend, infrastructure, or multi-project work.
 
 ## LK: Knowledge Base / Bible (load for business-context tasks)
 

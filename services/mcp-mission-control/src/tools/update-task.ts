@@ -8,6 +8,7 @@ interface UpdateTaskArgs {
   notes?: string;
   due_date?: string;
   tags?: string[];
+  context_files?: string[];
 }
 
 export async function updateTask(args: UpdateTaskArgs) {
@@ -32,6 +33,7 @@ export async function updateTask(args: UpdateTaskArgs) {
   if (args.notes !== undefined) update.notes = args.notes;
   if (args.due_date !== undefined) update.due_date = args.due_date;
   if (args.tags !== undefined) update.tags = args.tags;
+  if (args.context_files !== undefined) update.context_files = args.context_files;
 
   if (Object.keys(update).length === 0) {
     return { error: "No fields to update. Provide at least one field." };

@@ -153,6 +153,8 @@ server.tool(
       .describe("Set or update due date (YYYY-MM-DD)"),
     tags: z.array(z.string()).optional()
       .describe("Replace tags array"),
+    context_files: z.array(z.string()).optional()
+      .describe("Scoped context: array of file paths relative to repo root for agent context loading"),
   },
   async (args) => jsonResult(await updateTask(args))
 );
