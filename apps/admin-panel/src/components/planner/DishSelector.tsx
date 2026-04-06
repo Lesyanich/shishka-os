@@ -97,12 +97,29 @@ export function DishSelector({ dishes, onChange }: DishSelectorProps) {
                   </span>
                   {d.name}
                 </span>
+                {/* Batch multiplier quick buttons */}
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3].map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => updateQty(d.id, m)}
+                      className={`h-6 w-7 rounded text-[10px] font-medium transition ${
+                        d.qty === m
+                          ? 'bg-emerald-500/20 text-emerald-300'
+                          : 'bg-slate-800 text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      x{m}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="number"
                   min={1}
                   value={d.qty}
                   onChange={(e) => updateQty(d.id, parseInt(e.target.value, 10) || 1)}
-                  className="h-6 w-14 rounded border border-slate-700 bg-slate-800 text-center text-xs text-slate-100 focus:outline-none"
+                  className="h-6 w-12 rounded border border-slate-700 bg-slate-800 text-center text-xs text-slate-100 focus:outline-none"
                 />
                 <button
                   type="button"

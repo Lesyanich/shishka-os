@@ -29,6 +29,15 @@ export interface ScheduleOptions {
   target_unit?: string
   equipment_map?: Map<string, EquipmentCapacity> // equipment_id → capacity info
   buffer_pct?: number                            // buffer as % of total duration (default: 10)
+  shift_start_hour?: number                      // earliest allowed start hour (default: 7)
+  shift_start_minute?: number                    // earliest allowed start minute (default: 0)
+}
+
+export interface ScheduleResult {
+  steps: ScheduledStep[]
+  earliest_start: Date | null
+  before_shift_start: boolean                    // true if schedule starts before shift start
+  shift_start_time: Date | null                  // configured shift start for the deadline date
 }
 
 // ─── Core algorithm ───────────────────────────────────────────────
@@ -51,6 +60,20 @@ export function backwardSchedule(
   dish_name: string,
   options?: ScheduleOptions,
 ): ScheduledStep[] {
+  return backwardScheduleWithResult(steps, deadline, nomenclature_id, product_code, dish_name, options).steps
+}
+
+/**
+ * Extended version that returns ScheduleResult with shift start validation.
+ */
+export function backwardScheduleWithResult(
+  steps: RecipeStep[],
+  deadline: Date,
+  nomenclature_id: string,
+  product_code: string,
+  dish_name: string,
+  options?: ScheduleOptions,
+): ScheduleResult {
   const result: ScheduledStep[] = []
   let currentEnd = deadline
   const equipMap = options?.equipment_map
@@ -119,7 +142,24 @@ export function backwardSchedule(
     }
   }
 
-  return result
+  // Check working hours constraint
+  const shiftHour = options?.shift_start_hour ?? 7
+  const shiftMinute = options?.shift_start_minute ?? 0
+  const shiftStart = new Date(deadline)
+  shiftStart.setHours(shiftHour, shiftMinute, 0, 0)
+
+  const earliestStart = result.length > 0
+    ? new Date(Math.min(...result.map(s => (s.setup_start ?? s.scheduled_start).getTime())))
+    : null
+
+  const beforeShiftStart = earliestStart ? earliestStart.getTime() < shiftStart.getTime() : false
+
+  return {
+    steps: result,
+    earliest_start: earliestStart,
+    before_shift_start: beforeShiftStart,
+    shift_start_time: shiftStart,
+  }
 }
 
 // ─── Conflict detection ───────────────────────────────────────────
