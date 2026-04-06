@@ -4,6 +4,7 @@ import { useBatches } from '../hooks/useBatches'
 import { useRecipeSteps, type RecipeStep } from '../hooks/useRecipeSteps'
 import { TaskExecutionCard } from '../components/kds/TaskExecutionCard'
 import { RecipeStepCard } from '../components/kds/RecipeStepCard'
+import { KitchenNav } from '../components/KitchenNav'
 import { ChefHat, ArrowLeft } from 'lucide-react'
 
 export function CookStation() {
@@ -95,6 +96,7 @@ export function CookStation() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
+      <KitchenNav />
       {/* Header */}
       <div className="text-center">
         <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">

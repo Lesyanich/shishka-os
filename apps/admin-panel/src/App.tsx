@@ -27,7 +27,10 @@ const FinanceEntry = lazy(() => import('./pages/FinanceEntry').then(m => ({ defa
 const FinanceAnalytics = lazy(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
 const ReceivingStation = lazy(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
-const KitchenDashboard = lazy(() => import('./pages/KitchenDashboard').then(m => ({ default: m.KitchenDashboard })))
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })))
+const CookLogin = lazy(() => import('./pages/CookLogin').then(m => ({ default: m.CookLogin })))
+const MyTasks = lazy(() => import('./pages/MyTasks').then(m => ({ default: m.MyTasks })))
+const KitchenLive = lazy(() => import('./pages/KitchenLive').then(m => ({ default: m.KitchenLive })))
 const ScheduleManager = lazy(() => import('./pages/ScheduleManager').then(m => ({ default: m.ScheduleManager })))
 const BatchPlanner = lazy(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
 const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
@@ -68,7 +71,12 @@ function App() {
         <Sentry.ErrorBoundary fallback={FallbackError}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/kitchen" element={<Suspense fallback={<PageLoader />}><KitchenDashboard /></Suspense>} />
+            <Route path="/cook-login" element={<Suspense fallback={<PageLoader />}><CookLogin /></Suspense>} />
+            {/* /kitchen → redirect to /dashboard (legacy fix) */}
+            <Route path="/kitchen" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+            <Route path="/tasks" element={<Suspense fallback={<PageLoader />}><MyTasks /></Suspense>} />
+            <Route path="/live" element={<Suspense fallback={<PageLoader />}><KitchenLive /></Suspense>} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
                 <Route path="/" element={<ControlCenter />} />

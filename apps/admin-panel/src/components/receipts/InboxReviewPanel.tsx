@@ -81,6 +81,8 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<string | null>(null)
   const [nomMap, setNomMap] = useState<Record<string, { code: string; name: string }>>({})
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   const p = row.parsed_payload as Record<string, any>
   if (!p) return null
@@ -249,10 +251,34 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       })
   }, [row.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleApprove = async () => {
+  const validate = (): string[] => {
+    const errs: string[] = []
+    if (!supplierName.trim()) errs.push('Не указан поставщик')
+    if (!transactionDate.trim()) errs.push('Не указана дата')
+    if (totalItems === 0) errs.push('Нет ни одной позиции (food/capex/opex)')
+    if (receiptTotal <= 0) errs.push('Сумма чека должна быть > 0')
+    // Check for empty item names
+    foodItems.forEach((it, i) => { if (!it.name.trim()) errs.push(`Food #${i + 1}: пустое название`) })
+    capexItems.forEach((it, i) => { if (!it.name.trim()) errs.push(`CapEx #${i + 1}: пустое название`) })
+    opexItems.forEach((it, i) => { if (!it.description.trim()) errs.push(`OpEx #${i + 1}: пустое описание`) })
+    return errs
+  }
+
+  const handleApproveClick = () => {
+    setError(null)
+    const errs = validate()
+    if (errs.length > 0) {
+      setValidationErrors(errs)
+      return
+    }
+    setValidationErrors([])
+    setShowConfirm(true)
+  }
+
+  const handleApproveConfirm = async () => {
+    setShowConfirm(false)
     setIsApproving(true)
     setError(null)
-    // Attach photo URLs from inbox row if not already in parsed payload
     const photos = row.photo_urls || []
     const editedPayload = {
       ...p,
@@ -263,8 +289,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       food_items: foodItems,
       capex_items: capexItems,
       opex_items: opexItems,
-      // Map inbox photos to expense_ledger receipt columns
-      // Only assign distinct photos — don't duplicate the same URL across columns
       receipt_supplier_url: p.receipt_supplier_url || photos[0] || null,
       receipt_bank_url: p.receipt_bank_url || (photos[1] && photos[1] !== photos[0] ? photos[1] : null),
       tax_invoice_url: p.tax_invoice_url || (p.has_tax_invoice && photos.length > 1 ? photos[1] : null),
@@ -272,7 +296,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     const res = await onApprove(row.id, editedPayload)
     setIsApproving(false)
     if (!res.ok) {
-      // Friendly error for duplicate invoice
       const msg = res.error || 'Approval failed'
       if (msg.includes('duplicate key') && msg.includes('invoice')) {
         setError(`Чек с номером "${invoiceNumber}" уже записан в систему. Дубликаты не допускаются.`)
@@ -723,6 +746,53 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
         </div>
       )}
 
+      {/* ── Validation errors ── */}
+      {validationErrors.length > 0 && (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+          <div className="mb-1 font-medium">Исправьте перед подтверждением:</div>
+          <ul className="list-inside list-disc space-y-0.5">
+            {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* ── Confirmation dialog ── */}
+      {showConfirm && (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-xs">
+          <div className="mb-2 font-medium text-slate-200">Подтвердите запись в систему:</div>
+          <div className="mb-3 grid grid-cols-2 gap-x-6 gap-y-1 text-slate-400">
+            <div>Поставщик: <span className="text-slate-200">{supplierName}</span></div>
+            <div>Дата: <span className="text-slate-200">{transactionDate}</span></div>
+            <div>Сумма: <span className="text-slate-200">{'\u0E3F'}{fmt(receiptTotal)}</span></div>
+            <div>Позиций: <span className="text-slate-200">{foodItems.length} food, {capexItems.length} capex, {opexItems.length} opex</span></div>
+            {totalMismatch && (
+              <div className="col-span-2 text-amber-400">
+                <AlertTriangle className="mr-1 inline h-3 w-3" />
+                Сумма позиций не совпадает с чеком (разница: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))})
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isApproving}
+              onClick={handleApproveConfirm}
+              className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
+            >
+              {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              Да, записать
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowConfirm(false)}
+              className="rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-xs text-slate-400 hover:bg-slate-700"
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Error / Result ── */}
       {error && (
         <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">{error}</div>
@@ -759,8 +829,8 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           <>
             <button
               type="button"
-              disabled={isApproving || !!result}
-              onClick={handleApprove}
+              disabled={isApproving || !!result || showConfirm}
+              onClick={handleApproveClick}
               className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
             >
               {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}

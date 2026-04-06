@@ -1,5 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import type { ScheduledStep } from '../../lib/backwardSchedule'
+import { Clock, Wrench, AlertTriangle } from 'lucide-react'
+
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint)
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [breakpoint])
+  return isMobile
+}
 
 // Color palette for dishes
 const DISH_COLORS = [
@@ -24,6 +36,7 @@ interface BackwardGanttProps {
 }
 
 export function BackwardGantt({ steps, equipmentLocations }: BackwardGanttProps) {
+  const isMobile = useIsMobile()
   const [tooltip, setTooltip] = useState<{ step: ScheduledStep; x: number; y: number } | null>(null)
 
   // Determine time range (include setup_start)
@@ -101,6 +114,67 @@ export function BackwardGantt({ steps, equipmentLocations }: BackwardGanttProps)
     )
   }
 
+  const fmt = (d: Date) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+  // Mobile: vertical list grouped by equipment
+  if (isMobile) {
+    return (
+      <div className="space-y-2">
+        {equipmentRows.map(([eqId, row]) => (
+          <div key={eqId} className="rounded-xl border border-slate-800 bg-slate-900/50">
+            <div className="flex items-center gap-2 border-b border-slate-800 px-3 py-2">
+              <Wrench className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-xs font-medium text-slate-200">{row.name}</span>
+              {eqId !== '__manual__' && equipmentLocations?.get(eqId) && (
+                <span className={`text-[10px] ${
+                  equipmentLocations.get(eqId)!.zone === 'Hot' ? 'text-red-400' :
+                  equipmentLocations.get(eqId)!.zone === 'Cold' ? 'text-sky-400' :
+                  'text-slate-500'
+                }`}>
+                  {equipmentLocations.get(eqId)!.wall ?? equipmentLocations.get(eqId)!.zone}
+                </span>
+              )}
+            </div>
+            <div className="divide-y divide-slate-800/50">
+              {row.steps.map((s, i) => {
+                const color = dishColorMap.get(s.nomenclature_id) ?? DISH_COLORS[0]
+                return (
+                  <div key={i} className={`flex items-center gap-3 px-3 py-2.5 ${s.has_conflict ? 'bg-rose-500/5' : ''}`}>
+                    <div className={`h-3 w-3 rounded ${color} shrink-0`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-slate-200 truncate">{s.step.operation_name}</p>
+                      <p className="text-[11px] text-slate-500">{s.dish_name} · {s.step.duration_min} min</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-slate-400 shrink-0">
+                      <Clock className="h-3 w-3" />
+                      <span>{fmt(s.scheduled_start)}–{fmt(s.scheduled_end)}</span>
+                    </div>
+                    {s.has_conflict && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-400" />}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-2 text-[10px] text-slate-400">
+          {[...new Set(steps.map((s) => s.nomenclature_id))].map((id) => {
+            const step = steps.find((s) => s.nomenclature_id === id)!
+            const color = dishColorMap.get(id) ?? DISH_COLORS[0]
+            return (
+              <span key={id} className="flex items-center gap-1">
+                <span className={`inline-block h-2.5 w-2.5 rounded ${color}`} />
+                {step.dish_name}
+              </span>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // Desktop/tablet: Gantt chart
   return (
     <div className="overflow-x-auto -mx-4 px-4">
       <div className="min-w-[700px]">

@@ -1,5 +1,16 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint)
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [breakpoint])
+  return isMobile
+}
 import { useStaff } from '../../hooks/useStaff'
 import { useShifts, type Shift, type ShiftInsert } from '../../hooks/useShifts'
 import { useShiftTasks } from '../../hooks/useShiftTasks'
@@ -36,7 +47,9 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 export function WeekCalendar() {
+  const isMobile = useIsMobile()
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
+  const [mobileDay, setMobileDay] = useState(() => formatDate(new Date()))
   const [editorState, setEditorState] = useState<{
     shift?: Shift | null
     date: string
@@ -143,42 +156,130 @@ export function WeekCalendar() {
 
   const isLoading = staffLoading || shiftsLoading
 
+  const mobileDayLabel = useMemo(() => {
+    const d = new Date(mobileDay + 'T00:00')
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  }, [mobileDay])
+
+  function prevMobileDay() {
+    const d = new Date(mobileDay + 'T00:00')
+    d.setDate(d.getDate() - 1)
+    setMobileDay(formatDate(d))
+  }
+
+  function nextMobileDay() {
+    const d = new Date(mobileDay + 'T00:00')
+    d.setDate(d.getDate() + 1)
+    setMobileDay(formatDate(d))
+  }
+
+  function goMobileToday() {
+    setMobileDay(formatDate(new Date()))
+  }
+
   return (
     <div>
-      {/* Week navigation */}
-      <div className="mb-4 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={prevWeek}
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={goToday}
-          className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700"
-        >
-          Today
-        </button>
-        <button
-          type="button"
-          onClick={nextWeek}
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-        <span className="ml-2 text-sm text-slate-400">
-          {formatShort(weekStart)} — {formatShort(new Date(weekStart.getTime() + 6 * 86400000))}
-        </span>
-      </div>
+      {/* Navigation — different for mobile vs desktop */}
+      {isMobile ? (
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={prevMobileDay}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={goMobileToday}
+            className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={nextMobileDay}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <span className={`ml-2 text-sm ${mobileDay === today ? 'text-emerald-400' : 'text-slate-400'}`}>
+            {mobileDayLabel}
+          </span>
+        </div>
+      ) : (
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={prevWeek}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={goToday}
+            className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={nextWeek}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <span className="ml-2 text-sm text-slate-400">
+            {formatShort(weekStart)} — {formatShort(new Date(weekStart.getTime() + 6 * 86400000))}
+          </span>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-slate-500">
           <Loader2 className="mr-2 h-5 w-5 animate-spin text-emerald-500" />
           Loading...
         </div>
+      ) : isMobile ? (
+        /* Mobile: single-day card list */
+        <div className="space-y-2">
+          {activeStaff.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">No active staff members</p>
+          ) : (
+            activeStaff.map((s) => {
+              const cellShifts = shiftMap.get(`${s.id}|${mobileDay}`) ?? []
+              return (
+                <div
+                  key={s.id}
+                  onClick={() => openCell(s.id, mobileDay)}
+                  className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-3 cursor-pointer hover:border-slate-700 transition"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-200 truncate">{s.name}</p>
+                    <p className="text-[11px] text-slate-500 capitalize">{s.role}</p>
+                  </div>
+                  {cellShifts.length > 0 ? (
+                    <div className="flex flex-col gap-1">
+                      {cellShifts.map((sh) => (
+                        <span
+                          key={sh.id}
+                          className={`rounded px-2 py-0.5 text-xs border ${ROLE_COLORS[s.role] ?? ROLE_COLORS.cook}`}
+                        >
+                          {sh.start_time.slice(0, 5)}–{sh.end_time.slice(0, 5)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-600">No shift</span>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
       ) : (
+        /* Desktop: week table */
         <div className="overflow-x-auto rounded-xl border border-slate-800">
           <table className="w-full text-sm">
             <thead>

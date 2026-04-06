@@ -1,10 +1,20 @@
-import { useState } from 'react'
-import { Monitor } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Monitor, Clock, Wrench } from 'lucide-react'
 import type { DashboardEquipmentSlot } from '../../hooks/useKitchenDashboard'
 
-const HOUR_START = 6
-const HOUR_END = 23
-const TOTAL_HOURS = HOUR_END - HOUR_START // 17 hours
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint)
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [breakpoint])
+  return isMobile
+}
+
+const DEFAULT_HOUR_START = 6
+const DEFAULT_HOUR_END = 23
 
 function timeToMinutes(timeStr: string): number {
   const [h, m] = timeStr.split(':').map(Number)
@@ -22,6 +32,7 @@ interface SlotPopup {
 }
 
 export function EquipmentTimeline({ slots }: EquipmentTimelineProps) {
+  const isMobile = useIsMobile()
   const [popup, setPopup] = useState<SlotPopup | null>(null)
 
   // Group slots by equipment
@@ -56,6 +67,17 @@ export function EquipmentTimeline({ slots }: EquipmentTimelineProps) {
     }
   }
 
+  // Adaptive time window: expand beyond defaults if slots fall outside 6am-11pm
+  let HOUR_START = DEFAULT_HOUR_START
+  let HOUR_END = DEFAULT_HOUR_END
+  for (const slot of slots) {
+    const sH = Math.floor(timeToMinutes(slot.start_time) / 60)
+    const eH = Math.ceil(timeToMinutes(slot.end_time) / 60)
+    if (sH < HOUR_START) HOUR_START = sH
+    if (eH > HOUR_END) HOUR_END = eH
+  }
+  const TOTAL_HOURS = HOUR_END - HOUR_START
+
   const startMin = HOUR_START * 60
   const totalMin = TOTAL_HOURS * 60
 
@@ -86,7 +108,40 @@ export function EquipmentTimeline({ slots }: EquipmentTimelineProps) {
 
       {equipmentRows.length === 0 ? (
         <p className="text-base text-slate-500">No scheduled slots</p>
+      ) : isMobile ? (
+        /* Mobile: vertical list */
+        <div className="space-y-1">
+          {equipmentRows.map(([eqId, row]) => (
+            <div key={eqId}>
+              <div className="flex items-center gap-2 py-1.5">
+                <Wrench className="h-3 w-3 text-slate-500" />
+                <span className="text-xs font-medium text-slate-300">{row.name}</span>
+              </div>
+              <div className="space-y-1 pl-5">
+                {row.slots
+                  .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
+                  .map((slot) => (
+                    <div
+                      key={slot.id}
+                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 ${
+                        conflictSlotIds.has(slot.id) ? 'bg-rose-500/10 border border-rose-500/30' : 'bg-slate-800/50'
+                      }`}
+                    >
+                      <Clock className="h-3 w-3 text-slate-500 shrink-0" />
+                      <span className="text-xs text-slate-300">
+                        {slot.start_time.slice(0, 5)}–{slot.end_time.slice(0, 5)}
+                      </span>
+                      <span className="text-xs text-slate-400 truncate flex-1">
+                        {slot.label ?? '—'}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
+        /* Desktop/tablet: horizontal Gantt */
         <div className="overflow-x-auto -mx-4 px-4">
           <div className="min-w-[600px]">
             {/* Hour labels */}

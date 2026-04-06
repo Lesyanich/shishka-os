@@ -3,6 +3,7 @@ import { CalendarDays, Users, LayoutTemplate } from 'lucide-react'
 import { StaffList } from '../components/schedule/StaffList'
 import { WeekCalendar } from '../components/schedule/WeekCalendar'
 import { BulkScheduleGenerator } from '../components/schedule/BulkScheduleGenerator'
+import { KitchenNav } from '../components/KitchenNav'
 
 type Tab = 'schedule' | 'staff' | 'templates'
 
@@ -17,6 +18,7 @@ export function ScheduleManager() {
 
   return (
     <div className="space-y-4">
+      <KitchenNav />
       <h1 className="text-lg font-bold text-slate-100">Schedule Manager</h1>
 
       {/* Tabs */}
