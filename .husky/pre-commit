@@ -35,6 +35,22 @@ if git diff --cached --name-only | grep -q "^apps/admin-panel/.*\.\(ts\|tsx\)$";
   echo "[eslint] OK"
 fi
 
+# --- 2b. ESLint domain boundaries (MCP services) ---
+for MCP_SVC in mcp-chef mcp-finance mcp-mission-control; do
+  if git diff --cached --name-only | grep -q "^services/${MCP_SVC}/src/.*\.ts$"; then
+    echo "[eslint] Linting ${MCP_SVC} domain boundaries..."
+    cd "services/${MCP_SVC}"
+    npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only | grep "^services/${MCP_SVC}/src/.*\.ts$" | sed "s|^services/${MCP_SVC}/||")
+    MCP_LINT_EXIT=$?
+    cd ../..
+    if [ $MCP_LINT_EXIT -ne 0 ]; then
+      echo "BLOCKED: ESLint domain boundary violation in ${MCP_SVC}."
+      exit 1
+    fi
+    echo "[eslint] ${MCP_SVC} OK"
+  fi
+done
+
 # --- 3. Migration canary (Boris Rule #16) ---
 if git diff --cached --name-only | grep -q "^services/supabase/migrations/.*\.sql$"; then
   echo "[migration-canary] Validating staged migrations..."
