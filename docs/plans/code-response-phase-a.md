@@ -62,7 +62,7 @@ INSERT INTO migration_log (filename, applied_by, checksum) VALUES (...)
 
 ## Полный спек
 
-Читай: `docs/plans/spec-kitchen-ux-v2.md` — 16 секций, все решения зафиксированы.
+Читай: `docs/projects/app/plans/spec-kitchen-ux-v2.md` — 16 секций, все решения зафиксированы.
 
 Ключевые секции для Phase A:
 - Section 5.3 — My Tasks (cook execution flow + REQUIRED photo + batch creation)

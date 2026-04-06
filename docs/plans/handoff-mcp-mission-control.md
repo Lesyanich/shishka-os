@@ -34,7 +34,7 @@ ENV-переменные те же что у mcp-chef: SUPABASE_URL, SUPABASE_SE
   priority: "high"
   source: "owner"
   created_by: "coo"
-  related_ids: { spec_file: "docs/plans/spec-inbox-management.md" }
+  related_ids: { spec_file: "docs/projects/admin/plans/spec-inbox-management.md" }
 
 - Обнови STATUS.md: добавь mcp-mission-control в Mission Control секцию
 ```

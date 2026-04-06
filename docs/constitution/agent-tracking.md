@@ -171,6 +171,23 @@ A spec with `MC Task: TBD` is a violation. No TBD — create the task immediatel
 
 Violation: spec-gdrive-receipt-archive.md was created without MC task (2026-04-04).
 
+### Scoped Context Protocol (Boris Rule #17)
+
+Every MC task intended for a code agent MUST have `context_files` filled before moving to `in_progress`.
+
+When creating or triaging a task:
+1. Identify the 2–5 files an agent needs to complete the task (spec, domain docs, AGENT.md)
+2. Set `context_files` via `update_task` — array of repo-relative paths
+3. Use project-specific spec paths: `docs/projects/{project}/plans/spec-*.md`
+4. Always include `docs/constitution/p0-rules.md` for tasks touching DB or architecture
+
+Example:
+```json
+["docs/plans/spec-receipt-model-selector.md", "agents/finance/AGENT.md", "docs/domain/financial-codes.md"]
+```
+
+**Agent behavior:** Call `get_task(id)` → if `context_files` is non-empty, load ONLY those files + p0-rules. Skip CLAUDE.md L2 module scan entirely. If `context_files` is empty — fall back to L2 routing.
+
 ### MCP Server Identity (Boris Rule #15)
 
 Each MCP server has a specific domain. Use the correct server:

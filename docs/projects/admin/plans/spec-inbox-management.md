@@ -20,7 +20,7 @@
 Receipt inbox — входная точка для чеков. Полный workflow:
 
 ```
-Фото чека → Telegram/Admin Upload → receipt_inbox (pending)
+Фото чека → Admin UI (/receipts → InboxUploader) → receipt_inbox (pending)
   → Finance Agent парсит → update_inbox(status:"parsed", parsed_payload:{...})
   → Admin Panel: Леся видит детали, редактирует, подтверждает → approve_receipt
   → expense_ledger + purchase_logs (Hub-and-Spoke)
