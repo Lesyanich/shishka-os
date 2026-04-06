@@ -7,11 +7,11 @@
 
 ## Primer
 <!-- AUTO-REWRITTEN by Claude at session end. Do not edit manually. -->
-- **Session date:** 2026-04-05
-- **Last completed:** Kitchen UX v2 Phase A — Foundation. New pages: Dashboard (/dashboard), MyTasks (/tasks), KitchenLive (/live), CookLogin (/cook-login). /kitchen redirects to /dashboard. Cook PIN login with staff list + 4-digit numpad. MyTasks: step-by-step recipe execution, weight input, photo capture (compressed 1200px JPEG), Label Info screen with batch_code for handwriting on bags. Schedule: added 6/1 template + custom work/off pattern builder. KitchenNav role-based (manager sees all 5 pages, cook sees 2). Migration 096: assigned_to/actual_temperature/notes on production_tasks, preferred_language/skill_level on staff, shelf_life_days on nomenclature, min_skill_level on recipes_flow, batch_code/produced_by/photo_url/photo_skipped_reason on inventory_batches, cook_feedback table, fn_generate_batch_code function, batch_status enum extended.
-- **Next step:** 1) Apply migration 096. 2) Create batch-photos Storage bucket in Supabase. 3) Test cook login + task execution + photo + label flow. 4) Phase B: Planner enhancements (working hours, staff assignment).
-- **Blockers:** Migration 096 not yet applied. batch-photos storage bucket not yet created.
-- **Modified files:** src/App.tsx, src/pages/Dashboard.tsx (new), src/pages/MyTasks.tsx (new), src/pages/CookLogin.tsx (new), src/pages/KitchenLive.tsx (new), src/components/KitchenNav.tsx, src/components/schedule/BulkScheduleGenerator.tsx, services/supabase/migrations/096_kitchen_ux_v2_foundation.sql (new)
+- **Session date:** 2026-04-06
+- **Last completed:** Kitchen UX v2 Phase A+B. Phase A: Dashboard, MyTasks (photo+label), CookLogin (PIN), KitchenLive, Schedule 6/1+custom, migration 096. Phase B: BackwardScheduler enhanced with configurable shift start + working hours warning, batch multiplier (x1/x2/x3) in DishSelector, skill-based staff assignment with auto-suggest and color-coded match indicators (green/yellow/red), save with assigned_to. backwardSchedule.ts extended with ScheduleResult type and shift constraint validation.
+- **Next step:** 1) Create batch-photos Storage bucket in Supabase. 2) Test planner: deadline → dishes → calculate → assign staff → confirm plan. 3) Phase C: Cook Feedback (voice input, FAB button).
+- **Blockers:** batch-photos storage bucket not yet created.
+- **Modified files:** (Phase B) src/components/planner/BackwardScheduler.tsx, src/components/planner/DishSelector.tsx, src/lib/backwardSchedule.ts
 
 ## Tech Stack
 
