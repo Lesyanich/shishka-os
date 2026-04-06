@@ -1,0 +1,48 @@
+#!/bin/sh
+
+# ============================================================
+# Shishka OS — Pre-commit Guard Rails
+# Spec: docs/plans/spec-ai-native-ops.md, Phase A
+# ============================================================
+
+echo "=== Shishka OS pre-commit checks ==="
+
+# --- 1. TypeScript strict check (admin-panel) ---
+if git diff --cached --name-only | grep -q "^apps/admin-panel/"; then
+  echo "[tsc] Checking admin-panel types..."
+  cd apps/admin-panel
+  npx tsc --noEmit
+  TSC_EXIT=$?
+  cd ../..
+  if [ $TSC_EXIT -ne 0 ]; then
+    echo "BLOCKED: TypeScript errors in admin-panel. Fix before committing."
+    exit 1
+  fi
+  echo "[tsc] OK"
+fi
+
+# --- 2. ESLint with zero warnings (admin-panel) ---
+if git diff --cached --name-only | grep -q "^apps/admin-panel/.*\.\(ts\|tsx\)$"; then
+  echo "[eslint] Linting admin-panel..."
+  cd apps/admin-panel
+  npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only | grep "^apps/admin-panel/.*\.\(ts\|tsx\)$" | sed 's|^apps/admin-panel/||')
+  ESLINT_EXIT=$?
+  cd ../..
+  if [ $ESLINT_EXIT -ne 0 ]; then
+    echo "BLOCKED: ESLint errors in admin-panel. Fix before committing."
+    exit 1
+  fi
+  echo "[eslint] OK"
+fi
+
+# --- 3. AI-TDD gate (HC-3) ---
+echo "[ai-tdd] Checking test pairs..."
+sh scripts/check-test-pair.sh
+TDD_EXIT=$?
+if [ $TDD_EXIT -ne 0 ]; then
+  echo "BLOCKED: New src/ files without tests. Write tests first (HC-3)."
+  exit 1
+fi
+echo "[ai-tdd] OK"
+
+echo "=== All pre-commit checks passed ==="

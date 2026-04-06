@@ -19,5 +19,16 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // HC-2: Domain boundary — admin-panel must NOT import from MCP servers directly
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['**/services/mcp-*', '**/services/mcp-*/**'],
+            message: 'HC-2: Admin panel must not import from MCP servers directly. Use Supabase client or shared types from services/supabase/types/.',
+          },
+        ],
+      }],
+    },
   },
 ])
