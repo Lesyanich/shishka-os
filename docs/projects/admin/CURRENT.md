@@ -1,17 +1,17 @@
 # Admin Panel — Current State
 
-**Last updated:** 2026-03-31
-**Active phase:** Production Flow Infrastructure (post Phase 17)
-**Branch:** `feature/phase-6-mapping-engine`
+**Last updated:** 2026-04-05
+**Active phase:** Kitchen UX v2 — Phase A Foundation
+**Branch:** `feature/admin/kitchen-ux-v2-phase-a`
 **Dev server:** `apps/admin-panel/` (port 5173)
 
 ## Primer
 <!-- AUTO-REWRITTEN by Claude at session end. Do not edit manually. -->
-- **Session date:** 2026-03-31 (part 3)
-- **Last completed:** Production Flow UI complete — all tasks from prompts 02 + 04. ProductionOrdersPage (/production route, cards, create modal with backward schedule preview). RecipeStepCard in CookStation (step-by-step cooking with timer, HACCP temp confirm, passive/active badges). BackwardGantt updated (passive hatching, setup blocks, batch badges, equipment location in tooltip/rows). DishSelector extended (PF + SALE, type dot indicators). EquipmentLocationBadge (Hot/Cold/Store zone colors in KDS GanttRow). useEquipmentCategories updated with location_zone/wall/floor/notes/unit_id fields + zone filter.
-- **Next step:** 1) Rebuild MCP agent + restart Claude Desktop. 2) Run chef-agent test prompts (03). 3) Test production flow end-to-end: create order → start → recipe steps → complete. 4) Fix pre-existing shift_tasks.shift column error on /kitchen page.
-- **Blockers:** MCP agent needs rebuild for recipe flow changes.
-- **Modified files:** src/pages/ProductionOrdersPage.tsx (new), src/components/production/ProductionOrderCard.tsx (new), src/components/production/CreateOrderModal.tsx (new), src/components/kds/RecipeStepCard.tsx (new), src/components/kds/EquipmentLocationBadge.tsx (new), src/pages/CookStation.tsx, src/components/planner/BackwardGantt.tsx, src/components/planner/BackwardScheduler.tsx, src/components/planner/DishSelector.tsx, src/components/kds/GanttRow.tsx, src/hooks/useEquipmentCategories.ts, src/layouts/AppShell.tsx, src/App.tsx
+- **Session date:** 2026-04-05
+- **Last completed:** Kitchen UX v2 Phase A — Foundation. New pages: Dashboard (/dashboard), MyTasks (/tasks), KitchenLive (/live), CookLogin (/cook-login). /kitchen redirects to /dashboard. Cook PIN login with staff list + 4-digit numpad. MyTasks: step-by-step recipe execution, weight input, photo capture (compressed 1200px JPEG), Label Info screen with batch_code for handwriting on bags. Schedule: added 6/1 template + custom work/off pattern builder. KitchenNav role-based (manager sees all 5 pages, cook sees 2). Migration 096: assigned_to/actual_temperature/notes on production_tasks, preferred_language/skill_level on staff, shelf_life_days on nomenclature, min_skill_level on recipes_flow, batch_code/produced_by/photo_url/photo_skipped_reason on inventory_batches, cook_feedback table, fn_generate_batch_code function, batch_status enum extended.
+- **Next step:** 1) Apply migration 096. 2) Create batch-photos Storage bucket in Supabase. 3) Test cook login + task execution + photo + label flow. 4) Phase B: Planner enhancements (working hours, staff assignment).
+- **Blockers:** Migration 096 not yet applied. batch-photos storage bucket not yet created.
+- **Modified files:** src/App.tsx, src/pages/Dashboard.tsx (new), src/pages/MyTasks.tsx (new), src/pages/CookLogin.tsx (new), src/pages/KitchenLive.tsx (new), src/components/KitchenNav.tsx, src/components/schedule/BulkScheduleGenerator.tsx, services/supabase/migrations/096_kitchen_ux_v2_foundation.sql (new)
 
 ## Tech Stack
 
@@ -68,11 +68,15 @@ New modules added in session 2026-03-21:
 | Route | Component | Status |
 |---|---|---|
 | `/login` | LoginPage.tsx | public |
-| `/kitchen` | KitchenDashboard.tsx | **public (no auth)** |
+| `/cook-login` | CookLogin.tsx | **public (PIN auth)** |
+| `/kitchen` | → redirect to /dashboard | legacy redirect |
+| `/dashboard` | Dashboard.tsx | **public (no auth)** |
+| `/tasks` | MyTasks.tsx | **public (cook session)** |
+| `/live` | KitchenLive.tsx | **public (no auth)** |
 | `/` | ControlCenter.tsx | protected |
 | `/bom` | BOMHub.tsx | protected |
 | `/kds` | KDSBoard.tsx | protected |
-| `/cook` | CookStation.tsx | protected |
+| `/cook` | CookStation.tsx | protected (legacy) |
 | `/waste` | WasteTracker.tsx | protected |
 | `/logistics` | LogisticsScanner.tsx | protected |
 | `/procurement` | Procurement.tsx | protected |

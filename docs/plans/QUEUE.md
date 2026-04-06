@@ -22,9 +22,9 @@
 - [x] `done` 2026-04-05 **CRITICAL** Receipt Inbox Management UI — `docs/plans/spec-receipt-inbox-ui.md` (`68af7dc1`)
   - Реализовано на feature/admin/receipt-review-recovery. Follow-up: валидация + confirm dialog.
 
-- [ ] `ready` **CRITICAL** UX Audit: Kitchen Pages — (`26a8ec5b`)
-  - 6 из 8 страниц production-ready, но нужна полировка для реальной эксплуатации.
-  - Зависимость: кухня работает через эти страницы.
+- [ ] `in_progress` **CRITICAL** UX Audit: Kitchen Pages — `docs/plans/spec-kitchen-ux-v2.md` (`26a8ec5b`)
+  - Phase A (Foundation) done: Dashboard, MyTasks, CookLogin, KitchenLive, Schedule fix, migration 096.
+  - Next: apply migration, test, then Phase B (Planner + Assignment).
 
 ---
 

@@ -3,31 +3,39 @@ import { CalendarPlus, Loader2 } from 'lucide-react'
 import { useStaff } from '../../hooks/useStaff'
 import { useShifts } from '../../hooks/useShifts'
 
-type Template = '5_2' | '2_2' | 'every_day'
+type Template = '5_2' | '2_2' | '6_1' | 'every_day' | 'custom'
 
 const TEMPLATES: { id: Template; label: string; description: string }[] = [
   { id: 'every_day', label: 'Every Day', description: 'Shift every day of the period' },
+  { id: '6_1', label: '6/1', description: '6 working days, 1 day off' },
   { id: '5_2', label: '5/2', description: '5 working days, 2 days off' },
   { id: '2_2', label: '2/2', description: '2 on, 2 off' },
+  { id: 'custom', label: 'Custom', description: 'Custom work/off pattern' },
 ]
 
 function generateDates(
   start: string,
   end: string,
   template: Template,
+  customWorkDays: number,
+  customOffDays: number,
 ): string[] {
   const dates: string[] = []
   const s = new Date(start + 'T00:00:00')
   const e = new Date(end + 'T00:00:00')
   let dayIndex = 0
 
+  // Resolve work/off cycle
+  let workDays: number
+  let cycleDays: number
+  if (template === '5_2') { workDays = 5; cycleDays = 7 }
+  else if (template === '2_2') { workDays = 2; cycleDays = 4 }
+  else if (template === '6_1') { workDays = 6; cycleDays = 7 }
+  else if (template === 'custom') { workDays = customWorkDays; cycleDays = customWorkDays + customOffDays }
+  else { workDays = 1; cycleDays = 1 } // every_day
+
   while (s <= e) {
-    let isWork = true
-    if (template === '5_2') {
-      isWork = dayIndex % 7 < 5
-    } else if (template === '2_2') {
-      isWork = dayIndex % 4 < 2
-    }
+    const isWork = cycleDays > 0 ? (dayIndex % cycleDays) < workDays : true
     if (isWork) {
       dates.push(s.toISOString().split('T')[0])
     }
@@ -57,6 +65,8 @@ export function BulkScheduleGenerator() {
     return d.toISOString().split('T')[0]
   })
   const [template, setTemplate] = useState<Template>('every_day')
+  const [customWorkDays, setCustomWorkDays] = useState(5)
+  const [customOffDays, setCustomOffDays] = useState(2)
   const [shiftStart, setShiftStart] = useState('08:00')
   const [shiftEnd, setShiftEnd] = useState('16:00')
   const [generating, setGenerating] = useState(false)
@@ -65,8 +75,8 @@ export function BulkScheduleGenerator() {
   const activeStaff = staff.filter((s) => s.is_active)
 
   const previewDates = useMemo(
-    () => generateDates(startDate, endDate, template),
-    [startDate, endDate, template],
+    () => generateDates(startDate, endDate, template, customWorkDays, customOffDays),
+    [startDate, endDate, template, customWorkDays, customOffDays],
   )
 
   const totalShifts = previewDates.length * selectedStaff.length
@@ -205,7 +215,7 @@ export function BulkScheduleGenerator() {
                 key={t.id}
                 type="button"
                 onClick={() => setTemplate(t.id)}
-                className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition ${
+                className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
                   template === t.id
                     ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
                     : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -216,6 +226,39 @@ export function BulkScheduleGenerator() {
               </button>
             ))}
           </div>
+          {/* Custom pattern controls */}
+          {template === 'custom' && (
+            <div className="mt-3 flex gap-4 rounded-lg border border-slate-700 bg-slate-800/50 p-3">
+              <div className="flex-1">
+                <label className="mb-1 block text-[10px] text-slate-400">Work days</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={1}
+                    max={7}
+                    value={customWorkDays}
+                    onChange={(e) => setCustomWorkDays(parseInt(e.target.value))}
+                    className="flex-1 accent-emerald-500"
+                  />
+                  <span className="w-6 text-center text-sm font-bold text-emerald-300">{customWorkDays}</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <label className="mb-1 block text-[10px] text-slate-400">Off days</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={6}
+                    value={customOffDays}
+                    onChange={(e) => setCustomOffDays(parseInt(e.target.value))}
+                    className="flex-1 accent-amber-500"
+                  />
+                  <span className="w-6 text-center text-sm font-bold text-amber-300">{customOffDays}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
