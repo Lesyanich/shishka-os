@@ -4,7 +4,7 @@
 <!-- Format: numbered rule + date added + context. -->
 
 ## Data Entry Rules
-1. **All database entries must be in English only.** Product names, descriptions, notes — everything in the DB is English. (Added: 2026-03-30)
+1. **All database entries must be in English only.** Product names, descriptions, notes, MC task titles AND descriptions — everything written to any database (Supabase, Mission Control) must be in English. This includes emit_business_task descriptions, BOM notes, recipe flow instructions. The team is multilingual — Russian is only for conversation between Lesia and the agent. (Updated: 2026-04-05)
 
 ## Naming Conventions
 <!-- e.g., "Use ROMAINE_LETTUCE not SALAD_ROMAINE" -->

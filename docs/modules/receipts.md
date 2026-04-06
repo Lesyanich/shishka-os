@@ -1,6 +1,18 @@
 # Receipt Parsing Module Context
 
-## Architecture
+> **DEPRECATED (2026-04-06):** The pipeline described below (GAS + Gemini + Edge Functions) is NO LONGER IN USE.
+> It was replaced by the Finance Agent which uses Claude Sonnet vision directly.
+>
+> **Current pipeline:** Finance Agent → `download_receipt` (base64 from Supabase Storage) → Claude Sonnet vision → `update_inbox`
+> **Agent docs:** `agents/finance/AGENT.md`
+> **Live state:** `STATUS.md` → Receipt Pipeline State
+> **Tracking:** MC Task a35ff4e5, Initiative 96f18092
+>
+> This file is kept for historical reference only. Do NOT use it as a source for new specs or code.
+
+---
+
+## Architecture (LEGACY — see disclaimer above)
 
 ```
 Frontend (MagicDropzone)

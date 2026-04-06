@@ -80,7 +80,7 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 |------|-------------------|
 | `check_inbox` | Получить список чеков (pending/processing/parsed/error/skipped) |
 | `update_inbox` | Обновить статус чека, сохранить parsed_payload |
-| `create_inbox` | Создать новую запись inbox (редко — обычно через Telegram бот) |
+| `create_inbox` | Создать новую запись inbox (редко — обычно чеки загружаются через Admin UI) |
 
 ### Finance MCP: Guideline Loading (1 tool)
 | Tool | Когда использовать |

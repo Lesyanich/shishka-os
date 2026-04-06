@@ -1,4 +1,10 @@
 // ═══════════════════════════════════════════════════════════
+// DEPRECATED — 2026-04-06
+// This edge function is LEGACY code. DO NOT USE, DO NOT DEPLOY.
+// Was: proxy to GAS ReceiptParser. Replaced by Finance Agent.
+// See: agents/finance/AGENT.md, STATUS.md → Receipt Pipeline State
+// Tracking: Initiative 96f18092, Task a35ff4e5
+// ═══════════════════════════════════════════════════════════
 // Edge Function: parse-receipts (PROXY MODE v2)
 // Phase 5.0c: Zero Body-Read Architecture
 // ═══════════════════════════════════════════════════════════

@@ -5,6 +5,8 @@ on:
     branches: [main]
   push:
     branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6am UTC — prune stale memories
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -29,9 +31,9 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run lint
 
-  # ─── MCP Mission Control: TypeScript + Tests ───────────���───────
+  # ─── MCP Mission Control: TypeScript + Lint + Tests ─────────────
   mcp-mission-control:
-    name: MCP Mission Control (tsc + test)
+    name: MCP Mission Control (tsc + lint + test)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,6 +46,7 @@ jobs:
           cache: npm
           cache-dependency-path: services/mcp-mission-control/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run build
       - name: Run tests
         run: npm test
@@ -52,9 +55,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         continue-on-error: ${{ secrets.SUPABASE_URL == '' }}
 
-  # ─── MCP Chef: TypeScript ──────────────────────────────────────
+  # ─── MCP Chef: TypeScript + Lint ───────────────────────────────
   mcp-chef:
-    name: MCP Chef (tsc)
+    name: MCP Chef (tsc + lint)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -67,11 +70,12 @@ jobs:
           cache: npm
           cache-dependency-path: services/mcp-chef/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run build
 
-  # ─── MCP Finance: TypeScript ───────────────────────────────────
+  # ─── MCP Finance: TypeScript + Lint ────────────��───────────────
   mcp-finance:
-    name: MCP Finance (tsc)
+    name: MCP Finance (tsc + lint)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -84,7 +88,18 @@ jobs:
           cache: npm
           cache-dependency-path: services/mcp-finance/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run build
+
+  # ─── Memory Pruning (D2: scheduled automation) ─────────────────
+  prune-memories:
+    name: Prune stale agent memories
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run prune-memories (dry-run on CI)
+        run: bash scripts/prune-memories.sh --dry-run --ttl 30
 
   # ─── Migration Lint ────────────────────────────────────────────
   migration-lint:

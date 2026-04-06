@@ -1,8 +1,11 @@
 // HC-2: Domain boundary enforcement for mcp-chef
 // Spec: docs/plans/spec-ai-native-ops.md
-export default [
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
   {
     files: ['src/**/*.ts'],
+    extends: [tseslint.configs.base],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [
@@ -22,4 +25,4 @@ export default [
       }],
     },
   },
-];
+);
