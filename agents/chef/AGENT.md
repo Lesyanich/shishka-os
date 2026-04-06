@@ -15,14 +15,17 @@ AI-шеф Shishka OS. Управляет номенклатурой (RAW/PF/MOD/
 5. Читай остальные domain-файлы **по необходимости** (см. секцию Domain Files).
 
 ### Business Knowledge (Bible)
-При задачах, требующих бизнес-контекста (R&D блюд, оптимизация меню, анализ конкурентов):
-1. Прочитай `docs/bible/INDEX.md` → определи какие файлы нужны.
-2. Загрузи релевантные файлы. Типичный набор для Chef:
-   - `docs/bible/menu-concept.md` — CBS, 3-Axis Booster, L1→L2 workflow
-   - `docs/bible/menu-items.md` — текущее меню, блюда, ингредиенты
-   - `docs/bible/operations.md` — зоны кухни, bottleneck, cold chain
-   - `docs/bible/equipment.md` — оборудование с Unit ID
-3. **НЕ редактируй файлы библии напрямую.** Если обнаружил новое знание → создай `field_note` через MC или Tier 1 задачу.
+
+**Core (загружай каждую сессию — ~3K токенов):**
+- `docs/bible/menu-concept.md` — CBS, 3-Axis Booster, L1→L2 workflow, Food Cost Target
+- `docs/bible/identity.md` — бренд, USP, философия, ключевые отличия
+
+**On-demand (загружай по необходимости):**
+- `docs/bible/menu-items.md` — текущее меню, блюда, ингредиенты
+- `docs/bible/operations.md` — зоны кухни, bottleneck, cold chain
+- `docs/bible/equipment.md` — оборудование с Unit ID
+
+**НЕ редактируй файлы библии без одобрения Леси.** Используй Bible Proposal Protocol (WF-8).
 
 ## Autonomy Model
 
@@ -201,6 +204,40 @@ Chef Agent подключает **два** MCP-сервера:
 5. После выбора → перейти к WF-1 или WF-3
 ```
 
+### WF-8: Bible Proposal (изменения в бизнес-контексте)
+
+```
+Когда обнаружил, что библия нуждается в обновлении
+(новое знание, устаревшая информация, результаты тестов, новая техника):
+
+1. ПОКАЗАТЬ ПРЕДЛОЖЕНИЕ в чате:
+   📖 Bible Proposal:
+   Файл: [menu-concept.md / identity.md / ...]
+   Секция: [путь к секции, напр. "CBS > Axis A > Examples"]
+   Действие: [добавить / заменить / удалить]
+   Текущий текст: > ...
+   Предлагаемый текст: > ...
+   Обоснование: [почему]
+
+2. ЖДАТЬ РЕШЕНИЕ Леси:
+   ├─ "Отправляй" → emit_business_task:
+   │    title: "Bible: {file} — {action} {section}"
+   │    domain: kitchen
+   │    tags: ["bible-proposal"]
+   │    status: done
+   │    related_ids: {bible_file: "...", bible_section: "..."}
+   │  → Внести правку в файл
+   │  → Обновить Change Log в docs/bible/INDEX.md
+   │
+   └─ "Подумаю" → emit_business_task:
+        title: "Bible proposal: {file} — {section}"
+        domain: kitchen
+        tags: ["bible-proposal"]
+        status: inbox
+        description: текущий текст + предлагаемый + обоснование
+        related_ids: {bible_file: "...", bible_section: "..."}
+```
+
 ## Rules
 
 ### Immutable (из P0 + Lego)
@@ -280,6 +317,43 @@ Chef Agent подключает **два** MCP-сервера:
 1. **Autonomy override**: запись разрешена без подтверждения, НО только для read-heavy workflows (WF-2 Audit, WF-5 Discovery).
 2. **Write workflows** (WF-1, WF-3, WF-4, WF-6) — создать Tier 1 задачу с предложением, НЕ выполнять.
 3. **Отчёт** — записать результат в session-log + создать summary Tier 1 задачу.
+
+## Launch Options
+
+### Terminal (primary — экономит токены)
+
+```bash
+# Из корня репо:
+bash agents/chef/launch.sh
+
+# С opus для сложных R&D задач:
+CHEF_MODEL=opus bash agents/chef/launch.sh
+```
+
+Что делает скрипт:
+- Запускает Claude Code из корня репо (чтобы .mcp.json и пути работали)
+- `--append-system-prompt-file` загружает `cowork-project-instructions.md` как системный промпт (~2K токенов)
+- `--allowedTools` авто-одобряет read-тулы chef + MC (не спрашивает permission)
+- Начальный промпт из `first-prompt.md` запускает загрузку контекста
+- Write-тулы (create_product, add_bom_line и т.д.) НЕ в allowedTools → Claude спрашивает permission = confirm-all
+
+Token overhead: ~5K (root CLAUDE.md + chef prompt) vs ~20K в Cowork.
+
+### Cowork (для brainstorm, планирования меню)
+
+1. Создать проект в Cowork
+2. Project Instructions → скопировать содержимое `cowork-project-instructions.md`
+3. Подключить папку Shishka healthy kitchen
+4. Первое сообщение → скопировать `first-prompt.md`
+
+### Файлы конфигурации
+
+| Файл | Назначение |
+|------|-----------|
+| `launch.sh` | Скрипт запуска для терминала |
+| `cowork-project-instructions.md` | Системный промпт (compact, для обоих режимов) |
+| `first-prompt.md` | Начальный промпт (копировать в первое сообщение) |
+| `AGENT.md` | Полная спецификация (reference, не грузится автоматически) |
 
 ## MCP Server Reference
 

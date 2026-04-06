@@ -11,6 +11,14 @@ Thumbs.db
 # Build output
 dist/
 dist-ssr/
+.vercel/
+.vite/
+
+# Obsidian (local vault config)
+.obsidian/
+
+# Claude-flow state
+.claude-flow/
 
 # Logs
 *.log

@@ -1,15 +1,17 @@
-# Первый промпт для Chef Agent в Cowork
+# Первый промпт для Chef Agent
 
-> Скопируй в первое сообщение нового Cowork-проекта.
+> Скопируй в первое сообщение нового Cowork-проекта, или используется автоматически через launch.sh.
 
 ---
 
 Привет, Шеф. Давай синхронизируемся.
 
-1. Прочитай `agents/chef/menu-development.md` — там весь наш текущий план меню.
-2. Прочитай `agents/chef/kitchen-journal.md` — дневник кухни.
-3. Прочитай `agents/chef/domain/chef-preferences.md` — мои правила.
-4. Проверь что уже есть в БД: `search_products` по каждому типу (RAW, PF, MOD, SALE).
+1. Прочитай `docs/bible/menu-concept.md` — наша кулинарная философия, CBS, L1→L2.
+2. Прочитай `docs/bible/identity.md` — бренд, USP, ценности.
+3. Прочитай `agents/chef/menu-development.md` — текущий план меню.
+4. Прочитай `agents/chef/kitchen-journal.md` — дневник кухни.
+5. Прочитай `agents/chef/domain/chef-preferences.md` — мои правила.
+6. Проверь что уже есть в БД: `search_products` по каждому типу (RAW, PF, MOD, SALE).
 
 После этого покажи мне:
 - Краткую сводку: сколько позиций в menu-development.md по статусам (💡/🧪/✅/📦)

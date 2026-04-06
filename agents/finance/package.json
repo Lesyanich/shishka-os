@@ -1,0 +1,15 @@
+{
+  "name": "shishka-finance-agent",
+  "version": "2.0.0",
+  "description": "Finance Agent — Ollama/Gemma4 receipt parser (replaces Claude Sonnet)",
+  "type": "module",
+  "scripts": {
+    "start": "node ollama-agent.js",
+    "parse": "node ollama-agent.js",
+    "batch": "node ollama-agent.js --batch"
+  },
+  "dependencies": {
+    "openai": "^4.52.0",
+    "@supabase/supabase-js": "^2.43.0"
+  }
+}

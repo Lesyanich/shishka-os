@@ -1,4 +1,9 @@
 // ═══════════════════════════════════════════════════════════
+// DEPRECATED — 2026-04-06
+// This entire file is LEGACY code. DO NOT USE, DO NOT DEPLOY.
+// Replaced by: Finance Agent (Claude Sonnet vision) → see agents/finance/AGENT.md
+// Tracking: Initiative 96f18092, Task a35ff4e5
+// ═══════════════════════════════════════════════════════════
 // Google Apps Script: ReceiptParser
 // Phase 5.0f: Edge Function Callback Edition
 // ═══════════════════════════════════════════════════════════

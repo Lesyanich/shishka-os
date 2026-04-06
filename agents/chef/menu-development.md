@@ -44,7 +44,7 @@
 
 | # | Позиция | Статус | Заметки |
 |---|---------|--------|---------|
-| 1 | Хуммус (классический) | 💡 idea | — |
+| 1 | Хуммус (классический) | 🧪 testing | BOM v.A в БД. A/B тест запланирован (тахини 160 vs 200g, чеснок 6 vs 10g) |
 | 2 | Мутабель из баклажана | 💡 idea | — |
 | 3 | Мутабель из свёклы | 💡 idea | — |
 | 4 | Хуммус морковный | 💡 idea | — |
@@ -77,8 +77,69 @@
 | # | Позиция | Статус | Заметки |
 |---|---------|--------|---------|
 | 1 | Курица гриль — Шаверма | 💡 idea | Процесс как у нейтральной курицы, другой маринад |
-| 2 | Курица гриль — Тауук | 💡 idea | Процесс как у нейтральной курицы, другой маринад |
+| 2 | Курица гриль — Тауук | 🧪 testing | Спайс-матрица v1 готова. BOM на согласовании. |
 | 3 | Курица гриль — Нейтральная (маринованная) | 📦 in_db | PF-CHICKEN_GRILL_NEUTRAL уже есть |
+
+---
+
+### PF-CHICKEN_GRILL_TAWOOK — Shish Tawook (The Fresh Edition)
+**Статус:** 🧪 testing  
+**Концепция:** Wet-rub маринад на свежем чесноке (без чесночного порошка), кисломолочная основа (йогурт), авторская спайс-матрица с махлабом.
+
+#### Lego-цепочка:
+```
+RAW (специи × 9) → PF-SHISH_TAWOOK_SPICE_MIX (dry blend)
+                                    ↓
+RAW (курица, йогурт, масло, etc.) → PF-CHICKEN_GRILL_TAWOOK ← PF-SHISH_TAWOOK_SPICE_MIX
+```
+
+#### PF-SHISH_TAWOOK_SPICE_MIX — Сухая смесь специй (batch 530g = 10% scale)
+
+| Ингредиент | Граммов | Функция |
+|-----------|---------|---------|
+| Fine Coriander | 150g | Aromatic Backbone |
+| Smoked Paprika | 100g | Radiant Bronze Visual |
+| Fine Dried Mint | 70g | Vitality — High-level freshness |
+| Turmeric | 60g | Essential Golden Pigment |
+| White Pepper | 50g | Sophisticated Thermal Heat |
+| Fine Mahlab | 40g | SHiSHKA Signature: Nutty Undertone |
+| Fine Cardamom | 30g | Royal Olfactory Note |
+| Allspice (Pimento) | 20g | Luxury Substitute: Flavor Complexity |
+| Fine Cinnamon | 10g | Subtle Subsurface Warmth |
+| **TOTAL** | **530g** | — |
+
+*Дозировка: 30g сухой смеси на 1kg сырой курицы*
+
+#### Wet Rub Protocol (на 1 kg сырой курицы)
+
+| Компонент | Количество | Роль |
+|-----------|-----------|------|
+| PF-SHISH_TAWOOK_SPICE_MIX | 30g | Dry matrix |
+| Fresh Garlic (crushed) | 50g | Structural floor (no powder) |
+| Natural Yogurt | ~75g (~3 tbsp) | Enzyme activation |
+| Red Pepper Paste | ~15g (~1 tbsp) | Adhesion + color |
+| Tomato Paste | ~15g (~1 tbsp) | Adhesion + umami |
+| Extra Virgin Olive Oil | 50g | Functional fat, moisture |
+| Fresh Lemon Juice | 20g | Acid |
+| Apple Cider Vinegar | 20g | Acid |
+| Sea Salt | 12g | Mineral load |
+
+**Процесс:**
+1. Marinade: смешать всё → покрыть курицу → 6 часов при 4°C (минимум, Deep Infusion)
+2. Grill: термическое запечатывание
+3. Finishing: в процессе гриля смазывать чесночным маслом из маринада → caramelized exterior + structural moisture
+
+**IDs:**
+- `PF-SHISH_TAWOOK_SPICE_MIX`: d53bf82b-3cff-458e-8b6f-97fb8c494f5b
+- `PF-CHICKEN_GRILL_TAWOOK`: 91f0331c-5f2e-4ced-949d-de91082c043e
+
+**Чеклист для БД:**
+- BOM: ✅ (9 специй в спайс-миксе, 10 ингредиентов в маринаде)
+- Flow: ✅ (спайс-микс: 3 шага / 10 мин; таук: 5 шагов / 406 мин вкл. 6ч маринад)
+- КБЖУ: ⏳ — нет данных для RAW-CARDAMOM, RAW-CINNAMON-POWDER, RAW-YOGURT-GREEK, RAW-TOMATO-PASTE, RAW-VINEGAR-ACV
+- Cost: ⏳ — нет закупочных цен для RAW-PAPRIKA_SMOKED, RAW-MINT_DRIED, RAW-PEPPER_WHITE, RAW-FENUGREEK, RAW-CARDAMOM, RAW-ALLSPICE, RAW-YOGURT-GREEK, RAW-PEPPER_PASTE_RED, RAW-TOMATO-PASTE, RAW-OLIVE-OIL, RAW-LEMON-JUICE, RAW-SALT-PLAIN. Частичная стоимость: ~124 THB/kg (75% = курица)
+- Price: ⏳ (после получения всех закупочных цен)
+- Тест: ⏳ (первый замес не проводился)
 | 4 | Креветки (гриль или другой способ) | 💡 idea | Способ приготовления TBD |
 | 5 | Нут | 💡 idea | — |
 | 6 | Бобы | 💡 idea | — |
