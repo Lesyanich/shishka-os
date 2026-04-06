@@ -36,6 +36,11 @@ pnpm-debug.log*
 .claude/*
 !.claude/skills/
 !.claude/.claude-plugin/
+!.claude/commands/
+.claude/commands/*
+!.claude/commands/chef.md
+!.claude/commands/finance.md
+!.claude/commands/coo.md
 .agent/
 .cursorrules
 
