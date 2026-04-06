@@ -35,6 +35,6 @@ UPDATE business_tasks SET context_files = '["docs/plans/spec-ai-native-ops.md", 
 WHERE id = '9df2c5ff-fb1b-433c-b30d-a100b459ddaf';
 
 -- Self-register (Boris Rule #16)
-INSERT INTO migration_log (version, name, description, status)
-VALUES (98, 'seed_context_files', 'Seed context_files for HIGH priority tasks (Phase C)', 'applied')
-ON CONFLICT (version) DO NOTHING;
+INSERT INTO migration_log (filename, applied_by, checksum, notes)
+VALUES ('098_seed_context_files.sql', 'claude-code', md5('098_seed_context_files'), 'Seed context_files for HIGH priority tasks (Phase C)')
+ON CONFLICT DO NOTHING;

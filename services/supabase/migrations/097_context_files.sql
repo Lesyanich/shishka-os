@@ -31,11 +31,11 @@ END
 $$;
 
 -- 2. Self-register in migration_log (Boris Rule #16)
-INSERT INTO migration_log (version, name, description, status)
+INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  97,
-  'context_files',
-  'Add context_files JSONB column to business_tasks for scoped agent context (Phase B)',
-  'applied'
+  '097_context_files.sql',
+  'claude-code',
+  md5('097_context_files'),
+  'Add context_files JSONB column to business_tasks for scoped agent context (Phase B)'
 )
-ON CONFLICT (version) DO NOTHING;
+ON CONFLICT DO NOTHING;
