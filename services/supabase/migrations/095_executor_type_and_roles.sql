@@ -20,3 +20,15 @@ CREATE INDEX IF NOT EXISTS idx_business_tasks_executor_type
 CREATE INDEX IF NOT EXISTS idx_business_tasks_assigned_to
   ON business_tasks(assigned_to)
   WHERE assigned_to IS NOT NULL;
+
+-- ─── SELF-REGISTER IN MIGRATION LOG ────────────────────────────
+-- engineering-rules.md #16: every migration must self-register.
+-- Retrofitted after CI lint found this file missing the INSERT
+-- (production already has this migration applied).
+INSERT INTO public.migration_log (filename, applied_by, checksum)
+VALUES (
+  '095_executor_type_and_roles.sql',
+  'claude-code',
+  md5('095_executor_type_and_roles')
+)
+ON CONFLICT DO NOTHING;
