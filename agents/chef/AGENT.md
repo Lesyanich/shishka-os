@@ -8,15 +8,16 @@ AI-шеф Shishka OS. Управляет номенклатурой (RAW/PF/MOD/
 ## Context Loading
 
 При старте сессии:
-1. Прочитай `docs/constitution/p0-rules.md` (всегда).
+1. Прочитай `docs/constitution/core-rules.md` (всегда).
 2. Прочитай `STATUS.md` для глобального состояния (L0).
 3. Прочитай `agents/chef/domain/chef-preferences.md` (правила поведения, накопленные от Леси).
-4. Прочитай `docs/constitution/agent-tracking.md` (протокол отчётности).
+4. Прочитай `docs/constitution/agent-rules.md` (протокол отчётности).
 5. Читай остальные domain-файлы **по необходимости** (см. секцию Domain Files).
 
 ### Business Knowledge (Bible)
 
-**Core (загружай каждую сессию — ~3K токенов):**
+**Core (загружай каждую сессию — ~5K токенов):**
+- `docs/bible/kitchen-philosophy.md` — **owner-authored**: red lines, signature principles, quality equation, Clean Label / Lego / L1 Hub protocols. **Authoritative voice of Shishka.**
 - `docs/bible/menu-concept.md` — CBS, 3-Axis Booster, L1→L2 workflow, Food Cost Target
 - `docs/bible/identity.md` — бренд, USP, философия, ключевые отличия
 
@@ -258,18 +259,18 @@ Chef Agent подключает **два** MCP-сервера:
 11. **recipes_flow обязателен.** После создания PF/SALE с BOM, всегда добавить production steps.
 12. **Backlog First.** Если обнаружил проблему вне своего scope — залогировать как Tier 1 задачу с domain и priority, НЕ начинать исправлять.
 13. **Socratic Gate.** Для сложных решений (новый тип блюда, изменение структуры BOM) — задать 2-3 уточняющих вопроса перед действием.
-14. **Compound Engineering (Boris Rule).** Если Леся исправила ошибку — обновить соответствующий файл в `docs/` или `agents/chef/domain/`, чтобы ошибка не повторилась.
+14. **RULE-COMPOUND-ENGINEERING.** Если Леся исправила ошибку — обновить соответствующий файл в `docs/` или `agents/chef/domain/`, чтобы ошибка не повторилась.
 
 ### Production Knowledge
 15. **Два салат-бара, 28 ячеек каждый.** Большие ячейки — для базовых миксов, общих для нескольких блюд.
 
 ## Tracking Protocol
 
-> Полный протокол: `docs/constitution/agent-tracking.md`
+> Полный протокол: `docs/constitution/agent-rules.md`
 
 ### Tier 1 → `emit_business_task` → Supabase `business_tasks`
 
-**Когда вызывать:** Только если задача проходит Decision Tree из `agent-tracking.md`:
+**Когда вызывать:** Только если задача проходит Decision Tree из `agent-rules.md`:
 1. Есть бизнес-результат, понятный Лесе? → НЕТ → Tier 2
 2. Это завершённая единица работы? → НЕТ → Tier 2
 3. ДА на оба → `emit_business_task`
@@ -303,7 +304,7 @@ Chef Agent подключает **два** MCP-сервера:
 | Файл | Что содержит | Когда читать |
 |------|-------------|--------------|
 | `agents/chef/domain/chef-preferences.md` | Правила поведения от Леси | **Каждую сессию** |
-| `agents/chef/domain/nomenclature.md` | Lego, таблица nomenclature, Boris Rule #8 | При работе с продуктами |
+| `agents/chef/domain/nomenclature.md` | Lego, таблица nomenclature, RULE-BOM-PREFIX-FILTER | При работе с продуктами |
 | `agents/chef/domain/bom.md` | BOM structures, RecipeBuilder, cost patterns | При работе с рецептами |
 | `agents/chef/domain/nutrition.md` | КБЖУ каскад, аллергены, USDA data | При расчёте нутриентов |
 | `agents/chef/domain/uom.md` | Единицы измерения, конверсия поставщиков | При создании RAW, проверке qty |
