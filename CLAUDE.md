@@ -16,8 +16,9 @@ Shishka Healthy Kitchen ERP. Multiple projects, one Supabase backend.
    - `list_tasks(status="in_progress")` → continue from previous agent's `notes`
    - If empty → `list_tasks(status="inbox", priority="critical")` → propose to user
 3. **Load task context:** `get_task(id)` → read `spec_file` + `context_files` + `notes`
-4. If task has `context_files` → load ONLY those + `core-rules.md`. **Skip L1/L2.**
-5. If no context_files → use L1/L2 routing below
+4. **Skills routing (tech tasks only):** Read the `kind:*` tag from `get_task(id).tags`. Open `docs/operations/skills-services-policy.md` → "Kind → Skills mapping" subsection. Load all REQUIRED skills before first edit. Treat FORBIDDEN as a hard constraint, RECOMMENDED as judgment. If a tech-domain task has no `kind:*` tag → post a comment to the task asking COO for clarification and STOP. Do not guess.
+5. If task has `context_files` → load ONLY those + `core-rules.md`. **Skip L1/L2.**
+6. If no context_files → use L1/L2 routing below
 
 > **Workflow skill:** Read `.claude/skills/task-lifecycle/SKILL.md` for complete
 > session start → work → test → PR → MC update protocol.
