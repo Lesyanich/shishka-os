@@ -64,7 +64,7 @@ src/
 │   ├── supabase.ts     # Singleton Supabase-клиент
 │   ├── bom-walker.ts   # Рекурсивный обход BOM-дерева
 │   └── validators.ts   # Валидация (Lego, циклы, КБЖУ)
-├── tools/              # 19 MCP-инструментов
+├── tools/              # 14 MCP-инструментов
 ├── resources/          # Статические справочники
 └── prompts/            # Шаблоны воркфлоу
 ```
@@ -89,7 +89,7 @@ src/
 - `findSimilarProducts(name, code)` — fuzzy поиск дубликатов
 - `checkSupplierAvailability(name, id?)` — проверка в supplier_catalog
 
-## Tools (19)
+## Tools (14)
 
 ### Read-only (9)
 | # | Tool | Описание |
@@ -104,7 +104,7 @@ src/
 | 8 | `list_equipment` | Каталог оборудования (76 единиц, enriched schema) |
 | 9 | `check_inventory` | Остатки через v_inventory_by_nomenclature + low_stock alerts |
 
-### Write (6)
+### Write (5)
 | # | Tool | Описание |
 |---|------|----------|
 | 10 | `create_product` | Создание с валидацией (дубликаты, supplier, nutrition units) |
@@ -112,19 +112,9 @@ src/
 | 12 | `add_bom_line` | Добавление ингредиента (Lego + circular + yield_loss_pct) |
 | 13 | `remove_bom_line` | Удаление по ID или parent+ingredient |
 | 14 | `manage_recipe_flow` | CRUD для шагов приготовления (list/add/remove/set) |
-| 15 | `emit_business_task` | Создание бизнес-задачи в Mission Control (business_tasks) |
 
-### Task Management (3)
-| # | Tool | Описание |
-|---|------|----------|
-| 16 | `list_tasks` | Список задач MC с фильтрами (domain, status, priority, created_by) |
-| 17 | `get_task` | Полная информация о задаче по UUID (+ initiative, parent_task) |
-| 18 | `update_task` | Обновление статуса, приоритета, описания, notes, due_date, tags |
-
-### Knowledge (1)
-| # | Tool | Описание |
-|---|------|----------|
-| 19 | `search_knowledge` | Поиск по 193 кулинарным книгам (1478 карточек) |
+> **Note:** Mission Control tools (`list_tasks`, `get_task`, `update_task`, `emit_business_task`) live in `services/mcp-mission-control/`.
+> `search_knowledge` was removed 2026-04-07 — the JSON cookbook corpus was archived; use `agents/chef/domain/culinary-knowledge.md` or LightRAG instead.
 
 ## Resources (3)
 
@@ -163,6 +153,9 @@ src/
 
 - Migration 072: Нутриенты RAW ×10 (были per-100g, стали per base_unit)
 - bom-walker: lossFactor убран из nutrition (нутриенты не испаряются)
-- search_knowledge: defensive checks на массивы (cards, ingredients, tags)
 - create_product: валидация per-100g ошибки (calories < 500 при kg → error)
 - Новые tools: update_product, manage_recipe_flow
+
+## Changes (2026-04-07)
+
+- `search_knowledge` tool removed — JSON cookbook corpus (193 books / 1478 cards) was archived, tool returned empty results. Superseded by `agents/chef/domain/culinary-knowledge.md` and future LightRAG integration.

@@ -25,7 +25,6 @@ import { checkInventory } from "./tools/check-inventory.js";
 import { createProduct } from "./tools/create-product.js";
 import { addBomLine } from "./tools/add-bom-line.js";
 import { removeBomLine } from "./tools/remove-bom-line.js";
-import { searchKnowledge } from "./tools/search-knowledge.js";
 import { manageRecipeFlow } from "./tools/manage-recipe-flow.js";
 import { updateProduct } from "./tools/update-product.js";
 
@@ -225,21 +224,6 @@ server.tool(
   async (args) => jsonResult(await manageRecipeFlow(args))
 );
 
-// ─── Knowledge Tools ─────────────────────────────────────────────
-
-server.tool(
-  "search_knowledge",
-  "Search culinary knowledge base (193+ cookbooks). Returns ratios, techniques, hacks, pairings, chemistry. Use for menu planning and recipe development.",
-  {
-    query: z.string().describe("Search term — matches titles, content, tags, ingredients"),
-    type: z.enum(["ratio", "technique", "hack", "chemistry", "concept", "pairing", "substitution"]).optional().describe("Filter by card type"),
-    ingredient: z.string().optional().describe("Filter by ingredient name"),
-    relevance: z.enum(["high", "medium", "low"]).optional().describe("Filter by Shishka relevance"),
-    limit: z.number().optional().describe("Max results (default: 10)"),
-  },
-  async (args) => jsonResult(await searchKnowledge(args))
-);
-
 // ─── Resources ───────────────────────────────────────────────────
 
 // Static resources (hardcoded reference data)
@@ -322,7 +306,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Chef Agent MCP server running on stdio`);
-  console.error(`   Tools: 15 | Resources: 3 | Prompts: 4`);
+  console.error(`   Tools: 14 | Resources: 3 | Prompts: 4`);
 }
 
 main().catch((err) => {
