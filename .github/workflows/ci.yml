@@ -108,11 +108,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check all migrations have self-register INSERT
+        # Rule: engineering-rules.md #16 — every migration MUST self-register
+        # in migration_log. Enforced only for files >= 095 because migrations
+        # 001–093 were baseline-seeded in 094_migration_tracking.sql and do
+        # not have (nor need) their own INSERT. 094 itself contains both the
+        # seed and its own self-register.
         run: |
           failed=0
           for f in services/supabase/migrations/*.sql; do
-            if ! grep -q 'INSERT INTO migration_log' "$f"; then
-              echo "::error file=$f::Missing self-register INSERT INTO migration_log (Boris Rule #16)"
+            base="$(basename "$f")"
+            num="${base%%_*}"
+            case "$num" in
+              ''|*[!0-9]*) num=0 ;;
+            esac
+            if [ "$num" -lt 95 ]; then
+              continue
+            fi
+            # Match both `INSERT INTO migration_log` and schema-qualified
+            # `INSERT INTO public.migration_log`.
+            if ! grep -Eq 'INSERT INTO (public\.)?migration_log' "$f"; then
+              echo "::error file=$f::Missing self-register INSERT INTO migration_log (engineering-rules.md #16)"
               failed=1
             fi
           done

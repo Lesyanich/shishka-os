@@ -27,8 +27,10 @@ validate_migration() {
   local issues=()
   local warns=()
 
-  # 1. Self-register check (Boris Rule #16)
-  if ! grep -q 'INSERT INTO migration_log' "$file"; then
+  # 1. Self-register check (engineering-rules.md #16)
+  # Match both `INSERT INTO migration_log` and the schema-qualified
+  # `INSERT INTO public.migration_log` form.
+  if ! grep -Eq 'INSERT INTO (public\.)?migration_log' "$file"; then
     issues+=("Missing self-register INSERT INTO migration_log")
   fi
 
