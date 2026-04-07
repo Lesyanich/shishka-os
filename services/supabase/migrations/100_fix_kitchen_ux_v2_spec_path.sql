@@ -2,20 +2,12 @@
 -- Tasks referenced 'docs/plans/spec-kitchen-ux-v2.md' but the actual file lives
 -- at 'docs/projects/app/plans/spec-kitchen-ux-v2.md'. Found during context_files
 -- audit (MC task e1f6963c). Fix tracked as MC task f3c13234.
+--
+-- NOTE: business_tasks has NO top-level `spec_file` column — the value lives in
+-- related_ids JSONB (MCP list_tasks exposes it as a derived field). Earlier
+-- draft of this migration tried to UPDATE spec_file directly and failed with
+-- 42703. Fixed version goes through jsonb_set only.
 
-UPDATE business_tasks
-SET spec_file = 'docs/projects/app/plans/spec-kitchen-ux-v2.md'
-WHERE id IN (
-  'd7bca994-f8f8-49ab-8cf3-341419417c4c',  -- Kitchen UX v2: Phase B — Planner + Staff Assignment
-  '7d49630d-d337-489b-9de6-ecb71540b696',  -- Kitchen UX v2: Phase C — Cook Feedback
-  '3b3a6e5b-f6cf-4a1b-af60-824e973a4283',  -- Kitchen UX v2: Phase D — Live Kitchen View
-  'a551a520-3d54-490e-9aa4-a30c398a4a85'   -- Kitchen UX v2: Phase E — BOM Hub Enhancement
-)
-  AND spec_file = 'docs/plans/spec-kitchen-ux-v2.md';
-
--- related_ids->>spec_file also holds the wrong path for 3 of the 4 tasks
--- (a551a520 keeps it only in the top-level column). Guarded so the jsonb_set
--- is a no-op if already corrected.
 UPDATE business_tasks
 SET related_ids = jsonb_set(
   related_ids,
@@ -23,9 +15,10 @@ SET related_ids = jsonb_set(
   '"docs/projects/app/plans/spec-kitchen-ux-v2.md"'::jsonb
 )
 WHERE id IN (
-  'd7bca994-f8f8-49ab-8cf3-341419417c4c',  -- Phase B
-  '7d49630d-d337-489b-9de6-ecb71540b696',  -- Phase C
-  '3b3a6e5b-f6cf-4a1b-af60-824e973a4283'   -- Phase D
+  'd7bca994-f8f8-49ab-8cf3-341419417c4c',  -- Phase B — Planner + Staff Assignment
+  '7d49630d-d337-489b-9de6-ecb71540b696',  -- Phase C — Cook Feedback
+  '3b3a6e5b-f6cf-4a1b-af60-824e973a4283',  -- Phase D — Kitchen Live + Dashboard
+  'a551a520-3d54-490e-9aa4-a30c398a4a85'   -- Phase E — BOM Hub Enhancement
 )
   AND related_ids->>'spec_file' = 'docs/plans/spec-kitchen-ux-v2.md';
 
