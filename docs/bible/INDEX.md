@@ -21,6 +21,7 @@
 | File | Domains | Agents | Load When |
 |------|---------|--------|-----------|
 | `identity.md` | all | all | Brand questions, investor materials, marketing, onboarding |
+| `kitchen-philosophy.md` | kitchen | chef | **CORE — load every session.** Owner-authored. Red lines, signature principles, quality equation, protocols (Clean Label, Lego, L1 Hub) |
 | `menu-concept.md` | kitchen, marketing | chef, marketing | Menu design, CBS application, new dish creation, food philosophy |
 | `menu-items.md` | kitchen, procurement, sales | chef, procurement | Specific dishes, ingredients, BOM, procurement planning |
 | `operations.md` | kitchen, ops | chef, ops | Production workflow, L1→L2 logistics, cold chain, staffing |
@@ -46,3 +47,4 @@ Sources: `ceo` | `cook` | `admin` | `agent` | `partner`
 | Date | File | Change | By |
 |------|------|--------|----|
 | 2026-04-05 | all | Initial creation from Notion SHISHKA CORE HUB export | CEO + COO |
+| 2026-04-07 | kitchen-philosophy.md | Created from owner interview — replaces planned book RAG | CEO + COO |
