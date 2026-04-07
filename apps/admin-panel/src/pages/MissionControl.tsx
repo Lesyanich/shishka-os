@@ -39,7 +39,6 @@ import {
 import { KanbanBoard } from '../components/mission-control/KanbanBoard'
 import { TaskDetailPanel } from '../components/mission-control/TaskDetailPanel'
 import { useRole } from '../contexts/RoleContext'
-import type { ExecutorType } from '../hooks/useBusinessTasks'
 
 // ── Domain config ──
 

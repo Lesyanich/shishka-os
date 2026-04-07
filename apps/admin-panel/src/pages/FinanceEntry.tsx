@@ -302,7 +302,6 @@ export function FinanceEntry() {
       supabase.removeChannel(channel)
       clearInterval(fallbackTimer)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingJobId])
 
   const handleCreated = () => {

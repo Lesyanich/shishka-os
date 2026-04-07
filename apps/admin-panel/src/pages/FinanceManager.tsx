@@ -274,7 +274,6 @@ export function FinanceManager() {
       window.removeEventListener('receipt-job-resolved', onResolved)
       window.removeEventListener('receipt-job-failed', onFailed)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /* Lazy-loaded nomenclature for staging area food item mapping */
@@ -375,7 +374,6 @@ export function FinanceManager() {
       supabase.removeChannel(channel)
       clearInterval(fallbackTimer)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingJobId])
 
   const handleCreated = () => {

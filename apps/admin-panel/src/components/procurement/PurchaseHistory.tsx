@@ -85,6 +85,10 @@ export function PurchaseHistory({ refreshKey }: { refreshKey: number }) {
 
     setRows(mapped)
     setIsLoading(false)
+    // refreshKey is not read inside the callback, but it is intentionally
+    // included so that bumping it from the parent changes the memoized
+    // identity and triggers the useEffect below to refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey])
 
   useEffect(() => {
