@@ -22,10 +22,11 @@ if git diff --cached --name-only | grep -q "^apps/admin-panel/"; then
 fi
 
 # --- 2. ESLint with zero warnings (admin-panel) ---
-if git diff --cached --name-only | grep -q "^apps/admin-panel/.*\.\(ts\|tsx\)$"; then
+# --diff-filter=ACMR excludes deleted files (D) so lint doesn't choke on them
+if git diff --cached --name-only --diff-filter=ACMR | grep -q "^apps/admin-panel/.*\.\(ts\|tsx\)$"; then
   echo "[eslint] Linting admin-panel..."
   cd apps/admin-panel
-  npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only | grep "^apps/admin-panel/.*\.\(ts\|tsx\)$" | sed 's|^apps/admin-panel/||')
+  npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only --diff-filter=ACMR | grep "^apps/admin-panel/.*\.\(ts\|tsx\)$" | sed 's|^apps/admin-panel/||')
   ESLINT_EXIT=$?
   cd ../..
   if [ $ESLINT_EXIT -ne 0 ]; then
@@ -37,10 +38,10 @@ fi
 
 # --- 2b. ESLint domain boundaries (MCP services) ---
 for MCP_SVC in mcp-chef mcp-finance mcp-mission-control; do
-  if git diff --cached --name-only | grep -q "^services/${MCP_SVC}/src/.*\.ts$"; then
+  if git diff --cached --name-only --diff-filter=ACMR | grep -q "^services/${MCP_SVC}/src/.*\.ts$"; then
     echo "[eslint] Linting ${MCP_SVC} domain boundaries..."
     cd "services/${MCP_SVC}"
-    npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only | grep "^services/${MCP_SVC}/src/.*\.ts$" | sed "s|^services/${MCP_SVC}/||")
+    npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only --diff-filter=ACMR | grep "^services/${MCP_SVC}/src/.*\.ts$" | sed "s|^services/${MCP_SVC}/||")
     MCP_LINT_EXIT=$?
     cd ../..
     if [ $MCP_LINT_EXIT -ne 0 ]; then
