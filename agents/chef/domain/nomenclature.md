@@ -1,6 +1,6 @@
 # Nomenclature Domain (Shared)
 
-## Lego Architecture (P0 Rule #3)
+## Lego Architecture (RULE-LEGO-ARCHITECTURE)
 
 ```
 RAW (Raw ingredients) -> PF (Semi-finished) -> MOD (Toppings) -> SALE (Dishes)
@@ -24,7 +24,7 @@ SSoT for ALL products. Key columns:
 - Nutrition: `calories`, `protein`, `carbs`, `fat`, `allergens`
 - Syrve: `syrve_uuid`, `syrve_tax_category_id`
 
-## Boris Rule #8: Filtering
+## RULE-BOM-PREFIX-FILTER: Filtering
 
 **CRITICAL**: Nomenclature tabs MUST filter by `product_code` prefix using `.ilike('product_code', 'PREFIX-%')`.
 NEVER use `.or()` with `type` field -- types can be ambiguous.

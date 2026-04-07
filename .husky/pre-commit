@@ -51,7 +51,7 @@ for MCP_SVC in mcp-chef mcp-finance mcp-mission-control; do
   fi
 done
 
-# --- 3. Migration canary (Boris Rule #16) ---
+# --- 3. Migration canary (RULE-MIGRATION-TRACKING) ---
 if git diff --cached --name-only | grep -q "^services/supabase/migrations/.*\.sql$"; then
   echo "[migration-canary] Validating staged migrations..."
   for f in $(git diff --cached --name-only | grep "^services/supabase/migrations/.*\.sql$"); do

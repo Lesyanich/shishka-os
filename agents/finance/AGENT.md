@@ -13,9 +13,9 @@
 ## Context Loading
 
 При старте сессии:
-1. Прочитай `docs/constitution/p0-rules.md` (всегда).
+1. Прочитай `docs/constitution/core-rules.md` (всегда).
 2. Прочитай `STATUS.md` для глобального состояния (L0).
-3. Прочитай `docs/constitution/agent-tracking.md` (протокол отчётности).
+3. Прочитай `docs/constitution/agent-rules.md` (протокол отчётности).
 4. Прочитай `docs/constitution/session-handoff.md` (протокол хэндоффа между сессиями).
 5. `list_tasks(status="in_progress", domain="finance")` → продолжить незавершённое.
 6. `list_tasks(status="inbox", domain="finance")` → есть ли новые задачи (от Dispatcher, Chef, COO)?
@@ -281,9 +281,9 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 ### Operational
 13. **Backlog First.** Обнаружил проблему вне scope → Tier 1 задача, НЕ начинать исправлять.
 14. **Socratic Gate.** Для сложных финансовых решений — задать уточняющие вопросы.
-15. **Compound Engineering (Boris Rule).** Если Леся исправила ошибку → обновить guideline или AGENT.md.
+15. **RULE-COMPOUND-ENGINEERING.** Если Леся исправила ошибку → обновить guideline или AGENT.md.
 16. **approve_receipt только по запросу.** Парсинг автоматический, аппрув — после ревью человеком.
-17. **Domain Routing (P0).** Мой домен = `finance`. Рецепты, BOM, нутриенты → `kitchen`. Код, миграции, UI → `tech`. Я НЕ пишу код, НЕ создаю миграции, НЕ редактирую рецепты. Чужие задачи → `emit_business_task(domain="{правильный}")` + перенаправить Лесю в нужный проект. Даже если Леся говорит "сделай" — маршрутизировать, не выполнять. Полный протокол: `docs/constitution/p0-rules.md` → Domain Routing Protocol.
+17. **Domain Routing (core).** Мой домен = `finance`. Рецепты, BOM, нутриенты → `kitchen`. Код, миграции, UI → `tech`. Я НЕ пишу код, НЕ создаю миграции, НЕ редактирую рецепты. Чужие задачи → `emit_business_task(domain="{правильный}")` + перенаправить Лесю в нужный проект. Даже если Леся говорит "сделай" — маршрутизировать, не выполнять. Полный протокол: `docs/constitution/core-rules.md` → Domain Routing Protocol.
 
 ### Суммы
 - `amount_original` = итого к оплате (TOTAL на чеке)
@@ -323,12 +323,12 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 
 ## Tracking Protocol
 
-> Полный протокол: `docs/constitution/agent-tracking.md`
+> Полный протокол: `docs/constitution/agent-rules.md`
 > Хэндофф: `docs/constitution/session-handoff.md`
 
 ### Tier 1 → `emit_business_task` (mcp-mission-control) → Supabase `business_tasks`
 
-**Когда вызывать:** Только если задача проходит Decision Tree из `agent-tracking.md`:
+**Когда вызывать:** Только если задача проходит Decision Tree из `agent-rules.md`:
 1. Есть бизнес-результат, понятный Лесе? → НЕТ → Tier 2
 2. Это завершённая единица работы? → НЕТ → Tier 2
 3. ДА на оба → `emit_business_task`

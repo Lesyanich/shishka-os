@@ -161,7 +161,7 @@ Bulk action: "Assign to sprint" — выбрать задачи → добави
 
 ### 4.4 Agent Protocol Update
 
-`docs/constitution/agent-tracking.md` обновить:
+`docs/constitution/agent-rules.md` обновить:
 
 **Было (Tier 2):** агент пишет в `agents/{name}/session-log.md`
 **Стало (Tier 2):** агент пишет `add_comment(task_id, body)` к текущей задаче
@@ -212,7 +212,7 @@ Sprint-2 (следующая неделя):
   1. Admin Panel: Sprint Board page
   2. Admin Panel: Backlog page
   3. Admin Panel: Task Detail + Comments
-  4. Protocol update: agent-tracking.md v2
+  4. Protocol update: agent-rules.md v2
 
 Sprint-3 (по мере необходимости):
   1. n8n automation layer

@@ -75,7 +75,7 @@ src/
 - **Напоминай CEO о мерже** если feature-ветка опережает main на 5+ коммитов.
 - **URL:** admin-panel-six-dun.vercel.app
 
-## Immutable Rules (из p0-rules.md)
+## Immutable Rules (из core-rules.md)
 - SSoT = Supabase. UI — зеркало.
 - UUID everywhere.
 - No Direct DB Edits — только SQL миграции.

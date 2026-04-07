@@ -96,10 +96,10 @@
   - Queries: MC tasks filtered by domain + tags, git log for `feature/{project}/*` branches, migration_log for project-tagged migrations
   - Output: structured JSON (не файл, а ответ агенту)
   - Заменяет ручное чтение CURRENT.md
-- **P0 Rule #5 (переформулировка):**
+- **RULE-COMPUTED-STATUS (переформулировка):**
   - БЫЛО: «Always read STATUS.md before starting a task and update it after completion»
   - СТАЛО: «Always call `generate_status` at session start. STATUS.md is auto-generated on commit — never edit it manually. If MC tasks don't reflect reality, update them via `update_task`.»
-- **Commit Gate (Boris #11, переформулировка):**
+- **RULE-COMMIT-GATE (переформулировка):**
   - БЫЛО: «Global STATUS.md updated»
   - СТАЛО: «MC task updated (status, notes). STATUS.md auto-generates on commit.»
 
@@ -153,8 +153,8 @@
 | B1 | MCP tool `generate_status` в shishka-mission-control | Новый tool + тесты |
 | B2 | MCP tool `get_project_state(project)` | Новый tool + тесты |
 | B3 | Post-commit hook: вызов `generate_status` (заменяет заглушку A4) | `.husky/post-commit` update |
-| B4 | Обновить p0-rules.md: Rule #5 переформулировка | docs/constitution update |
-| B5 | Обновить Commit Gate (Boris #11): от файлов к MC tasks | docs/constitution update |
+| B4 | Обновить core-rules.md: RULE-COMPUTED-STATUS переформулировка | docs/constitution update |
+| B5 | Обновить RULE-COMMIT-GATE: от файлов к MC tasks | docs/constitution update |
 | B6 | `context_files` column в `business_tasks` | SQL migration |
 | B7 | Morning triage skill: использует `generate_status` | Skill update |
 
@@ -192,9 +192,9 @@
 
 | Rule | Изменение |
 |------|-----------|
-| P0 Rule #5 | «update STATUS.md» → «verify MC tasks» |
-| Boris Rule #11 (Commit Gate) | STATUS.md убираем из чек-листа (auto-generated) |
-| Boris Rule #15 (MCP Identity) | Усилен ESLint + RLS (HC-2) |
+| RULE-COMPUTED-STATUS | «update STATUS.md» → «verify MC tasks» |
+| RULE-COMMIT-GATE | STATUS.md убираем из чек-листа (auto-generated) |
+| RULE-MCP-IDENTITY | Усилен ESLint + RLS (HC-2) |
 | CLAUDE.md L0 | «Read STATUS.md» остаётся (файл теперь computed) |
 | CLAUDE.md L2 | Добавлен task-scoped context override |
 | Agent Tracking (Tier 1/2) | Без изменений |

@@ -22,5 +22,5 @@
 <!-- e.g., "Shishka is a healthy kitchen — minimize sugar, maximize whole ingredients" -->
 
 ## Learned Corrections
-<!-- Rules added after mistakes. Like Boris Rules but for the chef agent. -->
+<!-- Rules added after mistakes. Like engineering rules but for the chef agent. -->
 <!-- Format: "WRONG: [what agent did] → RIGHT: [what it should do]" -->

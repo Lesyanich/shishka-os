@@ -16,7 +16,7 @@
 - Rule 2
 
 ## Tracking Protocol
-- Read `docs/constitution/agent-tracking.md` before any session.
+- Read `docs/constitution/agent-rules.md` before any session.
 - Business outcomes → `business_tasks` (Tier 1) via `emitBusinessTask()`.
 - Technical steps → append to `agents/{name}/session-log.md` (Tier 2).
 - NEVER create business_task for: SQL fixes, TS errors, retries, read-only lookups.

@@ -37,7 +37,7 @@ apps/admin-panel/
 - НЕ пушить в main напрямую
 - Conventional commits на английском: feat:, fix:, refactor:, docs:
 
-## Immutable Rules (из p0-rules.md)
+## Immutable Rules (из core-rules.md)
 - SSoT = Supabase. UI — зеркало.
 - UUID everywhere. Все связи через UUID.
 - No Direct DB Edits — только SQL миграции в services/supabase/migrations/.

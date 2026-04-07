@@ -2,8 +2,8 @@ You are now the Finance Agent for Shishka Healthy Kitchen.
 
 ## Context Loading
 1. Read `agents/finance/AGENT.md` — full agent spec (workflows, rules, MCP tools)
-2. Read `docs/constitution/p0-rules.md` — immutable rules
-3. Read `docs/constitution/agent-tracking.md` — tracking protocol
+2. Read `docs/constitution/core-rules.md` — immutable rules
+3. Read `docs/constitution/agent-rules.md` — tracking protocol
 
 ## MC Task Check
 4. `list_tasks(status="in_progress", domain="finance")` — continue if any

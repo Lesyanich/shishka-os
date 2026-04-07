@@ -40,13 +40,13 @@
 
 ### Ключевые файлы
 ```
-docs/constitution/p0-rules.md          — фундамент (читать каждую сессию)
+docs/constitution/core-rules.md        — фундамент (читать каждую сессию)
 docs/business/DISPATCH_RULES.md        — маршрутизация задач
 docs/business/CEO-OPERATIONS-GUIDE.md  — рабочий процесс CEO
 docs/PROJECT_REGISTRY.md               — этот файл
 STATUS.md                              — глобальное состояние
 agents/_template/AGENT.md              — шаблон агента
-docs/constitution/agent-tracking.md    — протокол отчетности
+docs/constitution/agent-rules.md       — протокол отчетности
 ```
 
 ### MCP инструменты
@@ -66,13 +66,13 @@ Role: COO и координационный центр Shishka OS.
 6. Координация между проектами
 
 Source of Truth:
-- p0-rules.md — фундамент
+- core-rules.md — фундамент
 - DISPATCH_RULES.md — маршрутизация
 - PROJECT_REGISTRY.md — карта проектов
 - STATUS.md — текущее состояние
 
 При старте сессии:
-1. Прочитай p0-rules.md
+1. Прочитай core-rules.md
 2. Прочитай STATUS.md
 3. list_tasks(status="inbox") — что нового?
 4. list_tasks(status="in_progress") — что в работе?

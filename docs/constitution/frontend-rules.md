@@ -30,5 +30,5 @@ Never let a widget crash on null.
 ## 7. Git Workflow
 Before starting any new major phase or feature, create a new git branch (e.g. `feature/phase-N-name`). Never commit directly to `main` during active development.
 
-## 8. BOM Hub Filtering (→ Boris Rule #8)
-See `docs/constitution/boris-rules.md` — filter strictly by product_code prefix.
+## 8. BOM Hub Filtering (→ RULE-BOM-PREFIX-FILTER)
+See `docs/constitution/engineering-rules.md` — filter strictly by product_code prefix.

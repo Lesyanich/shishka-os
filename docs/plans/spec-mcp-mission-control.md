@@ -108,7 +108,7 @@ services/mcp-mission-control/
 - `docs/PROJECT_REGISTRY.md` — указать что MC tools теперь отдельный MCP
 - `agents/chef/AGENT.md` — убрать MC tools из Capabilities, добавить ссылку на mcp-mission-control
 - `agents/finance/AGENT.md` — обновить Capabilities секцию
-- `docs/constitution/agent-tracking.md` — уточнить что emit_business_task из mcp-mission-control
+- `docs/constitution/agent-rules.md` — уточнить что emit_business_task из mcp-mission-control
 
 ## 8. Приёмка
 

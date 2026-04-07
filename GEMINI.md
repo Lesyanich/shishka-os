@@ -18,8 +18,9 @@ the relevant file content when you need it:
 | Working on...          | Ask user to provide                              |
 |------------------------|--------------------------------------------------|
 | Any task               | `STATUS.md`                                      |
-| P0 rules               | `docs/constitution/p0-rules.md`                  |
-| Boris Rules            | `docs/constitution/boris-rules.md`               |
+| Core rules             | `docs/constitution/core-rules.md`                |
+| Engineering rules      | `docs/constitution/engineering-rules.md`         |
+| Agent rules            | `docs/constitution/agent-rules.md`               |
 | Finance / Receipts     | `docs/modules/finance.md`                        |
 | Inventory              | `docs/modules/inventory.md`                      |
 | Kitchen / KDS          | `docs/modules/kitchen.md`                        |
