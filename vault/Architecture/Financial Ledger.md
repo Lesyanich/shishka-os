@@ -95,7 +95,7 @@ graph LR
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | UUID PK | Auto-generated |
-| `transaction_date` | DATE | From source document (Boris Rule #12) |
+| `transaction_date` | DATE | From source document (RULE-TXN-DATE-INTEGRITY) |
 | `flow_type` | TEXT | 'OpEx' or 'CapEx' |
 | `category_code` | INTEGER FK | `fin_categories.code` |
 | `sub_category_code` | INTEGER FK | `fin_sub_categories.sub_code` |

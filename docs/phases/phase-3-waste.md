@@ -39,7 +39,7 @@
 - `notes TEXT` — free-text notes per nomenclature item
 
 ### BOM Hub Improvements
-- Filter Bugfix: Sales tab STRICTLY shows SALE-% only (Boris Rule #8 created)
+- Filter Bugfix: Sales tab STRICTLY shows SALE-% only (RULE-BOM-PREFIX-FILTER created)
 - Add/Edit Item modals, Cost Badge, Editable BOM Table, Per-line Cost
 
 ### Migrations 016-019 all applied to Supabase.

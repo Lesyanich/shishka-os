@@ -4,13 +4,13 @@
 - `nomenclature` (id UUID) — Unified SSoT for ALL products. Fields: product_code, name, type, base_unit, cost_per_unit, price, slug, image_url, nutrition (calories/protein/carbs/fat/allergens), markup_pct, display_order, is_available, is_featured, notes
 - `bom_structures` (id UUID) — Dynamic BOM: parent_id FK, ingredient_id FK, quantity_per_unit, yield_pct, notes
 
-## Lego Architecture (P0 Rule #3)
+## Lego Architecture (RULE-LEGO-ARCHITECTURE)
 ```
 RAW (Raw ingredients) → PF (Semi-finished) → MOD (Toppings) → SALE (Dishes)
 ```
 Product codes: `RAW-%`, `PF-%`, `MOD-%`, `SALE-%`
 
-## Boris Rule #8: Filtering
+## RULE-BOM-PREFIX-FILTER: Filtering
 **CRITICAL**: Nomenclature tabs MUST filter by `product_code` prefix using `.ilike('product_code', 'PREFIX-%')`.
 NEVER use `.or()` with `type.eq.dish` — types can be ambiguous.
 

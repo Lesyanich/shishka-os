@@ -32,7 +32,7 @@
 - 029: `suppliers` SELECT policy → public read (was authenticated-only)
 
 ### Database Schema Note Created
-- `02_Obsidian_Vault/Database Schema.md` — Boris Rule #10 created
+- `02_Obsidian_Vault/Database Schema.md` — RULE-DB-SCHEMA-DOCS created
 
 ## Phase 4.4: AI Receipt Routing & Hub-Spoke Architecture
 
@@ -68,7 +68,7 @@ expense_ledger (Hub)
 
 ### Migration 034: Zero Data Loss
 - fn_approve_receipt v4: auto-create nomenclature `RAW-AUTO-{hash}` for unmapped food items
-- Boris Rule #12 created (transaction date integrity)
+- RULE-TXN-DATE-INTEGRITY created (transaction date integrity)
 
 ## Phase 4.6–4.17: OCR Evolution (Superseded)
 
@@ -78,7 +78,7 @@ Extensive iteration on receipt OCR accuracy:
 - 4.10-4.11: Edge Function OOM fix, Deno Base64 performance
 - 4.12: JSON truncation fix (max_tokens)
 - 4.13: Structured Outputs attempted → reverted (CFG compilation timeout)
-- 4.14: Async receipt_jobs + Realtime (Migration 036) — Boris Rule #13
+- 4.14: Async receipt_jobs + Realtime (Migration 036) — RULE-ASYNC-LLM-PATTERN
 - 4.15-4.16: Zero-footprint pipeline → WebP compression → UX tiling
 - 4.17: Two-stage GCV + gpt-4o-mini pipeline (Migration 037: ocr_text column)
 

@@ -64,7 +64,7 @@ Frontend (FinanceManager)
 - `GEMINI_API_KEY` — In GAS Script Properties
 
 ## Patterns & Gotchas
-- Boris Rule #13: Long-running AI tasks MUST use async pattern (receipt_jobs + Realtime)
+- RULE-ASYNC-LLM-PATTERN: Long-running AI tasks MUST use async pattern (receipt_jobs + Realtime)
 - WebP compression (quality 0.5) preserves resolution, reduces bytes ~95%
 - fn_cleanup_stale_receipt_jobs() — lazy cleanup of zombie jobs (>5min)
 - Module-scope cache in useSpokeData (not useRef) — survives component unmount

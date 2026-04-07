@@ -2,15 +2,21 @@
 
 ## Identity
 Shishka Healthy Kitchen ERP. Multiple projects, one Supabase backend.
-Russian for docs, English for code.
+
+## Language Contract (RULE-LANGUAGE-CONTRACT)
+- **Conversation with humans:** the human's language. CEO is Russian-speaking → reply in Russian. Partner Arabic → Arabic. Contractor English → English.
+- **Storage (DB, MC tasks, code, comments, commits, specs, AGENT.md, schemas):** **English only**, no exceptions.
+- **Translation is the receiving agent's job** — translate at the boundary, before writing to MC.
+- Verbatim CEO quotes allowed in `notes` field with `«guillemets»` when nuance matters.
+- Full rule: `docs/constitution/core-rules.md` § RULE-LANGUAGE-CONTRACT.
 
 ## L0: Session Start (MANDATORY, every session)
-1. Read `docs/constitution/p0-rules.md`
+1. Read `docs/constitution/core-rules.md` (foundational — was p0-rules.md, renamed 2026-04-07). For code/DB tasks, also load `docs/constitution/engineering-rules.md`. For agent behavior questions, load `docs/constitution/agent-rules.md`.
 2. **Pick up your task from MC:**
    - `list_tasks(status="in_progress")` → continue from previous agent's `notes`
    - If empty → `list_tasks(status="inbox", priority="critical")` → propose to user
 3. **Load task context:** `get_task(id)` → read `spec_file` + `context_files` + `notes`
-4. If task has `context_files` → load ONLY those + p0-rules. **Skip L1/L2.**
+4. If task has `context_files` → load ONLY those + `core-rules.md`. **Skip L1/L2.**
 5. If no context_files → use L1/L2 routing below
 
 > **Workflow skill:** Read `.claude/skills/task-lifecycle/SKILL.md` for complete
@@ -24,7 +30,7 @@ Russian for docs, English for code.
 |---------|-------|--------------|
 | `/chef` | Chef Agent | `agents/chef/AGENT.md` + kitchen MCP tools + MC tasks (domain=kitchen) |
 | `/finance` | Finance Agent | `agents/finance/AGENT.md` + finance MCP tools + receipt inbox |
-| `/coo` | COO Agent | `DISPATCH_RULES.md` + MC dashboard + all-domain tasks |
+| `/coo` | COO Agent | `agents/coo/AGENT.md` + `core-rules.md` + `agent-rules.md` + `DISPATCH_RULES.md` + MC dashboard (all domains) — full design in `docs/plans/spec-coo-v2.md` |
 
 **Auto-routing** — if user sends free text without selecting an agent, classify intent:
 
@@ -70,11 +76,11 @@ Specs: project-specific → `docs/projects/{project}/plans/spec-*.md`, shared �
 
 ## LK: Knowledge Base
 Bible: `docs/bible/INDEX.md` → load only relevant files. Domain: `docs/domain/*.md`. Business: `docs/business/DISPATCH_RULES.md`.
-Agents: `agents/{name}/AGENT.md` + `docs/constitution/agent-tracking.md`.
-Reference: `knowledge/` (cooking 1.9GB, industry, AI, phases).
+Agents: `agents/{name}/AGENT.md` + `docs/constitution/agent-rules.md` (was agent-tracking.md, renamed 2026-04-07).
+Reference: `knowledge/` (ai-learning, industry, phases — ~13MB total). Cooking PDFs archived 2026-04-07: see Dead Zones.
 
 ## L3: On-demand
-DB Schema → `vault/Architecture/Database Schema.md`. Architecture → `vault/Architecture/*.md`. Boris Rules → `docs/constitution/boris-rules.md`. Keys → `docs/keys-config.md`.
+DB Schema → `vault/Architecture/Database Schema.md`. Architecture → `vault/Architecture/*.md`. Engineering Rules → `docs/constitution/engineering-rules.md` (was boris-rules.md, renamed 2026-04-07). Keys → `docs/keys-config.md`.
 
 ## Dead Zones (DO NOT load, DO NOT reference for new work)
 
@@ -84,6 +90,7 @@ DB Schema → `vault/Architecture/Database Schema.md`. Architecture → `vault/A
 | `services/supabase/functions/parse-receipts/` | DEPRECATED — proxy to GAS, dead |
 | `services/supabase/functions/update-receipt-job/` | DEPRECATED — GAS callback, dead |
 | `_archive/` | Global archive — historical snapshots, old menu/equipment .md files, vault leftovers |
+| `_archive/cookbooks/` | 386 cookbook PDFs (1.8GB) archived 2026-04-07 — Claude's training corpus already covers the famous references (Sharma, Segnit, Lahousse, McGee, Modernist Cuisine, etc.); book RAG was abandoned. Personal reference only, not for agent context. |
 | `04_Knowledge/` | **REMOVED** — consolidated into `knowledge/` and `_archive/` (2026-04-06) |
 
 ## Rules (enforced)

@@ -4,7 +4,7 @@
  * Writes meaningful business outcomes to Supabase `business_tasks` table.
  * These appear in Mission Control UI (Kanban board).
  *
- * See docs/constitution/agent-tracking.md for the full protocol.
+ * See docs/constitution/agent-rules.md for the full protocol.
  * NEVER use this for technical sub-steps (SQL fixes, TS errors, retries).
  */
 

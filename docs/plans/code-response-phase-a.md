@@ -8,7 +8,7 @@
 
 ## 2. DB миграции — ИСПОЛЬЗУЙ check_migrations()
 
-**Boris Rule #16 нарушен.** Прежде чем спрашивать CEO "какие колонки существуют" — вызови `check_migrations()` через свой MCP (Mission Control). Этот инструмент у тебя ЕСТЬ. Миграция 094 создала `migration_log` и засеяла все 83+ миграций. Вызови — и увидишь что applied, что pending.
+**RULE-MIGRATION-TRACKING нарушен.** Прежде чем спрашивать CEO "какие колонки существуют" — вызови `check_migrations()` через свой MCP (Mission Control). Этот инструмент у тебя ЕСТЬ. Миграция 094 создала `migration_log` и засеяла все 83+ миграций. Вызови — и увидишь что applied, что pending.
 
 Для текущей схемы — прочитай `vault/Architecture/Database Schema.md` или `docs/domain/db-schema-summary.md`. Не спрашивай CEO о технических деталях БД.
 

@@ -61,7 +61,7 @@
 - Archived 60+ legacy files to _Archive/
 - Installed Obsidian Skills (kepano): obsidian-markdown, obsidian-bases, json-canvas, obsidian-cli, defuddle
 - Created `Shishka OS Architecture.md` with Mermaid diagram
-- Boris Rule #9 added (Obsidian Protocol)
+- RULE-ARCH-NOTE-SYNC added (Obsidian Protocol)
 
 ## Phase 5.4: Agent Skills & Capabilities
 - Installed Anthropic Skills: pdf, xlsx, skill-creator

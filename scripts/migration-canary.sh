@@ -7,7 +7,7 @@
 #   With arg: validates the specified file only
 #
 # Checks:
-#   1. File has self-register INSERT INTO migration_log (Boris Rule #16)
+#   1. File has self-register INSERT INTO migration_log (RULE-MIGRATION-TRACKING)
 #   2. Uses IF NOT EXISTS / IF EXISTS for safe re-runs
 #   3. No DROP TABLE without explicit comment "-- INTENTIONAL DROP"
 #   4. No TRUNCATE without explicit comment "-- INTENTIONAL TRUNCATE"

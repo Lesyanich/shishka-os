@@ -28,7 +28,7 @@ bible_pages (SSoT)          field_notes (input)
 ```
 
 ### Why Supabase, not Git files
-- P0 Rule #1: "Supabase is the ONLY source of truth"
+- RULE-SUPABASE-SSOT: "Supabase is the ONLY source of truth"
 - Admin panel already uses Supabase for everything
 - Full-text search via PostgreSQL `tsvector`
 - field_notes + bible_pages in one DB = natural JOINs

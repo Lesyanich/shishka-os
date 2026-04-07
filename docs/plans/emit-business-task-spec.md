@@ -1,6 +1,6 @@
 # ТЗ: MCP-тул `emit_business_task` + Миграция 091
 
-> Для терминального агента. Контекст: agents/chef/AGENT.md, docs/constitution/agent-tracking.md
+> Для терминального агента. Контекст: agents/chef/AGENT.md, docs/constitution/agent-rules.md
 
 ---
 
@@ -48,7 +48,7 @@
 
 ### 2.1 Регистрация в `src/index.ts`
 
-**Когда вызывать:** Только если задача проходит Decision Tree из `agent-tracking.md`:
+**Когда вызывать:** Только если задача проходит Decision Tree из `agent-rules.md`:
 1. Есть бизнес-результат, понятный Лесе? → НЕТ → Tier 2 (session-log.md)
 2. Это завершённая единица работы? → НЕТ → Tier 2
 3. ДА на оба → emit_business_task

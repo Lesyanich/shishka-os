@@ -75,10 +75,10 @@ server.tool("check_migrations",
 
 ### 5. Обновление конституции
 
-Добавить в `docs/constitution/p0-rules.md`:
+Добавить в `docs/constitution/engineering-rules.md`:
 
 ```markdown
-## Migration Tracking (Boris Rule #16)
+## Migration Tracking (RULE-MIGRATION-TRACKING)
 Every migration file MUST end with a self-register INSERT into migration_log.
 Before applying a migration manually, run check_migrations() to see pending list.
 After applying, verify the migration registered itself: check_migrations() should show it as 'applied'.
@@ -91,7 +91,7 @@ If migration crashed mid-way — INSERT manually with status='failed' and error_
 
 1. **Migration 094**: создать таблицу `migration_log` + seed всех 83 существующих файлов
 2. **MCP tool**: `check_migrations` в `services/mcp-mission-control/`
-3. **Constitution**: Boris Rule #16 в `p0-rules.md`
+3. **Constitution**: RULE-MIGRATION-TRACKING в `engineering-rules.md`
 4. **Build + verify**: `npm run build`, вызвать `check_migrations()` — должен показать 0 pending (после apply 094)
 
 ## Acceptance Criteria
@@ -99,5 +99,5 @@ If migration crashed mid-way — INSERT manually with status='failed' and error_
 - [ ] `migration_log` содержит записи для всех 83 миграций (014–093) + себя (094)
 - [ ] `check_migrations()` возвращает `{ applied: 84, pending: 0, failed: 0, drift: 0 }`
 - [ ] Новая миграция без self-register INSERT видна как `pending` в `check_migrations()`
-- [ ] Boris Rule #16 в конституции
+- [ ] RULE-MIGRATION-TRACKING в конституции
 - [ ] MC task closed

@@ -168,7 +168,7 @@ RPC: fn_start_production_task, fn_create_batches_from_task, fn_run_mrp, fn_appro
 ### Файлы для загрузки
 
 1. `docs/context/state/CURRENT.md`
-2. `docs/context/constitution/p0-rules.md`
+2. `docs/context/constitution/core-rules.md`
 3. `docs/context/shared/db-schema-summary.md`
 4. `docs/context/projects/admin/modules/chef-agent.md`
 

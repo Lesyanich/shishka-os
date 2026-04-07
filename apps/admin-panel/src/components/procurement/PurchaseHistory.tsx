@@ -24,7 +24,7 @@ export function PurchaseHistory({ refreshKey }: { refreshKey: number }) {
   const fetchHistory = useCallback(async () => {
     setIsLoading(true)
 
-    // Two-query pattern (Boris Rule): purchase_logs + nomenclature + suppliers
+    // Two-query pattern (RULE-ASYNC-LLM-PATTERN style — engineering-rules.md): purchase_logs + nomenclature + suppliers
     const { data: logs, error: logsErr } = await supabase
       .from('purchase_logs')
       .select(

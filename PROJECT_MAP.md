@@ -63,4 +63,4 @@ shishka-os/
 
 - Read `STATUS.md` for current state and active tasks
 - Read `TECH_STACK.md` for infrastructure details
-- Read `docs/constitution/p0-rules.md` for immutable rules
+- Read `docs/constitution/core-rules.md` for immutable rules
