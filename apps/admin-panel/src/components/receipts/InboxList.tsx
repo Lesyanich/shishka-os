@@ -103,6 +103,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onApprove, onSkip
                 const badge = STATUS_BADGE[r.status]
                 const isExpanded = expandedId === r.id
                 const canExpand = r.parsed_payload && ['parsed', 'processed', 'skipped', 'error'].includes(r.status)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parsed_payload shape is dynamic
                 const pp = r.parsed_payload as Record<string, any> | null
 
                 // Use parsed data for supplier/amount if available

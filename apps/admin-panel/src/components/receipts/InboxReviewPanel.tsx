@@ -84,24 +84,23 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [showConfirm, setShowConfirm] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
 
-  const p = row.parsed_payload as Record<string, any>
-  if (!p) return null
-
-  // If expense_id exists, this receipt was already approved regardless of status
-  const isReadOnly = row.status === 'processed' || !!row.expense_id
-  const isSkippedStatus = row.status === 'skipped' && !row.expense_id
+  // NOTE: All hooks must run unconditionally (react-hooks/rules-of-hooks).
+  // The `if (!p) return null` early return is moved below the hook block;
+  // initializers use optional chaining so they are safe when p is null.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parsed_payload shape is dynamic, typing out of scope for this fix
+  const p = row.parsed_payload as Record<string, any> | null
 
   // ── Editable header state ──
-  const [supplierName, setSupplierName] = useState<string>(p.supplier_name || '')
-  const [transactionDate, setTransactionDate] = useState<string>(p.transaction_date || '')
-  const [receiptTotal, setReceiptTotal] = useState<number>(p.amount_original ?? 0)
-  const [invoiceNumber, setInvoiceNumber] = useState<string>(p.invoice_number || '')
+  const [supplierName, setSupplierName] = useState<string>(p?.supplier_name || '')
+  const [transactionDate, setTransactionDate] = useState<string>(p?.transaction_date || '')
+  const [receiptTotal, setReceiptTotal] = useState<number>(p?.amount_original ?? 0)
+  const [invoiceNumber, setInvoiceNumber] = useState<string>(p?.invoice_number || '')
   const [editingHeader, setEditingHeader] = useState(false)
 
   // ── Editable item state ──
-  const [foodItems, setFoodItems] = useState<FoodItem[]>(() => (p.food_items ?? []) as FoodItem[])
-  const [capexItems, setCapexItems] = useState<CapexItem[]>(() => (p.capex_items ?? []) as CapexItem[])
-  const [opexItems, setOpexItems] = useState<OpexItem[]>(() => (p.opex_items ?? []) as OpexItem[])
+  const [foodItems, setFoodItems] = useState<FoodItem[]>(() => (p?.food_items ?? []) as FoodItem[])
+  const [capexItems, setCapexItems] = useState<CapexItem[]>(() => (p?.capex_items ?? []) as CapexItem[])
+  const [opexItems, setOpexItems] = useState<OpexItem[]>(() => (p?.opex_items ?? []) as OpexItem[])
 
   // ── Checkboxes ──
   const [foodChecked, setFoodChecked] = useState<Set<number>>(() => new Set())
@@ -250,6 +249,13 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
         setNomMap(map)
       })
   }, [row.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Early return after all hooks have been called (rules-of-hooks).
+  if (!p) return null
+
+  // If expense_id exists, this receipt was already approved regardless of status
+  const isReadOnly = row.status === 'processed' || !!row.expense_id
+  const isSkippedStatus = row.status === 'skipped' && !row.expense_id
 
   const validate = (): string[] => {
     const errs: string[] = []

@@ -253,9 +253,19 @@ export function StagingArea({
   const [verifiedFood, setVerifiedFood] = useState<Set<number>>(new Set())
   const [verifiedOpex, setVerifiedOpex] = useState<Set<number>>(new Set())
   const toggleVerifiedFood = (i: number) =>
-    setVerifiedFood((prev) => { const next = new Set(prev); next.has(i) ? next.delete(i) : next.add(i); return next })
+    setVerifiedFood((prev) => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
   const toggleVerifiedOpex = (i: number) =>
-    setVerifiedOpex((prev) => { const next = new Set(prev); next.has(i) ? next.delete(i) : next.add(i); return next })
+    setVerifiedOpex((prev) => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
 
   // Category lookup: categoryId → { cat: L2 name, sub: L3 name }
   const categoryLookup = useMemo(() => {

@@ -118,8 +118,8 @@ export function useReceiptInbox(): UseReceiptInboxResult {
 
       await fetchData()
       return { ok: true, expense_id: data?.expense_id }
-    } catch (e: any) {
-      return { ok: false, error: e.message }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
   }, [fetchData])
 
