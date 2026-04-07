@@ -13,6 +13,22 @@ WHERE id IN (
 )
   AND spec_file = 'docs/plans/spec-kitchen-ux-v2.md';
 
+-- related_ids->>spec_file also holds the wrong path for 3 of the 4 tasks
+-- (a551a520 keeps it only in the top-level column). Guarded so the jsonb_set
+-- is a no-op if already corrected.
+UPDATE business_tasks
+SET related_ids = jsonb_set(
+  related_ids,
+  '{spec_file}',
+  '"docs/projects/app/plans/spec-kitchen-ux-v2.md"'::jsonb
+)
+WHERE id IN (
+  'd7bca994-f8f8-49ab-8cf3-341419417c4c',  -- Phase B
+  '7d49630d-d337-489b-9de6-ecb71540b696',  -- Phase C
+  '3b3a6e5b-f6cf-4a1b-af60-824e973a4283'   -- Phase D
+)
+  AND related_ids->>'spec_file' = 'docs/plans/spec-kitchen-ux-v2.md';
+
 -- Self-register (Boris Rule #16 / engineering-rules)
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
