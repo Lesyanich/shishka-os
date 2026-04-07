@@ -70,6 +70,8 @@ export async function generateStatus(args: {
       if (!allowOffline) {
         return { error: `DB error: ${error.message}` };
       }
+      // Offline mode: log and degrade to git-only instead of failing the hook.
+      console.warn(`[generate-status] DB query failed, degrading to git-only: ${error.message}`);
       offlineReason = `DB query failed: ${error.message}`;
     } else {
       allTasks = tasks ?? [];
@@ -102,7 +104,7 @@ export async function generateStatus(args: {
 
   // 3. Migration state (skip when offline)
   let latestMigration: { version: string; name: string; status: string; applied_at: string | null } | null = null;
-  if (sb && !offlineReason) {
+  if (!offlineReason && sb) {
     const { data: migrationData } = await sb
       .from("migration_log")
       .select("version, name, status, applied_at")
