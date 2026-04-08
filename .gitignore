@@ -41,6 +41,8 @@ pnpm-debug.log*
 !.claude/commands/chef.md
 !.claude/commands/finance.md
 !.claude/commands/coo.md
+!.claude/commands/strategy.md
+!.claude/commands/techlead.md
 .agent/
 .cursorrules
 
