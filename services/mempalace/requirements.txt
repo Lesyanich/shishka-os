@@ -1,0 +1,4 @@
+# MemPalace — L1 conversation memory for Shishka Brain v2
+# Spec: docs/plans/spec-mempalace-phase2.md
+# Pin explicitly; ChromaDB schema can drift between MemPalace minor versions.
+mempalace==3.0.0

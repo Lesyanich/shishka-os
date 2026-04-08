@@ -1,0 +1,19 @@
+## Clean sample for MemPalace pre-ingest filter
+##
+## This is ordinary conversation content. The filter MUST let it through.
+## If it ever starts failing, either the filter is too aggressive or a new
+## pattern overreached — investigate before shipping.
+
+CEO asked: what storage strategy did we pick for MemPalace?
+
+COO: Option B+ — live ~/.mempalace/ on FileVault-encrypted Mac, nightly
+age-encrypted tarball to GDrive _backups/mempalace/. Private key in Apple
+Keychain Secure Note. SQLite on GDrive corrupts within days because of
+lock-file and multi-file transaction semantics, so the live DB stays off
+GDrive entirely. Backups are binary blobs, gitignored.
+
+Decision rationale: we trade one manual Keychain step during setup for
+disaster recovery that works even if the Mac dies.
+
+Chef reminded us Makro delivers on Mondays — unrelated to this thread but
+captured for context.

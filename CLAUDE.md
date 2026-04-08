@@ -12,14 +12,15 @@ Shishka Healthy Kitchen ERP. Multiple projects, one Supabase backend.
 
 ## L0: Session Start (MANDATORY, every session)
 1. Read `docs/constitution/core-rules.md` (foundational — was p0-rules.md, renamed 2026-04-07). For code/DB tasks, also load `docs/constitution/engineering-rules.md`. For agent behavior questions, load `docs/constitution/agent-rules.md`.
-2. **Pick up your task from MC (ordered):**
+2. **Query MemPalace for Shishka Wing context (optional, ~170 tokens).** If the `shishka-mempalace` MCP server is listed in ToolSearch, call its wake-up tool for the `Shishka` wing. This surfaces cross-session decisions, CEO preferences, and recent pivots WITHOUT reading the last 20 MC Running Log comments manually. Skip silently if the server is absent (fresh machine, pre-restart, or Phase 2 not deployed yet). See `agents/*/AGENT.md` § Memory for routing between layers.
+3. **Pick up your task from MC (ordered):**
    - `list_tasks(status="in_progress")` → continue from previous agent's `notes`
    - If empty → filter by `tag="coo-autonomous"` on inbox → autonomous lane (see `RULE-AUTONOMOUS-LANE` in `agent-rules.md`); verify `kind:*` is on whitelist before picking up, refuse blacklisted combinations
    - If empty → `list_tasks(status="inbox", priority="critical")` → propose to user
-3. **Load task context:** `get_task(id)` → read `spec_file` + `context_files` + `notes`
-4. **Skills routing (tech tasks only):** Read the `kind:*` tag from `get_task(id).tags`. Open `docs/operations/skills-services-policy.md` → "Kind → Skills mapping" subsection. Load all REQUIRED skills before first edit. Treat FORBIDDEN as a hard constraint, RECOMMENDED as judgment. If a tech-domain task has no `kind:*` tag → post a comment to the task asking COO for clarification and STOP. Do not guess.
-5. If task has `context_files` → load ONLY those + `core-rules.md`. **Skip L1/L2.**
-6. If no context_files → use L1/L2 routing below
+4. **Load task context:** `get_task(id)` → read `spec_file` + `context_files` + `notes`
+5. **Skills routing (tech tasks only):** Read the `kind:*` tag from `get_task(id).tags`. Open `docs/operations/skills-services-policy.md` → "Kind → Skills mapping" subsection. Load all REQUIRED skills before first edit. Treat FORBIDDEN as a hard constraint, RECOMMENDED as judgment. If a tech-domain task has no `kind:*` tag → post a comment to the task asking COO for clarification and STOP. Do not guess.
+6. If task has `context_files` → load ONLY those + `core-rules.md`. **Skip L1/L2.**
+7. If no context_files → use L1/L2 routing below
 
 > **Workflow skill:** Read `.claude/skills/task-lifecycle/SKILL.md` for complete
 > session start → work → test → PR → MC update protocol.
