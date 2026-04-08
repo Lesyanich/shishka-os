@@ -193,6 +193,47 @@ LightRAG solves all three while keeping the existing L0/L1/L2 routing as fallbac
 - Validate query quality with 10 test questions per agent domain
 - Benchmark latency
 
+#### Phase 1 completion status (2026-04-08)
+
+**Indexed: 18/19 files** (clean state, no failed flag).
+- All 8 `docs/domain/*.md` files processed.
+- 10 of 11 `docs/bible/*.md` files processed.
+- Excluded: **`docs/bible/operations.md`** — see limitation below.
+
+**Stack as shipped:**
+- Local Python venv (`venv/`) + `lightrag-hku[api]` 1.4.13
+- Extraction LLM: `gemma4:e2b` via Ollama (local, ~9.6GB)
+- Embedding: `bge-m3` via Ollama (1024-dim, multilingual) — **permanently locked**
+- Storage: Supabase PostgreSQL + pgvector, tables `public.lightrag_*`, workspace `lightrag` (migration `099_lightrag_pgvector.sql`)
+- Graph: NetworkX file (`services/lightrag/rag_storage/`)
+- Ingest tuning: `MAX_PARALLEL_INSERT=1`, `TIMEOUT=600` (COO decision `d532e8ff`)
+
+**Note on schema location**: LightRAG-hku hardcodes the `public` schema in `postgres_impl.py` (~line 1608). A dedicated `lightrag` schema is not feasible without forking. Drop-safe boundary is preserved via the `lightrag_` table prefix + `workspace='lightrag'` row discriminator.
+
+##### Known limitation: `docs/bible/operations.md` excluded
+
+File is excluded from the LightRAG index. Both authorized local models walled out on it:
+
+| Model | Failure | Root cause |
+|-------|---------|------------|
+| `gemma4:e2b` | `ggml-metal-context.m:235 fatal error, command buffer 1 failed status 1` | Upstream llama.cpp Metal kernel bug, triggered deterministically by dense equipment codes (`L1-SPM-FRG-200-25`) + markdown tables. Not a timeout, not a contention issue — reproducible across 4 attempts with `MAX_PARALLEL_INSERT=1` and a fresh `ollama serve`. |
+| `qwen3:4b` (targeted fallback) | `httpcore.ReadTimeout` inside ollama SDK | `TIMEOUT=1800` env var does not propagate into `httpx.AsyncClient` used by the `ollama` python SDK. Qwen3 enters thinking mode, streams nothing for >300s, httpx default read-gap trips. Fix requires monkey-patching the ollama SDK — out of Phase 1 scope. |
+
+Forbidden escape routes under COO decision `6b845073` / `58080b93`:
+- ❌ `gemma3:12b` and any >5GB model (OOM-class, explicitly rejected)
+- ❌ Embedding swap (`bge-m3` permanently locked)
+- ❌ Chunk size changes (would force re-ingest of 18 working files)
+- ❌ Subscription proxies for Claude (ToS violation)
+
+**Agent fallback**: when any agent needs `operations.md` content it falls back to direct `Read(docs/bible/operations.md)` via the normal L2 file-loading path. `kind:*` skills routing already covers this file for ops-domain tasks.
+
+**Graph drift on the remaining 18 files**: `gemma4:e2b` frequently writes markdown tables instead of the `name|type|desc|source` delimiter format LightRAG expects. VDB chunks (via `bge-m3`) are fine; the graph layer is sparser than the framework assumes. Accepted as a Phase 1 limitation — model capability ceiling, not a config bug.
+
+**Phase 1.5 staged** (trigger only if Q2 cross-doc synthesis fails quality gate):
+- `$5` Anthropic prepay → `ANTHROPIC_API_KEY` → Apple Keychain → LightRAG extractor swap → `DELETE /documents` → re-ingest via Haiku 4.5 (~`$0.40`, ~10 min)
+- Claude used **only at ingest**. Queries stay on `gemma4:e2b` ($0 ongoing).
+- Fixes both the `operations.md` crash AND graph drift on the other 18 files in a single pass.
+
 ### Phase 2: MCP Integration (1 sprint)
 - Build `search_knowledge` MCP tool (TypeScript wrapper over REST API)
 - Integrate into Chef MCP and Finance MCP
