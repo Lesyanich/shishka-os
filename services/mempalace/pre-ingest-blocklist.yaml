@@ -1,0 +1,78 @@
+# MemPalace pre-ingest blocklist
+# Spec: docs/plans/spec-mempalace-phase2.md §4.2
+#
+# Every pattern here is a PCRE-compatible regex. filter.py scans candidate
+# content line-by-line AND across the full document (for multi-line matches).
+# A match → hard-fail (drop, NOT redact — spec §4.1).
+#
+# When adding a pattern:
+#   1. Add the regex here with a descriptive `name` + `severity`
+#   2. Add a matching fixture line to tests/fixtures/known-secrets.txt
+#   3. Run `python filter.py tests/fixtures/known-secrets.txt` — must still reject
+#   4. Document why in the `why` field (future-you will thank past-you)
+
+patterns:
+  # ── Credentials: Supabase ──────────────────────────────────────────────
+  - name: supabase_service_role_env_line
+    regex: 'VITE_SUPABASE_SERVICE_ROLE_KEY\s*=\s*\S+'
+    severity: critical
+    why: "Service role bypasses RLS — total DB compromise if leaked"
+
+  - name: supabase_service_role_jwt_prefix
+    regex: 'sbp_[A-Za-z0-9]{32,}'
+    severity: critical
+    why: "Supabase service role JWT prefix — same blast radius"
+
+  # ── Credentials: Anthropic / OpenAI / Google ───────────────────────────
+  - name: anthropic_api_key
+    regex: 'sk-ant-[A-Za-z0-9_\-]{40,}'
+    severity: critical
+    why: "Anthropic API key — billing + data exfil risk"
+
+  - name: openai_api_key
+    regex: 'sk-(?:proj-)?[A-Za-z0-9_\-]{40,}'
+    severity: critical
+    why: "OpenAI API key pattern (legacy + project-scoped)"
+
+  - name: google_oauth_token
+    regex: 'ya29\.[A-Za-z0-9_\-]{50,}'
+    severity: critical
+    why: "Google OAuth access token — GDrive + Gmail blast radius"
+
+  - name: google_service_account_json
+    regex: '"type"\s*:\s*"service_account"'
+    severity: critical
+    why: "GCP service account JSON key fragment"
+
+  # ── Credentials: generic ───────────────────────────────────────────────
+  - name: private_key_block
+    regex: '-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----'
+    severity: critical
+    why: "Any PEM-armored private key"
+
+  - name: aws_access_key_id
+    regex: 'AKIA[0-9A-Z]{16}'
+    severity: critical
+    why: "AWS access key ID format"
+
+  - name: generic_bearer_jwt
+    regex: 'eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}'
+    severity: high
+    why: "JWT shape — could be Supabase anon, service, or third-party"
+
+  # ── Personal identifiers ───────────────────────────────────────────────
+  - name: th_passport_number
+    regex: '\b[A-Z]{2}[0-9]{7}\b'
+    severity: high
+    why: "Thai passport pattern — local hires and partners"
+
+  - name: ru_passport_number
+    regex: '\b[0-9]{4}\s?[0-9]{6}\b'
+    severity: high
+    why: "Russian internal passport — CEO, founders, staff"
+
+  # ── Financial sensitivities ────────────────────────────────────────────
+  - name: payroll_salary_line
+    regex: '(?i)\b(salary|зарплата|payroll|ฐานเงินเดือน)\b.*\b[0-9]{4,}\b'
+    severity: high
+    why: "Individual payroll amounts — internal-only, not memory"
