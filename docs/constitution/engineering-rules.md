@@ -132,6 +132,23 @@ Workflow:
 
 ---
 
+## RULE-OLLAMA-MODEL-NAME-NORMALIZATION
+
+Ollama model tags are **not safe** to paste directly into anything that becomes part of a database schema, table name, filename, or other identifier. The implicit `:latest` suffix is the trap.
+
+**Canonical rules:**
+1. When a model is pulled without an explicit tag, Ollama stores it as `<name>:latest`. API responses return the literal stored tag, not a normalized short name.
+2. Downstream tools (e.g. LightRAG) sometimes derive table names, collection names, or cache keys from the model tag. `bge-m3` and `bge-m3:latest` produce **different** table names → silent split-brain: ingests write to one set of tables, queries read another, both succeed with zero data.
+3. **Always pin an explicit tag at pull time** (`ollama pull bge-m3:latest` or a versioned tag) AND **match that exact string** in every `.env`, config file, and schema reference.
+4. **Verify round-trip before ingesting:** `ollama list` → copy the tag **verbatim** → grep the same string in every config touching that model. If the strings don't byte-match, stop and reconcile before any write.
+5. When changing an embedding model name/tag after data exists, the change is **destructive**: existing vector tables are orphaned. Treat it as a migration, not a config edit.
+
+**Scope:** Applies to any integration where a model identifier reaches a schema-sensitive place — LightRAG, custom RAG stores, cache layers, vector DBs, prompt-hash keys.
+
+> Origin: 2026-04-08. LightRAG Phase 1 (task `996f1f86`). `.env` had `EMBEDDING_MODEL=bge-m3`, Ollama actually stored `bge-m3:latest`, LightRAG derived table names from the returned tag. Ingest wrote to `..._bge_m3_latest_*` tables, queries hit `..._bge_m3_*` tables → 0 results despite "successful" ingest. Option E graph layer recovery depended on catching this before the next reingest wiped the evidence.
+
+---
+
 ## Cross-References
 
 - DB SSoT and UUID rules → `core-rules.md` (`RULE-SUPABASE-SSOT`, `RULE-UUID-COMPLIANCE`)
