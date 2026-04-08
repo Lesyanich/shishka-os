@@ -119,7 +119,7 @@ server.tool(
       .describe("Filter by executor type"),
     assigned_to: z.string().optional().describe("Filter by assignee (e.g. 'lesia', 'bas')"),
     sprint_id: z.string().uuid().optional().describe("Filter by sprint UUID"),
-    limit: z.number().min(1).max(50).default(20).describe("Max results"),
+    limit: z.coerce.number().int().min(1).max(50).default(20).describe("Max results"),
     include_done: z.boolean().default(false)
       .describe("Include done/cancelled tasks (excluded by default)"),
   },
@@ -188,7 +188,7 @@ server.tool(
   {
     status: z.enum(["planning", "active", "review", "closed"]).optional()
       .describe("Filter by sprint status"),
-    limit: z.number().min(1).max(50).default(10).describe("Max results"),
+    limit: z.coerce.number().int().min(1).max(50).default(10).describe("Max results"),
   },
   async (args) => jsonResult(await listSprints(args))
 );
@@ -236,7 +236,7 @@ server.tool(
   "List comments for a business task, ordered chronologically.",
   {
     task_id: z.string().uuid().describe("UUID of the task"),
-    limit: z.number().min(1).max(100).default(20).describe("Max results"),
+    limit: z.coerce.number().int().min(1).max(100).default(20).describe("Max results"),
   },
   async (args) => jsonResult(await listComments(args))
 );
