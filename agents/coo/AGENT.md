@@ -101,9 +101,29 @@ Append one comment to **COO Running Log** task in MC with three sections:
 
 The COO has **no state file**. Working memory between sessions lives in:
 - MC tasks (the actual queue)
-- One permanent MC task **"COO Running Log"** (`id: 15c3d796-5aeb-43c4-bd64-835b5dc016b0`) with append-only comments (one per session)
+- MemPalace L1 conversation memory (see §Memory below) — primary since Phase 2
+- **COO Running Log** MC task (`id: 15c3d796-5aeb-43c4-bd64-835b5dc016b0`) — **interim, read-only archive** once MemPalace ships. New session-level reflection goes to MemPalace, not Running Log comments. See `spec-mempalace-phase2.md`.
 
 See `spec-coo-v2.md` § "Why no `coo-state.md` file" for the reasoning.
+
+## Memory
+
+Shishka Brain v2 has three orthogonal layers. Route queries by question shape, not keyword.
+
+| Question shape | Layer | Tool |
+|---|---|---|
+| "What did we decide last time about X?" | L1 Conversations | MemPalace `mempalace__*` |
+| "What does CEO prefer/hate?" | L1 Conversations | MemPalace |
+| "Why did we pivot from X to Y?" | L1 Conversations | MemPalace |
+| "What is <bible-id>?" / "What's our SOP?" | L2 Project Knowledge | LightRAG `:9621` |
+| "Where is function X?" / "What calls Y?" | L3 Code Structure | Graphify (when live) |
+| "What tasks are open?" | Action ledger | MC `shishka-mission-control` |
+
+**Rule:** no layer is a fallback for another. Knowledge gap in one layer → fix IN that layer, not by fishing elsewhere.
+
+**Session start:** MemPalace Wake-Up Protocol auto-loads ~170 tokens of critical facts for the `Shishka` Wing. Replaces manual reading of the last 20 MC Running Log comments.
+
+**COO examples:** cross-session decisions, task-routing patterns, CEO priorities, past architecture pivots, "why did we kill X", "what does CEO consistently hate".
 
 ## Tracking Protocol (Tier 1 / Tier 2)
 

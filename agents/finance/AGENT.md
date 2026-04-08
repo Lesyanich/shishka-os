@@ -321,6 +321,27 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 
 ---
 
+## Memory
+
+Shishka Brain v2 has three orthogonal layers. Route queries by question shape, not keyword.
+
+| Question shape | Layer | Tool |
+|---|---|---|
+| "What did we decide last time about X?" | L1 Conversations | MemPalace `mempalace__*` |
+| "What does CEO prefer/hate?" | L1 Conversations | MemPalace |
+| "Why did we pivot from X to Y?" | L1 Conversations | MemPalace |
+| "What is <bible-id>?" / "What's our SOP?" | L2 Project Knowledge | LightRAG `:9621` |
+| "Where is function X?" / "What calls Y?" | L3 Code Structure | Graphify (when live) |
+| "What tasks are open?" | Action ledger | MC `shishka-mission-control` |
+
+**Rule:** no layer is a fallback for another. Knowledge gap in one layer → fix IN that layer, not by fishing elsewhere.
+
+**Session start:** MemPalace Wake-Up Protocol auto-loads ~170 tokens of critical facts for the `Shishka` Wing. Replaces manual reading of the last 20 MC Running Log comments.
+
+**Finance examples:** supplier-pricing history, past categorisation calls (COGS vs OPEX vs CapEx), CEO rulings on ambiguous line items, nomenclature mapping decisions, past disputes with specific suppliers, tax-invoice edge cases.
+
+---
+
 ## Tracking Protocol
 
 > Полный протокол: `docs/constitution/agent-rules.md`
