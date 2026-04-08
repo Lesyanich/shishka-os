@@ -36,7 +36,7 @@ When you decide to hand off work to /code, /chef, /finance, or any executing age
 
 1. `emit_business_task(title, domain, priority, tags, related_ids)` — create the MC task
 2. `update_task(task_id, context_files=[...])` — add file paths the receiving agent needs
-3. `add_comment(task_id, body=scope)` — scope, acceptance gate, FORBIDDEN list, commit message. Split into multiple comments if > 2000 chars (until `3cc98121` raises the cap). **Every routing comment must carry all fields required by `RULE-HANDOFF-PACKET`** (lane, scope files, excluded files, commit/PR plan, commit message template, steps, skills to load, acceptance criteria, FORBIDDEN, blocks/blocked-by).
+3. `add_comment(task_id, body=scope)` — scope, acceptance gate, FORBIDDEN list, commit message. Cap is 32000 chars; split into multiple comments only if genuinely exceeded (full `RULE-HANDOFF-PACKET` packets fit in one comment). **Every routing comment must carry all fields required by `RULE-HANDOFF-PACKET`** (lane, scope files, excluded files, commit/PR plan, commit message template, steps, skills to load, acceptance criteria, FORBIDDEN, blocks/blocked-by).
 4. **Verify spec-committed-to-main** if the packet references a `docs/plans/spec-*.md` file: `git log --oneline main -- <spec-path>` must return at least one commit. Orphan-spec handoffs are forbidden by `RULE-SPEC-PROMOTION`.
 5. Return to CEO: `"<agent-command> <task-id>"` plus optionally ≤1 sentence of social context ("this is the bug from yesterday"). Nothing else.
 
