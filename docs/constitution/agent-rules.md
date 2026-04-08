@@ -109,6 +109,25 @@ A spec with `MC Task: TBD` is a violation. No TBD — create the task immediatel
 
 ---
 
+## RULE-SPEC-PROMOTION
+
+Architectural decisions, multi-step plans, and design specs **must** live in `docs/plans/spec-*.md` (or `docs/projects/{project}/plans/spec-*.md`), not inlined as MC task comments.
+
+Inlining a spec as a comment on an MC task is an **emergency fallback only** — valid when tooling is temporarily broken (e.g. `emit_business_task` rejects a payload, RPC is down, MCP server is unreachable) and losing the context is worse than breaking the rule.
+
+When you fall back to an inlined spec:
+
+1. **Immediately add a `TODO: promote to docs/plans/spec-*.md` marker** at the top of the comment
+2. **Flag it in the Running Log session-end comment** as "inlined spec, discoverability degraded"
+3. **Promote to a real `docs/plans/spec-*.md` file within the same session** (not "next session" — fatigue kills follow-through)
+4. **Once promoted, amend the inlined comment** with a link to the real spec file and the note "SUPERSEDED by docs/plans/spec-X.md — kept for provenance only"
+
+A 6-comment inlined spec split across session 5 that survives into session 6 is a violation. Spec content trapped in MC comments is effectively invisible to the session-start protocol (which reads only the last 20 comments of Running Log) and cannot be referenced by RULE-SPEC-MC-BINDING.
+
+> Origin: 2026-04-08. Session 5 architected a three-layer brain (LightRAG/MemPalace/Graphify) with full storage posture and phase plans — all trapped in 6 MC comments because `emit_business_task` was blocked by `3cc98121`. Session 6 COO session-start read only the last 5 comments and reported the architecture as non-existent. CEO caught the regression. Promoted to specs as `docs/plans/spec-shishka-brain.md`, `spec-mempalace-phase2.md`, `spec-graphify-phase3.md`.
+
+---
+
 ## RULE-MCP-IDENTITY
 
 Each MCP server owns a specific domain. Use the right server for the right job.
@@ -166,6 +185,56 @@ The capture happens **before** the discussion, not after. Otherwise ideas get lo
 Pure conversation ("how are you", "what do you think of X") is exempt — but when in doubt, capture.
 
 > Origin: 2026-04-07. CEO observed that ideas thrown into the COO get lost mid-conversation. (See `spec-coo-v2.md` for the full COO design.)
+
+---
+
+## RULE-AUTONOMOUS-LANE
+
+The COO may route **low-risk, reversible** tasks directly to Code without CEO mediation by tagging them `coo-autonomous`. Code picks these up in session-start, runs the full lifecycle, and reports on the next morning loop. Full design: `docs/plans/spec-coo-autonomous-lane.md`.
+
+### Whitelist — kinds eligible for autonomous execution
+
+- `kind:docs`
+- `kind:cleanup`
+- `kind:refactor`
+- `kind:bug-fix`
+- `kind:data-fix`
+
+### Blacklist — kinds that MUST NOT carry `coo-autonomous` (hard constraint)
+
+- `kind:security`, `kind:rls` — prod blast radius
+- `kind:meta` — protocol/constitution/dispatch changes; CEO is the principal
+- `kind:install`, `kind:install-prod` — physical/production setup, not reversible
+- `kind:rpc-backend` — schema/RPC changes hit every agent
+- `kind:feature` — all feature work gated until a later protocol revision
+
+If COO tags a blacklisted kind with `coo-autonomous`, Code **refuses and escalates**: strip the tag, post a rejection comment, leave the task in `inbox`. Do not silently proceed.
+
+### Code session-start ordering
+
+```
+1. list_tasks(status="in_progress")                        # continuity (unchanged)
+2. list_tasks(status="inbox", tag="coo-autonomous")        # NEW: autonomous queue
+3. list_tasks(status="inbox", priority="critical")         # normal fallback
+```
+
+If a `coo-autonomous-paused` task exists at project level (kill switch), Code skips step 2 and jumps to the critical fallback.
+
+### Gate-first inside the autonomous lane
+
+Autonomous ≠ careless. Inside the lane Code still:
+- runs build/lint/tests before claiming completion (`RULE-TASK-CLOSURE`)
+- investigates unexpected state before destructive action
+- escalates (status `blocked` + comment) if the task turns out to need a blacklisted action
+
+Escalation does **not** fall through to silent CEO-gated processing — the task is left `in_progress` or `blocked` with an explicit comment, so it surfaces in the CEO's morning/evening review.
+
+### CEO opt-out
+
+- Strip `coo-autonomous` tag from any inbox task → pulls it back to the gated lane
+- Use the kill switch `coo-autonomous-paused` (project-level tag) → disables the lane entirely for all new work
+
+> Origin: 2026-04-08. CEO: «я хочу чтобы некоторые задачи, которые не требуют моего апрува COO и код передавали друг другу». (MC task `201267d0`.)
 
 ---
 

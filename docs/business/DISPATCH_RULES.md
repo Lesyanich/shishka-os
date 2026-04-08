@@ -37,6 +37,17 @@
 3. If cascade domains exist, create linked subtasks with `parent_task_id`
 4. If >= 3 domains involved, suggest creating a `business_initiative`
 
+## COO Autonomous Lane
+
+The COO may route low-risk, reversible tasks directly to Code without CEO mediation by tagging them `coo-autonomous`. See `RULE-AUTONOMOUS-LANE` in `docs/constitution/agent-rules.md` for the full protocol.
+
+| Signal | Routing |
+|---|---|
+| Tag `coo-autonomous` present AND `kind:*` in whitelist (docs/cleanup/refactor/bug-fix/data-fix) | Code picks up directly on session-start, runs full lifecycle, CEO reviews on morning loop |
+| Tag `coo-autonomous` present AND `kind:*` in blacklist (security/rls/meta/install/install-prod/rpc-backend/feature) | Code **refuses**, strips tag, posts rejection comment, leaves in `inbox` |
+| Tag absent | Normal CEO-gated flow (unchanged) |
+| Project-level `coo-autonomous-paused` tag exists | Lane disabled — all tasks fall back to normal gated flow |
+
 ## Priority Assignment
 
 | Signal | Priority |

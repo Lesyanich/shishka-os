@@ -12,8 +12,9 @@ Shishka Healthy Kitchen ERP. Multiple projects, one Supabase backend.
 
 ## L0: Session Start (MANDATORY, every session)
 1. Read `docs/constitution/core-rules.md` (foundational — was p0-rules.md, renamed 2026-04-07). For code/DB tasks, also load `docs/constitution/engineering-rules.md`. For agent behavior questions, load `docs/constitution/agent-rules.md`.
-2. **Pick up your task from MC:**
+2. **Pick up your task from MC (ordered):**
    - `list_tasks(status="in_progress")` → continue from previous agent's `notes`
+   - If empty → filter by `tag="coo-autonomous"` on inbox → autonomous lane (see `RULE-AUTONOMOUS-LANE` in `agent-rules.md`); verify `kind:*` is on whitelist before picking up, refuse blacklisted combinations
    - If empty → `list_tasks(status="inbox", priority="critical")` → propose to user
 3. **Load task context:** `get_task(id)` → read `spec_file` + `context_files` + `notes`
 4. **Skills routing (tech tasks only):** Read the `kind:*` tag from `get_task(id).tags`. Open `docs/operations/skills-services-policy.md` → "Kind → Skills mapping" subsection. Load all REQUIRED skills before first edit. Treat FORBIDDEN as a hard constraint, RECOMMENDED as judgment. If a tech-domain task has no `kind:*` tag → post a comment to the task asking COO for clarification and STOP. Do not guess.
