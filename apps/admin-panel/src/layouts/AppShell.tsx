@@ -18,6 +18,7 @@ import {
   Truck,
   Package,
   Bell,
+  Brain,
   ClipboardCheck,
   Rocket,
   UtensilsCrossed,
@@ -42,6 +43,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { path: '/', icon: LayoutDashboard, label: 'Control Center', enabled: true },
   { path: '/mission', icon: Rocket, label: 'Mission Control', enabled: true },
+  { path: '/brain', icon: Brain, label: 'Brain', enabled: true },
   { path: '/bom', icon: GitBranch, label: 'BOM Hub', enabled: true },
   { path: '/kds', icon: ChefHat, label: 'Kitchen KDS', enabled: true },
   { path: '/cook', icon: Timer, label: 'Cook Station', enabled: true },
