@@ -11,6 +11,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { jsonArray, jsonRecord } from "./lib/zod-helpers.js";
 
 // Tool handlers
 import { emitBusinessTask } from "./tools/emit-business-task.js";
@@ -72,10 +73,10 @@ server.tool(
     created_by: z.string().describe(
       "Who created: 'chef-agent', 'finance-agent', 'dispatcher', 'lesia', 'coo'"
     ),
-    tags: z.array(z.string()).optional().describe(
+    tags: jsonArray(z.string()).optional().describe(
       "Freeform tags for filtering. Example: ['product', 'sale', 'audit']"
     ),
-    related_ids: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).describe(
+    related_ids: jsonRecord(z.string(), z.union([z.string(), z.number(), z.boolean()])).describe(
       "MUST include at least one entity ID. Keys: snake_case. " +
       "Standard keys: nomenclature_id, expense_id, inbox_id, agent_session, batch_count, batch_total_thb, git_branch, pr_number, spec_file"
     ),
@@ -153,13 +154,13 @@ server.tool(
       .describe("Add notes (e.g. why blocked, what was done)"),
     due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
       .describe("Set or update due date (YYYY-MM-DD)"),
-    tags: z.array(z.string()).optional()
+    tags: jsonArray(z.string()).optional()
       .describe("Replace tags array"),
-    context_files: z.array(z.string()).optional()
+    context_files: jsonArray(z.string()).optional()
       .describe("Scoped context: array of file paths relative to repo root for agent context loading"),
     parent_task_id: z.string().uuid().nullable().optional()
       .describe("Link to parent task (for backlinking children to initiatives). Pass null to detach."),
-    related_ids: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional()
+    related_ids: jsonRecord(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional()
       .describe("MERGE into existing related_ids. Keys passed here add/replace; unrelated keys are preserved. Use {} to no-op."),
   },
   async (args) => jsonResult(await updateTask({

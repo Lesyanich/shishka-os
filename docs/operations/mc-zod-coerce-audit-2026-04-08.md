@@ -49,3 +49,36 @@ When adding any new MCP tool with a numeric argument, prefer
 `z.coerce.number().int()` over `z.number()` unless there is a concrete reason to
 reject numeric strings. Zod 4 `coerce` has well-defined semantics — it uses
 `Number()` and then runs downstream checks — so `.int().min().max()` still apply.
+
+## 2026-04-08 extension — array/record coerce
+
+> MC orphan-host: 355bb967 comments (COO session 9, bug widened mid-session)
+> Sibling fix follows the exact shape of this audit, extended to non-primitive fields.
+
+COO session 9 discovered the same bug class on array and record fields:
+
+| RPC                  | Field                     | Broken                                  |
+|----------------------|---------------------------|-----------------------------------------|
+| `update_task`        | `tags`                    | array → "expected array, received string"   |
+| `update_task`        | `context_files`           | array → "expected array, received string"   |
+| `update_task`        | `related_ids`             | record → "expected record, received string" |
+| `emit_business_task` | `tags`                    | array → "expected array, received string"   |
+| `emit_business_task` | `related_ids`             | record → "expected record, received string" |
+
+Zod has no `z.coerce.array()` / `z.coerce.record()`, so the fix uses
+`z.preprocess(parseJsonIfString, ...)` via shared helpers in
+`src/lib/zod-helpers.ts`:
+
+- `jsonArray(inner)` wraps `z.array(inner)` with a string → `JSON.parse` preprocessor
+- `jsonRecord(key, value)` wraps `z.record(key, value)` similarly
+- On parse error the helper returns the original string unchanged so Zod
+  emits a meaningful "expected array, received string" error instead of a
+  cryptic SyntaxError
+
+Applied to the 5 fields above. Unit tests in `src/__tests__/zod-helpers.test.ts`
+cover: native payload, stringified payload, inner-schema enforcement,
+non-object/non-array rejection, and `.optional()` composition.
+
+**Future guardrail:** any new non-primitive MCP tool field must use
+`jsonArray` / `jsonRecord` unless the caller can guarantee the MCP transport
+layer will not stringify. Add to the schema audit whenever a new tool ships.
