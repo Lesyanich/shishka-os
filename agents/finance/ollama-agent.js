@@ -3,7 +3,7 @@
 // Finance Agent — Ollama Edition (WF-1: Receipt Parsing)
 // Replaces Claude Sonnet agent with local Gemma 4 via Ollama
 //
-// Model: gemma4:e4b (OpenAI-compatible API)
+// Model: gemma4:e2b (OpenAI-compatible API)
 // Cost: $0 per receipt (local inference)
 //
 // Usage:
@@ -15,7 +15,7 @@
 //   SUPABASE_URL              — required
 //   SUPABASE_SERVICE_ROLE_KEY — required
 //   OLLAMA_BASE_URL           — default: http://localhost:11434/v1
-//   OLLAMA_MODEL              — default: gemma4:e4b
+//   OLLAMA_MODEL              — default: gemma4:e2b
 // ═══════════════════════════════════════════════════════════
 
 import OpenAI from "openai";
@@ -23,7 +23,7 @@ import { createClient } from "@supabase/supabase-js";
 
 // ── Config ──
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "gemma4:e4b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "gemma4:e2b";
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const STORAGE_BUCKET = "receipts";

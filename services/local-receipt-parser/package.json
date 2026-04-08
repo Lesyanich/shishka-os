@@ -1,7 +1,7 @@
 {
   "name": "shishka-local-receipt-parser",
   "version": "1.0.0",
-  "description": "Local receipt parser using Ollama (gemma4:e4b) via OpenAI-compatible API",
+  "description": "Local receipt parser using Ollama (gemma4:e2b) via OpenAI-compatible API",
   "type": "module",
   "scripts": {
     "start": "node index.js",

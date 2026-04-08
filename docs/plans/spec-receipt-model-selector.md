@@ -22,7 +22,7 @@ Claude Sonnet IS the OCR engine — it sees receipt images via `download_receipt
 - GAS pipeline was Path A, now replaced by Finance Agent (Path C)
 
 ### Local fallback — EXISTS but CLI-only:
-- services/local-receipt-parser/index.js — uses Ollama (gemma4:e4b)
+- services/local-receipt-parser/index.js — uses Ollama (gemma4:e2b)
 - Works standalone, not integrated into Admin Panel
 
 ## Current Architecture (VERIFIED from session logs 2026-04-05)
