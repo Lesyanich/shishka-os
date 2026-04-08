@@ -78,3 +78,12 @@ POSsystem/
 Инструкции ИИ/
 services/supabase/.temp/
 services/supabase/supabase/
+
+# MemPalace — venv is local-only, never committed (spec §3.1).
+# Only requirements.txt, scripts, README, blocklist, and public key are tracked.
+services/mempalace/.venv/
+# Guard against accidental commit of live data if ~/.mempalace/ is copied into the repo by mistake.
+services/mempalace/palace/
+services/mempalace/knowledge_graph.sqlite3
+services/mempalace/*.age
+services/mempalace/*-key.txt
