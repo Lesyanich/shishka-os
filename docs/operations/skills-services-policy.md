@@ -168,11 +168,149 @@ Removal path: update `CLAUDE.md` skill-loading section (if exists) or agent AGEN
 
 ---
 
+## Task-Kind Taxonomy (for Code Agent routing)
+
+**Problem this solves:** Code agent has 200+ skills available. When picking up an MC task, it cannot reliably guess which skills are mandatory vs. optional vs. forbidden. Result: skills get skipped (TDD violations, missing systematic-debugging) or wrong ones loaded (frontend-design on a backend task).
+
+**Solution:** Every tech task in MC carries a `kind:*` tag. Code agent reads the tag, looks up this table, loads exactly that skill set.
+
+### Kind enumeration
+
+| Tag | What it means | When COO assigns it |
+|---|---|---|
+| `kind:install` | Install / configure deps, services, env, runtimes | Setup task, "fix broken install", new tooling onboarding |
+| `kind:migration` | Supabase SQL migration (schema, RLS, RPC, seed) | Anything touching `services/supabase/migrations/` |
+| `kind:rpc-backend` | Supabase RPC, edge function, MCP server tool | Backend logic without UI |
+| `kind:ui-component` | React component / page in admin-panel, web, app | Frontend work, new screen, redesign |
+| `kind:bug-fix` | Reproduce + fix a defect | Triggered by error report, failing test, regression |
+| `kind:feature` | New end-to-end functionality (UI + backend) | Any "build X" with non-trivial scope |
+| `kind:refactor` | Restructure without behavior change | Tech debt, code review follow-up, simplification |
+| `kind:research` | Explore codebase, gather info, no edits | "How does X work", "where is Y used", audit prep |
+| `kind:test` | Write or fix tests, increase coverage | Test backfill, TDD red phase prep |
+| `kind:doc` | Markdown / docs only, no code | New rule, AGENT.md update, spec writing |
+| `kind:integration` | Third-party service wiring (Vercel, supplier API, OAuth) | New external dependency |
+| `kind:security` | Security audit, RLS, vulnerability fix, secret rotation | Anything in attack surface |
+| `kind:data-fix` | One-off SQL patch on existing rows, no schema change | Data correction, dedup, backfill |
+| `kind:cleanup` | Delete dead code / files / config | Post-deprecation, after audit findings |
+| `kind:meta` | Coordination / umbrella / tracking task — no direct implementation | Initiatives, running logs, audit umbrellas, decision-only tasks |
+
+**Rule:** Every tech-domain MC task MUST carry exactly one `kind:*` tag. COO enforces this on task creation. Code agent rejects (asks for clarification) any tech task without one.
+
+### Kind → Skills mapping
+
+Format: **REQUIRED** = must load before starting; **RECOMMENDED** = load if relevant; **FORBIDDEN** = do not load even if Code agent thinks it applies.
+
+#### kind:install
+- **REQUIRED:** `superpowers:verification-before-completion`
+- **RECOMMENDED:** `superpowers:systematic-debugging` (if install is failing)
+- **FORBIDDEN:** `superpowers:test-driven-development` (no behavior to test), `frontend-design`
+
+#### kind:migration
+- **REQUIRED:** `sparc:supabase-admin`, `superpowers:verification-before-completion`
+- **RECOMMENDED:** `superpowers:writing-plans` (for schema changes touching >2 tables)
+- **FORBIDDEN:** auto-apply migrations without CEO approval; `frontend-design`
+- **Special rule:** check for existing migration with same number; never edit applied migrations.
+
+#### kind:rpc-backend
+- **REQUIRED:** `sparc:supabase-admin`, `superpowers:verification-before-completion`, `security-review`
+- **RECOMMENDED:** `superpowers:test-driven-development`
+- **FORBIDDEN:** `frontend-design`, `vercel:shadcn`
+
+#### kind:ui-component
+- **REQUIRED:** `vercel:react-best-practices`
+- **RECOMMENDED:** `vercel:shadcn` (admin-panel uses shadcn), `frontend-design` (new screens / distinctive UI), `vercel:nextjs` (web/app projects only — admin-panel is Vite/React 18, NOT Next.js)
+- **FORBIDDEN:** `sparc:supabase-admin` (use existing client, don't write SQL inline)
+
+#### kind:bug-fix
+- **REQUIRED:** `superpowers:systematic-debugging`, `superpowers:test-driven-development`, `superpowers:verification-before-completion`
+- **RECOMMENDED:** `simplify` (if fix reveals deeper smell)
+- **FORBIDDEN:** shipping a fix without a regression test
+
+#### kind:feature
+- **REQUIRED:** `superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:executing-plans`, `superpowers:verification-before-completion`
+- **RECOMMENDED:** `superpowers:requesting-code-review` after implementation
+- Sub-routing: if feature is UI → also load kind:ui-component skills; if backend → kind:rpc-backend skills
+
+#### kind:refactor
+- **REQUIRED:** `simplify`, `codereview`
+- **RECOMMENDED:** existing test coverage check before starting
+- **FORBIDDEN:** behavior changes (refactor ≠ feature); skipping codereview
+
+#### kind:research
+- **REQUIRED:** Agent tool with `subagent_type=Explore` for non-trivial searches
+- **RECOMMENDED:** `defuddle` for external docs
+- **FORBIDDEN:** Edit / Write tools (research is read-only); creating new files
+
+#### kind:test
+- **REQUIRED:** `superpowers:test-driven-development`
+- **RECOMMENDED:** read existing test patterns first
+
+#### kind:doc
+- **REQUIRED:** none beyond core-rules (RULE-LANGUAGE-CONTRACT)
+- **FORBIDDEN:** code edits in same task
+
+#### kind:integration
+- **REQUIRED:** `vercel:env-vars` (if env vars added), `superpowers:verification-before-completion`
+- **RECOMMENDED:** `vercel:vercel-functions` (Vercel functions), `vercel:ai-sdk` (LLM providers), `vercel:marketplace` (third-party services)
+- **Special rule:** never commit secrets; verify via `vercel env pull` before push
+
+#### kind:security
+- **REQUIRED:** `security-review`, `superpowers:verification-before-completion`
+- **RECOMMENDED:** `security-architect` agent for design-level threats
+- **FORBIDDEN:** silent security fixes — every change needs an MC task and audit trail
+
+#### kind:data-fix
+- **REQUIRED:** `sparc:supabase-admin`, `superpowers:verification-before-completion`
+- **RECOMMENDED:** dry-run with `SELECT` before any `UPDATE` / `DELETE`
+- **FORBIDDEN:** schema changes (those are kind:migration)
+
+#### kind:cleanup
+- **REQUIRED:** `superpowers:verification-before-completion` (grep before delete)
+- **RECOMMENDED:** `simplify`
+- **FORBIDDEN:** deleting anything referenced in MC tasks, AGENT.md, or active spec files without checking first
+
+#### kind:meta
+- **REQUIRED:** none — meta tasks are coordination artifacts, not implementation
+- **RECOMMENDED:** COO updates via `add_comment` on the meta task as substate evolves; child tasks linked via `related_ids`
+- **FORBIDDEN:** writing implementation code under a `kind:meta` task — if you find yourself editing files, you are working on the wrong task. Spawn or pick up a child task with the appropriate kind instead.
+- **Special rule:** Code agent should NOT pick up `kind:meta` tasks. Only COO works on these. If a `kind:meta` task surfaces in Code agent's queue, it is a routing error — comment and skip.
+
+### Globally forbidden for Code agent
+
+Regardless of `kind:*`, Code agent must NOT auto-load:
+- `shishka-mission-control:morning-triage` — superseded by COO Session Start Protocol
+- `shishka-mission-control:agent-tracking` — superseded by `agent-rules.md`
+- Any `gsd:*` planning commands — those are workflow orchestration, not implementation skills
+- `cowork-plugin-management:*` — only relevant if shipping Shishka OS as a plugin
+
+### COO enforcement
+
+When COO creates or triages a tech task:
+1. Pick exactly one `kind:*` tag from the enum above
+2. If unclear → ask CEO before creation; never default-pick
+3. If kind shifts mid-task (e.g. research turned into feature) → close original, open new with correct kind, link via `related_ids`
+
+### Code agent bootstrap (proposed CLAUDE.md L0 addition)
+
+```
+3a. After loading task context_files, read tags. If a `kind:*` tag exists:
+    - Open docs/operations/skills-services-policy.md
+    - Find the matching subsection under "Kind → Skills mapping"
+    - Load all REQUIRED skills BEFORE first edit
+    - Treat FORBIDDEN as hard constraint, RECOMMENDED as judgment call
+3b. If no `kind:*` tag on a tech task → STOP, ask CEO via comment, do not guess
+```
+
+Wiring this into actual `CLAUDE.md` is a separate code task (see follow-up in MC).
+
+---
+
 ## Review & Revision
 
 This policy should be revisited:
 - After 2 weeks (scheduled-tasks decision point)
 - When any new skill or MCP server becomes available
 - When agent usage patterns shift (measured via MC task `created_by` distribution)
+- When a `kind:*` is repeatedly insufficient (signal to add a new kind or split existing one)
 
-The CEO should read only the Executive Summary. Agents should read the Technical Sections relevant to their role.
+The CEO should read only the Executive Summary. Agents should read the Technical Sections relevant to their role. Code agent should treat the Task-Kind Taxonomy as a hard contract.

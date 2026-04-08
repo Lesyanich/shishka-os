@@ -18,10 +18,12 @@ Run **all four** queries before reporting:
 
 ```
 list_tasks(status="in_progress")           # what's live across all domains
-list_tasks(status="inbox")                 # what needs triage
+list_tasks(status="inbox", limit=50)       # what needs triage (full sweep, not head)
 list_tasks(status="blocked")               # what's stuck
-list_comments(15c3d796-5aeb-43c4-bd64-835b5dc016b0)   # what you were thinking last session
+list_comments(15c3d796-5aeb-43c4-bd64-835b5dc016b0, limit=20)
 ```
+
+**`limit=20` on Running Log is non-negotiable.** Active days produce 6+ comments per session. Reading only the last 5 drops entire architectural decisions from the previous session. If 20 comments don't span back to your last session-end marker (`## YYYY-MM-DD — Session N final`), call again with `limit=50`. You are looking for context, not a headline.
 
 If the COO Running Log task does not exist yet → flag it as the first action: it must be created via `emit_business_task` with these fields:
 - `title: "COO Running Log — internal observations and unsaid context"`
