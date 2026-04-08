@@ -31,17 +31,30 @@ if [[ -e "$LIVE_DIR" && "${MEMPALACE_FORCE_RESTORE:-0}" != "1" ]]; then
   exit 1
 fi
 
-# Fetch private key from Keychain (will prompt for Touch ID if configured)
-KEY="$(security find-generic-password -s "MemPalace age private key" -w 2>/dev/null || true)"
-if [[ -z "$KEY" ]]; then
+# Sanity-check the Keychain entry exists BEFORE invoking age so we get a
+# clearer error than `age: unknown identity type`.
+if ! security find-generic-password -s "MemPalace age private key" >/dev/null 2>&1; then
   echo "ERROR: 'MemPalace age private key' not found in Keychain" >&2
   echo "Recovery card is stored in CEO safe (spec §7)." >&2
   exit 1
 fi
 
-# Pipe key through a transient FD to avoid writing it to disk
-exec 3<<< "$KEY"
-age -d -i /dev/fd/3 "$ARCHIVE" | tar -C "$DEST_PARENT" -x
-exec 3<&-
+# `security find-generic-password -w` emits the payload as a hex dump when
+# the stored value contains any byte outside printable ASCII (newlines from
+# age-keygen output count). If the first char is not a hex digit, it's plain
+# ASCII and we pass it through; otherwise we xxd-decode. Either way the
+# private key is piped straight into age via process substitution — never
+# touches disk, never shows in ps, never lands in an env var.
+decode_keychain() {
+  local raw
+  raw="$(security find-generic-password -s "MemPalace age private key" -w 2>/dev/null)"
+  if [[ "$raw" =~ ^[0-9a-fA-F]+$ && $(( ${#raw} % 2 )) -eq 0 ]]; then
+    printf '%s' "$raw" | xxd -r -p
+  else
+    printf '%s\n' "$raw"
+  fi
+}
+
+age -d -i <(decode_keychain) "$ARCHIVE" | tar -C "$DEST_PARENT" -x
 
 echo "[restore] restored from $ARCHIVE into $LIVE_DIR"
