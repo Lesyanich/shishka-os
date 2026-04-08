@@ -2,7 +2,7 @@
 
 > MC Initiative: TBD (blocked by `3cc98121` MC RPC bugfix)
 > Priority: high
-> Status: architecture-locked, awaiting phase-2 kickoff
+> Status: Phase 1 ✅, Phase 2 ✅, Phase 3 deferred
 > Branch: `feature/shared/shishka-brain` (umbrella)
 > Related:
 > - `docs/plans/spec-lightrag.md` (Phase 1, ✅ done)
@@ -66,10 +66,10 @@ Architectural decisions live in `docs/plans/spec-*.md`, not in MC comments. Inli
 - **Known limitation:** `operations.md` injected via `ainsert_custom_kg` (Option E), absent from `GET /documents`. Brain View must handle gracefully.
 - **Phase 1.5 trigger:** if quality gate fails on Q2, re-ingest through Anthropic API + Claude Haiku as extraction LLM. See `docs/plans/spec-lightrag.md` §Phase 1.5.
 
-### Phase 2 — MemPalace (L1 Conversations) — NEXT
+### Phase 2 — MemPalace (L1 Conversations) — ✅ DONE
 **Why Phase 2, not Graphify:** MemPalace bites the bigger pain. Cross-session context loss is the exact thing COO Running Log fights manually every session. Graphify is a code-intelligence tool — useful but not critical-path until we are actively refactoring multi-module code with agents.
 
-See `docs/plans/spec-mempalace-phase2.md` for install, storage, and spike plan.
+See `docs/plans/spec-mempalace-phase2.md` for install, storage, and spike plan. Shipped on `feature/shared/mempalace-phase2` (MC `30f177b3`). All §6 acceptance criteria met: backup round-trip green, pre-ingest filter rejects known-secrets fixture, agent routing tables added to COO/Chef/Finance, CLAUDE.md L0 wake-up step wired, Session 5 bootstrap ingested into wing `Shishka` (32 drawers across `technical`/`architecture`/`general` rooms), all three CEO quality-gate questions answered with source attribution.
 
 ### Phase 3 — Graphify (L3 Code Structure) — DEFERRED
 Timebox: 1-day spike after Phase 2 ships. Criteria: adopt / wait / drop. Not blocking any current operational work. See `docs/plans/spec-graphify-phase3.md`.
