@@ -30,7 +30,6 @@ claude \
     "mcp__shishka-chef__audit_all_dishes" \
     "mcp__shishka-chef__check_inventory" \
     "mcp__shishka-chef__list_equipment" \
-    "mcp__shishka-chef__search_knowledge" \
     "mcp__shishka-chef__manage_recipe_flow" \
     "mcp__shishka-mission-control__list_tasks" \
     "mcp__shishka-mission-control__get_task" \
