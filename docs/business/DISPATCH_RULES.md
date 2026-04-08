@@ -48,6 +48,27 @@ The COO may route low-risk, reversible tasks directly to Code without CEO mediat
 | Tag absent | Normal CEO-gated flow (unchanged) |
 | Project-level `coo-autonomous-paused` tag exists | Lane disabled — all tasks fall back to normal gated flow |
 
+## Strategic COO vs Tech-Lead auto-routing
+
+The monolithic COO has been split into **Strategic COO** (`/strategy`) and **Technical Tech-Lead** (`/techlead`) per `docs/plans/spec-agents-split.md`. The `/coo` command is now a thin auto-router that classifies the CEO's incoming message and delegates to one of the two sub-agents. CEO can bypass the router with explicit `/strategy` or `/techlead`.
+
+Classification is a pure function of the incoming message (no state, no learning). If misclassified, CEO corrects with an explicit slash command on the next turn.
+
+| Signal in CEO message | Route |
+|---|---|
+| Contains explicit slash `/strategy` or `/techlead` | Direct, no auto-routing |
+| Contains `/coo` or no slash at all | Auto-router runs (below) |
+| Keywords: PR #, task UUID, `bug`, `fix`, `deploy`, `routing`, `handoff`, `MC RPC`, `commit`, `merge`, `CI`, `context_files`, `tag`, `dup`, `triage`, `blocked`, `RULE-*`, `/code`, `feature-branch`, engineering-rules, `kind:*` taxonomy | **Tech-Lead** |
+| Keywords: `roadmap`, `milestone`, `priority`, `стратегия`, `бизнес`, `решили`, `давай`, `хочу чтобы`, `нам нужна`, `идея`, `проблема с`, `что в приоритете`, `kind:meta` + no tech keywords | **Strategic COO** |
+| Ambiguous (both tech and strategy signals, or neither) | **Strategic COO** (tie-breaker per spec §2.3) |
+| Empty-handed "привет" / "ты здесь" / "что нового" | **Strategic COO** (default) |
+
+**Tie-breaker rationale:** idea loss is a worse failure than brief mis-classification. Strategic COO captures first, then hands to Tech-Lead with `needs-tech-lead` tag for execution.
+
+**No silent re-routing mid-session** — prevents identity confusion. Complete the current turn as the classified agent; CEO re-invokes explicitly on the next turn if needed.
+
+**Reverse flow:** Tech-Lead escalates strategic questions via `needs-strategic-review` tag (parallel track, does not block `/code` execution). Strategic COO picks these up on next session start.
+
 ## Priority Assignment
 
 | Signal | Priority |
