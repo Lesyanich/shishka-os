@@ -226,7 +226,7 @@ server.tool(
   {
     task_id: z.string().uuid().describe("UUID of the task"),
     author: z.string().describe("Who is commenting: 'coo', 'finance-agent', 'chef-agent', 'lesia'"),
-    body: z.string().min(1).max(8000).describe("Comment text (max 8000 chars)"),
+    body: z.string().min(1).max(32000).describe("Comment text (max 32000 chars)"),
   },
   async (args) => jsonResult(await addComment(args))
 );
