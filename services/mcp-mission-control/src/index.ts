@@ -145,6 +145,8 @@ server.tool(
     ]).optional().describe("New status"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional()
       .describe("New priority"),
+    title: z.string().min(5).max(200).optional()
+      .describe("Rename the task. Use sparingly — titles should be stable."),
     description: z.string().max(1000).optional()
       .describe("Update description (e.g. add result summary)"),
     notes: z.string().max(500).optional()
@@ -155,8 +157,15 @@ server.tool(
       .describe("Replace tags array"),
     context_files: z.array(z.string()).optional()
       .describe("Scoped context: array of file paths relative to repo root for agent context loading"),
+    parent_task_id: z.string().uuid().nullable().optional()
+      .describe("Link to parent task (for backlinking children to initiatives). Pass null to detach."),
+    related_ids: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional()
+      .describe("MERGE into existing related_ids. Keys passed here add/replace; unrelated keys are preserved. Use {} to no-op."),
   },
-  async (args) => jsonResult(await updateTask(args))
+  async (args) => jsonResult(await updateTask({
+    ...args,
+    related_ids: args.related_ids as Record<string, string | number | boolean> | undefined,
+  }))
 );
 
 // ─── Sprint Tools ───────────────────────────────────────────────
@@ -217,7 +226,7 @@ server.tool(
   {
     task_id: z.string().uuid().describe("UUID of the task"),
     author: z.string().describe("Who is commenting: 'coo', 'finance-agent', 'chef-agent', 'lesia'"),
-    body: z.string().min(1).max(2000).describe("Comment text"),
+    body: z.string().min(1).max(8000).describe("Comment text (max 8000 chars)"),
   },
   async (args) => jsonResult(await addComment(args))
 );
