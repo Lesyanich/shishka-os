@@ -195,10 +195,10 @@ LightRAG solves all three while keeping the existing L0/L1/L2 routing as fallbac
 
 #### Phase 1 completion status (2026-04-08)
 
-**Indexed: 18/19 files** (clean state, no failed flag).
-- All 8 `docs/domain/*.md` files processed.
-- 10 of 11 `docs/bible/*.md` files processed.
-- Excluded: **`docs/bible/operations.md`** — see limitation below.
+**Indexed: 18 docs via Ollama pipeline + 1 doc (operations.md) via Option E custom_kg injection.**
+- All 8 `docs/domain/*.md` files processed via standard `gemma4:e2b` extraction.
+- 10 of 11 `docs/bible/*.md` files processed via standard `gemma4:e2b` extraction.
+- **`docs/bible/operations.md`** — added via **Option E** (Claude-pre-extracted custom_kg, COO decision `1ab81a16`). Bypasses both upstream failure modes documented below. See "Option E delivery" subsection.
 
 **Stack as shipped:**
 - Local Python venv (`venv/`) + `lightrag-hku[api]` 1.4.13
@@ -232,7 +232,31 @@ Forbidden escape routes under COO decision `6b845073` / `58080b93`:
 **Phase 1.5 staged** (trigger only if Q2 cross-doc synthesis fails quality gate):
 - `$5` Anthropic prepay → `ANTHROPIC_API_KEY` → Apple Keychain → LightRAG extractor swap → `DELETE /documents` → re-ingest via Haiku 4.5 (~`$0.40`, ~10 min)
 - Claude used **only at ingest**. Queries stay on `gemma4:e2b` ($0 ongoing).
-- Fixes both the `operations.md` crash AND graph drift on the other 18 files in a single pass.
+- Fixes graph drift on the 18 Ollama-indexed files in a single pass. (operations.md is already covered by Option E.)
+
+##### Option E delivery: operations.md via Claude-pre-extracted custom_kg
+
+After both local extractors walled out, COO decision `1ab81a16` shipped Option E: have Claude (this conversation, free under existing subscription) read `docs/bible/operations.md`, hand-extract entities/relationships/chunks into `custom_kg` JSON shape (verified against `LightRAG.ainsert_custom_kg` source — see comment `da533813`), and inject via the Python API.
+
+**Artifacts:**
+- `services/lightrag/custom_kg_operations.json` — 4 chunks, 28 entities, 18 relationships. Schema validated against `ainsert_custom_kg`. All entity/relation `source_id`s match a `chunks[].source_id`.
+- `services/lightrag/inject_ops_kg.py` — one-shot Python injector. Mirrors `run-server.sh` env setup (DATABASE_URL parsing, SSL verify-ca with Supabase CA, all PG\* + `LIGHTRAG_*_STORAGE` env vars). Imports `LightRAG`, calls `ainsert_custom_kg(kg, full_doc_id="doc-operations-md-claude")`.
+
+**Critical gotcha encountered**: `lightrag-server` constructs `EmbeddingFunc(model_name=os.environ["EMBEDDING_MODEL"])` ⇒ `bge-m3` ⇒ tables suffixed `_bge_m3_1024d`. The stock `from lightrag.llm.ollama import ollama_embed` singleton ships with `model_name="bge-m3:latest"` ⇒ would yield `_bge_m3_latest_1024d`. `PGVectorStorage._generate_collection_suffix` derives the table name from `embedding_func.model_name`, NOT from env, so passing `ollama_embed` directly creates a parallel table family the running server cannot see. The injector therefore wraps `ollama_embed.func` in a fresh `EmbeddingFunc(model_name="bge-m3", ...)` to land in the correct tables. Documented inline in `inject_ops_kg.py`.
+
+**ainsert_custom_kg writes nothing to `lightrag_doc_status` / `lightrag_doc_full`** — operations.md does NOT show in `GET /documents` and has no `doc-*` id. Use the synthetic `doc-operations-md-claude` id only as a label inside the graph; reversibility is via `/documents/delete_entity` + `delete_relation` per id, or workspace nuke. Logged here so future sessions don't waste time looking for it under `/documents`.
+
+**Status counts after Option E**: `{"processed":18,"all":18}` (unchanged — Option E injects directly into VDB + graph, not into the doc pipeline). Graph file: 43 entity nodes, 18 relationship edges (was 15/0 after Ollama-only ingest — operations.md added 28 entities + 18 relations and rescued the previously-empty relations layer).
+
+**Smoke checks (read-only):**
+- `GET /graph/entity/exists?name=L1%20KITCHEN` → `{"exists":true}`
+- `GET /graph/entity/exists?name=L1-BL-FRZ-790-66` → `{"exists":true}`
+- `GET /graph/entity/exists?name=COOK-CHILL%20ALGORITHM` → `{"exists":true}`
+- `GET /graph/entity/exists?name=PHUKET%20WATER` → `{"exists":true}`
+- `POST /query {"mode":"hybrid", "query":"What is L1 in our context?"}` → returns L1 KITCHEN, L1 Infrastructure, L1 DAILY BATCH SCHEDULE, CENTRAL KITCHEN MODEL, ZONE 1 LOGISTICS, HACCP, L2, L1-D-MIX-10KG entities (all from operations.md content)
+- `POST /query {"mode":"naive", "query":"how often does L1 deliver to L2 by motorbike"}` → returns the actual operations.md chunk citing morning batch + 3x/day delivery + 5min motorbike trip. `bge-m3` chunk vectors are retrievable.
+
+Quality gate `b4c4b023` Q3-A ("what is L1") is now valid again.
 
 ### Phase 2: MCP Integration (1 sprint)
 - Build `search_knowledge` MCP tool (TypeScript wrapper over REST API)
