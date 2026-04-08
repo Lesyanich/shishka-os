@@ -10,7 +10,7 @@
 #
 # Prerequisites:
 #   - Ollama running: ollama serve
-#   - Model pulled: ollama pull gemma4:e4b
+#   - Model pulled: ollama pull gemma4:e2b
 #   - Dependencies: cd agents/finance && npm install
 
 set -e
@@ -51,7 +51,7 @@ fi
 # Check Ollama is running
 if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
   echo "ERROR: Ollama is not running. Start it with: ollama serve"
-  echo "Then pull the model: ollama pull gemma4:e4b"
+  echo "Then pull the model: ollama pull gemma4:e2b"
   echo ""
   echo "Falling back to Claude Sonnet..."
   exec "$0" --claude "$@"

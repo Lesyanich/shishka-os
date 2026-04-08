@@ -35,3 +35,20 @@
 
 - **Script ID:** `14BpgyjV6qH1a2mL3u6zC7p6GJAmGDkfXR7Qi1b9ufU2ItxrvOW_pvI8P`
 - **Deploy:** `cd services/gas && npm run deploy`
+
+## Secret Location Policy (SSoT)
+
+Every secret has exactly **one** file that holds the real value. Other services read that file at runtime — they do NOT copy it into their own `.env`.
+
+| Secret | SSoT File | Consumers | Loading Pattern |
+|---|---|---|---|
+| `DATABASE_URL` (Supabase Postgres) | `services/lightrag/db-url.local` (gitignored) | LightRAG (`run-server.sh`) | shell-source + URL parser |
+| `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` | `apps/admin-panel/.env` | admin-panel (Vite) | Vite auto-load. Public-by-design (anon key ships in browser bundle); RLS is the protection layer. |
+| `SUPABASE_SERVICE_ROLE_KEY` | host keychain / CI secrets (never committed) | MCP services, Edge Functions | `process.env` via external loader in dev, GitHub Secrets in CI |
+
+**Rules:**
+1. If a new service needs an existing secret → source it from the SSoT file. Do not create a second `.env` with the same value.
+2. If a new secret is introduced → pick its SSoT file explicitly, add a row here.
+3. Never paste secret values into Claude chat, MC comments, commit messages, or task notes.
+4. Private single-user repo: per-service gitignored `*.local` files are acceptable. Switch to host-keychain or secret-manager when team grows beyond CEO or a second consumer of the same secret appears.
+5. `lightrag/db-url.local` must use Supabase **direct connection** (`db.<project>.supabase.co:5432`) or **session pooler** (`:5432`) — **never transaction pooler `:6543`**, which breaks `asyncpg` prepared statements used by `lightrag-hku`.

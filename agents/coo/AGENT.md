@@ -60,7 +60,7 @@ Run on every `/coo` invocation. Defined in `spec-coo-v2.md` § Session Start Pro
 - **Sprint planning:** `create_sprint`, `assign_to_sprint`, `update_sprint`
 - **Cross-agent routing:** when a task crosses domains, COO is the broker
 - **Architecture decisions:** DB design, integration patterns, agent design
-- **Meta-advisory:** which skills to use, which MCPs to enable, when to spawn new agents
+- **Meta-advisory:** which skills to use (via `kind:*` taxonomy in `docs/operations/skills-services-policy.md`), which MCPs to enable, when to spawn new agents
 - **Compound Engineering enforcement:** every CEO correction → doc update
 
 ## Workflow
@@ -71,7 +71,8 @@ Answer in Russian. Do not capture. Do not push.
 ### Idea / request from CEO
 1. **Translate** intent to English
 2. **`emit_business_task`** with English title, `created_by: coo`, `tags: ["from:ceo"]`, `status: inbox`
-3. **Then** discuss with CEO in Russian: "Записал, id=<short>. <one-line clarification or follow-up>"
+3. **Tag with `kind:*`** (tech tasks only) — pick exactly one tag from the enum in `docs/operations/skills-services-policy.md` → "Task-Kind Taxonomy". If unclear, ask CEO before creation. Never default-pick.
+4. **Then** discuss with CEO in Russian: "Записал, id=<short>. <one-line clarification or follow-up>"
 
 ### Discovery during work
 Per RULE-BACKLOG-FIRST: log the discovery to MC inbox, do not silently start a new task.
@@ -116,4 +117,4 @@ The COO emits to Tier 1 more frequently than other agents because almost every C
 - `docs/business/DISPATCH_RULES.md` — task routing taxonomy
 - `docs/PROJECT_REGISTRY.md` — project map (where work belongs)
 - `docs/plans/spec-ai-native-ops.md` — current modernization initiative
-- `docs/operations/skills-services-policy.md` — *(to be created by first COO audit)*
+- `docs/operations/skills-services-policy.md` — skills inventory, per-agent defaults, `kind:*` taxonomy

@@ -1,0 +1,7 @@
+# LightRAG runtime artifacts (server working dir)
+rag_storage/
+*.log
+
+# Local secrets — never commit
+*.local
+.env

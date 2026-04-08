@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 // Local Receipt Parser — Ollama Edition
 // Replaces GAS + Gemini cloud pipeline with local Ollama inference
-// Model: gemma4:e4b via OpenAI-compatible API
+// Model: gemma4:e2b via OpenAI-compatible API
 // ═══════════════════════════════════════════════════════════
 //
 // Usage:
@@ -24,7 +24,7 @@ import { extname, resolve } from "node:path";
 
 // ── Config ──
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "gemma4:e4b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "gemma4:e2b";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -440,7 +440,7 @@ async function main() {
     console.error("");
     console.error("Environment:");
     console.error("  OLLAMA_BASE_URL  (default: http://localhost:11434/v1)");
-    console.error("  OLLAMA_MODEL     (default: gemma4:e4b)");
+    console.error("  OLLAMA_MODEL     (default: gemma4:e2b)");
     console.error("  SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  (for --job-id mode)");
     process.exit(1);
   }

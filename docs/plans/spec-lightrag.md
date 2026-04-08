@@ -193,6 +193,71 @@ LightRAG solves all three while keeping the existing L0/L1/L2 routing as fallbac
 - Validate query quality with 10 test questions per agent domain
 - Benchmark latency
 
+#### Phase 1 completion status (2026-04-08)
+
+**Indexed: 18 docs via Ollama pipeline + 1 doc (operations.md) via Option E custom_kg injection.**
+- All 8 `docs/domain/*.md` files processed via standard `gemma4:e2b` extraction.
+- 10 of 11 `docs/bible/*.md` files processed via standard `gemma4:e2b` extraction.
+- **`docs/bible/operations.md`** — added via **Option E** (Claude-pre-extracted custom_kg, COO decision `1ab81a16`). Bypasses both upstream failure modes documented below. See "Option E delivery" subsection.
+
+**Stack as shipped:**
+- Local Python venv (`venv/`) + `lightrag-hku[api]` 1.4.13
+- Extraction LLM: `gemma4:e2b` via Ollama (local, ~9.6GB)
+- Embedding: `bge-m3` via Ollama (1024-dim, multilingual) — **permanently locked**
+- Storage: Supabase PostgreSQL + pgvector, tables `public.lightrag_*`, workspace `lightrag` (migration `099_lightrag_pgvector.sql`)
+- Graph: NetworkX file (`services/lightrag/rag_storage/`)
+- Ingest tuning: `MAX_PARALLEL_INSERT=1`, `TIMEOUT=600` (COO decision `d532e8ff`)
+
+**Note on schema location**: LightRAG-hku hardcodes the `public` schema in `postgres_impl.py` (~line 1608). A dedicated `lightrag` schema is not feasible without forking. Drop-safe boundary is preserved via the `lightrag_` table prefix + `workspace='lightrag'` row discriminator.
+
+##### Known limitation: `docs/bible/operations.md` excluded
+
+File is excluded from the LightRAG index. Both authorized local models walled out on it:
+
+| Model | Failure | Root cause |
+|-------|---------|------------|
+| `gemma4:e2b` | `ggml-metal-context.m:235 fatal error, command buffer 1 failed status 1` | Upstream llama.cpp Metal kernel bug, triggered deterministically by dense equipment codes (`L1-SPM-FRG-200-25`) + markdown tables. Not a timeout, not a contention issue — reproducible across 4 attempts with `MAX_PARALLEL_INSERT=1` and a fresh `ollama serve`. |
+| `qwen3:4b` (targeted fallback) | `httpcore.ReadTimeout` inside ollama SDK | `TIMEOUT=1800` env var does not propagate into `httpx.AsyncClient` used by the `ollama` python SDK. Qwen3 enters thinking mode, streams nothing for >300s, httpx default read-gap trips. Fix requires monkey-patching the ollama SDK — out of Phase 1 scope. |
+
+Forbidden escape routes under COO decision `6b845073` / `58080b93`:
+- ❌ `gemma3:12b` and any >5GB model (OOM-class, explicitly rejected)
+- ❌ Embedding swap (`bge-m3` permanently locked)
+- ❌ Chunk size changes (would force re-ingest of 18 working files)
+- ❌ Subscription proxies for Claude (ToS violation)
+
+**Agent fallback**: when any agent needs `operations.md` content it falls back to direct `Read(docs/bible/operations.md)` via the normal L2 file-loading path. `kind:*` skills routing already covers this file for ops-domain tasks.
+
+**Graph drift on the remaining 18 files**: `gemma4:e2b` frequently writes markdown tables instead of the `name|type|desc|source` delimiter format LightRAG expects. VDB chunks (via `bge-m3`) are fine; the graph layer is sparser than the framework assumes. Accepted as a Phase 1 limitation — model capability ceiling, not a config bug.
+
+**Phase 1.5 staged** (trigger only if Q2 cross-doc synthesis fails quality gate):
+- `$5` Anthropic prepay → `ANTHROPIC_API_KEY` → Apple Keychain → LightRAG extractor swap → `DELETE /documents` → re-ingest via Haiku 4.5 (~`$0.40`, ~10 min)
+- Claude used **only at ingest**. Queries stay on `gemma4:e2b` ($0 ongoing).
+- Fixes graph drift on the 18 Ollama-indexed files in a single pass. (operations.md is already covered by Option E.)
+
+##### Option E delivery: operations.md via Claude-pre-extracted custom_kg
+
+After both local extractors walled out, COO decision `1ab81a16` shipped Option E: have Claude (this conversation, free under existing subscription) read `docs/bible/operations.md`, hand-extract entities/relationships/chunks into `custom_kg` JSON shape (verified against `LightRAG.ainsert_custom_kg` source — see comment `da533813`), and inject via the Python API.
+
+**Artifacts:**
+- `services/lightrag/custom_kg_operations.json` — 4 chunks, 28 entities, 18 relationships. Schema validated against `ainsert_custom_kg`. All entity/relation `source_id`s match a `chunks[].source_id`.
+- `services/lightrag/inject_ops_kg.py` — one-shot Python injector. Mirrors `run-server.sh` env setup (DATABASE_URL parsing, SSL verify-ca with Supabase CA, all PG\* + `LIGHTRAG_*_STORAGE` env vars). Imports `LightRAG`, calls `ainsert_custom_kg(kg, full_doc_id="doc-operations-md-claude")`.
+
+**Critical gotcha encountered**: `lightrag-server` constructs `EmbeddingFunc(model_name=os.environ["EMBEDDING_MODEL"])` ⇒ `bge-m3` ⇒ tables suffixed `_bge_m3_1024d`. The stock `from lightrag.llm.ollama import ollama_embed` singleton ships with `model_name="bge-m3:latest"` ⇒ would yield `_bge_m3_latest_1024d`. `PGVectorStorage._generate_collection_suffix` derives the table name from `embedding_func.model_name`, NOT from env, so passing `ollama_embed` directly creates a parallel table family the running server cannot see. The injector therefore wraps `ollama_embed.func` in a fresh `EmbeddingFunc(model_name="bge-m3", ...)` to land in the correct tables. Documented inline in `inject_ops_kg.py`.
+
+**ainsert_custom_kg writes nothing to `lightrag_doc_status` / `lightrag_doc_full`** — operations.md does NOT show in `GET /documents` and has no `doc-*` id. Use the synthetic `doc-operations-md-claude` id only as a label inside the graph; reversibility is via `/documents/delete_entity` + `delete_relation` per id, or workspace nuke. Logged here so future sessions don't waste time looking for it under `/documents`.
+
+**Status counts after Option E**: `{"processed":18,"all":18}` (unchanged — Option E injects directly into VDB + graph, not into the doc pipeline). Graph file: 43 entity nodes, 18 relationship edges (was 15/0 after Ollama-only ingest — operations.md added 28 entities + 18 relations and rescued the previously-empty relations layer).
+
+**Smoke checks (read-only):**
+- `GET /graph/entity/exists?name=L1%20KITCHEN` → `{"exists":true}`
+- `GET /graph/entity/exists?name=L1-BL-FRZ-790-66` → `{"exists":true}`
+- `GET /graph/entity/exists?name=COOK-CHILL%20ALGORITHM` → `{"exists":true}`
+- `GET /graph/entity/exists?name=PHUKET%20WATER` → `{"exists":true}`
+- `POST /query {"mode":"hybrid", "query":"What is L1 in our context?"}` → returns L1 KITCHEN, L1 Infrastructure, L1 DAILY BATCH SCHEDULE, CENTRAL KITCHEN MODEL, ZONE 1 LOGISTICS, HACCP, L2, L1-D-MIX-10KG entities (all from operations.md content)
+- `POST /query {"mode":"naive", "query":"how often does L1 deliver to L2 by motorbike"}` → returns the actual operations.md chunk citing morning batch + 3x/day delivery + 5min motorbike trip. `bge-m3` chunk vectors are retrievable.
+
+Quality gate `b4c4b023` Q3-A ("what is L1") is now valid again.
+
 ### Phase 2: MCP Integration (1 sprint)
 - Build `search_knowledge` MCP tool (TypeScript wrapper over REST API)
 - Integrate into Chef MCP and Finance MCP
