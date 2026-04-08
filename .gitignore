@@ -87,3 +87,6 @@ services/mempalace/palace/
 services/mempalace/knowledge_graph.sqlite3
 services/mempalace/*.age
 services/mempalace/*-key.txt
+
+# MemPalace encrypted backups — binary blobs, recoverable from live data, not source
+_backups/mempalace/
