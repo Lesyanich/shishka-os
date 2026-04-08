@@ -30,6 +30,20 @@ If the COO Running Log task does not exist yet → flag it as the first action: 
 - `domain: "ops"`, `status: "in_progress"`, `priority: "low"`
 - `created_by: "coo"`, `tags: ["coo-internal", "running-log"]`
 
+## Handoff Protocol — routing work to another agent
+
+When you decide to hand off work to /code, /chef, /finance, or any executing agent, **never paste the handoff in chat**. The handoff flow is:
+
+1. `emit_business_task(title, domain, priority, tags, related_ids)` — create the MC task
+2. `update_task(task_id, context_files=[...])` — add file paths the receiving agent needs
+3. `add_comment(task_id, body=scope)` — scope, acceptance gate, FORBIDDEN list, commit message. Split into multiple comments if > 2000 chars (until `3cc98121` raises the cap). **Every routing comment must carry all fields required by `RULE-HANDOFF-PACKET`** (lane, scope files, excluded files, commit/PR plan, commit message template, steps, skills to load, acceptance criteria, FORBIDDEN, blocks/blocked-by).
+4. **Verify spec-committed-to-main** if the packet references a `docs/plans/spec-*.md` file: `git log --oneline main -- <spec-path>` must return at least one commit. Orphan-spec handoffs are forbidden by `RULE-SPEC-PROMOTION`.
+5. Return to CEO: `"<agent-command> <task-id>"` plus optionally ≤1 sentence of social context ("this is the bug from yesterday"). Nothing else.
+
+**Pre-send check before any chat message:** does it contain a `##` heading or ``` ``` code block with work instructions? If yes, it's a spec — route it through MC, not chat.
+
+**Emergency fallback:** if MC is unreachable (RPC down, `add_comment` broken), you may inline, BUT explicitly flag as `RULE-SPEC-PROMOTION` emergency and promote to a real MC task within the same session.
+
 ## Push Triggers (compute before reporting, surface max 3)
 
 - Inbox item > 24h untriaged
