@@ -33,7 +33,11 @@ Shishka Healthy Kitchen ERP. Multiple projects, one Supabase backend.
 |---------|-------|--------------|
 | `/chef` | Chef Agent | `agents/chef/AGENT.md` + kitchen MCP tools + MC tasks (domain=kitchen) |
 | `/finance` | Finance Agent | `agents/finance/AGENT.md` + finance MCP tools + receipt inbox |
-| `/coo` | COO Agent | `agents/coo/AGENT.md` + `core-rules.md` + `agent-rules.md` + `DISPATCH_RULES.md` + MC dashboard (all domains) — full design in `docs/plans/spec-coo-v2.md` |
+| `/coo` | Auto-router | Classifies incoming message (tech vs strategic signals) and loads `/strategy` or `/techlead` — see spec `docs/plans/spec-agents-split.md` §3.1 |
+| `/strategy` | Strategic COO | `agents/strategy/AGENT.md` + `core-rules.md` + `agent-rules.md` + `DISPATCH_RULES.md` + MemPalace `wing_strategy` — business direction, CEO idea capture, cross-domain priorities, `kind:meta` ownership |
+| `/techlead` | Technical Tech-Lead | `agents/tech-lead/AGENT.md` + `core-rules.md` + `agent-rules.md` + `engineering-rules.md` + `skills-services-policy.md` + MemPalace `wing_tech` — tech task graph, `/code` handoffs, MC hygiene, engineering compound-engineering |
+
+> **COO split (2026-04-08):** The monolithic COO has been split into Strategic COO and Technical Tech-Lead per `docs/plans/spec-agents-split.md`. `/coo` is now a thin auto-router. `agents/coo/AGENT.md` is a deprecation stub — do not load it directly.
 
 **Auto-routing** — if user sends free text without selecting an agent, classify intent:
 
@@ -41,9 +45,10 @@ Shishka Healthy Kitchen ERP. Multiple projects, one Supabase backend.
 |----------------|--------|-------|
 | receipt, invoice, expense, supplier, cost report, spending | finance | `/finance` |
 | dish, menu, BOM, recipe, ingredient, nutrition, product, calorie | kitchen | `/chef` |
-| bug, feature, UI, page, component, deploy, PR, merge, migration | tech | code (default CLAUDE.md routing) |
-| queue, inbox, triage, priority, initiative, sprint, coordination | ops | `/coo` |
-| ambiguous | — | ASK: "This is for Chef, Finance, or Code?" |
+| PR #, task UUID, bug, fix, deploy, routing, handoff, MC RPC, commit, merge, CI, context_files, tag, dup, triage, blocked, RULE-*, /code, feature-branch, engineering-rules, kind:* | tech | `/techlead` (via `/coo` router or directly) |
+| roadmap, milestone, priority, стратегия, бизнес, решили, давай, хочу чтобы, нам нужна, идея, проблема с, что в приоритете, initiative, cross-domain trade-off, kind:meta | strategy / ops | `/strategy` (via `/coo` router or directly) |
+| queue, inbox, triage, priority, initiative, sprint, coordination (mechanical hygiene) | ops | `/techlead` (hygiene lives with Tech-Lead); priority re-ranking of initiatives → `/strategy` |
+| ambiguous | — | `/strategy` (tie-breaker per spec §2.3) — captures first, reclassifies after clarification |
 
 **After routing:** load the agent's AGENT.md, check MC tasks for that domain, report status, ask what to do.
 
