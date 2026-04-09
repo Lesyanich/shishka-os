@@ -1,61 +1,40 @@
 #!/usr/bin/env bash
 #
-# LightRAG server launcher (Phase 1, local venv).
+# LightRAG server launcher — GCP VM deployment (Phase 2).
 #
-# Sources DATABASE_URL from apps/admin-panel/.env (existing secret store, never
-# duplicated), parses it into POSTGRES_* env vars that lightrag-hku expects, and
-# launches lightrag-server with Ollama bindings (gemma4:e2b + bge-m3).
+# Expects secrets as environment variables (injected by docker-compose via
+# start.sh, which reads them from GCP Secret Manager). NO .env files, NO
+# local file secrets.
 #
-# Secret never enters Claude Code context — it only lives inside the spawned
-# subshell of this script.
+# Provider mix:
+#   LLM extraction:  Anthropic Claude 3.5 Haiku
+#   Embeddings:      OpenAI text-embedding-3-small (1536-dim)
 #
-# Usage:
-#   services/lightrag/run-server.sh                # foreground
-#   services/lightrag/run-server.sh --port 9621    # override args
+# Usage (inside Docker):
+#   /app/run-server.sh                  # default
+#   /app/run-server.sh --port 9621      # override args
 #
-# Workspace isolation: all tables are PUBLIC.LIGHTRAG_* with workspace='lightrag'
-# row discriminator. lightrag-hku hardcodes the public schema (postgres_impl.py
-# line ~1608) so a dedicated `lightrag` schema is not feasible without forking.
-# Drop-safe boundary is preserved via the LIGHTRAG_ table prefix.
+# Usage (local dev — secrets from env):
+#   export ANTHROPIC_API_KEY=... OPENAI_API_KEY=... DATABASE_URL=...
+#   ./run-server.sh
+#
+# Refs: MC 350a6738, spec-lightrag.md
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-ENV_FILE="$SCRIPT_DIR/db-url.local"
-VENV_PY="$REPO_ROOT/venv/bin/python"
-VENV_SERVER="$REPO_ROOT/venv/bin/lightrag-server"
 
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "ERROR: secret file not found: $ENV_FILE" >&2
-  exit 1
-fi
+# ── Validate required secrets ──
+for VAR in ANTHROPIC_API_KEY OPENAI_API_KEY DATABASE_URL; do
+  if [[ -z "${!VAR:-}" ]]; then
+    echo "ERROR: $VAR is not set. Use start.sh to fetch from GCP Secret Manager." >&2
+    exit 1
+  fi
+done
 
-if [[ ! -x "$VENV_SERVER" ]]; then
-  echo "ERROR: lightrag-server not installed at $VENV_SERVER" >&2
-  echo "Run: $REPO_ROOT/venv/bin/pip install 'lightrag-hku[api]'" >&2
-  exit 1
-fi
-
-# Extract DATABASE_URL line without sourcing the whole file (avoids leaking
-# unrelated vars and avoids quoting/eval pitfalls).
-DATABASE_URL_LINE="$(grep -E '^[[:space:]]*DATABASE_URL[[:space:]]*=' "$ENV_FILE" | tail -1 || true)"
-if [[ -z "$DATABASE_URL_LINE" ]]; then
-  echo "ERROR: DATABASE_URL not found in $ENV_FILE" >&2
-  exit 1
-fi
-
-# Strip 'DATABASE_URL=' prefix and surrounding quotes
-DATABASE_URL="${DATABASE_URL_LINE#*=}"
-DATABASE_URL="${DATABASE_URL#\"}"
-DATABASE_URL="${DATABASE_URL%\"}"
-DATABASE_URL="${DATABASE_URL#\'}"
-DATABASE_URL="${DATABASE_URL%\'}"
-export DATABASE_URL
-
-# Parse postgres URL into components via Python (robust against URL-encoded
-# passwords and the dotted Supabase pooler usernames).
-PARSED="$("$VENV_PY" - <<'PYEOF'
+# ── Parse DATABASE_URL into POSTGRES_* components ──
+# Robust against URL-encoded passwords and dotted Supabase pooler usernames.
+PARSED="$(python3 - <<'PYEOF'
 import os, sys
 from urllib.parse import urlparse, unquote
 url = os.environ["DATABASE_URL"]
@@ -77,55 +56,50 @@ PYEOF
 )"
 eval "$PARSED"
 
-# LightRAG workspace + storage backends
+# ── Workspace + storage backends ──
 export POSTGRES_WORKSPACE="${POSTGRES_WORKSPACE:-lightrag}"
 
-# Supabase pooler uses a private CA ("Supabase Intermediate 2021 CA"). Neither
-# certifi nor the system bundle trust it, so asyncpg's default ssl=True path
-# fails with "self-signed certificate in certificate chain".
-#
-# Fix: use verify-ca mode with the Supabase cert chain saved at
-# services/lightrag/supabase-ca.pem (extracted once via
-# `openssl s_client -connect ...pooler.supabase.com:5432 -starttls postgres
-#  -showcerts`). verify-ca validates the chain but skips hostname check —
-# sufficient for a private CA on a known pooler endpoint.
+# Supabase pooler uses a private CA. verify-ca validates the chain but skips
+# hostname check — sufficient for a known pooler endpoint.
 export POSTGRES_SSL_MODE="${POSTGRES_SSL_MODE:-verify-ca}"
 export POSTGRES_SSL_ROOT_CERT="${POSTGRES_SSL_ROOT_CERT:-$SCRIPT_DIR/supabase-ca.pem}"
 
-# Storage layer: PG for KV/Vector/DocStatus, NetworkX file for graph (Phase 1 OK)
+# Storage layer: PG for KV/Vector/DocStatus, NetworkX file for graph
 export LIGHTRAG_KV_STORAGE="${LIGHTRAG_KV_STORAGE:-PGKVStorage}"
 export LIGHTRAG_VECTOR_STORAGE="${LIGHTRAG_VECTOR_STORAGE:-PGVectorStorage}"
 export LIGHTRAG_DOC_STATUS_STORAGE="${LIGHTRAG_DOC_STATUS_STORAGE:-PGDocStatusStorage}"
 export LIGHTRAG_GRAPH_STORAGE="${LIGHTRAG_GRAPH_STORAGE:-NetworkXStorage}"
 
-# LLM + embedding bindings (Ollama, all local)
-export LLM_BINDING="${LLM_BINDING:-ollama}"
-export LLM_BINDING_HOST="${LLM_BINDING_HOST:-http://localhost:11434}"
-export LLM_MODEL="${LLM_MODEL:-gemma4:e2b}"
-export EMBEDDING_BINDING="${EMBEDDING_BINDING:-ollama}"
-export EMBEDDING_BINDING_HOST="${EMBEDDING_BINDING_HOST:-http://localhost:11434}"
-export EMBEDDING_MODEL="${EMBEDDING_MODEL:-bge-m3}"
-export EMBEDDING_DIM="${EMBEDDING_DIM:-1024}"
+# ── LLM + embedding providers ──
+# LLM: Anthropic Claude 3.5 Haiku (extraction + query answering)
+export LLM_BINDING="${LLM_BINDING:-anthropic}"
+export LLM_MODEL="${LLM_MODEL:-claude-3-5-haiku-latest}"
 
-# Path 2 tuning (COO decision d532e8ff, 2026-04-08):
-# - MAX_PARALLEL_INSERT=1 → sequential extraction, avoids Metal GPU command-buffer
-#   contention on gemma4:e2b under concurrent load (operations.md + menu-items.md
-#   crashed the llama runner at parallel=2).
-# - TIMEOUT=600 → raise ollama httpx client read timeout from default ~240s to 600s,
-#   fixes httpx.ReadTimeout on dense chunks (tables/lists in bible files).
-export MAX_PARALLEL_INSERT="${MAX_PARALLEL_INSERT:-1}"
-export TIMEOUT="${TIMEOUT:-600}"
+# Embeddings: OpenAI text-embedding-3-small (1536-dim)
+export EMBEDDING_BINDING="${EMBEDDING_BINDING:-openai}"
+export EMBEDDING_MODEL="${EMBEDDING_MODEL:-text-embedding-3-small}"
+export EMBEDDING_DIM="${EMBEDDING_DIM:-1536}"
 
-# Working directory for graph file + logs
-WORKING_DIR="$SCRIPT_DIR/rag_storage"
+# Tuning: no Ollama contention, but keep conservative for API rate limits
+export MAX_PARALLEL_INSERT="${MAX_PARALLEL_INSERT:-2}"
+export TIMEOUT="${TIMEOUT:-120}"
+
+# ── Working directory for graph file + logs ──
+# Docker: /var/lib/lightrag-rag-storage (mounted volume)
+# Local:  ./rag_storage
+if [[ -d /var/lib/lightrag-rag-storage ]]; then
+  WORKING_DIR="/var/lib/lightrag-rag-storage"
+else
+  WORKING_DIR="$SCRIPT_DIR/rag_storage"
+fi
 mkdir -p "$WORKING_DIR"
 
 cd "$SCRIPT_DIR"
-exec "$VENV_SERVER" \
-  --host 127.0.0.1 \
+exec lightrag-server \
+  --host 0.0.0.0 \
   --port 9621 \
   --working-dir "$WORKING_DIR" \
   --workspace "$POSTGRES_WORKSPACE" \
-  --llm-binding ollama \
-  --embedding-binding ollama \
+  --llm-binding "$LLM_BINDING" \
+  --embedding-binding "$EMBEDDING_BINDING" \
   "$@"
