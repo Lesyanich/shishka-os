@@ -56,7 +56,7 @@ export function GanttTimeline({
   // Build task name lookup for conflict details
   const taskNameMap = new Map<string, string>()
   for (const t of tasks) {
-    taskNameMap.set(t.id, t.nomenclature_name ?? t.operation_name ?? t.id.slice(0, 8))
+    taskNameMap.set(t.id, t.target_nomenclature?.name ?? t.description ?? t.id.slice(0, 8))
   }
 
   if (error) {
@@ -131,9 +131,12 @@ export function GanttTimeline({
       <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
         {conflictBanner}
         {displayEquipment.map((eq) => {
-          const eqTasks = (tasksByEquipment[eq.id] ?? []).sort(
-            (a, b) => new Date(a.scheduled_start).getTime() - new Date(b.scheduled_start).getTime(),
-          )
+          // SQL filters scheduled_start NOT NULL but the type is nullable; narrow with a runtime guard.
+          const eqTasks = (tasksByEquipment[eq.id] ?? [])
+            .filter((t): t is GanttTask & { scheduled_start: string } => t.scheduled_start !== null)
+            .sort(
+              (a, b) => new Date(a.scheduled_start).getTime() - new Date(b.scheduled_start).getTime(),
+            )
           if (eqTasks.length === 0) return null
           return (
             <div key={eq.id} className="border-b border-slate-800 last:border-b-0">
@@ -145,7 +148,7 @@ export function GanttTimeline({
               <div className="divide-y divide-slate-800/50">
                 {eqTasks.map((task) => {
                   const start = new Date(task.scheduled_start)
-                  const end = new Date(task.scheduled_end)
+                  const end = new Date(start.getTime() + (task.duration_min ?? 0) * 60_000)
                   const fmt = (d: Date) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
                   const isConflict = conflictTaskIds.has(task.id)
                   return (
@@ -158,9 +161,9 @@ export function GanttTimeline({
                         <span>{fmt(start)}–{fmt(end)}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm text-slate-200 truncate">{task.nomenclature_name ?? 'Task'}</p>
-                        {task.operation_name && (
-                          <p className="text-[11px] text-slate-500 truncate">{task.operation_name}</p>
+                        <p className="text-sm text-slate-200 truncate">{task.target_nomenclature?.name ?? 'Task'}</p>
+                        {task.description && (
+                          <p className="text-[11px] text-slate-500 truncate">{task.description}</p>
                         )}
                       </div>
                       {isConflict && (
