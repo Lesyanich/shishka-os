@@ -5,7 +5,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { RoleProvider } from './contexts/RoleContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppShell } from './layouts/AppShell'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Network, Code2 } from 'lucide-react'
 
 // Static — always in main bundle (login + first screen)
 import { LoginPage } from './pages/LoginPage'
@@ -36,6 +36,9 @@ const BatchPlanner = lazy(() => import('./pages/BatchPlanner').then(m => ({ defa
 const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
 const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
 const MissionControl = lazy(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
+const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
+const LightragGraph = lazy(() => import('./pages/brain').then(m => ({ default: m.LightragGraph })))
+const BrainPlaceholder = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPlaceholder })))
 
 function PageLoader() {
   return (
@@ -100,6 +103,36 @@ function App() {
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
                 <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
+                <Route path="/brain" element={<Suspense fallback={<PageLoader />}><BrainPage /></Suspense>}>
+                  <Route index element={<Navigate to="lightrag" replace />} />
+                  <Route path="lightrag" element={<Suspense fallback={<PageLoader />}><LightragGraph /></Suspense>} />
+                  <Route
+                    path="mempalace"
+                    element={
+                      <Suspense fallback={<PageLoader />}>
+                        <BrainPlaceholder
+                          icon={Network}
+                          title="MemPalace · L1"
+                          phase="Phase 2 — coming soon"
+                          description="Conversation memory graph from MemPalace will render here once it exposes a graph-shaped read API."
+                        />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="code"
+                    element={
+                      <Suspense fallback={<PageLoader />}>
+                        <BrainPlaceholder
+                          icon={Code2}
+                          title="Graphify · L3"
+                          phase="Phase 3 — deferred"
+                          description="Code structure graph (AST + call graphs) will render here after the Graphify spike."
+                        />
+                      </Suspense>
+                    }
+                  />
+                </Route>
                 <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
                 <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
               </Route>
