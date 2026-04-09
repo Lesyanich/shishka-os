@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir 'lightrag-hku[api]==1.4.13'
 
 # Copy server files
 COPY run-server.sh /app/run-server.sh
+COPY serve.py /app/serve.py
 COPY supabase-ca.pem /app/supabase-ca.pem
 RUN chmod +x /app/run-server.sh
 

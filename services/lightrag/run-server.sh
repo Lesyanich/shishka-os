@@ -98,7 +98,7 @@ fi
 mkdir -p "$WORKING_DIR"
 
 cd "$SCRIPT_DIR"
-exec lightrag-server \
+exec python3 /app/serve.py \
   --host 0.0.0.0 \
   --port 9621 \
   --working-dir "$WORKING_DIR" \
