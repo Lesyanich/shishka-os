@@ -149,9 +149,24 @@ Ollama model tags are **not safe** to paste directly into anything that becomes 
 
 ---
 
+## RULE-MINIMAL-CORRECT-CHANGE
+
+Every code change must be:
+
+1. **Minimal** — touch only files listed in the task scope (or handoff packet `Scope — files`). If you need to change a file not in scope, STOP: either expand scope via MC comment or log a separate task (`RULE-BACKLOG-FIRST`).
+
+2. **Root-cause** — fix the cause, not the symptom. No `// TODO: fix later` hacks, no `try/catch` that swallows errors to make tests pass, no hardcoded values that paper over a broken query. If the root cause is too deep for this task, log a new task with the real fix and document the temporary workaround explicitly in MC notes.
+
+3. **Simple** — if there's a direct solution and an abstract one, choose direct. Create an abstraction only when the same pattern appears 3+ times. "Might need it later" is not a reason to abstract now.
+
+> Origin: 2026-04-09. Inspired by Boris Cherny's "Simplicity First", "No Laziness", and "Minimal Impact" principles. Addresses observed pattern where agents over-engineer solutions, touch files outside scope, or apply temporary fixes that become permanent.
+
+---
+
 ## Cross-References
 
 - DB SSoT and UUID rules → `core-rules.md` (`RULE-SUPABASE-SSOT`, `RULE-UUID-COMPLIANCE`)
 - Frontend-specific rules → `frontend-rules.md`
+- Context loading (project detection, modules, dead zones) → `context-routing.md`
 - Migration spec/process → `docs/plans/spec-migration-tracking.md`
 - AI-Native Ops modernization → `docs/plans/spec-ai-native-ops.md`

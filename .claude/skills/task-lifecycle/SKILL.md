@@ -26,7 +26,7 @@ When starting a new session, BEFORE any work:
    - `get_task(id)` → read `description`, `notes`, `context_files`, `spec_file`
    - If `spec_file` exists → read it (this is your detailed instructions)
    - If `context_files` is non-empty → load ONLY those files + `docs/constitution/core-rules.md`
-   - If `context_files` is empty → fall back to CLAUDE.md L2 module routing
+   - If `context_files` is empty → fall back to `docs/constitution/context-routing.md` for L1/L2 module routing
 
 4. **Set up branch:**
    - Task notes or spec should specify the branch
