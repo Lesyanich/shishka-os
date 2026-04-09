@@ -39,6 +39,7 @@ const MissionControl = lazy(() => import('./pages/MissionControl').then(m => ({ 
 const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
 const LightragGraph = lazy(() => import('./pages/brain').then(m => ({ default: m.LightragGraph })))
 const BrainPlaceholder = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPlaceholder })))
+const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
 
 function PageLoader() {
   return (
@@ -106,6 +107,7 @@ function App() {
                 <Route path="/brain" element={<Suspense fallback={<PageLoader />}><BrainPage /></Suspense>}>
                   <Route index element={<Navigate to="lightrag" replace />} />
                   <Route path="lightrag" element={<Suspense fallback={<PageLoader />}><LightragGraph /></Suspense>} />
+                  <Route path="cost" element={<Suspense fallback={<PageLoader />}><BrainCostPage /></Suspense>} />
                   <Route
                     path="mempalace"
                     element={

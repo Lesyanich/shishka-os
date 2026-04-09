@@ -1,39 +1,58 @@
-# LightRAG Service (Phase 1)
+# LightRAG Service (Phase 2 — GCP VM)
 
-Local Python venv runner for [LightRAG](https://github.com/HKUDS/LightRAG) — graph + vector hybrid RAG over Shishka knowledge (`docs/bible/`, `docs/domain/`).
+Graph + vector hybrid RAG over Shishka knowledge (`docs/bible/`, `docs/domain/`) via [LightRAG](https://github.com/HKUDS/LightRAG).
 
-> **Status:** Phase 1 — local install, indexing bible/domain (~80KB).
-> **MC task:** `996f1f86-58d8-4be5-a2e7-a59b9fa049d6`
+> **Status:** Phase 2 — deployed to GCP VM (`shishka-production`), OpenAI providers.
+> **MC task:** `350a6738-152a-4d20-9c76-eb3d5431de89`
 > **Spec:** `docs/plans/spec-lightrag.md`
 
 ## Stack
 
 | Layer | Choice | Why |
 |---|---|---|
-| Extraction LLM | `gemma4:e2b` via Ollama | Local, free, already pulled (9.6 GB) |
-| Embedding | `bge-m3` via Ollama | Multilingual (RU/EN/AR), 1024-dim, free |
-| Vector + KV store | Supabase Postgres + pgvector | Existing infra, schema `public.LIGHTRAG_*` |
-| Graph store | NetworkX file | Phase 1 simplicity; Postgres graph in Phase 2+ |
-| Server | `lightrag-server` (FastAPI) on `:9621` | Native REST API |
+| Extraction LLM | `gpt-4o-mini` via OpenAI | Fast, cheap, native LightRAG support |
+| Embedding | `text-embedding-3-small` via OpenAI (1536-dim) | High quality, single-provider simplicity |
+| Vector + KV store | Supabase Postgres + pgvector | Existing infra, tables `public.LIGHTRAG_*` |
+| Graph store | NetworkX file | Mounted Docker volume |
+| Server | `lightrag-server` (FastAPI) on `:9621` | Docker on GCP VM |
+| Cost tracking | `brain_query_log` table + `/admin/brain/cost` | Per-query cost + latency dashboard |
 
-## Run
+## Run (GCP VM)
 
 ```bash
-services/lightrag/run-server.sh
+# On the VM (secrets fetched from GCP Secret Manager automatically)
+cd ~/lightrag && ./start.sh -d
 ```
 
-The wrapper sources `DATABASE_URL` from `apps/admin-panel/.env` (existing secret store, never duplicated), parses it into the `POSTGRES_*` env vars that `lightrag-hku` expects, then launches `lightrag-server` with Ollama bindings.
+Health check: `curl http://localhost:9621/health`
 
-Health check: `curl http://127.0.0.1:9621/health`
+See `deploy.md` for full deployment runbook.
+
+## Run (local dev)
+
+```bash
+export OPENAI_API_KEY=$(security find-generic-password -a "$USER" -s "shishka-openAI-api-key" -w)
+export DATABASE_URL=$(security find-generic-password -a "$USER" -s "shishka-database-url" -w)
+./run-server.sh
+```
 
 ## Storage layout
 
-LightRAG creates `public.LIGHTRAG_*` tables on first boot (DOC_FULL, DOC_CHUNKS, VDB_ENTITY, VDB_RELATION, VDB_CHUNKS, LLM_CACHE, DOC_STATUS). All rows carry a `workspace` column — Phase 1 uses `workspace='lightrag'` for the shared bible+domain index.
+LightRAG creates `public.LIGHTRAG_*` tables on first boot. All rows carry a `workspace` column — using `workspace='lightrag'` for the shared bible+domain index.
 
-> **Schema deviation:** the original Phase 1 plan called for a dedicated `lightrag` Postgres schema. `lightrag-hku` v1.4.13 hardcodes `public` (`postgres_impl.py:~1608`), so a separate schema is not feasible without forking. The drop-safe boundary is preserved via the `LIGHTRAG_` table prefix and the `workspace` column. See migration `099_lightrag_pgvector.sql`.
+> **Schema note:** `lightrag-hku` v1.4.13 hardcodes `public` schema. Drop-safe boundary preserved via `LIGHTRAG_` table prefix + `workspace` column. See migration `099_lightrag_pgvector.sql`.
+
+## Secrets
+
+All secrets live in **GCP Secret Manager** (project `shishka-automation-hubs`). See `SECRETS.md` for details.
 
 ## Files
 
-- `run-server.sh` — launcher (no secrets, sources existing .env at runtime)
-- `rag_storage/` — runtime working dir (gitignored): graph file, logs
-- `README.md` — this file
+- `run-server.sh` — server launcher (reads secrets from env vars)
+- `start.sh` — fetches secrets from GCP Secret Manager, starts docker-compose
+- `Dockerfile` — Python 3.11-slim + lightrag-hku[api]==1.4.13
+- `docker-compose.yml` — single service, volume mount, health check
+- `deploy.md` — GCP deployment runbook
+- `SECRETS.md` — secret inventory and rotation guide
+- `supabase-ca.pem` — Supabase pooler SSL cert
+- `rag_storage/` — runtime working dir (gitignored)
