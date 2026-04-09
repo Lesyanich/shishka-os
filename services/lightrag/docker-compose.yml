@@ -3,6 +3,8 @@
 #
 # Refs: MC 350a6738, spec-lightrag.md
 
+version: "3.8"
+
 services:
   lightrag:
     build: .
@@ -14,7 +16,6 @@ services:
       - lightrag-data:/var/lib/lightrag-rag-storage
     environment:
       # Secrets injected by start.sh from GCP Secret Manager — never hardcoded
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DATABASE_URL=${DATABASE_URL}
     healthcheck:

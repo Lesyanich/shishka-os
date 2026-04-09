@@ -6,9 +6,10 @@
 # start.sh, which reads them from GCP Secret Manager). NO .env files, NO
 # local file secrets.
 #
-# Provider mix:
-#   LLM extraction:  Anthropic Claude 3.5 Haiku
+# Provider mix (all OpenAI — lightrag-hku 1.4.13 has no anthropic binding):
+#   LLM extraction:  OpenAI gpt-4o-mini
 #   Embeddings:      OpenAI text-embedding-3-small (1536-dim)
+# Shishka agents themselves still run on Claude — LightRAG is retrieval only.
 #
 # Usage (inside Docker):
 #   /app/run-server.sh                  # default
@@ -25,7 +26,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Validate required secrets ──
-for VAR in ANTHROPIC_API_KEY OPENAI_API_KEY DATABASE_URL; do
+for VAR in OPENAI_API_KEY DATABASE_URL; do
   if [[ -z "${!VAR:-}" ]]; then
     echo "ERROR: $VAR is not set. Use start.sh to fetch from GCP Secret Manager." >&2
     exit 1
@@ -71,9 +72,11 @@ export LIGHTRAG_DOC_STATUS_STORAGE="${LIGHTRAG_DOC_STATUS_STORAGE:-PGDocStatusSt
 export LIGHTRAG_GRAPH_STORAGE="${LIGHTRAG_GRAPH_STORAGE:-NetworkXStorage}"
 
 # ── LLM + embedding providers ──
-# LLM: Anthropic Claude 3.5 Haiku (extraction + query answering)
-export LLM_BINDING="${LLM_BINDING:-anthropic}"
-export LLM_MODEL="${LLM_MODEL:-claude-3-5-haiku-latest}"
+# LLM: OpenAI gpt-4o-mini (entity extraction + query answering inside LightRAG)
+# Note: Shishka agents themselves still run on Claude — LightRAG is the retrieval
+# engine, not the agent brain. Anthropic binding not available in lightrag-hku 1.4.13.
+export LLM_BINDING="${LLM_BINDING:-openai}"
+export LLM_MODEL="${LLM_MODEL:-gpt-4o-mini}"
 
 # Embeddings: OpenAI text-embedding-3-small (1536-dim)
 export EMBEDDING_BINDING="${EMBEDDING_BINDING:-openai}"

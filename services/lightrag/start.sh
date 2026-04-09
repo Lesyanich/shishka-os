@@ -37,11 +37,10 @@ read_secret() {
 }
 
 echo "Fetching secrets from GCP Secret Manager..."
-export ANTHROPIC_API_KEY="$(read_secret lightrag-anthropic-key)"
 export OPENAI_API_KEY="$(read_secret lightrag-openai-key)"
 export DATABASE_URL="$(read_secret lightrag-database-url)"
 
-for VAR in ANTHROPIC_API_KEY OPENAI_API_KEY DATABASE_URL; do
+for VAR in OPENAI_API_KEY DATABASE_URL; do
   if [[ -z "${!VAR:-}" ]]; then
     echo "ERROR: Failed to read $VAR from Secret Manager. Check IAM permissions." >&2
     exit 1
@@ -50,4 +49,9 @@ done
 
 echo "Secrets loaded. Starting lightrag-server..."
 cd "$SCRIPT_DIR"
-exec sudo -E docker compose up --build "$@"
+# Support both docker compose v2 (plugin) and docker-compose v1 (standalone)
+if sudo docker compose version >/dev/null 2>&1; then
+  exec sudo -E docker compose up --build "$@"
+else
+  exec sudo -E docker-compose up --build "$@"
+fi
