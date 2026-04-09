@@ -7,7 +7,7 @@
 # local file secrets.
 #
 # Provider mix (all OpenAI — lightrag-hku 1.4.13 has no anthropic binding):
-#   LLM extraction:  OpenAI gpt-4o-mini
+#   LLM extraction:  OpenAI gpt-4o
 #   Embeddings:      OpenAI text-embedding-3-small (1536-dim)
 # Shishka agents themselves still run on Claude — LightRAG is retrieval only.
 #
@@ -72,11 +72,11 @@ export LIGHTRAG_DOC_STATUS_STORAGE="${LIGHTRAG_DOC_STATUS_STORAGE:-PGDocStatusSt
 export LIGHTRAG_GRAPH_STORAGE="${LIGHTRAG_GRAPH_STORAGE:-NetworkXStorage}"
 
 # ── LLM + embedding providers ──
-# LLM: OpenAI gpt-4o-mini (entity extraction + query answering inside LightRAG)
+# LLM: OpenAI gpt-4o (entity extraction + query answering inside LightRAG)
 # Note: Shishka agents themselves still run on Claude — LightRAG is the retrieval
 # engine, not the agent brain. Anthropic binding not available in lightrag-hku 1.4.13.
 export LLM_BINDING="${LLM_BINDING:-openai}"
-export LLM_MODEL="${LLM_MODEL:-gpt-4o-mini}"
+export LLM_MODEL="${LLM_MODEL:-gpt-4o}"
 
 # Embeddings: OpenAI text-embedding-3-small (1536-dim)
 export EMBEDDING_BINDING="${EMBEDDING_BINDING:-openai}"
