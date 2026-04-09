@@ -117,7 +117,7 @@ MCPs (write): shishka-finance, shishka-mission-control (task closure only)
 #### Code Agent (Claude Code in repo)
 ```
 Constitution: core-rules.md, engineering-rules.md, frontend-rules.md
-Routing: CLAUDE.md L0 → task context_files → L1/L2 fallback
+Routing: CLAUDE.md Session Start → task context_files → context-routing.md L1/L2 fallback
 Skills: session-handoff, task-lifecycle (existing local skill)
 MCPs (write): shishka-mission-control (task closure only)
 MCPs forbidden: shishka-chef, shishka-finance (domain agents only)

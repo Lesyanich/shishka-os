@@ -224,7 +224,7 @@ Example:
 ]
 ```
 
-**Agent loading behavior:** call `get_task(id)` → if `context_files` is non-empty, load **only** those files + `core-rules.md`. Skip the CLAUDE.md L2 module scan entirely. If `context_files` is empty, fall back to L2 routing.
+**Agent loading behavior:** call `get_task(id)` → if `context_files` is non-empty, load **only** those files + `core-rules.md`. Skip context routing entirely. If `context_files` is empty, fall back to `docs/constitution/context-routing.md` for L1/L2 routing.
 
 > Origin: AI-Native Ops Phase C. Token budgets exploded when agents loaded entire CLAUDE.md routing on every task. (Legacy: `Boris Rule #17`.)
 
@@ -304,6 +304,51 @@ Escalation does **not** fall through to silent CEO-gated processing — the task
 - Discover B → log to MC (Tier 1, `inbox`) → ask CEO whether to continue A or switch
 - Don't silently start B
 - Don't silently drop B
+
+---
+
+## RULE-VERIFY-BEFORE-DONE
+
+Never mark a task as `done` in MC without proving it works. Proof means:
+
+**Mandatory for all code tasks:**
+- Build passes
+- Lint passes
+
+**At least one of (depending on task type):**
+- Tests pass (if tests exist for the touched area)
+- UI verified (screenshot or manual check for frontend changes)
+- Diff reviewed: `git diff main...HEAD` shows only intended changes, no accidental side effects
+- grep/assertion confirms the change (for data fixes, config changes)
+
+**Elegance pause (non-trivial changes only):**
+Before marking done, ask: "Is there a simpler way to achieve this?" If the fix feels hacky — rethink. Skip this for obvious one-line fixes.
+
+Heuristic: "Would a senior engineer approve this PR?" If not → not done.
+
+> Origin: 2026-04-09. Inspired by Boris Cherny's "Verification Before Done" + "Demand Elegance" patterns. Codifies what task-lifecycle implies but doesn't enforce as a named rule. The elegance pause absorbs Boris's "Demand Elegance (Balanced)" — not a separate rule, but a step in verification.
+
+---
+
+## RULE-SUBAGENT-HYGIENE
+
+When working in Claude Code (not Cowork), use subagents to keep the main context window clean:
+
+**Offload to subagent:**
+- Research: grep across codebase, read multiple files to understand a pattern
+- Exploration: "how does module X work?", "find all usages of Y"
+- Parallel analysis: checking multiple files for the same pattern
+- Verification: running tests, checking build output, reviewing diffs
+
+**Keep in main context:**
+- Simple single-file edits
+- Quick lookups (one grep, one file read)
+- MC operations (emit_task, update_task, add_comment)
+- The actual implementation work
+
+**One task per subagent.** Don't ask a subagent to "research and then fix" — research in one subagent, implement in main context.
+
+> Origin: 2026-04-09. Inspired by Boris Cherny's "Subagent Strategy" pattern. Context window pollution was observed in long Claude Code sessions where research + implementation in the same thread degraded output quality.
 
 ---
 

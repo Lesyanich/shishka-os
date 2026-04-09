@@ -129,9 +129,26 @@ If the CEO corrects a mistake, the agent **must** update the relevant file in `d
 
 ---
 
+## RULE-PLAN-BEFORE-BUILD
+
+For any task requiring 3 or more steps, or involving architectural decisions:
+1. Write a plan FIRST (in MC comment, spec file, or session-log)
+2. Get confirmation from CEO (or COO for autonomous lane tasks)
+3. Only then begin implementation
+
+If something goes wrong mid-execution → STOP and re-plan immediately. Do not push through a broken approach hoping it will work out.
+
+Simple, obvious fixes (typo, one-line change, config update) are exempt.
+
+> Origin: 2026-04-09. Inspired by Boris Cherny's "Plan Mode Default" pattern. Complements RULE-SOCRATIC-GATE (which covers new features/migrations specifically). This rule covers the general case: any non-trivial work.
+
+---
+
 ## Cross-References
 
 - Engineering specifics (BOM filtering, commit gate, migrations, async patterns) → `engineering-rules.md`
 - Agent behavior (task closure, MCP identity, two-tier tracking, scoped context) → `agent-rules.md`
+- Context loading (project detection, modules, dead zones) → `context-routing.md`
+- Agent dispatching (slash commands, domain inference) → `agent-routing.md`
 - Task routing → `docs/business/DISPATCH_RULES.md`
 - Project map → `docs/PROJECT_REGISTRY.md`
