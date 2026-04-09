@@ -27,6 +27,7 @@ import {
   Columns3,
   Search,
   ArrowUpDown,
+  Layers,
 } from 'lucide-react'
 import {
   useBusinessTasks,
@@ -37,6 +38,8 @@ import {
   type NewBusinessTask,
 } from '../hooks/useBusinessTasks'
 import { KanbanBoard } from '../components/mission-control/KanbanBoard'
+import { GroupedTaskList } from '../components/mission-control/GroupedTaskList'
+import type { GroupBy } from '../utils/taskGrouping'
 import { TaskDetailPanel } from '../components/mission-control/TaskDetailPanel'
 import { useRole } from '../contexts/RoleContext'
 
@@ -306,6 +309,7 @@ export function MissionControl() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortField, setSortField] = useState<SortField>('priority')
   const [showDone, setShowDone] = useState(false)
+  const [groupBy, setGroupBy] = useState<GroupBy>('none')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [selectedTask, setSelectedTask] = useState<BusinessTask | null>(null)
@@ -499,6 +503,18 @@ export function MissionControl() {
             <option value="created">Newest first</option>
           </select>
         </div>
+        <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2">
+          <Layers className="h-3.5 w-3.5 text-slate-500" />
+          <select
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+            className="bg-transparent py-2 pr-1 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="none">No grouping</option>
+            <option value="topic">Group by topic</option>
+            <option value="agent">Group by agent</option>
+          </select>
+        </div>
       </div>
 
       {/* Executor + Priority filters */}
@@ -624,11 +640,13 @@ export function MissionControl() {
       {/* Content: List or Kanban */}
       {!isLoading && allTasks.length > 0 && viewMode === 'list' && (
         tasks.length > 0 ? (
-          <div className="space-y-2">
-            {tasks.map((task) => (
+          <GroupedTaskList
+            tasks={tasks}
+            groupBy={groupBy}
+            renderItem={(task) => (
               <TaskListItem key={task.id} task={task} onOpenDetail={handleOpenDetail} />
-            ))}
-          </div>
+            )}
+          />
         ) : (
           <p className="py-10 text-center text-sm text-slate-600">No tasks match this filter</p>
         )
