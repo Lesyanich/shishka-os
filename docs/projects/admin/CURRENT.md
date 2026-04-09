@@ -88,6 +88,7 @@ New modules added in session 2026-03-21:
 | `/receive` | ReceivingStation.tsx | protected |
 | `/production` | ProductionOrdersPage.tsx | protected |
 | `/schedule` | ScheduleManager.tsx | protected |
+| `/brain/cost` | BrainCostPage.tsx | protected |
 | `/settings` | Settings.tsx | protected |
 
 ## New Hooks (2026-03-21)
