@@ -52,9 +52,19 @@ def parse_database_url(url: str) -> dict:
 class QueryLogMiddleware(BaseHTTPMiddleware):
     """Intercept POST /query, log to brain_query_log after response."""
 
-    def __init__(self, app, db_pool: asyncpg.Pool):
+    def __init__(self, app, db_kwargs: dict):
         super().__init__(app)
-        self.db_pool = db_pool
+        self.db_kwargs = db_kwargs
+        self._pool = None
+
+    async def _get_pool(self) -> asyncpg.Pool:
+        """Lazy pool creation — runs inside uvicorn's event loop."""
+        if self._pool is None:
+            self._pool = await asyncpg.create_pool(
+                **self.db_kwargs, min_size=1, max_size=2
+            )
+            logger.info("asyncpg pool created for brain_query_log")
+        return self._pool
 
     async def dispatch(self, request: Request, call_next):
         # Only intercept POST /query (not /query/stream, /health, etc.)
@@ -141,7 +151,8 @@ class QueryLogMiddleware(BaseHTTPMiddleware):
 
     async def _log_query(self, **kwargs):
         try:
-            async with self.db_pool.acquire() as conn:
+            pool = await self._get_pool()
+            async with pool.acquire() as conn:
                 await conn.execute(
                     """
                     INSERT INTO brain_query_log
@@ -206,14 +217,8 @@ def main():
         ssl_ctx.check_hostname = False  # verify-ca, not verify-full
         db_kwargs["ssl"] = ssl_ctx
 
-        # Create pool in a sync wrapper (uvicorn hasn't started yet)
-        loop = asyncio.new_event_loop()
-        pool = loop.run_until_complete(
-            asyncpg.create_pool(**db_kwargs, min_size=1, max_size=2)
-        )
-        loop.close()
-
-        app.add_middleware(QueryLogMiddleware, db_pool=pool)
+        # Pool created lazily on first query (inside uvicorn's event loop)
+        app.add_middleware(QueryLogMiddleware, db_kwargs=db_kwargs)
         logger.info("Query logging middleware active → brain_query_log")
 
     # Run uvicorn (same as stock main)

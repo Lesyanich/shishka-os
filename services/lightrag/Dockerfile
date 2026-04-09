@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 # Pin lightrag-hku with API server support
-RUN pip install --no-cache-dir 'lightrag-hku[api]==1.4.13'
+RUN pip install --no-cache-dir 'lightrag-hku[api]==1.4.13' asyncpg
 
 # Copy server files
 COPY run-server.sh /app/run-server.sh
