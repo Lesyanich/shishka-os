@@ -44,7 +44,7 @@ Every secret has exactly **one** file that holds the real value. Other services 
 |---|---|---|---|
 | `DATABASE_URL` (Supabase Postgres) | `services/lightrag/db-url.local` (gitignored) | LightRAG (`run-server.sh`) | shell-source + URL parser |
 | `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` | `apps/admin-panel/.env` | admin-panel (Vite) | Vite auto-load. Public-by-design (anon key ships in browser bundle); RLS is the protection layer. |
-| `SUPABASE_SERVICE_ROLE_KEY` | host keychain / CI secrets (never committed) | MCP services, Edge Functions | `process.env` via external loader in dev, GitHub Secrets in CI |
+| `SUPABASE_SERVICE_ROLE_KEY` | macOS Keychain (item: `SUPABASE_SERVICE_ROLE_KEY`) / CI secrets (never committed) | MCP services, Edge Functions | `scripts/launch-*-mcp.sh` wrappers read from keychain via `security find-generic-password -s "SUPABASE_SERVICE_ROLE_KEY" -w`, GitHub Secrets in CI |
 
 **Rules:**
 1. If a new service needs an existing secret → source it from the SSoT file. Do not create a second `.env` with the same value.
