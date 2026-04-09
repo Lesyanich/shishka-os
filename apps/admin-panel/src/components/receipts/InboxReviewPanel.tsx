@@ -125,7 +125,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const capexTotal = capexItems.reduce((s, it) => s + (it.total_price || 0), 0)
   const opexTotal = opexItems.reduce((s, it) => s + (it.total_price || 0), 0)
   const calculatedTotal = foodTotal + capexTotal + opexTotal
-  const discountAmount = Math.abs(p.discount_total || 0)
+  const discountAmount = Math.abs(p?.discount_total || 0)
   // Receipt total = items - discount, so compare accordingly
   const expectedReceiptTotal = calculatedTotal - discountAmount
   const totalMismatch = Math.abs(expectedReceiptTotal - receiptTotal) > 0.5
