@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, User, Calendar } from 'lucide-react'
 import type { TaskDomain, TaskPriority, NewBusinessTask } from '../../hooks/useBusinessTasks'
+import { useStaffList } from '../../hooks/useStaffList'
 
 const DOMAINS: { id: TaskDomain; label: string }[] = [
   { id: 'kitchen', label: 'Kitchen' },
@@ -20,6 +21,7 @@ export interface QuickAddFormProps {
 }
 
 export function QuickAddForm({ onSubmit, onCancel, activeDomain }: QuickAddFormProps) {
+  const { people } = useStaffList()
   const [title, setTitle] = useState('')
   const [domain, setDomain] = useState<TaskDomain>(activeDomain === 'all' ? 'ops' : activeDomain)
   const [priority, setPriority] = useState<TaskPriority>('medium')
@@ -94,12 +96,18 @@ export function QuickAddForm({ onSubmit, onCancel, activeDomain }: QuickAddFormP
       <div className="flex gap-2">
         <div className="relative flex-1">
           <User className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
-          <input
+          <select
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
-            placeholder="Assigned to..."
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 pl-8 pr-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none"
-          />
+            className="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800 pl-8 pr-3 py-2 text-sm text-slate-200 focus:border-emerald-500/50 focus:outline-none"
+          >
+            <option value="">Unassigned</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.name}>
+                {p.name} — {p.role}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="relative flex-1">
           <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />

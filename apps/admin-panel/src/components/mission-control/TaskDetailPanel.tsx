@@ -27,6 +27,7 @@ import {
   FileText,
 } from 'lucide-react'
 import type { BusinessTask, TaskDomain, TaskStatus, TaskPriority } from '../../hooks/useBusinessTasks'
+import { useStaffList } from '../../hooks/useStaffList'
 
 // ── Config maps ──
 
@@ -88,6 +89,7 @@ export function TaskDetailPanel({ task, onClose, onUpdate }: TaskDetailPanelProp
   const [dueDate, setDueDate] = useState(task.due_date ?? '')
   const [notes, setNotes] = useState(task.notes ?? '')
   const [saving, setSaving] = useState(false)
+  const { people } = useStaffList()
 
   const hasChanges =
     title !== task.title ||
@@ -267,12 +269,21 @@ export function TaskDetailPanel({ task, onClose, onUpdate }: TaskDetailPanelProp
               <label className="mb-1 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">
                 <User className="h-3 w-3" /> Assigned to
               </label>
-              <input
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                placeholder="e.g. lesia, chef"
-                className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-slate-700 focus:outline-none"
-              />
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                <select
+                  value={assignedTo}
+                  onChange={(e) => setAssignedTo(e.target.value)}
+                  className="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-200 focus:border-emerald-500/50 focus:outline-none"
+                >
+                  <option value="">Unassigned</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.name}>
+                      {p.name} — {p.role}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div>
               <label className="mb-1 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">
