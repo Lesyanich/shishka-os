@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { Search, Zap } from 'lucide-react'
+import { Search, Zap, List, Layers } from 'lucide-react'
 import { FocusCard } from './FocusCard'
+import { GroupedTaskList } from './GroupedTaskList'
 import type { BusinessTask } from '../../hooks/useBusinessTasks'
+import type { GroupBy } from '../../utils/taskGrouping'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,11 +29,47 @@ export interface TeamSegmentProps {
   onOpenDetail: (task: BusinessTask) => void
 }
 
+// ── TaskRow ──────────────────────────────────────────────────────────────────
+
+function TaskRow({ task, onClick }: { task: BusinessTask; onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      className="group flex cursor-pointer items-center gap-3 rounded-lg border border-slate-800/30 bg-slate-900/40 px-3 py-2 hover:border-slate-700/50 hover:bg-slate-800/40 transition"
+    >
+      {/* Priority dot */}
+      <span className={`h-2 w-2 rounded-full shrink-0 ${
+        task.priority === 'critical' ? 'bg-red-400' :
+        task.priority === 'high' ? 'bg-orange-400' :
+        task.priority === 'medium' ? 'bg-blue-400' : 'bg-slate-500'
+      }`} />
+      {/* Title */}
+      <span className="text-xs font-medium text-slate-100 truncate flex-1">{task.title}</span>
+      {/* Domain badge */}
+      <span className="rounded-full bg-slate-800/60 px-2 py-0.5 text-[9px] text-slate-400">{task.domain}</span>
+      {/* Status */}
+      <span className={`rounded-full px-2 py-0.5 text-[9px] font-medium ${
+        task.status === 'in_progress' ? 'bg-amber-500/10 text-amber-400' :
+        task.status === 'blocked' ? 'bg-red-500/10 text-red-400' :
+        task.status === 'inbox' ? 'bg-slate-500/10 text-slate-400' :
+        'bg-blue-500/10 text-blue-400'
+      }`}>{task.status.replace('_', ' ')}</span>
+      {/* Assignee */}
+      {task.assigned_to && (
+        <span className="text-[9px] text-slate-500">{task.assigned_to}</span>
+      )}
+    </div>
+  )
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
   const [personFilter, setPersonFilter] = useState<PersonFilter>('all')
   const [search, setSearch] = useState('')
+  const [groupBy, setGroupBy] = useState<GroupBy>('topic')
+
+  const person = personFilter !== 'all' ? personFilter : null
 
   const filtered = tasks.filter(task => {
     // Only human executor tasks in active states
@@ -52,6 +90,17 @@ export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
       if (!inTitle && !inDesc) return false
     }
 
+    return true
+  })
+
+  const allHumanTasks = tasks.filter(t => {
+    if (t.executor_type !== 'human') return false
+    if (t.status === 'done' || t.status === 'cancelled') return false
+    if (person && t.assigned_to?.toLowerCase() !== person) return false
+    if (search) {
+      const q = search.toLowerCase()
+      if (!t.title.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q)) return false
+    }
     return true
   })
 
@@ -85,6 +134,20 @@ export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
               </button>
             )
           })}
+        </div>
+
+        {/* GroupBy dropdown */}
+        <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2">
+          <Layers className="h-3 w-3 text-slate-500" />
+          <select
+            value={groupBy}
+            onChange={e => setGroupBy(e.target.value as GroupBy)}
+            className="bg-transparent py-1.5 pr-1 text-[11px] text-slate-300 focus:outline-none"
+          >
+            <option value="none">No grouping</option>
+            <option value="topic">Group by topic</option>
+            <option value="agent">Group by agent</option>
+          </select>
         </div>
 
         {/* Search input — ml-auto pushes it to the right */}
@@ -130,6 +193,40 @@ export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
           <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-800/60 bg-slate-900/20 px-6 py-8">
             <p className="text-[12px] text-slate-600">
               No active tasks
+              {personFilter !== 'all' ? ` for ${personFilter}` : ''}
+              {search.trim() ? ` matching "${search.trim()}"` : ''}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── All Tasks zone ────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-3">
+        {/* Zone header */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-500/10 text-slate-400">
+            <List className="h-3.5 w-3.5" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-slate-100">All Tasks</div>
+            <div className="text-[11px] text-slate-500">Inbox, backlog, in progress, blocked</div>
+          </div>
+          <span className="ml-2 rounded-md bg-slate-800/60 px-2 py-0.5 font-mono text-[10px] text-slate-400">
+            {allHumanTasks.length}
+          </span>
+        </div>
+
+        {/* Task list */}
+        {allHumanTasks.length > 0 ? (
+          <GroupedTaskList
+            tasks={allHumanTasks}
+            groupBy={groupBy}
+            renderItem={(task) => <TaskRow key={task.id} task={task} onClick={() => onOpenDetail(task)} />}
+          />
+        ) : (
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-800/60 bg-slate-900/20 px-6 py-8">
+            <p className="text-[12px] text-slate-600">
+              No tasks
               {personFilter !== 'all' ? ` for ${personFilter}` : ''}
               {search.trim() ? ` matching "${search.trim()}"` : ''}
             </p>
