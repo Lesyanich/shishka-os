@@ -121,6 +121,23 @@ This preserves focus, saves tokens, and prevents scope creep mid-session.
 
 ---
 
+## RULE-SELF-HEAL-TOOLING
+
+If the same workaround, retry, or fallback fires **2+ times in a session** (or is observed across multiple sessions), the agent **must not** silently keep retrying. Instead:
+
+1. **Diagnose** the root cause (schema mismatch, missing feature, wrong validation, etc.)
+2. **Estimate effort** — is the fix under ~15 minutes and within the agent's tooling scope?
+3. If **yes** → propose the fix to CEO, implement after approval
+4. If **no** → create an MC task with tag `dx-friction`, domain `tech`, describe the symptom, frequency, and proposed fix
+
+**Rationale:** Silent retries cost tokens, add latency, and erode trust. A 5-minute infra fix that eliminates 30 seconds of waste per session pays for itself in 10 sessions.
+
+**Scope:** Applies to MCP servers, tooling, scripts, and DX infrastructure. Does **not** apply to transient network errors or rate limits.
+
+> Origin: 2026-04-11. Observed pattern: `get_task` prefix lookup failed every session for weeks; no agent flagged or fixed it. CEO escalated.
+
+---
+
 ## RULE-COMPOUND-ENGINEERING
 
 If the CEO corrects a mistake, the agent **must** update the relevant file in `docs/constitution/`, `docs/domain/`, or `docs/projects/` so the same mistake never happens again. A correction without a doc update is a wasted lesson.
@@ -152,3 +169,5 @@ Simple, obvious fixes (typo, one-line change, config update) are exempt.
 - Agent dispatching (slash commands, domain inference) → `agent-routing.md`
 - Task routing → `docs/business/DISPATCH_RULES.md`
 - Project map → `docs/PROJECT_REGISTRY.md`
+- Managed Agents architecture (event log, context replay, wake/resume) → `agent-rules.md` (RULE-EVENT-LOG, RULE-CONTEXT-REPLAY, RULE-WAKE-RESUME)
+- Managed Agents spec → `docs/plans/spec-managed-agents-architecture.md`

@@ -131,7 +131,9 @@ server.tool(
   "get_task",
   "Get full details of a specific business task by ID.",
   {
-    task_id: z.string().uuid().describe("UUID of the task"),
+    task_id: z
+      .string()
+      .describe("Full UUID or 8+ char prefix of the task"),
   },
   async (args) => jsonResult(await getTask(args))
 );
