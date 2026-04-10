@@ -63,7 +63,7 @@ class QueryLogMiddleware(BaseHTTPMiddleware):
             self._pool = await asyncpg.create_pool(
                 **self.db_kwargs, min_size=1, max_size=2
             )
-            logger.info("asyncpg pool created for brain_query_log")
+            print("[query_log] asyncpg pool created for brain_query_log", flush=True)
         return self._pool
 
     async def dispatch(self, request: Request, call_next):
@@ -173,7 +173,14 @@ class QueryLogMiddleware(BaseHTTPMiddleware):
                     kwargs["error"],
                 )
         except Exception as e:
-            logger.error(f"Failed to log query: {e}")
+            print(f"[query_log] Failed to log query: {e}", flush=True)
+            # Reset pool on connection errors so next attempt reconnects
+            if self._pool is not None:
+                try:
+                    await self._pool.close()
+                except Exception:
+                    pass
+                self._pool = None
 
 
 def main():

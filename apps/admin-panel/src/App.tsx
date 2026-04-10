@@ -5,7 +5,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { RoleProvider } from './contexts/RoleContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppShell } from './layouts/AppShell'
-import { Loader2, Network, Code2 } from 'lucide-react'
+import { Loader2, Code2 } from 'lucide-react'
 
 // Static — always in main bundle (login + first screen)
 import { LoginPage } from './pages/LoginPage'
@@ -40,6 +40,7 @@ const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.Bra
 const LightragGraph = lazy(() => import('./pages/brain').then(m => ({ default: m.LightragGraph })))
 const BrainPlaceholder = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPlaceholder })))
 const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
+const MemPalaceBrowser = lazy(() => import('./pages/brain').then(m => ({ default: m.MemPalaceBrowser })))
 
 function PageLoader() {
   return (
@@ -108,19 +109,7 @@ function App() {
                   <Route index element={<Navigate to="lightrag" replace />} />
                   <Route path="lightrag" element={<Suspense fallback={<PageLoader />}><LightragGraph /></Suspense>} />
                   <Route path="cost" element={<Suspense fallback={<PageLoader />}><BrainCostPage /></Suspense>} />
-                  <Route
-                    path="mempalace"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <BrainPlaceholder
-                          icon={Network}
-                          title="MemPalace · L1"
-                          phase="Phase 2 — coming soon"
-                          description="Conversation memory graph from MemPalace will render here once it exposes a graph-shaped read API."
-                        />
-                      </Suspense>
-                    }
-                  />
+                  <Route path="mempalace" element={<Suspense fallback={<PageLoader />}><MemPalaceBrowser /></Suspense>} />
                   <Route
                     path="code"
                     element={

@@ -258,6 +258,34 @@ After both local extractors walled out, COO decision `1ab81a16` shipped Option E
 
 Quality gate `b4c4b023` Q3-A ("what is L1") is now valid again.
 
+#### Enrichment completion (2026-04-10)
+
+**MC Task:** `a43361ce` — Brain: LightRAG enrichment
+
+Indexed 42 additional documents from 3 directories:
+
+| Directory | Files | Size | Notes |
+|-----------|-------|------|-------|
+| `docs/constitution/*.md` | 10 | ~91 KB | Excluded `p0-rules.md` (legacy, replaced by core-rules.md) |
+| `docs/plans/spec-*.md` | 27 | ~408 KB | Excluded `spec-lightrag.md` (self-referential) |
+| `docs/operations/*.md` | 5 | ~44 KB | All files |
+
+**Ingestion method:** `scripts/lightrag-enrich.sh` → `POST /documents/text` to GCP VM via SSH tunnel. Extraction: `gpt-4o-mini` (OpenAI), Embedding: `text-embedding-3-small` (1536-dim).
+
+**Stack change vs Phase 1:** GCP deployment switched from Ollama (`gemma4:e2b` + `bge-m3` 1024d) to OpenAI (`gpt-4o-mini` + `text-embedding-3-small` 1536d). Bible+domain docs were re-indexed with new embeddings (see `deploy.md` re-ingest). Phase 1 "permanently locked bge-m3" note is superseded.
+
+**Results:**
+- Documents: 61 processed (19 existing + 42 new)
+- Graph: **511 entity nodes, 252 relationship edges** (was 43/18 — **12x nodes, 14x edges**)
+- 1 transient failure (`skills-services-policy.md` chunk 5/5 OpenAI JSON parse error) — resolved via `POST /documents/reprocess_failed`
+
+**Quality checks (mix mode):**
+- "What are the rules for agent task closure?" → pulls RULE-TASK-CLOSURE from `agent-rules.md`, returns full lifecycle (work → build → commit → PR → merge → update_task)
+- "What is the COO autonomous lane?" → pulls from `spec-coo-autonomous-lane.md` + `coo-autonomous-lane.md`, describes opt-in mechanism for low-risk tasks
+- "How does the receipt pipeline work?" → pulls from `spec-download-receipt.md` + `spec-receipt-pipeline-optimization.md`, describes upload → parse → approve flow
+
+**Estimated cost:** ~$0.75 (gpt-4o-mini extraction + text-embedding-3-small, 42 files ~543 KB).
+
 ### Phase 2: MCP Integration (1 sprint)
 - Build `search_knowledge` MCP tool (TypeScript wrapper over REST API)
 - Integrate into Chef MCP and Finance MCP
