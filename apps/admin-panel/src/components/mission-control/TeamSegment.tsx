@@ -2,15 +2,21 @@ import { useState } from 'react'
 import { Search, Zap, List, Layers } from 'lucide-react'
 import { FocusCard } from './FocusCard'
 import { GroupedTaskList } from './GroupedTaskList'
-import type { BusinessTask } from '../../hooks/useBusinessTasks'
+import type { BusinessTask, TaskDomain } from '../../hooks/useBusinessTasks'
 import type { GroupBy } from '../../utils/taskGrouping'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type PersonFilter = 'all' | 'lesia' | 'bas'
+type DomainFilter = 'all' | TaskDomain
 
 interface PersonPill {
   id: PersonFilter
+  label: string
+}
+
+interface DomainPill {
+  id: DomainFilter
   label: string
 }
 
@@ -20,6 +26,18 @@ const PERSON_PILLS: PersonPill[] = [
   { id: 'all',   label: 'All' },
   { id: 'lesia', label: '👑 Lesia' },
   { id: 'bas',   label: '👤 Bas' },
+]
+
+const DOMAIN_PILLS: DomainPill[] = [
+  { id: 'all',         label: 'All' },
+  { id: 'kitchen',     label: 'Kitchen' },
+  { id: 'finance',     label: 'Finance' },
+  { id: 'procurement', label: 'Procurement' },
+  { id: 'ops',         label: 'Ops' },
+  { id: 'tech',        label: 'Tech' },
+  { id: 'marketing',   label: 'Marketing' },
+  { id: 'sales',       label: 'Sales' },
+  { id: 'strategy',    label: 'Strategy' },
 ]
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -66,42 +84,34 @@ function TaskRow({ task, onClick }: { task: BusinessTask; onClick: () => void })
 
 export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
   const [personFilter, setPersonFilter] = useState<PersonFilter>('all')
+  const [domainFilter, setDomainFilter] = useState<DomainFilter>('all')
   const [search, setSearch] = useState('')
   const [groupBy, setGroupBy] = useState<GroupBy>('topic')
 
   const person = personFilter !== 'all' ? personFilter : null
 
-  const filtered = tasks.filter(task => {
-    // Only human executor tasks in active states
+  // Shared filter for person + domain + search
+  function matchesFilters(task: BusinessTask): boolean {
     if (task.executor_type !== 'human') return false
-    if (task.status !== 'in_progress' && task.status !== 'blocked') return false
-
-    // Person filter
-    if (personFilter !== 'all') {
-      if (!task.assigned_to) return false
-      if (task.assigned_to.toLowerCase() !== personFilter) return false
-    }
-
-    // Search filter
+    if (domainFilter !== 'all' && task.domain !== domainFilter) return false
+    if (person && task.assigned_to?.toLowerCase() !== person) return false
     if (search.trim()) {
       const q = search.trim().toLowerCase()
-      const inTitle = task.title.toLowerCase().includes(q)
-      const inDesc  = task.description?.toLowerCase().includes(q) ?? false
-      if (!inTitle && !inDesc) return false
+      if (!task.title.toLowerCase().includes(q) && !task.description?.toLowerCase().includes(q)) return false
     }
-
     return true
+  }
+
+  // Focus Now: only in_progress + blocked
+  const filtered = tasks.filter(task => {
+    if (!matchesFilters(task)) return false
+    return task.status === 'in_progress' || task.status === 'blocked'
   })
 
-  const allHumanTasks = tasks.filter(t => {
-    if (t.executor_type !== 'human') return false
-    if (t.status === 'done' || t.status === 'cancelled') return false
-    if (person && t.assigned_to?.toLowerCase() !== person) return false
-    if (search) {
-      const q = search.toLowerCase()
-      if (!t.title.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q)) return false
-    }
-    return true
+  // All Tasks: everything except done/cancelled
+  const allHumanTasks = tasks.filter(task => {
+    if (!matchesFilters(task)) return false
+    return task.status !== 'done' && task.status !== 'cancelled'
   })
 
   return (
@@ -124,6 +134,33 @@ export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
                 onClick={() => setPersonFilter(pill.id)}
                 className={[
                   'rounded-full px-3 py-1 text-[11px] font-medium transition-colors duration-150',
+                  'border',
+                  isActive
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                    : 'border-slate-700/60 bg-transparent text-slate-400 hover:text-slate-300 hover:border-slate-600',
+                ].join(' ')}
+              >
+                {pill.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Domain divider + pills */}
+        <div className="h-5 w-px bg-slate-700/40" />
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 shrink-0">
+          Domain
+        </span>
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {DOMAIN_PILLS.map(pill => {
+            const isActive = domainFilter === pill.id
+            return (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => setDomainFilter(pill.id)}
+                className={[
+                  'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors duration-150 whitespace-nowrap',
                   'border',
                   isActive
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
