@@ -1,196 +1,44 @@
 import { useState, useMemo } from 'react'
-import {
-  Rocket,
-  Plus,
-  X,
-  Loader2,
-  ChefHat,
-  Truck,
-  DollarSign,
-  Megaphone,
-  Wrench,
-  ShoppingCart,
-  Target,
-  Cpu,
-  AlertTriangle,
-  ArrowUp,
-  Minus,
-  ArrowDown,
-  Inbox,
-  ListTodo,
-  PlayCircle,
-  Ban,
-  CheckCircle2,
-  Calendar,
-  User,
-  List,
-  Columns3,
-  Search,
-  ArrowUpDown,
-  Layers,
-} from 'lucide-react'
-import {
-  useBusinessTasks,
-  type BusinessTask,
-  type TaskDomain,
-  type TaskStatus,
-  type TaskPriority,
-  type NewBusinessTask,
-} from '../hooks/useBusinessTasks'
-import { KanbanBoard } from '../components/mission-control/KanbanBoard'
-import { QuickAddForm } from '../components/mission-control/QuickAddForm'
-import { GroupedTaskList } from '../components/mission-control/GroupedTaskList'
-import type { GroupBy } from '../utils/taskGrouping'
-import { TaskDetailPanel } from '../components/mission-control/TaskDetailPanel'
+import { Rocket, Plus, Loader2, X, Search, ArrowUpDown, AlertTriangle } from 'lucide-react'
+import { useBusinessTasks } from '../hooks/useBusinessTasks'
+import type { BusinessTask, TaskStatus, TaskPriority, NewBusinessTask } from '../hooks/useBusinessTasks'
 import { useRole } from '../contexts/RoleContext'
+import { SegmentBar } from '../components/mission-control/SegmentBar'
+import type { Segment } from '../components/mission-control/SegmentBar'
+import { TeamSegment } from '../components/mission-control/TeamSegment'
+import { TechSegment } from '../components/mission-control/TechSegment'
+import { KitchenSegment } from '../components/mission-control/KitchenSegment'
+import { QuickAddForm } from '../components/mission-control/QuickAddForm'
+import { KanbanBoard } from '../components/mission-control/KanbanBoard'
+import { TaskDetailPanel } from '../components/mission-control/TaskDetailPanel'
 
-// ── Domain config ──
+// ── Constants ──
 
-const DOMAINS: { id: TaskDomain | 'all'; label: string; icon: typeof ChefHat }[] = [
-  { id: 'all', label: 'All', icon: Rocket },
-  { id: 'kitchen', label: 'Kitchen', icon: ChefHat },
-  { id: 'procurement', label: 'Procurement', icon: Truck },
-  { id: 'finance', label: 'Finance', icon: DollarSign },
-  { id: 'marketing', label: 'Marketing', icon: Megaphone },
-  { id: 'ops', label: 'Ops', icon: Wrench },
-  { id: 'sales', label: 'Sales', icon: ShoppingCart },
-  { id: 'strategy', label: 'Strategy', icon: Target },
-  { id: 'tech', label: 'Tech', icon: Cpu },
-]
-
-const DOMAIN_COLORS: Record<TaskDomain, string> = {
-  kitchen: 'bg-orange-500/15 text-orange-300 border-orange-500/30',
-  procurement: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  finance: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  marketing: 'bg-pink-500/15 text-pink-300 border-pink-500/30',
-  ops: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
-  sales: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
-  strategy: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-  tech: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
-}
-
-const STATUS_CONFIG: Record<TaskStatus, { label: string; icon: typeof Inbox; color: string }> = {
-  inbox: { label: 'Inbox', icon: Inbox, color: 'bg-slate-500/15 text-slate-300' },
-  backlog: { label: 'Backlog', icon: ListTodo, color: 'bg-blue-500/15 text-blue-300' },
-  in_progress: { label: 'In Progress', icon: PlayCircle, color: 'bg-amber-500/15 text-amber-300' },
-  blocked: { label: 'Blocked', icon: Ban, color: 'bg-red-500/15 text-red-300' },
-  done: { label: 'Done', icon: CheckCircle2, color: 'bg-emerald-500/15 text-emerald-300' },
-  cancelled: { label: 'Cancelled', icon: X, color: 'bg-slate-600/15 text-slate-500' },
-}
-
-const PRIORITY_CONFIG: Record<TaskPriority, { label: string; icon: typeof AlertTriangle; color: string }> = {
-  critical: { label: 'Critical', icon: AlertTriangle, color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
-  high: { label: 'High', icon: ArrowUp, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
-  medium: { label: 'Medium', icon: Minus, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  low: { label: 'Low', icon: ArrowDown, color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
-}
-
-type ViewMode = 'list' | 'kanban'
-type ExecutorFilter = 'all' | 'human' | 'code_agent' | 'my'
-type SortField = 'priority' | 'created' | 'updated'
-type PriorityFilter = TaskPriority | 'all'
+type TopTab = 'planning' | 'kanban' | 'data-health'
+type SortField = 'priority' | 'updated' | 'created'
 
 const PRIORITY_ORDER: Record<TaskPriority, number> = { critical: 0, high: 1, medium: 2, low: 3 }
 
-// ── Task List Item ──
-
-function TaskListItem({
-  task,
-  onOpenDetail,
-}: {
-  task: BusinessTask
-  onOpenDetail: (task: BusinessTask) => void
-}) {
-  const domainCfg = DOMAIN_COLORS[task.domain]
-  const statusCfg = STATUS_CONFIG[task.status]
-  const priorityCfg = PRIORITY_CONFIG[task.priority]
-  const StatusIcon = statusCfg.icon
-  const PriorityIcon = priorityCfg.icon
-  const domainObj = DOMAINS.find((d) => d.id === task.domain)
-  const DomainIcon = domainObj?.icon ?? Wrench
-
-  return (
-    <div
-      onClick={() => onOpenDetail(task)}
-      className="group flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800/50 bg-slate-900/60 px-4 py-3 hover:border-slate-700/60 hover:bg-slate-900/80 transition"
-    >
-      {/* Priority indicator */}
-      <div className={`mt-0.5 rounded-md p-1 ${priorityCfg.color}`}>
-        <PriorityIcon className="h-3.5 w-3.5" />
-      </div>
-
-      {/* Content */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-100 truncate">{task.title}</span>
-        </div>
-
-        {task.description && (
-          <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{task.description}</p>
-        )}
-
-        {/* Badges row */}
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${domainCfg}`}>
-            <DomainIcon className="h-2.5 w-2.5" />
-            {domainObj?.label}
-          </span>
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusCfg.color}`}>
-            <StatusIcon className="h-2.5 w-2.5" />
-            {statusCfg.label}
-          </span>
-          {task.assigned_to && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-400">
-              <User className="h-2.5 w-2.5" />
-              {task.assigned_to}
-            </span>
-          )}
-          {task.due_date && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-400">
-              <Calendar className="h-2.5 w-2.5" />
-              {new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-            </span>
-          )}
-          {task.tags?.map((tag) => (
-            <span key={tag} className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500">
-              #{tag}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Timestamp */}
-      <span className="shrink-0 text-[10px] text-slate-600">
-        {new Date(task.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-      </span>
-    </div>
-  )
-}
-
 // ── Main Page ──
-
-// Role-based default executor filter
-const ROLE_DEFAULTS: Record<string, { executorFilter: ExecutorFilter; domain: TaskDomain | 'all' }> = {
-  lesia: { executorFilter: 'all', domain: 'all' },
-  bas: { executorFilter: 'my', domain: 'all' },
-  chef: { executorFilter: 'human', domain: 'kitchen' },
-}
 
 export function MissionControl() {
   const { role } = useRole()
-  const defaults = ROLE_DEFAULTS[role] ?? ROLE_DEFAULTS.lesia
-  const [activeDomain, setActiveDomain] = useState<TaskDomain | 'all'>(defaults.domain)
-  const [activeStatus, setActiveStatus] = useState<TaskStatus | null>(null)
-  const [executorFilter, setExecutorFilter] = useState<ExecutorFilter>(defaults.executorFilter)
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortField, setSortField] = useState<SortField>('priority')
-  const [showDone, setShowDone] = useState(false)
-  const [groupBy, setGroupBy] = useState<GroupBy>('none')
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const isCEO = role === 'lesia'
+
+  const [activeTab, setActiveTab] = useState<TopTab>('planning')
+  const [segment, setSegment] = useState<Segment>('team')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [selectedTask, setSelectedTask] = useState<BusinessTask | null>(null)
-  const { tasks: allTasks, isLoading, error, refetch, addTask, updateTask } = useBusinessTasks(activeDomain)
+
+  // Kanban-specific state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortField, setSortField] = useState<SortField>('priority')
+  const [showDone] = useState(false)
+  const [activeStatus] = useState<TaskStatus | null>(null)
+
+  const { tasks: allTasks, isLoading, error, refetch, addTask, updateTask } = useBusinessTasks('all')
+
+  // ── Handlers ──
 
   const handleAddTask = async (task: NewBusinessTask) => {
     const ok = await addTask(task)
@@ -207,30 +55,32 @@ export function MissionControl() {
     return ok
   }
 
-  const handleOpenDetail = (task: BusinessTask) => {
-    setSelectedTask(task)
-  }
+  const handleOpenDetail = (task: BusinessTask) => setSelectedTask(task)
 
-  // Count tasks by status from ALL tasks (before filtering)
-  const statusCounts = allTasks.reduce<Record<string, number>>((acc, t) => {
-    acc[t.status] = (acc[t.status] ?? 0) + 1
-    return acc
-  }, {})
+  // ── Derived data ──
 
-  // Filter tasks: hide done/cancelled by default, apply all filters + sort
+  const activeTasks = useMemo(
+    () => allTasks.filter(t => t.status !== 'done' && t.status !== 'cancelled'),
+    [allTasks],
+  )
+
+  const segmentCounts = useMemo<Record<Segment, number>>(() => ({
+    team: activeTasks.filter(t => t.executor_type === 'human').length,
+    tech: activeTasks.filter(t => t.executor_type === 'code' || t.executor_type === 'agent').length,
+    kitchen: activeTasks.filter(t => t.domain === 'kitchen' && t.executor_type === 'human').length,
+  }), [activeTasks])
+
+  const dataHealthCount = 20 // placeholder
+
   const searchLower = searchQuery.toLowerCase()
-  const tasks = useMemo(() => {
-    const filtered = allTasks.filter((t) => {
+  const kanbanTasks = useMemo(() => {
+    const filtered = allTasks.filter(t => {
       if (!showDone && (t.status === 'done' || t.status === 'cancelled')) return false
       if (activeStatus && t.status !== activeStatus) return false
-      if (executorFilter === 'human' && t.executor_type !== 'human') return false
-      if (executorFilter === 'code_agent' && t.executor_type !== 'code' && t.executor_type !== 'agent') return false
-      if (executorFilter === 'my' && t.assigned_to !== role) return false
-      if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false
       if (searchLower) {
         const inTitle = t.title.toLowerCase().includes(searchLower)
         const inDesc = t.description?.toLowerCase().includes(searchLower)
-        const inTags = t.tags?.some((tag) => tag.toLowerCase().includes(searchLower))
+        const inTags = t.tags?.some(tag => tag.toLowerCase().includes(searchLower))
         if (!inTitle && !inDesc && !inTags) return false
       }
       return true
@@ -241,21 +91,34 @@ export function MissionControl() {
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     })
     return filtered
-  }, [allTasks, showDone, activeStatus, executorFilter, priorityFilter, searchLower, sortField, role])
+  }, [allTasks, showDone, activeStatus, searchLower, sortField])
 
-  const handleStatusToggle = (status: TaskStatus) => {
-    if (status === 'done' || status === 'cancelled') {
-      if (activeStatus === status) {
-        setActiveStatus(null)
-        setShowDone(false)
-      } else {
-        setShowDone(true)
-        setActiveStatus(status)
-      }
-    } else {
-      setActiveStatus(activeStatus === status ? null : status)
-    }
-  }
+  // Force non-CEO to team segment
+  const effectiveSegment = isCEO ? segment : 'team'
+
+  // ── Tab definitions ──
+
+  const tabs: { id: TopTab; label: string; badge?: React.ReactNode }[] = [
+    {
+      id: 'planning',
+      label: 'Planning',
+      badge: activeTasks.length > 0 ? (
+        <span className="ml-1.5 rounded-full bg-slate-700 px-1.5 text-[10px] text-slate-300">
+          {activeTasks.length}
+        </span>
+      ) : null,
+    },
+    { id: 'kanban', label: 'Kanban' },
+    {
+      id: 'data-health',
+      label: 'Data Health',
+      badge: dataHealthCount > 0 ? (
+        <span className="ml-1.5 rounded-full bg-red-500/20 px-1.5 text-[10px] font-semibold text-red-400">
+          {dataHealthCount}
+        </span>
+      ) : null,
+    },
+  ]
 
   return (
     <div className="space-y-5">
@@ -268,43 +131,13 @@ export function MissionControl() {
           </h1>
           <p className="text-sm text-slate-500">Cross-domain task tracker</p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* View mode toggle */}
-          <div className="flex rounded-lg border border-slate-800 bg-slate-900/50">
-            <button
-              onClick={() => setViewMode('list')}
-              className={[
-                'flex items-center gap-1 rounded-l-lg px-2.5 py-1.5 text-xs transition',
-                viewMode === 'list'
-                  ? 'bg-slate-800 text-emerald-300'
-                  : 'text-slate-500 hover:text-slate-300',
-              ].join(' ')}
-            >
-              <List className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">List</span>
-            </button>
-            <button
-              onClick={() => setViewMode('kanban')}
-              className={[
-                'flex items-center gap-1 rounded-r-lg px-2.5 py-1.5 text-xs transition',
-                viewMode === 'kanban'
-                  ? 'bg-slate-800 text-emerald-300'
-                  : 'text-slate-500 hover:text-slate-300',
-              ].join(' ')}
-            >
-              <Columns3 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Kanban</span>
-            </button>
-          </div>
-
-          <button
-            onClick={() => setShowQuickAdd(!showQuickAdd)}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-500 transition"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Quick Add
-          </button>
-        </div>
+        <button
+          onClick={() => setShowQuickAdd(!showQuickAdd)}
+          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-500 transition"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Quick Add
+        </button>
       </div>
 
       {/* Quick Add Form */}
@@ -312,177 +145,38 @@ export function MissionControl() {
         <QuickAddForm
           onSubmit={handleAddTask}
           onCancel={() => setShowQuickAdd(false)}
-          activeDomain={activeDomain}
+          activeDomain="all"
         />
       )}
 
-      {/* Domain Tabs */}
-      <div className="flex gap-1 rounded-xl bg-slate-900/50 p-1 overflow-x-auto">
-        {DOMAINS.map(({ id, label, icon: Icon }) => {
-          // Count tasks per domain, respecting status filter but not domain filter
-          const domainCount = allTasks.filter((t) => {
-            if (!showDone && (t.status === 'done' || t.status === 'cancelled')) return false
-            if (activeStatus && t.status !== activeStatus) return false
-            if (id !== 'all' && t.domain !== id) return false
-            return true
-          }).length
-          return (
-            <button
-              key={id}
-              onClick={() => setActiveDomain(id)}
-              className={[
-                'flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition',
-                activeDomain === id
-                  ? 'bg-slate-800 text-emerald-300 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200',
-              ].join(' ')}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-              {domainCount > 0 && (
-                <span className="ml-1 rounded-full bg-slate-700 px-1.5 text-[10px] text-slate-300">
-                  {domainCount}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Search + Sort row */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tasks by title, description, or tag..."
-            className="w-full rounded-lg border border-slate-800 bg-slate-900/60 pl-9 pr-8 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2">
-          <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" />
-          <select
-            value={sortField}
-            onChange={(e) => setSortField(e.target.value as SortField)}
-            className="bg-transparent py-2 pr-1 text-xs text-slate-300 focus:outline-none"
-          >
-            <option value="priority">Priority</option>
-            <option value="updated">Last updated</option>
-            <option value="created">Newest first</option>
-          </select>
-        </div>
-        <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2">
-          <Layers className="h-3.5 w-3.5 text-slate-500" />
-          <select
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-            className="bg-transparent py-2 pr-1 text-xs text-slate-300 focus:outline-none"
-          >
-            <option value="none">No grouping</option>
-            <option value="topic">Group by topic</option>
-            <option value="agent">Group by agent</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Executor + Priority filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1.5">
-          {([
-            { id: 'all' as const, label: 'All Tasks' },
-            { id: 'my' as const, label: 'My Tasks' },
-            { id: 'human' as const, label: 'Human' },
-            { id: 'code_agent' as const, label: 'Code / Agent' },
-          ]).map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setExecutorFilter(id)}
-              className={[
-                'rounded-lg px-3 py-1.5 text-xs font-medium transition',
-                executorFilter === id
-                  ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
-                  : 'bg-slate-800/50 text-slate-400 hover:text-slate-200',
-              ].join(' ')}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div className="h-4 w-px bg-slate-800" />
-
-        <div className="flex gap-1.5">
-          {([
-            { id: 'all' as PriorityFilter, label: 'Any priority' },
-            { id: 'critical' as PriorityFilter, label: 'Critical', color: 'text-red-400' },
-            { id: 'high' as PriorityFilter, label: 'High', color: 'text-orange-400' },
-            { id: 'medium' as PriorityFilter, label: 'Medium', color: 'text-blue-400' },
-            { id: 'low' as PriorityFilter, label: 'Low', color: 'text-gray-400' },
-          ]).map(({ id, label, color }) => (
-            <button
-              key={id}
-              onClick={() => setPriorityFilter(id)}
-              className={[
-                'rounded-lg px-2.5 py-1.5 text-xs font-medium transition',
-                priorityFilter === id
-                  ? `bg-slate-800 ${color ?? 'text-emerald-300'} ring-1 ring-slate-700`
-                  : 'text-slate-500 hover:text-slate-300',
-              ].join(' ')}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Status summary bar — clickable filters */}
-      {!isLoading && allTasks.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {(['inbox', 'backlog', 'in_progress', 'blocked', 'done', 'cancelled'] as TaskStatus[]).map((status) => {
-            const count = statusCounts[status] ?? 0
-            if (count === 0) return null
-            const cfg = STATUS_CONFIG[status]
-            const Icon = cfg.icon
-            const isActive = activeStatus === status
-            const isDoneish = status === 'done' || status === 'cancelled'
-            return (
-              <button
-                key={status}
-                onClick={() => handleStatusToggle(status)}
-                className={[
-                  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all',
-                  isActive
-                    ? `${cfg.color} ring-1 ring-current`
-                    : isDoneish && !showDone
-                      ? 'bg-slate-800/50 text-slate-600'
-                      : cfg.color,
-                ].join(' ')}
-              >
-                <Icon className="h-3 w-3" />
-                {cfg.label}: {count}
-              </button>
-            )
-          })}
-          {activeStatus && (
-            <button
-              onClick={() => { setActiveStatus(null); setShowDone(false) }}
-              className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 transition"
-            >
-              <X className="h-3 w-3" />
-              Clear
-            </button>
-          )}
+      {/* Role banner (non-CEO) */}
+      {!isCEO && (
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2.5 text-sm text-blue-300">
+          👁 Viewing as <strong className="font-semibold">{role === 'bas' ? 'Bas' : 'Chef'}</strong> — showing only your tasks
         </div>
       )}
+
+      {/* Tab bar */}
+      <div className="flex gap-0 border-b-2 border-slate-800">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={[
+              'relative flex items-center px-4 py-2.5 text-sm font-medium transition',
+              activeTab === tab.id
+                ? 'text-emerald-300'
+                : 'text-slate-500 hover:text-slate-300',
+            ].join(' ')}
+          >
+            {tab.label}
+            {tab.badge}
+            {activeTab === tab.id && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400 -mb-[2px]" />
+            )}
+          </button>
+        ))}
+      </div>
 
       {/* Loading */}
       {isLoading && (
@@ -500,44 +194,78 @@ export function MissionControl() {
         </div>
       )}
 
-      {/* Empty state */}
-      {!isLoading && !error && allTasks.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-          <Rocket className="h-10 w-10 mb-3 text-slate-700" />
-          <p className="text-sm">No tasks yet</p>
-          <button
-            onClick={() => setShowQuickAdd(true)}
-            className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 transition"
-          >
-            Create your first task
-          </button>
+      {/* ── Planning tab ── */}
+      {!isLoading && activeTab === 'planning' && (
+        <div className="space-y-4">
+          {isCEO && (
+            <SegmentBar active={effectiveSegment} onChange={setSegment} counts={segmentCounts} />
+          )}
+
+          {effectiveSegment === 'team' && (
+            <TeamSegment tasks={allTasks} onOpenDetail={handleOpenDetail} />
+          )}
+          {effectiveSegment === 'tech' && (
+            <TechSegment tasks={allTasks} onOpenDetail={handleOpenDetail} />
+          )}
+          {effectiveSegment === 'kitchen' && (
+            <KitchenSegment tasks={allTasks} onOpenDetail={handleOpenDetail} />
+          )}
         </div>
       )}
 
-      {/* Content: List or Kanban */}
-      {!isLoading && allTasks.length > 0 && viewMode === 'list' && (
-        tasks.length > 0 ? (
-          <GroupedTaskList
-            tasks={tasks}
-            groupBy={groupBy}
-            renderItem={(task) => (
-              <TaskListItem key={task.id} task={task} onOpenDetail={handleOpenDetail} />
-            )}
+      {/* ── Kanban tab ── */}
+      {!isLoading && activeTab === 'kanban' && (
+        <div className="space-y-4">
+          {/* Search + Sort row */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search tasks by title, description, or tag..."
+                className="w-full rounded-lg border border-slate-800 bg-slate-900/60 pl-9 pr-8 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2">
+              <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" />
+              <select
+                value={sortField}
+                onChange={e => setSortField(e.target.value as SortField)}
+                className="bg-transparent py-2 pr-1 text-xs text-slate-300 focus:outline-none"
+              >
+                <option value="priority">Priority</option>
+                <option value="updated">Last updated</option>
+                <option value="created">Newest first</option>
+              </select>
+            </div>
+          </div>
+
+          <KanbanBoard
+            tasks={kanbanTasks}
+            isLoading={isLoading}
+            onMoveTask={handleMoveTask}
+            onOpenDetail={handleOpenDetail}
+            showDone={showDone}
+            activeStatus={activeStatus}
           />
-        ) : (
-          <p className="py-10 text-center text-sm text-slate-600">No tasks match this filter</p>
-        )
+        </div>
       )}
 
-      {!isLoading && allTasks.length > 0 && viewMode === 'kanban' && (
-        <KanbanBoard
-          tasks={tasks}
-          isLoading={isLoading}
-          onMoveTask={handleMoveTask}
-          onOpenDetail={handleOpenDetail}
-          showDone={showDone}
-          activeStatus={activeStatus}
-        />
+      {/* ── Data Health tab ── */}
+      {!isLoading && activeTab === 'data-health' && (
+        <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+          <AlertTriangle className="h-10 w-10 mb-3 text-slate-700" />
+          <p className="text-sm font-medium">Data Health — Coming in next iteration</p>
+        </div>
       )}
 
       {/* Task Detail Panel */}
