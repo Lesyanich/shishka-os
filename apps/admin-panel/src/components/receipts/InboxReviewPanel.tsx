@@ -17,6 +17,7 @@ interface FoodItem {
   supplier_sku?: string | null
   brand?: string | null
   package_weight?: string | null
+  confidence?: 'high' | 'medium' | 'low'
 }
 
 interface CapexItem {
@@ -57,6 +58,19 @@ function flowBadge(ft: string) {
     CapEx: 'bg-sky-500/15 text-sky-400',
   }
   return map[ft] || 'bg-slate-500/15 text-slate-400'
+}
+
+function confidenceBadge(level?: 'high' | 'medium' | 'low') {
+  switch (level) {
+    case 'high':
+      return <span className="inline-block rounded px-1 py-0.5 text-[9px] font-medium bg-emerald-500/20 text-emerald-400">exact</span>
+    case 'medium':
+      return <span className="inline-block rounded px-1 py-0.5 text-[9px] font-medium bg-amber-500/20 text-amber-400">fuzzy</span>
+    case 'low':
+      return <span className="inline-block rounded px-1 py-0.5 text-[9px] font-medium bg-rose-500/20 text-rose-400">new</span>
+    default:
+      return null
+  }
 }
 
 const inputCls = 'w-full rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-200 outline-none focus:border-indigo-500'
@@ -259,14 +273,14 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
 
   const validate = (): string[] => {
     const errs: string[] = []
-    if (!supplierName.trim()) errs.push('Не указан поставщик')
-    if (!transactionDate.trim()) errs.push('Не указана дата')
-    if (totalItems === 0) errs.push('Нет ни одной позиции (food/capex/opex)')
-    if (receiptTotal <= 0) errs.push('Сумма чека должна быть > 0')
+    if (!supplierName.trim()) errs.push('Supplier is required')
+    if (!transactionDate.trim()) errs.push('Date is required')
+    if (totalItems === 0) errs.push('No items (food/capex/opex)')
+    if (receiptTotal <= 0) errs.push('Receipt total must be > 0')
     // Check for empty item names
-    foodItems.forEach((it, i) => { if (!it.name.trim()) errs.push(`Food #${i + 1}: пустое название`) })
-    capexItems.forEach((it, i) => { if (!it.name.trim()) errs.push(`CapEx #${i + 1}: пустое название`) })
-    opexItems.forEach((it, i) => { if (!it.description.trim()) errs.push(`OpEx #${i + 1}: пустое описание`) })
+    foodItems.forEach((it, i) => { if (!it.name.trim()) errs.push(`Food #${i + 1}: empty name`) })
+    capexItems.forEach((it, i) => { if (!it.name.trim()) errs.push(`CapEx #${i + 1}: empty name`) })
+    opexItems.forEach((it, i) => { if (!it.description.trim()) errs.push(`OpEx #${i + 1}: empty description`) })
     return errs
   }
 
@@ -304,12 +318,12 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     if (!res.ok) {
       const msg = res.error || 'Approval failed'
       if (msg.includes('duplicate key') && msg.includes('invoice')) {
-        setError(`Чек с номером "${invoiceNumber}" уже записан в систему. Дубликаты не допускаются.`)
+        setError(`Receipt "${invoiceNumber}" already recorded. Duplicates not allowed.`)
       } else {
         setError(msg)
       }
     } else {
-      setResult(`Записано! expense_id: ${res.expense_id}`)
+      setResult(`Saved! expense_id: ${res.expense_id}`)
     }
   }
 
@@ -367,7 +381,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 value={supplierName}
                 onChange={(e) => setSupplierName(e.target.value)}
                 className={`${inputCls} max-w-xs text-sm font-semibold`}
-                placeholder="Поставщик"
+                placeholder="Supplier"
               />
             ) : (
               <h3 className="text-sm font-semibold text-slate-100">
@@ -382,7 +396,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 type="button"
                 onClick={() => setEditingHeader(!editingHeader)}
                 className={`ml-1 rounded p-0.5 hover:bg-slate-700 ${editingHeader ? 'text-indigo-400' : 'text-slate-600'}`}
-                title={editingHeader ? 'Готово' : 'Редактировать шапку'}
+                title={editingHeader ? 'Done' : 'Edit header'}
               >
                 {editingHeader ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
               </button>
@@ -391,7 +405,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
 
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
             <div>
-              <span className="text-slate-500">Дата: </span>
+              <span className="text-slate-500">Date: </span>
               {editingHeader ? (
                 <input value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} className={`${inputCls} inline w-32`} />
               ) : (
@@ -399,7 +413,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               )}
             </div>
             <div>
-              <span className="text-slate-500">Номер: </span>
+              <span className="text-slate-500">Invoice: </span>
               {editingHeader ? (
                 <input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className={`${inputCls} inline w-32`} placeholder="—" />
               ) : (
@@ -407,7 +421,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               )}
             </div>
             <div>
-              <span className="text-slate-500">Оплата: </span>
+              <span className="text-slate-500">Paid by: </span>
               <span className="text-slate-200">{p.payment_method} ({p.paid_by})</span>
             </div>
             <div>
@@ -419,7 +433,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           {/* Totals bar */}
           <div className="flex items-center gap-4 rounded-lg bg-slate-800/60 px-3 py-2 text-xs">
             <div>
-              <span className="text-slate-500">Чек: </span>
+              <span className="text-slate-500">Receipt: </span>
               {editingHeader ? (
                 <input
                   type="number"
@@ -434,7 +448,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             </div>
             {discountAmount > 0 && (
               <div>
-                <span className="text-slate-500">Скидка: </span>
+                <span className="text-slate-500">Discount: </span>
                 <span className="text-rose-400">{fmt(p.discount_total)}</span>
               </div>
             )}
@@ -445,7 +459,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               </div>
             ) : null}
             <div className="ml-auto">
-              <span className="text-slate-500">TOTAL (позиции): </span>
+              <span className="text-slate-500">TOTAL (items): </span>
               <span className={`text-base font-semibold ${totalMismatch ? 'text-amber-400' : 'text-slate-100'}`}>
                 {'\u0E3F'}{fmt(calculatedTotal)}
               </span>
@@ -456,8 +470,8 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           {totalMismatch && (
             <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
               <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              Сумма позиций ({'\u0E3F'}{fmt(calculatedTotal)}) − скидка ({'\u0E3F'}{fmt(discountAmount)}) = {'\u0E3F'}{fmt(expectedReceiptTotal)} ≠ чек ({'\u0E3F'}{fmt(receiptTotal)}).
-              Разница: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))}
+              Items ({'\u0E3F'}{fmt(calculatedTotal)}) − discount ({'\u0E3F'}{fmt(discountAmount)}) = {'\u0E3F'}{fmt(expectedReceiptTotal)} ≠ receipt ({'\u0E3F'}{fmt(receiptTotal)}).
+              Diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))}
             </div>
           )}
         </div>
@@ -470,7 +484,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             <h4 className="text-[10px] font-medium uppercase tracking-wide text-emerald-400">
               Food Items ({foodItems.length})
               {foodChecked.size > 0 && (
-                <span className="ml-2 text-emerald-300/60">— {foodChecked.size}/{foodItems.length} сверено</span>
+                <span className="ml-2 text-emerald-300/60">— {foodChecked.size}/{foodItems.length} verified</span>
               )}
             </h4>
           </div>
@@ -480,13 +494,13 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 <tr>
                   {checkboxTh(foodChecked, setFoodChecked, foodItems.length)}
                   <th className="w-8 px-2 py-1.5 text-left">#</th>
-                  <th className="px-2 py-1.5 text-left">Товар</th>
+                  <th className="px-2 py-1.5 text-left">Product</th>
                   <th className="px-2 py-1.5 text-left">Barcode</th>
                   <th className="w-16 px-2 py-1.5 text-right">Qty</th>
                   <th className="w-14 px-2 py-1.5 text-left">Unit</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Цена</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Итого</th>
-                  <th className="px-2 py-1.5 text-left">Номенклатура</th>
+                  <th className="w-20 px-2 py-1.5 text-right">Price</th>
+                  <th className="w-20 px-2 py-1.5 text-right">Total</th>
+                  <th className="px-2 py-1.5 text-left">Nomenclature</th>
                   {!isReadOnly && <th className="w-16 px-1 py-1.5" />}
                 </tr>
               </thead>
@@ -554,20 +568,26 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                       <td className="px-2 py-1.5">
                         {nom ? (
                           <div>
-                            <div className="font-mono text-[10px] text-emerald-500">{nom.code}</div>
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-[10px] text-emerald-500">{nom.code}</span>
+                              {confidenceBadge(item.confidence)}
+                            </div>
                             <div className="text-[10px] text-emerald-400/70">{nom.name}</div>
                           </div>
                         ) : (
-                          <span className="text-amber-400">New (auto)</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-amber-400">New (auto)</span>
+                            {confidenceBadge(item.confidence)}
+                          </div>
                         )}
                       </td>
                       {!isReadOnly && (
                         <td className="px-1 py-1.5 text-center">
                           <div className="flex items-center gap-0.5">
-                            <button type="button" onClick={() => toggleEdit(key)} className={`rounded p-0.5 hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-500'}`} title={editing ? 'Готово' : 'Редактировать'}>
+                            <button type="button" onClick={() => toggleEdit(key)} className={`rounded p-0.5 hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-500'}`} title={editing ? 'Done' : 'Edit'}>
                               {editing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
                             </button>
-                            <button type="button" onClick={() => removeFood(i)} className="rounded p-0.5 text-slate-600 hover:bg-slate-700 hover:text-rose-400" title="Удалить">
+                            <button type="button" onClick={() => removeFood(i)} className="rounded p-0.5 text-slate-600 hover:bg-slate-700 hover:text-rose-400" title="Delete">
                               <Trash2 className="h-3 w-3" />
                             </button>
                           </div>
@@ -581,7 +601,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           </div>
           {!isReadOnly && (
             <button type="button" onClick={addFood} className="mt-1.5 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-emerald-500 hover:bg-emerald-500/10">
-              <Plus className="h-3 w-3" /> Добавить строку
+              <Plus className="h-3 w-3" /> Add row
             </button>
           )}
         </div>
@@ -594,7 +614,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             <h4 className="text-[10px] font-medium uppercase tracking-wide text-sky-400">
               CapEx Items ({capexItems.length})
               {capexChecked.size > 0 && (
-                <span className="ml-2 text-sky-300/60">— {capexChecked.size}/{capexItems.length} сверено</span>
+                <span className="ml-2 text-sky-300/60">— {capexChecked.size}/{capexItems.length} verified</span>
               )}
             </h4>
           </div>
@@ -604,10 +624,10 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 <tr>
                   {checkboxTh(capexChecked, setCapexChecked, capexItems.length)}
                   <th className="w-8 px-2 py-1.5 text-left">#</th>
-                  <th className="px-2 py-1.5 text-left">Оборудование</th>
+                  <th className="px-2 py-1.5 text-left">Equipment</th>
                   <th className="w-16 px-2 py-1.5 text-right">Qty</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Цена</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Итого</th>
+                  <th className="w-20 px-2 py-1.5 text-right">Price</th>
+                  <th className="w-20 px-2 py-1.5 text-right">Total</th>
                   {!isReadOnly && <th className="w-16 px-1 py-1.5" />}
                 </tr>
               </thead>
@@ -648,7 +668,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           </div>
           {!isReadOnly && (
             <button type="button" onClick={addCapex} className="mt-1.5 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-sky-500 hover:bg-sky-500/10">
-              <Plus className="h-3 w-3" /> Добавить строку
+              <Plus className="h-3 w-3" /> Add row
             </button>
           )}
         </div>
@@ -661,7 +681,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             <h4 className="text-[10px] font-medium uppercase tracking-wide text-amber-400">
               OpEx Items ({opexItems.length})
               {opexChecked.size > 0 && (
-                <span className="ml-2 text-amber-300/60">— {opexChecked.size}/{opexItems.length} сверено</span>
+                <span className="ml-2 text-amber-300/60">— {opexChecked.size}/{opexItems.length} verified</span>
               )}
             </h4>
           </div>
@@ -671,11 +691,11 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 <tr>
                   {checkboxTh(opexChecked, setOpexChecked, opexItems.length)}
                   <th className="w-8 px-2 py-1.5 text-left">#</th>
-                  <th className="px-2 py-1.5 text-left">Расход</th>
+                  <th className="px-2 py-1.5 text-left">Expense</th>
                   <th className="w-16 px-2 py-1.5 text-right">Qty</th>
                   <th className="w-14 px-2 py-1.5 text-left">Unit</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Цена</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Итого</th>
+                  <th className="w-20 px-2 py-1.5 text-right">Price</th>
+                  <th className="w-20 px-2 py-1.5 text-right">Total</th>
                   {!isReadOnly && <th className="w-16 px-1 py-1.5" />}
                 </tr>
               </thead>
@@ -719,7 +739,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           </div>
           {!isReadOnly && (
             <button type="button" onClick={addOpex} className="mt-1.5 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-amber-500 hover:bg-amber-500/10">
-              <Plus className="h-3 w-3" /> Добавить строку
+              <Plus className="h-3 w-3" /> Add row
             </button>
           )}
         </div>
@@ -728,17 +748,17 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       {/* Show add buttons even when sections are empty */}
       {!isReadOnly && foodItems.length === 0 && (
         <button type="button" onClick={addFood} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-emerald-500 hover:bg-emerald-500/10">
-          <Plus className="h-3 w-3" /> Добавить Food Item
+          <Plus className="h-3 w-3" /> Add Food Item
         </button>
       )}
       {!isReadOnly && capexItems.length === 0 && (
         <button type="button" onClick={addCapex} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-sky-500 hover:bg-sky-500/10">
-          <Plus className="h-3 w-3" /> Добавить CapEx Item
+          <Plus className="h-3 w-3" /> Add CapEx Item
         </button>
       )}
       {!isReadOnly && opexItems.length === 0 && (
         <button type="button" onClick={addOpex} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-amber-500 hover:bg-amber-500/10">
-          <Plus className="h-3 w-3" /> Добавить OpEx Item
+          <Plus className="h-3 w-3" /> Add OpEx Item
         </button>
       )}
 
@@ -755,7 +775,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       {/* ── Validation errors ── */}
       {validationErrors.length > 0 && (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-          <div className="mb-1 font-medium">Исправьте перед подтверждением:</div>
+          <div className="mb-1 font-medium">Fix before approving:</div>
           <ul className="list-inside list-disc space-y-0.5">
             {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
           </ul>
@@ -765,16 +785,16 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       {/* ── Confirmation dialog ── */}
       {showConfirm && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-xs">
-          <div className="mb-2 font-medium text-slate-200">Подтвердите запись в систему:</div>
+          <div className="mb-2 font-medium text-slate-200">Confirm approval:</div>
           <div className="mb-3 grid grid-cols-2 gap-x-6 gap-y-1 text-slate-400">
-            <div>Поставщик: <span className="text-slate-200">{supplierName}</span></div>
-            <div>Дата: <span className="text-slate-200">{transactionDate}</span></div>
-            <div>Сумма: <span className="text-slate-200">{'\u0E3F'}{fmt(receiptTotal)}</span></div>
-            <div>Позиций: <span className="text-slate-200">{foodItems.length} food, {capexItems.length} capex, {opexItems.length} opex</span></div>
+            <div>Supplier: <span className="text-slate-200">{supplierName}</span></div>
+            <div>Date: <span className="text-slate-200">{transactionDate}</span></div>
+            <div>Amount: <span className="text-slate-200">{'\u0E3F'}{fmt(receiptTotal)}</span></div>
+            <div>Items: <span className="text-slate-200">{foodItems.length} food, {capexItems.length} capex, {opexItems.length} opex</span></div>
             {totalMismatch && (
               <div className="col-span-2 text-amber-400">
                 <AlertTriangle className="mr-1 inline h-3 w-3" />
-                Сумма позиций не совпадает с чеком (разница: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))})
+                Items total mismatch (diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))})
               </div>
             )}
           </div>
@@ -786,14 +806,14 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
             >
               {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              Да, записать
+              Yes, approve
             </button>
             <button
               type="button"
               onClick={() => setShowConfirm(false)}
               className="rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-xs text-slate-400 hover:bg-slate-700"
             >
-              Отмена
+              Cancel
             </button>
           </div>
         </div>
@@ -812,7 +832,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
         {isReadOnly ? (
           <div className="flex items-center gap-2 text-xs">
             <span className="rounded-md bg-emerald-500/15 px-3 py-2 font-medium text-emerald-400">
-              Записан в систему
+              Saved to ledger
             </span>
             {row.expense_id && (
               <span className="text-[10px] text-slate-500">expense_id: {row.expense_id}</span>
@@ -827,9 +847,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
             >
               {isReopening ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              Вернуть в ревью
+              Reopen for review
             </button>
-            <span className="text-[10px] text-slate-500">Статус: пропущен</span>
+            <span className="text-[10px] text-slate-500">Status: skipped</span>
           </>
         ) : (
           <>
@@ -856,7 +876,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
         <div className="ml-auto flex items-center gap-3 text-[10px] text-slate-600">
           {totalChecked > 0 && (
             <span className="text-emerald-500/70">
-              Сверено: {totalChecked}/{totalItems}
+              Verified: {totalChecked}/{totalItems}
             </span>
           )}
           <span>{p.currency ?? 'THB'} | {p.flow_type} | cat {p.category_code ?? '\u2014'}</span>

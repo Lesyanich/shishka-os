@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 
 /* ────────────────────────── Types ────────────────────────── */
 
-export type OcrModel = 'gemini-flash' | 'gemini-pro' | 'claude-sonnet' | 'gpt-4o' | 'claude-sub'
+export type OcrModel = 'gemini-flash' | 'gemini-flash-lite' | 'gemini-3-flash' | 'gemini-pro' | 'claude-sonnet' | 'claude-haiku' | 'gpt-4o' | 'claude-sub'
 
 export interface InboxRow {
   id: string

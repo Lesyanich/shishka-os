@@ -1,17 +1,17 @@
 import { useState } from 'react'
-import { Brain, ChevronRight, Loader2, Play, RefreshCcw, RotateCcw, Trash2, Zap } from 'lucide-react'
+import { Brain, ChevronRight, Loader2, Play, RefreshCcw, Trash2, Zap } from 'lucide-react'
 import type { InboxRow, OcrModel } from '../../hooks/useReceiptInbox'
 import { InboxReviewPanel } from './InboxReviewPanel'
 
 /* ────────────────────────── Status config ────────────────────────── */
 
 const STATUS_BADGE: Record<InboxRow['status'], { label: string; cls: string }> = {
-  pending: { label: 'Ожидает', cls: 'bg-amber-500/15 text-amber-400' },
-  processing: { label: 'Обработка', cls: 'bg-blue-500/15 text-blue-400' },
-  parsed: { label: 'Ревью', cls: 'bg-indigo-500/15 text-indigo-400' },
-  processed: { label: 'Готово', cls: 'bg-emerald-500/15 text-emerald-400' },
-  error: { label: 'Ошибка', cls: 'bg-rose-500/15 text-rose-400' },
-  skipped: { label: 'Пропущен', cls: 'bg-slate-500/15 text-slate-400' },
+  pending: { label: 'Pending', cls: 'bg-amber-500/15 text-amber-400' },
+  processing: { label: 'Processing', cls: 'bg-blue-500/15 text-blue-400' },
+  parsed: { label: 'Review', cls: 'bg-indigo-500/15 text-indigo-400' },
+  processed: { label: 'Done', cls: 'bg-emerald-500/15 text-emerald-400' },
+  error: { label: 'Error', cls: 'bg-rose-500/15 text-rose-400' },
+  skipped: { label: 'Skipped', cls: 'bg-slate-500/15 text-slate-400' },
 }
 
 /* ────────────────────────── Props ────────────────────────── */
@@ -20,12 +20,26 @@ const STATUS_BADGE: Record<InboxRow['status'], { label: string; cls: string }> =
 
 function ModelBadge({ model }: { model: string | null }) {
   if (!model) return <span className="text-slate-600">—</span>
-  if (model.includes('gemini')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-400"><Zap className="h-2.5 w-2.5" />Gemini</span>
+  if (model.includes('flash-lite')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-400"><Zap className="h-2.5 w-2.5" />Flash Lite</span>
+  if (model.includes('gemini-3')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-teal-400"><Zap className="h-2.5 w-2.5" />Gem3 Flash</span>
+  if (model.includes('flash')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-400"><Zap className="h-2.5 w-2.5" />Flash</span>
+  if (model.includes('gemini')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-400"><Zap className="h-2.5 w-2.5" />Gemini Pro</span>
+  if (model.includes('haiku')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-orange-400"><Brain className="h-2.5 w-2.5" />Haiku</span>
   if (model.includes('sonnet')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-purple-400"><Brain className="h-2.5 w-2.5" />Sonnet</span>
   if (model.includes('gpt-4o')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-green-400"><Zap className="h-2.5 w-2.5" />GPT-4o</span>
-  if (model === 'claude-subscription') return <span className="text-[9px] text-slate-500">Подписка</span>
+  if (model === 'claude-subscription') return <span className="text-[9px] text-slate-500">Queue</span>
   return <span className="text-[9px] text-slate-500">{model}</span>
 }
+
+const ROW_MODEL_OPTIONS: { value: OcrModel; label: string }[] = [
+  { value: 'gemini-flash', label: 'Flash' },
+  { value: 'gemini-flash-lite', label: 'Flash Lite' },
+  { value: 'gemini-3-flash', label: 'Gem3 Flash' },
+  { value: 'gemini-pro', label: 'Gem Pro' },
+  { value: 'gpt-4o', label: 'GPT-4o' },
+  { value: 'claude-sonnet', label: 'Sonnet' },
+  { value: 'claude-haiku', label: 'Haiku' },
+]
 
 /* ────────────────────────── Props ────────────────────────── */
 
@@ -49,23 +63,25 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [parsingId, setParsingId] = useState<string | null>(null)
   const [bulkParsing, setBulkParsing] = useState<{ current: number; total: number } | null>(null)
+  const [rowModels, setRowModels] = useState<Record<string, OcrModel>>({})
 
   const pendingRows = rows.filter((r) => r.status === 'pending' && r.model_used !== 'claude-subscription')
 
   const getSelectedModel = (): OcrModel => {
     const v = localStorage.getItem('receipt-ocr-model')
-    if (v === 'gemini-flash' || v === 'gemini-pro' || v === 'claude-sonnet' || v === 'gpt-4o' || v === 'claude-sub') return v
+    if (v === 'gemini-flash' || v === 'gemini-flash-lite' || v === 'gemini-3-flash' || v === 'gemini-pro' || v === 'claude-sonnet' || v === 'claude-haiku' || v === 'gpt-4o' || v === 'claude-sub') return v
     return 'gemini-flash'
   }
 
   const handleParse = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    const model = getSelectedModel()
+    const model = rowModels[id] || getSelectedModel()
     if (model === 'claude-sub') {
-      window.alert('Выберите модель API (Sonnet или GPT-4o) для распознавания')
+      window.alert('Select an API model for parsing')
       return
     }
     setParsingId(id)
+    await onResetToPending(id)
     const result = await onParse(id, model)
     setParsingId(null)
     if (!result.ok) window.alert(result.error)
@@ -74,12 +90,12 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
   const handleBulkParse = async () => {
     const model: OcrModel = (localStorage.getItem('receipt-ocr-model') as OcrModel) || 'claude-sonnet'
     if (model === 'claude-sub') {
-      window.alert('Выберите модель API (Sonnet ил�� GPT-4o) для пакетной обработки')
+      window.alert('Select an API model for bulk parsing')
       return
     }
     const cost = model === 'claude-sonnet' ? 0.05 : 0.03
     const est = (pendingRows.length * cost).toFixed(2)
-    if (!window.confirm(`Распознать ${pendingRows.length} чеков через ${model === 'claude-sonnet' ? 'Claude Sonnet' : 'GPT-4o'}?\nОжидаемая стоимость: ~$${est}`)) return
+    if (!window.confirm(`Parse ${pendingRows.length} receipts via ${model}?\nEstimated cost: ~$${est}`)) return
 
     setBulkParsing({ current: 0, total: pendingRows.length })
     for (let i = 0; i < pendingRows.length; i++) {
@@ -91,7 +107,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    if (!window.confirm('Удалить этот чек из inbox?')) return
+    if (!window.confirm('Delete this receipt from inbox?')) return
     setDeletingId(id)
     const err = await onDelete(id)
     setDeletingId(null)
@@ -122,7 +138,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
       {/* Header */}
       <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-slate-100">Загруженные чеки</h2>
+          <h2 className="text-sm font-semibold text-slate-100">Receipt Inbox</h2>
           <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
             {rows.length}
           </span>
@@ -140,7 +156,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
               onClick={handleBulkParse}
               className="flex items-center gap-1 rounded-md bg-blue-600/20 px-2 py-1 text-[10px] text-blue-400 hover:bg-blue-600/30"
             >
-              <Play className="h-3 w-3" /> Распознать все ({pendingRows.length})
+              <Play className="h-3 w-3" /> Parse all ({pendingRows.length})
             </button>
           )}
           <button
@@ -155,21 +171,21 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
 
       {rows.length === 0 ? (
         <div className="py-10 text-center text-xs text-slate-500">
-          Пока нет загруженных чеков
+          No receipts uploaded yet
         </div>
       ) : (
         <div className="max-h-[520px] overflow-y-auto">
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 z-10 bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-3 py-2">Дата загрузки</th>
-                <th className="px-2 py-2">Кто</th>
-                <th className="px-2 py-2">Поставщик</th>
-                <th className="px-2 py-2 text-right">Сумма</th>
-                <th className="px-2 py-2 text-center">Модель</th>
-                <th className="px-2 py-2 text-right">Цена</th>
-                <th className="px-2 py-2 text-center">Статус</th>
-                <th className="px-2 py-2 text-center">Фото</th>
+                <th className="px-3 py-2">Upload Date</th>
+                <th className="px-2 py-2">By</th>
+                <th className="px-2 py-2">Supplier</th>
+                <th className="px-2 py-2 text-right">Amount</th>
+                <th className="px-2 py-2 text-center">Model</th>
+                <th className="px-2 py-2 text-right">Cost</th>
+                <th className="px-2 py-2 text-center">Status</th>
+                <th className="px-2 py-2 text-center">Photo</th>
                 <th className="w-16 px-1 py-2" />
               </tr>
             </thead>
@@ -191,6 +207,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                   year: 'numeric',
                   hour: '2-digit',
                   minute: '2-digit',
+                  second: '2-digit',
                 })
                 return (
                   <>
@@ -252,40 +269,42 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                       </td>
                       <td className="px-1 py-2.5">
                         <div className="flex items-center justify-center gap-1">
-                          {r.status === 'pending' && r.model_used !== 'claude-subscription' && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleParse(e, r.id)}
-                              disabled={parsingId === r.id || !!bulkParsing}
-                              className="rounded p-1 text-blue-500 hover:bg-blue-500/10 disabled:opacity-40"
-                              title="Распознать"
-                            >
-                              {parsingId === r.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Play className="h-3.5 w-3.5" />
-                              )}
-                            </button>
-                          )}
-                          {(r.status === 'error' || r.status === 'processing') && (
-                            <button
-                              type="button"
-                              onClick={async (e) => { e.stopPropagation(); await onResetToPending(r.id) }}
-                              className="rounded p-1 text-amber-500 hover:bg-amber-500/10"
-                              title="Сбросить в ожидание"
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" />
-                            </button>
+                          {!r.expense_id && r.model_used !== 'claude-subscription' && (
+                            <>
+                              <select
+                                value={rowModels[r.id] || 'gemini-flash'}
+                                onChange={(e) => { e.stopPropagation(); setRowModels(prev => ({ ...prev, [r.id]: e.target.value as OcrModel })) }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-6 rounded border border-slate-700 bg-slate-800 px-1 text-[9px] text-slate-300 outline-none focus:border-indigo-500"
+                              >
+                                {ROW_MODEL_OPTIONS.map(o => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={(e) => handleParse(e, r.id)}
+                                disabled={parsingId === r.id || !!bulkParsing}
+                                className="rounded p-1 text-blue-500 hover:bg-blue-500/10 disabled:opacity-40"
+                                title={r.status === 'pending' ? 'Parse' : 'Re-parse'}
+                              >
+                                {parsingId === r.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Play className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </>
                           )}
                           {r.expense_id ? (
-                            <span className="text-[9px] text-emerald-500/50" title="Записан в систему">✓</span>
+                            <span className="text-[9px] text-emerald-500/50" title="Saved to ledger">✓</span>
                           ) : (
                             <button
                               type="button"
                               onClick={(e) => handleDelete(e, r.id)}
                               disabled={deletingId === r.id}
                               className="rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-rose-400 disabled:opacity-40"
-                              title="Удалить чек"
+                              title="Delete receipt"
                             >
                               {deletingId === r.id ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
