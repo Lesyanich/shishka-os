@@ -7,3 +7,7 @@
 ## 2026-04-11
 
 - [TEST] Auto-ingest pipeline test entry. This should be picked up by mempalace-ingest-session.sh and ingested into wing=Shishka, room=technical.
+
+## 2026-04-12
+
+- [TEST-FILTER] This entry contains a fake secret: sk-ant-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA and should be BLOCKED by filter.py.
