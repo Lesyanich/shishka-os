@@ -27,6 +27,16 @@ export interface LowScoreQuery {
   chunks_returned: number | null
 }
 
+export interface RegressionTest {
+  id: string
+  layer: string
+  query: string
+  expected_keywords: string[]
+  last_run_at: string | null
+  last_score: number | null
+  last_response_preview: string | null
+}
+
 export async function fetchScoreDistribution(days = 30): Promise<ScoreBucket[]> {
   const since = new Date()
   since.setDate(since.getDate() - days)
@@ -97,6 +107,16 @@ export async function fetchQualitySummary(days = 30): Promise<{
   const gapCount = rows.filter(r => r.is_gap).length
 
   return { totalScored, avgScore, gapCount }
+}
+
+export async function fetchRegressionTests(): Promise<RegressionTest[]> {
+  const { data, error } = await supabase
+    .from('brain_quality_tests')
+    .select('id, layer, query, expected_keywords, last_run_at, last_score, last_response_preview')
+    .order('created_at', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return (data ?? []) as RegressionTest[]
 }
 
 export async function rateQuery(queryPreview: string, score: 1 | 5): Promise<boolean> {

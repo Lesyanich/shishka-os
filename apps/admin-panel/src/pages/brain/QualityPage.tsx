@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { AlertTriangle, Activity, Hash, TrendingDown, Loader2 } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
+import { AlertTriangle, Activity, Hash, TrendingDown, Loader2, ShieldCheck, Copy, Check } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -15,9 +15,11 @@ import {
   fetchGaps,
   fetchLowScoreQueries,
   fetchQualitySummary,
+  fetchRegressionTests,
   type ScoreBucket,
   type GapRow,
   type LowScoreQuery,
+  type RegressionTest,
 } from '../../api/brainQuality'
 
 const SCORE_COLORS: Record<number, string> = {
@@ -32,23 +34,39 @@ export function QualityPage() {
   const [distribution, setDistribution] = useState<ScoreBucket[]>([])
   const [gaps, setGaps] = useState<GapRow[]>([])
   const [lowQueries, setLowQueries] = useState<LowScoreQuery[]>([])
+  const [regressionTests, setRegressionTests] = useState<RegressionTest[]>([])
   const [summary, setSummary] = useState({ totalScored: 0, avgScore: 0, gapCount: 0 })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [copiedGap, setCopiedGap] = useState<number | null>(null)
+
+  const copyGapToClipboard = useCallback((gap: GapRow, idx: number) => {
+    const text = [
+      `Brain gap: ${gap.query_pattern} (${gap.layer}, ${gap.hit_count}x)`,
+      `Avg score: ${gap.avg_score ?? 'N/A'}`,
+      `Agents: ${gap.agents?.join(', ') ?? 'unknown'}`,
+      `First seen: ${gap.first_seen}`,
+    ].join('\n')
+    navigator.clipboard.writeText(text)
+    setCopiedGap(idx)
+    setTimeout(() => setCopiedGap(null), 2000)
+  }, [])
 
   useEffect(() => {
     async function load() {
       try {
-        const [dist, g, lq, s] = await Promise.all([
+        const [dist, g, lq, s, rt] = await Promise.all([
           fetchScoreDistribution(30),
           fetchGaps(50),
           fetchLowScoreQueries(30),
           fetchQualitySummary(30),
+          fetchRegressionTests(),
         ])
         setDistribution(dist)
         setGaps(g)
         setLowQueries(lq)
         setSummary(s)
+        setRegressionTests(rt)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load')
       } finally {
@@ -97,6 +115,66 @@ export function QualityPage() {
           value={String(summary.gapCount)}
           accent={summary.gapCount > 0 ? 'amber' : 'emerald'}
         />
+      </div>
+
+      {/* Regression tests */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-300">
+          <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+          Regression tests
+        </h3>
+        {regressionTests.length === 0 ? (
+          <p className="text-sm text-slate-500">No regression tests configured</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-700 text-slate-400">
+                  <th className="pb-2 pr-3">Layer</th>
+                  <th className="pb-2 pr-3">Query</th>
+                  <th className="pb-2 pr-3 text-center">Status</th>
+                  <th className="pb-2">Last run</th>
+                </tr>
+              </thead>
+              <tbody>
+                {regressionTests.map((t) => (
+                  <tr key={t.id} className="border-b border-slate-800/50">
+                    <td className="py-1.5 pr-3">
+                      <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">
+                        {t.layer}
+                      </span>
+                    </td>
+                    <td className="max-w-[300px] truncate py-1.5 pr-3 text-slate-300">
+                      {t.query}
+                    </td>
+                    <td className="py-1.5 pr-3 text-center">
+                      {t.last_score == null ? (
+                        <span className="rounded bg-slate-700 px-2 py-0.5 text-[10px] text-slate-500">
+                          not run
+                        </span>
+                      ) : t.last_score >= 3 ? (
+                        <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                          PASS ({t.last_score}/5)
+                        </span>
+                      ) : (
+                        <span className="rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-medium text-red-400">
+                          FAIL ({t.last_score}/5)
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-slate-500">
+                      {t.last_run_at
+                        ? new Date(t.last_run_at).toLocaleString('en-GB', {
+                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                          })
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Score distribution chart */}
@@ -148,7 +226,8 @@ export function QualityPage() {
                   <th className="pb-2 pr-3 text-right">Hits</th>
                   <th className="pb-2 pr-3 text-right">Avg score</th>
                   <th className="pb-2 pr-3">First seen</th>
-                  <th className="pb-2">Agents</th>
+                  <th className="pb-2 pr-3">Agents</th>
+                  <th className="pb-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -169,8 +248,21 @@ export function QualityPage() {
                     <td className="py-1.5 pr-3 text-slate-500">
                       {new Date(g.first_seen).toLocaleDateString('en-GB')}
                     </td>
-                    <td className="py-1.5 text-slate-500">
+                    <td className="py-1.5 pr-3 text-slate-500">
                       {g.agents?.join(', ') ?? '—'}
+                    </td>
+                    <td className="py-1.5">
+                      <button
+                        onClick={() => copyGapToClipboard(g, i)}
+                        className="rounded p-1 text-slate-500 hover:bg-slate-700 hover:text-slate-300"
+                        title="Copy gap info for MC task"
+                      >
+                        {copiedGap === i ? (
+                          <Check className="h-3 w-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -197,6 +289,7 @@ export function QualityPage() {
                   <th className="pb-2 pr-3">Layer</th>
                   <th className="pb-2 pr-3">Agent</th>
                   <th className="pb-2 pr-3">Score</th>
+                  <th className="pb-2 pr-3">Source</th>
                   <th className="pb-2 pr-3">Query</th>
                   <th className="pb-2">Response</th>
                 </tr>
@@ -225,6 +318,9 @@ export function QualityPage() {
                       >
                         {q.quality_score}
                       </span>
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <SourceBadge source={q.quality_source} />
                     </td>
                     <td className="max-w-[200px] truncate py-1.5 pr-3 text-slate-400">
                       {q.query_preview ?? '—'}
@@ -272,5 +368,20 @@ function SummaryCard({
         </div>
       </div>
     </div>
+  )
+}
+
+const SOURCE_STYLES: Record<string, string> = {
+  heuristic: 'bg-slate-600/30 text-slate-400',
+  'llm-judge': 'bg-violet-500/20 text-violet-400',
+  ceo: 'bg-fuchsia-500/20 text-fuchsia-400',
+}
+
+function SourceBadge({ source }: { source: string | null }) {
+  if (!source) return <span className="text-slate-600">—</span>
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[10px] ${SOURCE_STYLES[source] ?? 'bg-slate-700 text-slate-400'}`}>
+      {source}
+    </span>
   )
 }
