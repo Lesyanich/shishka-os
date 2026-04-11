@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { AlertCircle, Brain, ImagePlus, Loader2, Send, Trash2, Upload, Zap } from 'lucide-react'
+import { AlertCircle, ChevronDown, ImagePlus, Loader2, Send, Trash2, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { InboxInsert, OcrModel } from '../../hooks/useReceiptInbox'
 
@@ -10,17 +10,20 @@ const WEBP_QUALITY = 0.65
 const ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 const UPLOADERS = ['Bas', 'Lesia', 'Admin'] as const
 
-const MODEL_OPTIONS: { value: OcrModel; label: string; desc: string }[] = [
-  { value: 'gemini-flash', label: 'Gemini Flash', desc: '~$0.004/чек, лучший' },
-  { value: 'gemini-pro', label: 'Gemini Pro', desc: '~$0.04/чек' },
-  { value: 'gpt-4o', label: 'GPT-4o', desc: '~$0.03/чек, быстрый' },
-  { value: 'claude-sonnet', label: 'Claude Sonnet', desc: '~$0.07/чек' },
-  { value: 'claude-sub', label: 'Подписка', desc: 'Очередь для агента, $0' },
+const MODEL_OPTIONS: { value: OcrModel; label: string }[] = [
+  { value: 'gemini-flash', label: 'Gemini Flash ($0.008)' },
+  { value: 'gemini-flash-lite', label: 'Flash Lite ($0.003)' },
+  { value: 'gemini-3-flash', label: 'Gemini 3 Flash ($0.01)' },
+  { value: 'gemini-pro', label: 'Gemini Pro ($0.04)' },
+  { value: 'gpt-4o', label: 'GPT-4o ($0.03)' },
+  { value: 'claude-sonnet', label: 'Sonnet ($0.07)' },
+  { value: 'claude-haiku', label: 'Haiku ($0.04)' },
+  { value: 'claude-sub', label: 'Agent queue ($0)' },
 ]
 
 function getStoredModel(): OcrModel {
   const v = localStorage.getItem('receipt-ocr-model')
-  if (v === 'gemini-flash' || v === 'gemini-pro' || v === 'claude-sonnet' || v === 'gpt-4o' || v === 'claude-sub') return v
+  if (v === 'gemini-flash' || v === 'gemini-flash-lite' || v === 'gemini-3-flash' || v === 'gemini-pro' || v === 'claude-sonnet' || v === 'claude-haiku' || v === 'gpt-4o' || v === 'claude-sub') return v
   return 'gemini-flash'
 }
 
@@ -102,6 +105,7 @@ interface InboxUploaderProps {
 /* ────────────────────────── Component ────────────────────────── */
 
 export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
+  const [isOpen, setIsOpen] = useState(false)
   const [files, setFiles] = useState<DroppedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -172,11 +176,11 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
   /* ── Submit ── */
   const handleSubmit = async () => {
     if (!uploadedBy) {
-      setToast({ type: 'err', msg: 'Выберите, кто загружает' })
+      setToast({ type: 'err', msg: 'Select who is uploading' })
       return
     }
     if (files.length === 0) {
-      setToast({ type: 'err', msg: 'Добавьте хотя бы одно фото' })
+      setToast({ type: 'err', msg: 'Add at least one photo' })
       return
     }
 
@@ -190,7 +194,7 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
       const errors = results.filter((r): r is { error: string } => 'error' in r)
 
       if (photoUrls.length === 0) {
-        setToast({ type: 'err', msg: `Ошибка загрузки: ${errors[0]?.error ?? 'unknown'}` })
+        setToast({ type: 'err', msg: `Upload failed: ${errors[0]?.error ?? 'unknown'}` })
         return
       }
 
@@ -212,13 +216,10 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
       }
 
       if (model !== 'claude-sub' && onParse) {
-        // Get the newly inserted row ID — it's the latest one
-        // The insert callback already refetched, but we need the ID
-        // Fire Edge Function in background — Realtime will update status
-        setToast({ type: 'ok', msg: `Чек загружен! Распознавание через ${model === 'claude-sonnet' ? 'Claude Sonnet' : 'GPT-4o'}...` })
+        setToast({ type: 'ok', msg: `Uploaded! Parsing via ${model}...` })
         resetForm()
       } else {
-        setToast({ type: 'ok', msg: model === 'claude-sub' ? 'Чек загружен в очередь для агента' : 'Чек загружен!' })
+        setToast({ type: 'ok', msg: model === 'claude-sub' ? 'Queued for agent' : 'Uploaded!' })
         resetForm()
       }
     } catch (err) {
@@ -229,9 +230,20 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-      <h3 className="text-sm font-semibold text-slate-100">Загрузить чек</h3>
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-800/30"
+      >
+        <div className="flex items-center gap-2">
+          <Upload className="h-4 w-4 text-slate-500" />
+          <span className="text-sm font-semibold text-slate-100">Upload Receipt</span>
+        </div>
+        <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
 
+      {isOpen && <div className="space-y-4 border-t border-slate-800 px-4 pb-4 pt-3">
       {/* ── Drop zone ── */}
       <div
         onDragOver={handleDragOver}
@@ -250,7 +262,7 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
           <Upload className={`h-6 w-6 ${isDragging ? 'text-blue-400' : 'text-slate-500'}`} />
         )}
         <p className="text-xs text-slate-400">
-          Перетащите фото или <span className="font-medium text-blue-400 underline underline-offset-2">выберите</span>
+          Drop photos or <span className="font-medium text-blue-400 underline underline-offset-2">browse</span>
         </p>
         <p className="text-[10px] text-slate-600">JPEG · PNG · WebP · PDF · max 5 MB</p>
         <input
@@ -301,14 +313,14 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
         {/* Who */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-            Кто загружает <span className="text-rose-400">*</span>
+            Uploaded by <span className="text-rose-400">*</span>
           </label>
           <select
             value={uploadedBy}
             onChange={(e) => setUploadedBy(e.target.value)}
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 outline-none focus:border-blue-500"
           >
-            <option value="">Выберите...</option>
+            <option value="">Select...</option>
             {UPLOADERS.map((u) => (
               <option key={u} value={u}>{u}</option>
             ))}
@@ -318,7 +330,7 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
         {/* Date */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-            Дата чека
+            Receipt date
           </label>
           <input
             type="date"
@@ -331,7 +343,7 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
         {/* Supplier */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-            Поставщик
+            Supplier
           </label>
           <input
             type="text"
@@ -342,10 +354,10 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
           />
         </div>
 
-        {/* Amount */}
+        {/* Amount + Model on same row */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-            Сумма, ฿
+            Amount, ฿
           </label>
           <input
             type="number"
@@ -356,46 +368,34 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
           />
         </div>
 
-        {/* Notes — full width */}
-        <div className="col-span-2">
+        {/* Notes */}
+        <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-            Комментарий
+            Notes
           </label>
           <input
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Любые заметки..."
+            placeholder="Optional..."
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 outline-none focus:border-blue-500"
           />
         </div>
-      </div>
 
-      {/* ── Model selector ── */}
-      <div>
-        <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-          Режим распознавания
-        </label>
-        <div className="grid grid-cols-3 gap-2">
-          {MODEL_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => { setModel(opt.value); localStorage.setItem('receipt-ocr-model', opt.value) }}
-              className={`flex flex-col items-center gap-0.5 rounded-lg border px-2 py-2 text-center transition ${
-                model === opt.value
-                  ? 'border-blue-500 bg-blue-500/10 text-blue-300'
-                  : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
-              }`}
-            >
-              {opt.value === 'gemini-pro' && <Zap className="h-4 w-4" />}
-              {opt.value === 'claude-sonnet' && <Brain className="h-4 w-4" />}
-              {opt.value === 'gpt-4o' && <Zap className="h-4 w-4" />}
-              {opt.value === 'claude-sub' && <Send className="h-4 w-4" />}
-              <span className="text-[11px] font-medium">{opt.label}</span>
-              <span className="text-[9px] text-slate-500">{opt.desc}</span>
-            </button>
-          ))}
+        {/* Model — compact dropdown */}
+        <div>
+          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
+            OCR Model
+          </label>
+          <select
+            value={model}
+            onChange={(e) => { setModel(e.target.value as OcrModel); localStorage.setItem('receipt-ocr-model', e.target.value) }}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 outline-none focus:border-blue-500"
+          >
+            {MODEL_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -411,7 +411,7 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
         ) : (
           <Send className="h-4 w-4" />
         )}
-        {model === 'claude-sub' ? 'В очередь для агента' : 'Загрузить и распознать'}
+        {model === 'claude-sub' ? 'Queue for agent' : 'Upload & parse'}
       </button>
 
       {/* ── Toast ── */}
@@ -427,6 +427,7 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
           <span>{toast.msg}</span>
         </div>
       )}
+      </div>}
     </div>
   )
 }

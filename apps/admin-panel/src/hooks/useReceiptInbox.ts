@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 
 /* ────────────────────────── Types ────────────────────────── */
 
-export type OcrModel = 'gemini-flash' | 'gemini-pro' | 'claude-sonnet' | 'gpt-4o' | 'claude-sub'
+export type OcrModel = 'gemini-flash' | 'gemini-flash-lite' | 'gemini-3-flash' | 'gemini-pro' | 'claude-sonnet' | 'claude-haiku' | 'gpt-4o' | 'claude-sub'
 
 export interface InboxRow {
   id: string
@@ -49,7 +49,36 @@ export interface UseReceiptInboxResult {
   reopen: (inboxId: string) => Promise<string | null>
   resetToPending: (inboxId: string) => Promise<string | null>
   deleteRow: (inboxId: string) => Promise<string | null>
+  deleteManyRows: (ids: string[]) => Promise<string | null>
+  approveManyRows: (ids: string[]) => Promise<{ ok: number; failed: number; errors: string[] }>
   syncStatus: (inboxId: string) => Promise<string | null>
+}
+
+/* ────────────────────────── Row mapper ────────────────────────── */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapRow(r: Record<string, any>): InboxRow {
+  return {
+    id: r.id as string,
+    uploaded_by: r.uploaded_by as string,
+    upload_date: r.upload_date as string,
+    receipt_date: (r.receipt_date ?? null) as string | null,
+    supplier_hint: (r.supplier_hint ?? null) as string | null,
+    amount_hint: r.amount_hint != null ? Number(r.amount_hint) : null,
+    photo_urls: (r.photo_urls ?? []) as string[],
+    notes: (r.notes ?? null) as string | null,
+    status: (r.status ?? 'pending') as InboxRow['status'],
+    expense_id: (r.expense_id ?? null) as string | null,
+    error_message: (r.error_message ?? null) as string | null,
+    parsed_payload: (r.parsed_payload ?? null) as Record<string, unknown> | null,
+    parsed_at: (r.parsed_at ?? null) as string | null,
+    gdrive_paths: (r.gdrive_paths ?? null) as string[] | null,
+    model_used: (r.model_used ?? null) as string | null,
+    parse_cost_usd: r.parse_cost_usd != null ? Number(r.parse_cost_usd) : null,
+    parse_tokens_in: r.parse_tokens_in != null ? Number(r.parse_tokens_in) : null,
+    parse_tokens_out: r.parse_tokens_out != null ? Number(r.parse_tokens_out) : null,
+    created_at: r.created_at as string,
+  }
 }
 
 /* ────────────────────────── Hook ────────────────────────── */
@@ -75,33 +104,11 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       return
     }
 
-    setRows(
-      (data ?? []).map((r) => ({
-        id: r.id as string,
-        uploaded_by: r.uploaded_by as string,
-        upload_date: r.upload_date as string,
-        receipt_date: (r.receipt_date ?? null) as string | null,
-        supplier_hint: (r.supplier_hint ?? null) as string | null,
-        amount_hint: r.amount_hint != null ? Number(r.amount_hint) : null,
-        photo_urls: (r.photo_urls ?? []) as string[],
-        notes: (r.notes ?? null) as string | null,
-        status: (r.status ?? 'pending') as InboxRow['status'],
-        expense_id: (r.expense_id ?? null) as string | null,
-        error_message: (r.error_message ?? null) as string | null,
-        parsed_payload: (r.parsed_payload ?? null) as Record<string, unknown> | null,
-        parsed_at: (r.parsed_at ?? null) as string | null,
-        gdrive_paths: (r.gdrive_paths ?? null) as string[] | null,
-        model_used: (r.model_used ?? null) as string | null,
-        parse_cost_usd: r.parse_cost_usd != null ? Number(r.parse_cost_usd) : null,
-        parse_tokens_in: r.parse_tokens_in != null ? Number(r.parse_tokens_in) : null,
-        parse_tokens_out: r.parse_tokens_out != null ? Number(r.parse_tokens_out) : null,
-        created_at: r.created_at as string,
-      })),
-    )
+    setRows((data ?? []).map(mapRow))
     setIsLoading(false)
   }, [])
 
-  // ── Realtime subscription for live status updates ──
+  // ── Realtime subscription — targeted row patch, not full refetch ──
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   useEffect(() => {
@@ -112,7 +119,39 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'receipt_inbox' },
-        () => { fetchData() },
+        (payload) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const updated = payload.new as Record<string, any>
+          if (!updated?.id) return
+          const mapped = mapRow(updated)
+          setRows((prev) =>
+            prev.map((r) => (r.id === mapped.id ? mapped : r)),
+          )
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'receipt_inbox' },
+        (payload) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const newRow = payload.new as Record<string, any>
+          if (!newRow?.id) return
+          const mapped = mapRow(newRow)
+          setRows((prev) => {
+            if (prev.some((r) => r.id === mapped.id)) return prev
+            return [mapped, ...prev]
+          })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'receipt_inbox' },
+        (payload) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const old = payload.old as Record<string, any>
+          if (!old?.id) return
+          setRows((prev) => prev.filter((r) => r.id !== old.id))
+        },
       )
       .subscribe()
 
@@ -129,36 +168,35 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       console.error('[useReceiptInbox] insert error', err)
       return err.message
     }
-    await fetchData()
+    // Realtime INSERT subscription will add the row
     return null
-  }, [fetchData])
+  }, [])
 
   const parseReceipt = useCallback(async (inboxId: string, model: OcrModel): Promise<{ ok: boolean; error?: string }> => {
     if (model === 'claude-sub') {
-      // Just mark as pending with claude-subscription model — agent will handle later
       const { error: err } = await supabase
         .from('receipt_inbox')
         .update({ model_used: 'claude-subscription' })
         .eq('id', inboxId)
       if (err) return { ok: false, error: err.message }
-      await fetchData()
+      setRows((prev) =>
+        prev.map((r) => (r.id === inboxId ? { ...r, model_used: 'claude-subscription' } : r)),
+      )
       return { ok: true }
     }
 
     try {
-      // Invoke Edge Function (fire-and-forget style, Realtime picks up changes)
       const { data, error: fnErr } = await supabase.functions.invoke(
         `ocr-receipt?inbox_id=${inboxId}&model=${model}`,
       )
       if (fnErr) return { ok: false, error: fnErr.message }
       if (data && !data.ok) return { ok: false, error: data.error || 'Parse failed' }
-      // Realtime will update the row, but also refetch to be safe
-      await fetchData()
+      // Realtime will update the row status from processing → parsed/error
       return { ok: true }
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
-  }, [fetchData])
+  }, [])
 
   const approve = useCallback(async (inboxId: string, payload: Record<string, unknown>) => {
     try {
@@ -168,18 +206,22 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       if (rpcErr) return { ok: false, error: rpcErr.message }
       if (data && !data.ok) return { ok: false, error: data.error || 'RPC returned error' }
 
-      // Mark inbox as processed
+      const expenseId = data?.expense_id ?? null
       await supabase
         .from('receipt_inbox')
-        .update({ status: 'processed', expense_id: data?.expense_id ?? null, processed_at: new Date().toISOString() })
+        .update({ status: 'processed', expense_id: expenseId, processed_at: new Date().toISOString() })
         .eq('id', inboxId)
 
-      await fetchData()
-      return { ok: true, expense_id: data?.expense_id }
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === inboxId ? { ...r, status: 'processed' as const, expense_id: expenseId } : r,
+        ),
+      )
+      return { ok: true, expense_id: expenseId }
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
-  }, [fetchData])
+  }, [])
 
   const skip = useCallback(async (inboxId: string): Promise<string | null> => {
     const { error: err } = await supabase
@@ -187,9 +229,11 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       .update({ status: 'skipped' })
       .eq('id', inboxId)
     if (err) return err.message
-    await fetchData()
+    setRows((prev) =>
+      prev.map((r) => (r.id === inboxId ? { ...r, status: 'skipped' as const } : r)),
+    )
     return null
-  }, [fetchData])
+  }, [])
 
   const reopen = useCallback(async (inboxId: string): Promise<string | null> => {
     const { error: err } = await supabase
@@ -197,9 +241,11 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       .update({ status: 'parsed' })
       .eq('id', inboxId)
     if (err) return err.message
-    await fetchData()
+    setRows((prev) =>
+      prev.map((r) => (r.id === inboxId ? { ...r, status: 'parsed' as const } : r)),
+    )
     return null
-  }, [fetchData])
+  }, [])
 
   const resetToPending = useCallback(async (inboxId: string): Promise<string | null> => {
     const { error: err } = await supabase
@@ -207,9 +253,15 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       .update({ status: 'pending', error_message: null, model_used: null })
       .eq('id', inboxId)
     if (err) return err.message
-    await fetchData()
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === inboxId
+          ? { ...r, status: 'pending' as const, error_message: null, model_used: null }
+          : r,
+      ),
+    )
     return null
-  }, [fetchData])
+  }, [])
 
   const deleteRow = useCallback(async (inboxId: string): Promise<string | null> => {
     const { data, error: err } = await supabase.rpc('fn_delete_inbox_row', {
@@ -217,19 +269,70 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     })
     if (err) return err.message
     if (data && !data.ok) return data.error || 'Delete failed'
-    await fetchData()
+    setRows((prev) => prev.filter((r) => r.id !== inboxId))
     return null
-  }, [fetchData])
+  }, [])
 
-  // Sync inbox status if expense_id exists but status is wrong
+  const deleteManyRows = useCallback(async (ids: string[]): Promise<string | null> => {
+    for (const id of ids) {
+      const err = await deleteRow(id)
+      if (err) return `Failed to delete ${id}: ${err}`
+    }
+    return null
+  }, [deleteRow])
+
+  const approveManyRows = useCallback(async (ids: string[]): Promise<{ ok: number; failed: number; errors: string[] }> => {
+    const result = { ok: 0, failed: 0, errors: [] as string[] }
+    for (const id of ids) {
+      // Find the row in current state
+      const row = rows.find((r) => r.id === id)
+      if (!row) { result.failed++; result.errors.push(`${id.slice(0, 8)}: not found`); continue }
+      if (row.status !== 'parsed') { result.failed++; result.errors.push(`${id.slice(0, 8)}: status is ${row.status}, not parsed`); continue }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pp = row.parsed_payload as Record<string, any> | null
+      if (!pp) { result.failed++; result.errors.push(`${id.slice(0, 8)}: no parsed data`); continue }
+
+      // Validate minimum fields
+      if (!pp.supplier_name || !pp.transaction_date || !pp.amount_original || pp.amount_original <= 0) {
+        result.failed++; result.errors.push(`${id.slice(0, 8)}: missing supplier/date/amount`); continue
+      }
+      const hasItems = (pp.food_items?.length || 0) + (pp.capex_items?.length || 0) + (pp.opex_items?.length || 0)
+      if (!hasItems) { result.failed++; result.errors.push(`${id.slice(0, 8)}: no items`); continue }
+
+      // Build payload (same as InboxReviewPanel.handleApproveConfirm)
+      const photos = row.photo_urls || []
+      const payload = {
+        ...pp,
+        receipt_supplier_url: pp.receipt_supplier_url || photos[0] || null,
+        receipt_bank_url: pp.receipt_bank_url || (photos[1] && photos[1] !== photos[0] ? photos[1] : null),
+        tax_invoice_url: pp.tax_invoice_url || (pp.has_tax_invoice && photos.length > 1 ? photos[1] : null),
+      }
+
+      const res = await approve(id, payload)
+      if (res.ok) {
+        result.ok++
+      } else {
+        result.failed++
+        result.errors.push(`${id.slice(0, 8)}: ${res.error || 'unknown error'}`)
+      }
+    }
+    return result
+  }, [rows, approve])
+
   const syncStatus = useCallback(async (inboxId: string): Promise<string | null> => {
     const { data, error: err } = await supabase.rpc('fn_sync_inbox_status', {
       p_inbox_id: inboxId,
     })
     if (err) return err.message
-    if (data?.fixed) await fetchData()
+    if (data?.fixed) {
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === inboxId ? { ...r, status: 'processed' as const } : r,
+        ),
+      )
+    }
     return null
-  }, [fetchData])
+  }, [])
 
-  return { rows, isLoading, error, refetch: fetchData, insert, parseReceipt, approve, skip, reopen, resetToPending, deleteRow, syncStatus }
+  return { rows, isLoading, error, refetch: fetchData, insert, parseReceipt, approve, skip, reopen, resetToPending, deleteRow, deleteManyRows, approveManyRows, syncStatus }
 }

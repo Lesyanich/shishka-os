@@ -180,6 +180,9 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   'gpt-4o-mini': { input: 0.15 / 1_000_000, output: 0.6 / 1_000_000 },
   'gemini-2.5-pro': { input: 1.25 / 1_000_000, output: 10 / 1_000_000 },
   'gemini-2.5-flash': { input: 0.15 / 1_000_000, output: 0.6 / 1_000_000 },
+  'claude-haiku-4-5-20251001': { input: 0.8 / 1_000_000, output: 4 / 1_000_000 },
+  'gemini-2.5-flash-lite': { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 },
+  'gemini-3-flash-preview': { input: 0.50 / 1_000_000, output: 3.0 / 1_000_000 },
 }
 
 // Map user-facing model names to API model IDs
@@ -189,4 +192,7 @@ export const MODEL_MAP: Record<string, { provider: 'anthropic' | 'openai' | 'goo
   'gpt-4o-mini': { provider: 'openai', modelId: 'gpt-4o-mini' },
   'gemini-pro': { provider: 'google', modelId: 'gemini-2.5-pro' },
   'gemini-flash': { provider: 'google', modelId: 'gemini-2.5-flash' },
+  'claude-haiku': { provider: 'anthropic', modelId: 'claude-haiku-4-5-20251001' },
+  'gemini-flash-lite': { provider: 'google', modelId: 'gemini-2.5-flash-lite' },
+  'gemini-3-flash': { provider: 'google', modelId: 'gemini-3-flash-preview' },
 }
