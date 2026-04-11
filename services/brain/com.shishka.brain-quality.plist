@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Brain Quality Nightly — macOS launchd plist.
+  Spec: docs/plans/spec-brain-feedback-loop.md §3-§6
+  MC task: 087e6502
+
+  Runs at 4:00 AM daily (after mempalace backup at 3:00 AM).
+  Executes: judge.py → gap_monitor.py → regression.py
+
+  Install:
+    cp services/brain/com.shishka.brain-quality.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.shishka.brain-quality.plist
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.shishka.brain-quality.plist
+    rm ~/Library/LaunchAgents/com.shishka.brain-quality.plist
+
+  Manual run:
+    launchctl start com.shishka.brain-quality
+
+  Logs:
+    tail -f /tmp/brain-quality.log
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.shishka.brain-quality</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/lesianich/Library/CloudStorage/GoogleDrive-lesia@shishka.health/Общие диски/Shishka healthy kitchen/services/brain/run-nightly.sh</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>4</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/brain-quality.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/brain-quality.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>
