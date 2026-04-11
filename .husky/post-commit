@@ -11,8 +11,24 @@
 
 echo "[post-commit] Commit: $(git log --oneline -1)"
 
-# Run generate-status asynchronously (non-blocking)
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+
+# ── HC-1: STATUS.md auto-generation (non-blocking) ──
 if [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/scripts/generate-status.sh" ]; then
   sh "$REPO_ROOT/scripts/generate-status.sh" &
+fi
+
+# ── Brain: detect changed files in this commit ──
+CHANGED_FILES=""
+if [ -n "$REPO_ROOT" ]; then
+  CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null || true)
+fi
+
+# ── Brain: LightRAG auto-reindex on bible/domain change ──
+if [ -n "$CHANGED_FILES" ]; then
+  BIBLE_DOMAIN=$(echo "$CHANGED_FILES" | grep -E '^docs/(bible|domain)/.*\.md$' || true)
+  if [ -n "$BIBLE_DOMAIN" ]; then
+    echo "[post-commit] Brain: LightRAG reindex triggered"
+    echo "$BIBLE_DOMAIN" | sh "$REPO_ROOT/scripts/lightrag-reindex-changed.sh" &
+  fi
 fi
