@@ -73,7 +73,8 @@ src/
   4. Дождись одобрения CEO → `gh pr merge --merge`
   5. Vercel задеплоит автоматически
 - **Напоминай CEO о мерже** если feature-ветка опережает main на 5+ коммитов.
-- **URL:** admin-panel-six-dun.vercel.app
+- **Vercel project:** `shishka-os` (old `admin-panel` project deleted 2026-04-11)
+- **URL:** shishka-os.vercel.app
 
 ## Immutable Rules (из core-rules.md)
 - SSoT = Supabase. UI — зеркало.

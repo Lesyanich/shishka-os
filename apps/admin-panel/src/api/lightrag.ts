@@ -155,6 +155,35 @@ export async function listLabels(): Promise<string[]> {
   return getJson<string[]>('/graph/label/list')
 }
 
+export type QueryMode = 'naive' | 'local' | 'global' | 'hybrid' | 'mix'
+
+export interface QueryBrainResponse {
+  response: string
+}
+
+export async function queryBrain(
+  query: string,
+  mode: QueryMode = 'mix',
+): Promise<QueryBrainResponse> {
+  const params = withApiKey(new URLSearchParams({ mode }))
+  const qs = params.toString() ? `?${params.toString()}` : ''
+  const url = `${baseUrl}/query${qs}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query }),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new LightragError(
+      `LightRAG ${res.status} ${res.statusText} on /query`,
+      res.status,
+      body,
+    )
+  }
+  return (await res.json()) as QueryBrainResponse
+}
+
 export function getBaseUrl(): string {
   return baseUrl
 }

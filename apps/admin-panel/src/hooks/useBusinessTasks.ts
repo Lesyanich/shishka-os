@@ -45,6 +45,8 @@ export interface BusinessTask {
   tags: string[]
   related_ids: Record<string, unknown>
   notes: string | null
+  sprint_id: string | null
+  story_points: number | null
 }
 
 export interface NewBusinessTask {
