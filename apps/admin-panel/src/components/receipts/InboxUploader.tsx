@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { AlertCircle, ImagePlus, Loader2, Send, Trash2, Upload } from 'lucide-react'
+import { AlertCircle, ChevronDown, ImagePlus, Loader2, Send, Trash2, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { InboxInsert, OcrModel } from '../../hooks/useReceiptInbox'
 
@@ -105,6 +105,7 @@ interface InboxUploaderProps {
 /* ────────────────────────── Component ────────────────────────── */
 
 export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
+  const [isOpen, setIsOpen] = useState(false)
   const [files, setFiles] = useState<DroppedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -229,9 +230,20 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-      <h3 className="text-sm font-semibold text-slate-100">Upload Receipt</h3>
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-800/30"
+      >
+        <div className="flex items-center gap-2">
+          <Upload className="h-4 w-4 text-slate-500" />
+          <span className="text-sm font-semibold text-slate-100">Upload Receipt</span>
+        </div>
+        <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
 
+      {isOpen && <div className="space-y-4 border-t border-slate-800 px-4 pb-4 pt-3">
       {/* ── Drop zone ── */}
       <div
         onDragOver={handleDragOver}
@@ -415,6 +427,7 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
           <span>{toast.msg}</span>
         </div>
       )}
+      </div>}
     </div>
   )
 }

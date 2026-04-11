@@ -546,7 +546,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             </div>
             <div>
               <span className="text-slate-500">Paid by: </span>
-              <span className="text-slate-200">{p.payment_method} ({p.paid_by})</span>
+              <span className="text-slate-200">{[p.payment_method, p.paid_by].filter(Boolean).join(' · ') || '—'}</span>
             </div>
             <div>
               <span className="text-slate-500">Tax invoice: </span>

@@ -329,12 +329,10 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                 <th className="px-2 py-2">By</th>
                 <th className="px-2 py-2">Supplier</th>
                 <th className="px-2 py-2 text-right">Amount</th>
-                <th className="px-2 py-2 text-center">Model</th>
-                <th className="px-2 py-2 text-right">Cost</th>
+                <th className="px-2 py-2 text-center">Model / Cost</th>
                 <th className="px-2 py-2 text-center">Status</th>
                 <th className="px-2 py-2 text-center">Recognized</th>
                 <th className="px-2 py-2">Invoice #</th>
-                <th className="px-2 py-2 text-center">Photo</th>
                 <th className="w-16 px-1 py-2" />
               </tr>
             </thead>
@@ -386,12 +384,12 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                           : '\u2014'}
                       </td>
                       <td className="px-2 py-2.5 text-center">
-                        <ModelBadge model={r.model_used} />
-                      </td>
-                      <td className="px-2 py-2.5 text-right text-[10px] text-slate-500">
-                        {r.parse_cost_usd != null && r.parse_cost_usd > 0
-                          ? `$${r.parse_cost_usd.toFixed(4)}`
-                          : '—'}
+                        <div className="flex flex-col items-center">
+                          <ModelBadge model={r.model_used} />
+                          {r.parse_cost_usd != null && r.parse_cost_usd > 0 && (
+                            <span className="text-[9px] text-slate-600">${r.parse_cost_usd.toFixed(4)}</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-2 py-2.5 text-center">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-medium ${badge.cls}`}>
@@ -405,30 +403,6 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                       {/* Invoice # */}
                       <td className="px-2 py-2.5 text-[10px] text-slate-400 truncate max-w-[80px]">
                         {pp?.invoice_number || '—'}
-                      </td>
-                      {/* Photo */}
-                      <td className="px-2 py-2.5">
-                        <div className="flex items-center justify-center gap-1">
-                          {r.photo_urls.slice(0, 3).map((url, i) => (
-                            <a
-                              key={i}
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="block h-8 w-8 overflow-hidden rounded border border-slate-700 bg-slate-800 hover:border-slate-500"
-                            >
-                              {url.endsWith('.pdf') ? (
-                                <span className="flex h-full w-full items-center justify-center text-[8px] text-slate-400">PDF</span>
-                              ) : (
-                                <img src={url} alt="" className="h-full w-full object-cover" />
-                              )}
-                            </a>
-                          ))}
-                          {r.photo_urls.length > 3 && (
-                            <span className="text-[9px] text-slate-500">+{r.photo_urls.length - 3}</span>
-                          )}
-                        </div>
                       </td>
                       {/* Actions */}
                       <td className="px-1 py-2.5">
@@ -482,7 +456,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                     </tr>
                     {isExpanded && r.parsed_payload && (
                       <tr>
-                        <td colSpan={12} className="border-t border-indigo-500/20 bg-slate-900/80 px-0 py-0">
+                        <td colSpan={10} className="border-t border-indigo-500/20 bg-slate-900/80 px-0 py-0">
                           <InboxReviewPanel row={r} onApprove={onApprove} onSkip={onSkip} onReopen={onReopen} />
                         </td>
                       </tr>
