@@ -39,10 +39,10 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/Users/lesianich/Library/Logs/mempalace-backup.log</string>
+  <string>/tmp/mempalace-backup.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/lesianich/Library/Logs/mempalace-backup.log</string>
+  <string>/tmp/mempalace-backup.log</string>
 
   <key>RunAtLoad</key>
   <false/>
