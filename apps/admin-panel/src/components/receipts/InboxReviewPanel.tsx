@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, X, Loader2, FolderOpen, Pencil, Plus, Trash2, AlertTriangle, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
+import { Check, X, Loader2, FolderOpen, Pencil, Plus, Trash2, AlertTriangle, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { InboxRow } from '../../hooks/useReceiptInbox'
 import { supabase } from '../../lib/supabase'
 
@@ -33,6 +33,7 @@ interface OpexItem {
   unit: string
   unit_price: number
   total_price: number
+  barcode?: string | null
 }
 
 /* ────────────────────────── Props ────────────────────────── */
@@ -133,7 +134,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
-    setZoom((prev) => Math.min(5, Math.max(0.5, prev + (e.deltaY < 0 ? 0.3 : -0.3))))
+    setZoom((prev) => Math.min(5, Math.max(1, prev + (e.deltaY < 0 ? 0.3 : -0.3))))
   }, [])
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -398,7 +399,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setZoom((z) => Math.max(0.5, z - 0.5))}
+              onClick={() => setZoom((z) => Math.max(1, z - 0.5))}
               className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
               title="Zoom out"
             >
@@ -427,27 +428,50 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           <span className="text-[9px] text-slate-600">Scroll to zoom</span>
         </div>
 
-        {/* Image container */}
-        <div
-          ref={imgContainerRef}
-          onWheel={handleWheel}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          className={`h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
-        >
-          <img
-            src={row.photo_urls[selectedPhotoIdx]}
-            alt="Receipt"
-            draggable={false}
-            className="h-full w-full select-none"
-            style={{
-              objectFit: 'contain',
-              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-              transformOrigin: 'center center',
-            }}
-          />
+        {/* Image container with arrows */}
+        <div className="relative">
+          <div
+            ref={imgContainerRef}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            className={`h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
+          >
+            <img
+              src={row.photo_urls[selectedPhotoIdx]}
+              alt="Receipt"
+              draggable={false}
+              className="h-full w-full select-none"
+              style={{
+                objectFit: 'contain',
+                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                transformOrigin: 'center center',
+              }}
+            />
+          </div>
+          {/* Prev/Next arrows for multi-page */}
+          {row.photo_urls.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setSelectedPhotoIdx((i) => Math.max(0, i - 1))}
+                disabled={selectedPhotoIdx === 0}
+                className="absolute left-1.5 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/80 p-1.5 text-slate-300 shadow-lg backdrop-blur-sm hover:bg-slate-800 disabled:opacity-20"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPhotoIdx((i) => Math.min(row.photo_urls.length - 1, i + 1))}
+                disabled={selectedPhotoIdx === row.photo_urls.length - 1}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/80 p-1.5 text-slate-300 shadow-lg backdrop-blur-sm hover:bg-slate-800 disabled:opacity-20"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </>
+          )}
         </div>
 
         {/* Page thumbnails */}
@@ -594,8 +618,8 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 <tr>
                   {checkboxTh(foodChecked, setFoodChecked, foodItems.length)}
                   <th className="w-8 px-2 py-1.5 text-left">#</th>
-                  <th className="px-2 py-1.5 text-left">Product</th>
-                  <th className="px-2 py-1.5 text-left">Barcode</th>
+                  <th className="min-w-[140px] px-2 py-1.5 text-left">Product</th>
+                  <th className="min-w-[100px] px-2 py-1.5 text-left">Barcode</th>
                   <th className="w-16 px-2 py-1.5 text-right">Qty</th>
                   <th className="w-14 px-2 py-1.5 text-left">Unit</th>
                   <th className="w-20 px-2 py-1.5 text-right">Price</th>
@@ -791,7 +815,8 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 <tr>
                   {checkboxTh(opexChecked, setOpexChecked, opexItems.length)}
                   <th className="w-8 px-2 py-1.5 text-left">#</th>
-                  <th className="px-2 py-1.5 text-left">Expense</th>
+                  <th className="min-w-[140px] px-2 py-1.5 text-left">Expense</th>
+                  <th className="min-w-[100px] px-2 py-1.5 text-left">Barcode</th>
                   <th className="w-16 px-2 py-1.5 text-right">Qty</th>
                   <th className="w-14 px-2 py-1.5 text-left">Unit</th>
                   <th className="w-20 px-2 py-1.5 text-right">Price</th>
@@ -812,6 +837,13 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                       <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
                       <td className="px-2 py-1.5">
                         {editing ? <input value={item.description} onChange={(e) => updateOpex(i, 'description', e.target.value)} className={inputCls} /> : <span className="text-slate-200">{item.description}</span>}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {editing ? (
+                          <input value={item.barcode || ''} onChange={(e) => updateOpex(i, 'barcode', e.target.value)} className={`${inputCls} font-mono text-[10px]`} placeholder="barcode" />
+                        ) : (
+                          <span className="font-mono text-[10px] text-slate-500">{item.barcode || '\u2014'}</span>
+                        )}
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         {editing ? <input type="number" step="any" value={item.quantity} onChange={(e) => updateOpex(i, 'quantity', Number(e.target.value))} className={`${numInputCls} w-16`} /> : <span className="text-slate-300">{item.quantity}</span>}
