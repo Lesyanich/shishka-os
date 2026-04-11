@@ -1,10 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Brain, Network, BookOpen, Code2 } from 'lucide-react'
+import { Brain, Network, BookOpen, Code2, DollarSign, Activity } from 'lucide-react'
 
 const TABS = [
   { to: '/brain/lightrag', label: 'L2 · Knowledge', icon: BookOpen },
   { to: '/brain/mempalace', label: 'L1 · Memory', icon: Network },
   { to: '/brain/code', label: 'L3 · Code', icon: Code2 },
+  { to: '/brain/cost', label: 'Cost', icon: DollarSign },
+  { to: '/brain/quality', label: 'Quality', icon: Activity },
 ]
 
 export function BrainPage() {
