@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Brain, ChevronRight, Loader2, Play, RefreshCcw, Trash2, Zap } from 'lucide-react'
 import type { InboxRow, OcrModel } from '../../hooks/useReceiptInbox'
 import { InboxReviewPanel } from './InboxReviewPanel'
@@ -13,8 +13,6 @@ const STATUS_BADGE: Record<InboxRow['status'], { label: string; cls: string }> =
   error: { label: 'Error', cls: 'bg-rose-500/15 text-rose-400' },
   skipped: { label: 'Skipped', cls: 'bg-slate-500/15 text-slate-400' },
 }
-
-/* ────────────────────────── Props ────────────────────────── */
 
 /* ────────────────────────── Model badge helper ────────────────────────── */
 
@@ -54,18 +52,48 @@ interface InboxListProps {
   onReopen: (inboxId: string) => Promise<string | null>
   onResetToPending: (inboxId: string) => Promise<string | null>
   onDelete: (inboxId: string) => Promise<string | null>
+  onDeleteMany: (ids: string[]) => Promise<string | null>
+}
+
+/* ────────────────────────── Date helpers ────────────────────────── */
+
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString('en-GB', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+}
+
+function fmtDateShort(iso: string) {
+  return new Date(iso).toLocaleString('en-GB', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  })
 }
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprove, onSkip, onReopen, onResetToPending, onDelete }: InboxListProps) {
+export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprove, onSkip, onReopen, onResetToPending, onDelete, onDeleteMany }: InboxListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [parsingId, setParsingId] = useState<string | null>(null)
   const [bulkParsing, setBulkParsing] = useState<{ current: number; total: number } | null>(null)
   const [rowModels, setRowModels] = useState<Record<string, OcrModel>>({})
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
+  const selectableRows = rows.filter((r) => !r.expense_id)
   const pendingRows = rows.filter((r) => r.status === 'pending' && r.model_used !== 'claude-subscription')
+
+  // Clean up stale selections when rows change
+  useEffect(() => {
+    const rowIds = new Set(rows.map((r) => r.id))
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => rowIds.has(id)))
+      if (next.size === prev.size) return prev
+      return next
+    })
+  }, [rows])
 
   const getSelectedModel = (): OcrModel => {
     const v = localStorage.getItem('receipt-ocr-model')
@@ -114,6 +142,33 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
     if (err) window.alert(err)
   }
 
+  const handleBulkDelete = async () => {
+    const count = selectedIds.size
+    if (!window.confirm(`Delete ${count} receipt(s) from inbox?`)) return
+    setBulkDeleting(true)
+    const err = await onDeleteMany(Array.from(selectedIds))
+    setSelectedIds(new Set())
+    setBulkDeleting(false)
+    if (err) window.alert(err)
+  }
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(selectableRows.map((r) => r.id)))
+    } else {
+      setSelectedIds(new Set())
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   if (error) {
     return (
       <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
@@ -144,6 +199,17 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="flex items-center gap-1 rounded-md bg-rose-600/20 px-2 py-1 text-[10px] text-rose-400 hover:bg-rose-600/30 disabled:opacity-40"
+            >
+              {bulkDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+              Delete selected ({selectedIds.size})
+            </button>
+          )}
           {bulkParsing && (
             <span className="flex items-center gap-1 text-[10px] text-blue-400">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -178,6 +244,14 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 z-10 bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500">
               <tr>
+                <th className="w-8 px-2 py-2">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-indigo-500 accent-indigo-500"
+                    checked={selectableRows.length > 0 && selectedIds.size === selectableRows.length}
+                    onChange={(e) => toggleSelectAll(e.target.checked)}
+                  />
+                </th>
                 <th className="px-3 py-2">Upload Date</th>
                 <th className="px-2 py-2">By</th>
                 <th className="px-2 py-2">Supplier</th>
@@ -185,6 +259,8 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                 <th className="px-2 py-2 text-center">Model</th>
                 <th className="px-2 py-2 text-right">Cost</th>
                 <th className="px-2 py-2 text-center">Status</th>
+                <th className="px-2 py-2 text-center">Recognized</th>
+                <th className="px-2 py-2">Invoice #</th>
                 <th className="px-2 py-2 text-center">Photo</th>
                 <th className="w-16 px-1 py-2" />
               </tr>
@@ -197,31 +273,36 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parsed_payload shape is dynamic
                 const pp = r.parsed_payload as Record<string, any> | null
 
-                // Use parsed data for supplier/amount if available
                 const supplier = pp?.supplier_name || r.supplier_hint || '\u2014'
                 const amount = pp?.amount_original ?? r.amount_hint
 
-                const dateStr = new Date(r.created_at).toLocaleString('ru-RU', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                })
                 return (
-                  <>
+                  <Fragment key={r.id}>
                     <tr
-                      key={r.id}
                       className={`hover:bg-slate-800/30 ${canExpand ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-slate-800/40' : ''}`}
                       onClick={() => canExpand && setExpandedId(isExpanded ? null : r.id)}
                     >
+                      {/* Checkbox */}
+                      <td className="px-2 py-2.5">
+                        {!r.expense_id ? (
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-indigo-500 accent-indigo-500"
+                            checked={selectedIds.has(r.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => toggleSelect(r.id)}
+                          />
+                        ) : (
+                          <span className="inline-block w-3.5" />
+                        )}
+                      </td>
+                      {/* Upload date */}
                       <td className="px-3 py-2.5 text-slate-300">
                         <span className="flex items-center gap-1">
                           {canExpand && (
                             <ChevronRight className={`h-3 w-3 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                           )}
-                          {dateStr}
+                          {fmtDateTime(r.created_at)}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-slate-200 font-medium">{r.uploaded_by}</td>
@@ -244,6 +325,15 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                           {badge.label}
                         </span>
                       </td>
+                      {/* Recognized date */}
+                      <td className="px-2 py-2.5 text-center text-[10px] text-slate-500">
+                        {r.parsed_at ? fmtDateShort(r.parsed_at) : '—'}
+                      </td>
+                      {/* Invoice # */}
+                      <td className="px-2 py-2.5 text-[10px] text-slate-400 truncate max-w-[80px]">
+                        {pp?.invoice_number || '—'}
+                      </td>
+                      {/* Photo */}
                       <td className="px-2 py-2.5">
                         <div className="flex items-center justify-center gap-1">
                           {r.photo_urls.slice(0, 3).map((url, i) => (
@@ -267,6 +357,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                           )}
                         </div>
                       </td>
+                      {/* Actions */}
                       <td className="px-1 py-2.5">
                         <div className="flex items-center justify-center gap-1">
                           {!r.expense_id && r.model_used !== 'claude-subscription' && (
@@ -317,13 +408,13 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                       </td>
                     </tr>
                     {isExpanded && r.parsed_payload && (
-                      <tr key={`${r.id}-review`}>
-                        <td colSpan={9} className="border-t border-indigo-500/20 bg-slate-900/80 px-0 py-0">
+                      <tr>
+                        <td colSpan={12} className="border-t border-indigo-500/20 bg-slate-900/80 px-0 py-0">
                           <InboxReviewPanel row={r} onApprove={onApprove} onSkip={onSkip} onReopen={onReopen} />
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 )
               })}
             </tbody>
