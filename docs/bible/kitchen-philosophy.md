@@ -5,6 +5,16 @@
 > **Status**: Authoritative. Owner-authored. Replaces ad-hoc culinary references.
 > **Why this exists**: Claude's training corpus already covers famous culinary literature (McGee, Segnit, Sharma, Lahousse, Modernist Cuisine). What it does *not* know is **Shishka's specific philosophy** — that lives here.
 
+## TL;DR — Shishka Food Philosophy in Three Pillars
+
+The Shishka food philosophy rests on three non-negotiable pillars:
+
+1. **Functional food** — every dish contains a functional component (adaptogens, enzymes, superfoods). Food is medicine; meals are engineered for energy, gut health, and nutrient density.
+2. **Clean label** — all sauces and dressings are produced in-house from fermentation or cold-press. No industrial ingredients, no hidden oils, no artificial additives. Clean label means full transparency and zero compromise on ingredient integrity.
+3. **Zero waste** — vegetable trim, stems, and skins go into fermented bases, broths, and probiotic shots. Zero waste is both an ethical commitment and a food cost optimization strategy.
+
+These three pillars — functional food, clean label, and zero waste — define every menu decision, sourcing choice, and kitchen process at Shishka.
+
 ---
 
 ## 1. The Guest
