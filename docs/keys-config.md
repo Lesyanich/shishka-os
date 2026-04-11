@@ -17,8 +17,8 @@
 
 | Secret | Used By | Notes |
 |---|---|---|
-| `VITE_SUPABASE_URL` | Frontend (.env) | Public URL |
-| `VITE_SUPABASE_ANON_KEY` | Frontend (.env) | Public anon key |
+| `VITE_SUPABASE_URL` | Frontend (.env.local) | Public URL |
+| `VITE_SUPABASE_ANON_KEY` | Frontend (.env.local) | Public anon key |
 | `SUPABASE_URL` | Edge Functions | Same as VITE_ |
 | `SUPABASE_SERVICE_ROLE_KEY` | Edge Functions | For RLS bypass in update-receipt-job |
 | `GAS_WEB_APP_URL` | Edge Function (parse-receipts) | Pinned GAS deployment URL |
@@ -43,7 +43,7 @@ Every secret has exactly **one** file that holds the real value. Other services 
 | Secret | SSoT File | Consumers | Loading Pattern |
 |---|---|---|---|
 | `DATABASE_URL` (Supabase Postgres) | `services/lightrag/db-url.local` (gitignored) | LightRAG (`run-server.sh`) | shell-source + URL parser |
-| `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` | `apps/admin-panel/.env` | admin-panel (Vite) | Vite auto-load. Public-by-design (anon key ships in browser bundle); RLS is the protection layer. |
+| `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` | `apps/admin-panel/.env.local` (gitignored) | admin-panel (Vite) | Vite auto-load. Public-by-design (anon key ships in browser bundle); RLS is the protection layer. Copy from `.env.example`. |
 | `SUPABASE_SERVICE_ROLE_KEY` | macOS Keychain (item: `SUPABASE_SERVICE_ROLE_KEY`) / CI secrets (never committed) | MCP services, Edge Functions | `scripts/launch-*-mcp.sh` wrappers read from keychain via `security find-generic-password -s "SUPABASE_SERVICE_ROLE_KEY" -w`, GitHub Secrets in CI |
 
 **Rules:**

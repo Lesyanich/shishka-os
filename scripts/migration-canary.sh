@@ -34,6 +34,15 @@ validate_migration() {
     issues+=("Missing self-register INSERT INTO migration_log")
   fi
 
+  # 1b. Checksum must be NULL in self-register (RULE-MIGRATION-TRACKING)
+  if grep -Eq "INSERT INTO (public\.)?migration_log" "$file" && grep -Eq "md5\('" "$file"; then
+    # Allow references to md5() in comments or UPDATE statements (e.g. 101, 108)
+    # Only flag if md5() appears in the INSERT VALUES clause
+    if grep -A5 "INSERT INTO.*migration_log" "$file" | grep -q "md5('"; then
+      issues+=("Self-register uses md5('filename') — must use NULL checksum (RULE-MIGRATION-TRACKING)")
+    fi
+  fi
+
   # 2. Safe DDL patterns
   if grep -qi 'ALTER TABLE.*ADD COLUMN' "$file" && ! grep -qi 'IF NOT EXISTS\|ADD COLUMN IF NOT EXISTS' "$file"; then
     warns+=("ADD COLUMN without IF NOT EXISTS — may fail on re-run")
