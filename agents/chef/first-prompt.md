@@ -11,7 +11,8 @@
 3. Прочитай `agents/chef/menu-development.md` — текущий план меню.
 4. Прочитай `agents/chef/kitchen-journal.md` — дневник кухни.
 5. Прочитай `agents/chef/domain/chef-preferences.md` — мои правила.
-6. Проверь что уже есть в БД: `search_products` по каждому типу (RAW, PF, MOD, SALE).
+6. MemPalace wake-up: запроси `mempalace_kg_query(wing="wing_kitchen", limit=10)` — что мы обсуждали в прошлых сессиях, какие решения приняли. Если wing пуст — ОК, контент накопится.
+7. Проверь что уже есть в БД: `search_products` по каждому типу (RAW, PF, MOD, SALE).
 
 После этого покажи мне:
 - Краткую сводку: сколько позиций в menu-development.md по статусам (💡/🧪/✅/📦)

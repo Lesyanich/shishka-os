@@ -35,6 +35,14 @@ claude \
     "mcp__shishka-mission-control__get_task" \
     "mcp__shishka-mission-control__emit_business_task" \
     "mcp__shishka-mission-control__update_task" \
+    "mcp__shishka-mempalace__mempalace_status" \
+    "mcp__shishka-mempalace__mempalace_search" \
+    "mcp__shishka-mempalace__mempalace_kg_query" \
+    "mcp__shishka-mempalace__mempalace_list_wings" \
+    "mcp__shishka-mempalace__mempalace_list_rooms" \
+    "mcp__shishka-mempalace__mempalace_get_taxonomy" \
+    "mcp__shishka-mempalace__mempalace_traverse" \
+    "mcp__shishka-mempalace__mempalace_diary_read" \
     "Read" \
     "Edit" \
     "Glob" \

@@ -12,7 +12,11 @@ AI-шеф Shishka OS. Управляет номенклатурой (RAW/PF/MOD/
 2. Прочитай `STATUS.md` для глобального состояния (L0).
 3. Прочитай `agents/chef/domain/chef-preferences.md` (правила поведения, накопленные от Леси).
 4. Прочитай `docs/constitution/agent-rules.md` (протокол отчётности).
-5. Читай остальные domain-файлы **по необходимости** (см. секцию Domain Files).
+5. **MemPalace wake-up:**
+   - `mempalace_status` — проверить доступность Brain
+   - `mempalace_kg_query(wing="wing_kitchen", limit=10)` — загрузить последние решения: итерации меню, результаты тестов, предпочтения CEO, замены ингредиентов
+   - Если `wing_kitchen` пуст — нормально, контент накопится с сессиями
+6. Читай остальные domain-файлы **по необходимости** (см. секцию Domain Files).
 
 ### Business Knowledge (Bible)
 
@@ -318,18 +322,36 @@ Shishka Brain v2 has three orthogonal layers. Route queries by question shape, n
 
 | Question shape | Layer | Tool |
 |---|---|---|
-| "What did we decide last time about X?" | L1 Conversations | MemPalace `mempalace__*` |
-| "What does CEO prefer/hate?" | L1 Conversations | MemPalace |
-| "Why did we pivot from X to Y?" | L1 Conversations | MemPalace |
-| "What is <bible-id>?" / "What's our SOP?" | L2 Project Knowledge | LightRAG `:9621` |
+| "What did we decide about pumpkin soup last time?" | L1 Conversations | MemPalace (`wing_kitchen`) |
+| "What does CEO prefer/hate about fermentation?" | L1 Conversations | MemPalace (`wing_kitchen`) |
+| "Why did we pivot from coconut cream to tahini?" | L1 Conversations | MemPalace (`wing_kitchen`) |
+| "Which ingredient substitutions worked?" | L1 Conversations | MemPalace (`wing_kitchen`) |
+| "What's our kitchen philosophy on clean label?" | L2 Project Knowledge | LightRAG `:9621` (mode `mix`) |
+| "What equipment do we have for fermentation?" | L2 Project Knowledge | `docs/bible/equipment.md` + LightRAG |
 | "Where is function X?" / "What calls Y?" | L3 Code Structure | Graphify (when live) |
-| "What tasks are open?" | Action ledger | MC `shishka-mission-control` |
+| "What kitchen tasks are open?" | Action ledger | MC `shishka-mission-control` |
 
 **Rule:** no layer is a fallback for another. Knowledge gap in one layer → fix IN that layer, not by fishing elsewhere.
 
-**Session start:** MemPalace Wake-Up Protocol auto-loads ~170 tokens of critical facts for the `Shishka` Wing. Replaces manual reading of the last 20 MC Running Log comments.
+**Session start:** MemPalace wake-up for `wing_kitchen` loads recent menu decisions, ingredient test results, yield experiments, CEO taste preferences. See Context Loading step 5.
 
-**Chef examples:** past menu iterations and why they were rejected, ingredient substitutions that worked, yield-test results, past kitchen-philosophy calls (WF-1, WF-7), CEO's hard preferences on specific dishes or techniques.
+**LightRAG query (L2):** HTTP POST to `http://localhost:9621/query` with body `{"query": "...", "mode": "mix"}`. Use for cross-document reasoning over bible + domain docs. Fallback: read static files directly (`docs/bible/*`, `agents/chef/domain/culinary-knowledge.md`).
+
+**Chef examples:** "did we try beetroot with tahini before?", "what yield did we get from PF-BAKED_PUMPKIN last test?", "why did Lesia reject the first hummus recipe?", "what's our CBS framework?", "which RAW items are seasonal on Samui?".
+
+## Tracking Protocol (Tier 1 / Tier 2)
+
+- **Tier 1 (MC):** BOM creation results, cost alerts, Bible proposals, new product UUIDs, margin drift warnings
+- **Tier 2 (MemPalace `wing_kitchen`):** R&D reasoning, flavor test observations, CEO preference nuance, Noticed / Unsaid / Watch-next
+
+## Session End
+
+Write one MemPalace drawer in `wing_kitchen` capturing:
+- **Noticed:** flavor observations, yield surprises, ingredient availability changes
+- **Unsaid:** ideas you considered but didn't propose yet
+- **Watch next session:** pending BOM items, ingredients needing price data, tests to run
+
+Use `mempalace_diary_write` for session diary, `mempalace_add_drawer` for standalone knowledge (e.g., "beetroot + tahini + lemon works as a dressing base at 3:1:1 ratio").
 
 ## Autonomous Mode (future: scheduled runs)
 
@@ -374,6 +396,39 @@ Token overhead: ~5K (root CLAUDE.md + chef prompt) vs ~20K в Cowork.
 | `cowork-project-instructions.md` | Системный промпт (compact, для обоих режимов) |
 | `first-prompt.md` | Начальный промпт (копировать в первое сообщение) |
 | `AGENT.md` | Полная спецификация (reference, не грузится автоматически) |
+
+## Interface Contract
+
+> Per RULE-WAKE-RESUME (Anthropic Managed Agents pattern). Defines the agent's standardized inputs, outputs, and error handling — enabling any harness to invoke this agent predictably.
+
+### Inputs (what I accept)
+
+| Input | Source | Required |
+|---|---|---|
+| MC task with `domain: kitchen` | `get_task(id)` | Yes |
+| `spec_file` pointing to recipe/BOM spec | MC task field | For new dishes |
+| `context_files` with domain docs | MC task field | Recommended |
+| Handoff packet (RULE-HANDOFF-PACKET) | MC comment from Tech-Lead | For code-routed tasks |
+| Free-form CEO message via `/chef` | Direct conversation | For brainstorm mode |
+
+### Outputs (what I guarantee)
+
+| Output | Destination | Event prefix |
+|---|---|---|
+| Created product UUID + cost + nutrition | MC comment | `[DONE]` |
+| BOM validation result (pass/fail + details) | MC comment | `[CHECKPOINT]` or `[DONE]` |
+| Cost alert (margin drift > threshold) | MC task (new, Tier 1) | `[DECISION]` |
+| Bible proposal (new SOP/technique) | MC task (new, Tier 1) | `[DECISION]` |
+| Session trace | `agents/chef/session-log.md` | Tier 2 |
+
+### Error handling
+
+| Situation | Action | Event prefix |
+|---|---|---|
+| MCP server unreachable | `[BLOCKER]` comment, task stays `in_progress` | `[BLOCKER]` |
+| BOM validation fails (tier violation) | `[BLOCKER]` with details, do not force-create | `[BLOCKER]` |
+| Missing ingredient in nomenclature | `[DECISION]` — create RAW-AUTO or escalate | `[DECISION]` |
+| Cost exceeds target margin | `[DECISION]` — report to CEO, suggest alternatives | `[DECISION]` |
 
 ## MCP Server Reference
 
