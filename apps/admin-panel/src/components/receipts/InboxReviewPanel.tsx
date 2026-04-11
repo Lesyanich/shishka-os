@@ -121,6 +121,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [capexChecked, setCapexChecked] = useState<Set<number>>(() => new Set())
   const [opexChecked, setOpexChecked] = useState<Set<number>>(() => new Set())
 
+  // ── Image viewer ──
+  const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0)
+
   // ── Edit mode per row ──
   const [editingRows, setEditingRows] = useState<Set<string>>(() => new Set())
 
@@ -355,26 +358,46 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   )
 
   return (
-    <div className="space-y-4 px-4 py-4">
-      {/* ── Header: receipt summary + images ── */}
-      <div className="flex gap-4">
-        {/* Images */}
-        <div className="flex flex-shrink-0 gap-2">
-          {row.photo_urls.map((url, i) => (
-            <a
-              key={i}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block h-28 w-20 overflow-hidden rounded-lg border border-slate-700 bg-slate-800 hover:border-indigo-500/50"
-            >
-              <img src={url} alt={`page ${i + 1}`} className="h-full w-full object-cover" />
-            </a>
-          ))}
-        </div>
+    <div className="flex">
+      {/* ── LEFT: Image viewer (sticky) ── */}
+      <div className="w-[340px] shrink-0 self-start sticky top-0 border-r border-slate-800 bg-slate-900/90 p-3">
+        <button
+          type="button"
+          onClick={() => window.open(row.photo_urls[selectedPhotoIdx], '_blank')}
+          className="block w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 hover:border-indigo-500/50 cursor-zoom-in"
+        >
+          <img
+            src={row.photo_urls[selectedPhotoIdx]}
+            alt="Receipt"
+            className="h-[500px] w-full object-contain"
+          />
+        </button>
+        {row.photo_urls.length > 1 && (
+          <div className="mt-2 flex items-center justify-center gap-1.5">
+            {row.photo_urls.map((url, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setSelectedPhotoIdx(i)}
+                className={`h-14 w-10 overflow-hidden rounded border ${i === selectedPhotoIdx ? 'border-indigo-500 ring-1 ring-indigo-500/50' : 'border-slate-700 hover:border-slate-500'} bg-slate-800`}
+              >
+                <img src={url} alt={`page ${i + 1}`} className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
+        {row.photo_urls.length > 1 && (
+          <p className="mt-1 text-center text-[9px] text-slate-600">
+            Page {selectedPhotoIdx + 1} of {row.photo_urls.length}
+          </p>
+        )}
+      </div>
 
-        {/* Summary */}
-        <div className="flex-1 space-y-2">
+      {/* ── RIGHT: Parsed data ── */}
+      <div className="flex-1 space-y-4 px-4 py-4">
+      {/* ── Header: receipt summary ── */}
+      <div>
+        <div className="space-y-2">
           <div className="flex items-center gap-2">
             {editingHeader ? (
               <input
@@ -882,6 +905,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           <span>{p.currency ?? 'THB'} | {p.flow_type} | cat {p.category_code ?? '\u2014'}</span>
         </div>
       </div>
+    </div>
     </div>
   )
 }

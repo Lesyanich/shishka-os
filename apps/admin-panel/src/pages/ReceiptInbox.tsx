@@ -3,7 +3,7 @@ import { InboxUploader } from '../components/receipts/InboxUploader'
 import { InboxList } from '../components/receipts/InboxList'
 
 export function ReceiptInbox() {
-  const { rows, isLoading, error, refetch, insert, parseReceipt, approve, skip, reopen, resetToPending, deleteRow, deleteManyRows } = useReceiptInbox()
+  const { rows, isLoading, error, refetch, insert, parseReceipt, approve, skip, reopen, resetToPending, deleteRow, deleteManyRows, approveManyRows } = useReceiptInbox()
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -31,6 +31,7 @@ export function ReceiptInbox() {
         onResetToPending={resetToPending}
         onDelete={deleteRow}
         onDeleteMany={deleteManyRows}
+        onApproveMany={approveManyRows}
       />
     </div>
   )

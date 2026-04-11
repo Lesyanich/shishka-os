@@ -50,6 +50,7 @@ export interface UseReceiptInboxResult {
   resetToPending: (inboxId: string) => Promise<string | null>
   deleteRow: (inboxId: string) => Promise<string | null>
   deleteManyRows: (ids: string[]) => Promise<string | null>
+  approveManyRows: (ids: string[]) => Promise<{ ok: number; failed: number; errors: string[] }>
   syncStatus: (inboxId: string) => Promise<string | null>
 }
 
@@ -280,6 +281,44 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     return null
   }, [deleteRow])
 
+  const approveManyRows = useCallback(async (ids: string[]): Promise<{ ok: number; failed: number; errors: string[] }> => {
+    const result = { ok: 0, failed: 0, errors: [] as string[] }
+    for (const id of ids) {
+      // Find the row in current state
+      const row = rows.find((r) => r.id === id)
+      if (!row) { result.failed++; result.errors.push(`${id.slice(0, 8)}: not found`); continue }
+      if (row.status !== 'parsed') { result.failed++; result.errors.push(`${id.slice(0, 8)}: status is ${row.status}, not parsed`); continue }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pp = row.parsed_payload as Record<string, any> | null
+      if (!pp) { result.failed++; result.errors.push(`${id.slice(0, 8)}: no parsed data`); continue }
+
+      // Validate minimum fields
+      if (!pp.supplier_name || !pp.transaction_date || !pp.amount_original || pp.amount_original <= 0) {
+        result.failed++; result.errors.push(`${id.slice(0, 8)}: missing supplier/date/amount`); continue
+      }
+      const hasItems = (pp.food_items?.length || 0) + (pp.capex_items?.length || 0) + (pp.opex_items?.length || 0)
+      if (!hasItems) { result.failed++; result.errors.push(`${id.slice(0, 8)}: no items`); continue }
+
+      // Build payload (same as InboxReviewPanel.handleApproveConfirm)
+      const photos = row.photo_urls || []
+      const payload = {
+        ...pp,
+        receipt_supplier_url: pp.receipt_supplier_url || photos[0] || null,
+        receipt_bank_url: pp.receipt_bank_url || (photos[1] && photos[1] !== photos[0] ? photos[1] : null),
+        tax_invoice_url: pp.tax_invoice_url || (pp.has_tax_invoice && photos.length > 1 ? photos[1] : null),
+      }
+
+      const res = await approve(id, payload)
+      if (res.ok) {
+        result.ok++
+      } else {
+        result.failed++
+        result.errors.push(`${id.slice(0, 8)}: ${res.error || 'unknown error'}`)
+      }
+    }
+    return result
+  }, [rows, approve])
+
   const syncStatus = useCallback(async (inboxId: string): Promise<string | null> => {
     const { data, error: err } = await supabase.rpc('fn_sync_inbox_status', {
       p_inbox_id: inboxId,
@@ -295,5 +334,5 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     return null
   }, [])
 
-  return { rows, isLoading, error, refetch: fetchData, insert, parseReceipt, approve, skip, reopen, resetToPending, deleteRow, deleteManyRows, syncStatus }
+  return { rows, isLoading, error, refetch: fetchData, insert, parseReceipt, approve, skip, reopen, resetToPending, deleteRow, deleteManyRows, approveManyRows, syncStatus }
 }

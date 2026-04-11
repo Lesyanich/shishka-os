@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { Brain, ChevronRight, Loader2, Play, RefreshCcw, Trash2, Zap } from 'lucide-react'
+import { Brain, Check, ChevronRight, Loader2, Play, RefreshCcw, Trash2, Zap } from 'lucide-react'
 import type { InboxRow, OcrModel } from '../../hooks/useReceiptInbox'
 import { InboxReviewPanel } from './InboxReviewPanel'
 
@@ -53,6 +53,7 @@ interface InboxListProps {
   onResetToPending: (inboxId: string) => Promise<string | null>
   onDelete: (inboxId: string) => Promise<string | null>
   onDeleteMany: (ids: string[]) => Promise<string | null>
+  onApproveMany: (ids: string[]) => Promise<{ ok: number; failed: number; errors: string[] }>
 }
 
 /* ────────────────────────── Date helpers ────────────────────────── */
@@ -73,7 +74,7 @@ function fmtDateShort(iso: string) {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprove, onSkip, onReopen, onResetToPending, onDelete, onDeleteMany }: InboxListProps) {
+export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprove, onSkip, onReopen, onResetToPending, onDelete, onDeleteMany, onApproveMany }: InboxListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [parsingId, setParsingId] = useState<string | null>(null)
@@ -81,9 +82,12 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
   const [rowModels, setRowModels] = useState<Record<string, OcrModel>>({})
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkApproving, setBulkApproving] = useState(false)
+  const [selectedParsing, setSelectedParsing] = useState<{ current: number; total: number } | null>(null)
 
   const selectableRows = rows.filter((r) => !r.expense_id)
   const pendingRows = rows.filter((r) => r.status === 'pending' && r.model_used !== 'claude-subscription')
+  const selectedParsedCount = rows.filter((r) => selectedIds.has(r.id) && r.status === 'parsed').length
 
   // Clean up stale selections when rows change
   useEffect(() => {
@@ -152,6 +156,48 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
     if (err) window.alert(err)
   }
 
+  const handleBulkParseSelected = async () => {
+    const ids = Array.from(selectedIds)
+    const parseable = ids.filter((id) => {
+      const r = rows.find((row) => row.id === id)
+      return r && !r.expense_id && r.model_used !== 'claude-subscription'
+    })
+    if (parseable.length === 0) return
+    const defaultModel = getSelectedModel()
+    if (defaultModel === 'claude-sub') {
+      window.alert('Select an API model for parsing')
+      return
+    }
+    if (!window.confirm(`Parse ${parseable.length} receipt(s)?`)) return
+
+    setSelectedParsing({ current: 0, total: parseable.length })
+    for (let i = 0; i < parseable.length; i++) {
+      setSelectedParsing({ current: i + 1, total: parseable.length })
+      const id = parseable[i]
+      const model = rowModels[id] || defaultModel
+      await onResetToPending(id)
+      await onParse(id, model)
+    }
+    setSelectedParsing(null)
+    setSelectedIds(new Set())
+  }
+
+  const handleBulkApprove = async () => {
+    const parsedIds = Array.from(selectedIds).filter((id) => {
+      const r = rows.find((row) => row.id === id)
+      return r?.status === 'parsed'
+    })
+    if (parsedIds.length === 0) return
+    if (!window.confirm(`Approve ${parsedIds.length} receipt(s) to expense ledger?`)) return
+    setBulkApproving(true)
+    const result = await onApproveMany(parsedIds)
+    setBulkApproving(false)
+    setSelectedIds(new Set())
+    if (result.failed > 0) {
+      window.alert(`Approved: ${result.ok}, Failed: ${result.failed}\n${result.errors.join('\n')}`)
+    }
+  }
+
   const toggleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedIds(new Set(selectableRows.map((r) => r.id)))
@@ -208,6 +254,33 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
             >
               {bulkDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
               Delete selected ({selectedIds.size})
+            </button>
+          )}
+          {selectedIds.size > 0 && !selectedParsing && (
+            <button
+              type="button"
+              onClick={handleBulkParseSelected}
+              disabled={bulkDeleting || bulkApproving}
+              className="flex items-center gap-1 rounded-md bg-blue-600/20 px-2 py-1 text-[10px] text-blue-400 hover:bg-blue-600/30 disabled:opacity-40"
+            >
+              <Play className="h-3 w-3" /> Parse selected ({selectedIds.size})
+            </button>
+          )}
+          {selectedParsing && (
+            <span className="flex items-center gap-1 text-[10px] text-blue-400">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Parsing {selectedParsing.current}/{selectedParsing.total}
+            </span>
+          )}
+          {selectedIds.size > 0 && selectedParsedCount > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkApprove}
+              disabled={bulkDeleting || bulkApproving || !!selectedParsing}
+              className="flex items-center gap-1 rounded-md bg-emerald-600/20 px-2 py-1 text-[10px] text-emerald-400 hover:bg-emerald-600/30 disabled:opacity-40"
+            >
+              {bulkApproving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              Approve selected ({selectedParsedCount})
             </button>
           )}
           {bulkParsing && (
