@@ -22,6 +22,7 @@ import {
   ClipboardCheck,
   Rocket,
   UtensilsCrossed,
+  DollarSign,
   Settings,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -60,6 +61,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/finance/entry', icon: PlusCircle, label: 'New Entry', enabled: true },
   { path: '/finance/analytics', icon: BarChart3, label: 'Analytics', enabled: true },
   { path: '/receipts', icon: Inbox, label: 'Receipt Inbox', enabled: true },
+  { path: '/api-costs', icon: DollarSign, label: 'API Costs', enabled: true },
   { path: '/schedule', icon: CalendarClock, label: 'Schedule', enabled: true },
   { path: '/settings', icon: Settings, label: 'Settings', enabled: true },
 ]

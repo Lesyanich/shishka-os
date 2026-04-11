@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
-import { AlertCircle, ImagePlus, Loader2, Send, Trash2, Upload } from 'lucide-react'
+import { AlertCircle, Brain, ImagePlus, Loader2, Send, Trash2, Upload, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import type { InboxInsert } from '../../hooks/useReceiptInbox'
+import type { InboxInsert, OcrModel } from '../../hooks/useReceiptInbox'
 
 /* ────────────────────────── Constants ────────────────────────── */
 
@@ -9,6 +9,20 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 const WEBP_QUALITY = 0.65
 const ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 const UPLOADERS = ['Bas', 'Lesia', 'Admin'] as const
+
+const MODEL_OPTIONS: { value: OcrModel; label: string; desc: string }[] = [
+  { value: 'gemini-flash', label: 'Gemini Flash', desc: '~$0.004/чек, лучший' },
+  { value: 'gemini-pro', label: 'Gemini Pro', desc: '~$0.04/чек' },
+  { value: 'gpt-4o', label: 'GPT-4o', desc: '~$0.03/чек, быстрый' },
+  { value: 'claude-sonnet', label: 'Claude Sonnet', desc: '~$0.07/чек' },
+  { value: 'claude-sub', label: 'Подписка', desc: 'Очередь для агента, $0' },
+]
+
+function getStoredModel(): OcrModel {
+  const v = localStorage.getItem('receipt-ocr-model')
+  if (v === 'gemini-flash' || v === 'gemini-pro' || v === 'claude-sonnet' || v === 'gpt-4o' || v === 'claude-sub') return v
+  return 'gemini-flash'
+}
 
 /* ────────────────────────── Helpers ────────────────────────── */
 
@@ -82,11 +96,12 @@ async function uploadToStorage(
 
 interface InboxUploaderProps {
   onSubmit: (payload: InboxInsert) => Promise<string | null>
+  onParse?: (inboxId: string, model: OcrModel) => Promise<{ ok: boolean; error?: string }>
 }
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function InboxUploader({ onSubmit }: InboxUploaderProps) {
+export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
   const [files, setFiles] = useState<DroppedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -99,6 +114,7 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
   const [supplierHint, setSupplierHint] = useState('')
   const [amountHint, setAmountHint] = useState('')
   const [notes, setNotes] = useState('')
+  const [model, setModel] = useState<OcrModel>(getStoredModel)
 
   const addFiles = useCallback((incoming: FileList | File[]) => {
     const arr = Array.from(incoming).filter((f) => {
@@ -178,6 +194,7 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
         return
       }
 
+      const modelUsed = model === 'claude-sub' ? 'claude-subscription' : null
       const payload: InboxInsert = {
         uploaded_by: uploadedBy,
         photo_urls: photoUrls,
@@ -185,13 +202,23 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
         supplier_hint: supplierHint || null,
         amount_hint: amountHint ? Number(amountHint) : null,
         notes: notes || null,
+        model_used: modelUsed,
       }
 
       const err = await onSubmit(payload)
       if (err) {
         setToast({ type: 'err', msg: err })
+        return
+      }
+
+      if (model !== 'claude-sub' && onParse) {
+        // Get the newly inserted row ID — it's the latest one
+        // The insert callback already refetched, but we need the ID
+        // Fire Edge Function in background — Realtime will update status
+        setToast({ type: 'ok', msg: `Чек загружен! Распознавание через ${model === 'claude-sonnet' ? 'Claude Sonnet' : 'GPT-4o'}...` })
+        resetForm()
       } else {
-        setToast({ type: 'ok', msg: 'Чек загружен!' })
+        setToast({ type: 'ok', msg: model === 'claude-sub' ? 'Чек загружен в очередь для агента' : 'Чек загружен!' })
         resetForm()
       }
     } catch (err) {
@@ -344,6 +371,34 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
         </div>
       </div>
 
+      {/* ── Model selector ── */}
+      <div>
+        <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
+          Режим распознавания
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          {MODEL_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { setModel(opt.value); localStorage.setItem('receipt-ocr-model', opt.value) }}
+              className={`flex flex-col items-center gap-0.5 rounded-lg border px-2 py-2 text-center transition ${
+                model === opt.value
+                  ? 'border-blue-500 bg-blue-500/10 text-blue-300'
+                  : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+              }`}
+            >
+              {opt.value === 'gemini-pro' && <Zap className="h-4 w-4" />}
+              {opt.value === 'claude-sonnet' && <Brain className="h-4 w-4" />}
+              {opt.value === 'gpt-4o' && <Zap className="h-4 w-4" />}
+              {opt.value === 'claude-sub' && <Send className="h-4 w-4" />}
+              <span className="text-[11px] font-medium">{opt.label}</span>
+              <span className="text-[9px] text-slate-500">{opt.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Submit ── */}
       <button
         type="button"
@@ -356,7 +411,7 @@ export function InboxUploader({ onSubmit }: InboxUploaderProps) {
         ) : (
           <Send className="h-4 w-4" />
         )}
-        Загрузить чек
+        {model === 'claude-sub' ? 'В очередь для агента' : 'Загрузить и распознать'}
       </button>
 
       {/* ── Toast ── */}
