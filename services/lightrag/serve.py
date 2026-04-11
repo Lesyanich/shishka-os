@@ -125,6 +125,23 @@ class QueryLogMiddleware(BaseHTTPMiddleware):
             + llm_tokens_out * LLM_COST_OUT
         )
 
+        # Heuristic quality scoring (spec §3 Tier 0)
+        quality_score = 5
+        if error_text is not None:
+            quality_score = 1
+        elif chunks_returned == 0:
+            quality_score = 1
+        else:
+            if chunks_returned < 3:
+                quality_score -= 1
+            if latency_ms > 10000:
+                quality_score -= 1
+            response_lower = response_text.lower()
+            if "i don't have information" in response_lower or "no relevant" in response_lower:
+                quality_score = 2
+        quality_score = max(1, min(5, quality_score))
+        is_gap = quality_score <= 2 or chunks_returned == 0
+
         # Fire-and-forget INSERT
         asyncio.create_task(
             self._log_query(
@@ -138,6 +155,11 @@ class QueryLogMiddleware(BaseHTTPMiddleware):
                 cost_usd=cost_usd,
                 latency_ms=latency_ms,
                 error=error_text,
+                layer="L2",
+                response_preview=response_text[:500] if response_text else None,
+                quality_score=quality_score,
+                quality_source="heuristic",
+                is_gap=is_gap,
             )
         )
 
@@ -158,8 +180,10 @@ class QueryLogMiddleware(BaseHTTPMiddleware):
                     INSERT INTO brain_query_log
                         (agent_id, query_mode, query_preview, chunks_returned,
                          llm_tokens_in, llm_tokens_out, embed_tokens,
-                         cost_usd, latency_ms, error)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                         cost_usd, latency_ms, error,
+                         layer, response_preview, quality_score,
+                         quality_source, is_gap)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
                     """,
                     kwargs["agent_id"],
                     kwargs["query_mode"],
@@ -171,6 +195,11 @@ class QueryLogMiddleware(BaseHTTPMiddleware):
                     kwargs["cost_usd"],
                     kwargs["latency_ms"],
                     kwargs["error"],
+                    kwargs["layer"],
+                    kwargs["response_preview"],
+                    kwargs["quality_score"],
+                    kwargs["quality_source"],
+                    kwargs["is_gap"],
                 )
         except Exception as e:
             print(f"[query_log] Failed to log query: {e}", flush=True)
