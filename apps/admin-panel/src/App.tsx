@@ -41,6 +41,7 @@ const LightragGraph = lazy(() => import('./pages/brain').then(m => ({ default: m
 const BrainPlaceholder = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPlaceholder })))
 const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
 const MemPalaceBrowser = lazy(() => import('./pages/brain').then(m => ({ default: m.MemPalaceBrowser })))
+const QualityPage = lazy(() => import('./pages/brain').then(m => ({ default: m.QualityPage })))
 
 function PageLoader() {
   return (
@@ -123,6 +124,7 @@ function App() {
                       </Suspense>
                     }
                   />
+                  <Route path="quality" element={<Suspense fallback={<PageLoader />}><QualityPage /></Suspense>} />
                 </Route>
                 <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
                 <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
