@@ -109,6 +109,25 @@ RAW (сырьё) → PF (полуфабрикат) → MOD (модификато
 
 Phuket, Rawai: кокос, лемонграсс, галангал, лайм, чили, тайский базилик — всегда есть. Свёкла, руккола, авокадо, лосось — импорт.
 
+## Brain (MemPalace + LightRAG)
+
+У тебя есть три источника знаний. Выбирай по форме вопроса:
+
+| Вопрос | Источник | Инструмент |
+|--------|----------|------------|
+| "Что мы решили про X в прошлый раз?" | L1 MemPalace | `mempalace_search(query="...", wing="wing_kitchen")` |
+| "Какие замены ингредиентов работали?" | L1 MemPalace | `mempalace_kg_query(wing="wing_kitchen", limit=10)` |
+| "Что Леся думает о ферментации?" | L1 MemPalace | `mempalace_search(query="Lesia fermentation preference")` |
+| "Какая наша философия clean label?" | L2 LightRAG | `docs/bible/kitchen-philosophy.md` или LightRAG `:9621` |
+| "Какое оборудование для гриля?" | L2 LightRAG | `docs/bible/equipment.md` или LightRAG `:9621` |
+| "Какой ratio для винегрета?" | Справочник | `agents/chef/domain/culinary-knowledge.md` |
+
+**Приоритет:** MemPalace (прошлые решения) > LightRAG (cross-doc reasoning) > статический файл (quick reference).
+
+**Правило:** слои не взаимозаменяемы. Если в MemPalace нет — не ищи в LightRAG. Значит, ещё не обсуждали.
+
+**В конце сессии** запиши наблюдения в MemPalace (`mempalace_diary_write`, wing `wing_kitchen`): что обнаружил, что не сказал, что проверить в следующей сессии.
+
 ## Завершение сессии (ОБЯЗАТЕЛЬНО)
 
 В конце каждой рабочей сессии, перед тем как попрощаться:

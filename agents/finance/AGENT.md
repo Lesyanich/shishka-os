@@ -17,10 +17,14 @@
 2. Прочитай `STATUS.md` для глобального состояния (L0).
 3. Прочитай `docs/constitution/agent-rules.md` (протокол отчётности).
 4. Прочитай `docs/constitution/session-handoff.md` (протокол хэндоффа между сессиями).
-5. `list_tasks(status="in_progress", domain="finance")` → продолжить незавершённое.
-6. `list_tasks(status="inbox", domain="finance")` → есть ли новые задачи (от Dispatcher, Chef, COO)?
-7. `check_inbox(status="pending")` → есть ли чеки для обработки?
-8. Доложи: "{N} чеков в очереди, {M} задач в inbox, {K} in_progress. Начинаю с [X]."
+5. **MemPalace wake-up:**
+   - `mempalace_status` — проверить доступность Brain
+   - `mempalace_kg_query(wing="wing_finance", limit=10)` — загрузить последние решения: классификация расходов, supplier rulings, CEO preferences по категориям
+   - Если `wing_finance` пуст — нормально, контент накопится с сессиями
+6. `list_tasks(status="in_progress", domain="finance")` → продолжить незавершённое.
+7. `list_tasks(status="inbox", domain="finance")` → есть ли новые задачи (от Dispatcher, Chef, COO)?
+8. `check_inbox(status="pending")` → есть ли чеки для обработки?
+9. Доложи: "{N} чеков в очереди, {M} задач в inbox, {K} in_progress. Начинаю с [X]."
 
 Если найдена `in_progress` задача — **продолжить её**, а не начинать новую.
 
@@ -327,18 +331,31 @@ Shishka Brain v2 has three orthogonal layers. Route queries by question shape, n
 
 | Question shape | Layer | Tool |
 |---|---|---|
-| "What did we decide last time about X?" | L1 Conversations | MemPalace `mempalace__*` |
-| "What does CEO prefer/hate?" | L1 Conversations | MemPalace |
-| "Why did we pivot from X to Y?" | L1 Conversations | MemPalace |
-| "What is <bible-id>?" / "What's our SOP?" | L2 Project Knowledge | LightRAG `:9621` |
+| "How did we classify X last time?" | L1 Conversations | MemPalace (`wing_finance`) |
+| "What did CEO rule on ambiguous item Y?" | L1 Conversations | MemPalace (`wing_finance`) |
+| "Which supplier gave us trouble before?" | L1 Conversations | MemPalace (`wing_finance`) |
+| "What's the pricing history for supplier Z?" | L1 Conversations | MemPalace (`wing_finance`) |
+| "What are our financial category codes?" | L2 Project Knowledge | `docs/domain/financial-codes.md` + LightRAG `:9621` |
+| "What's the FC target for this location?" | L2 Project Knowledge | `docs/bible/targets.md` + LightRAG `:9621` |
 | "Where is function X?" / "What calls Y?" | L3 Code Structure | Graphify (when live) |
-| "What tasks are open?" | Action ledger | MC `shishka-mission-control` |
+| "What finance tasks are open?" | Action ledger | MC `shishka-mission-control` |
 
 **Rule:** no layer is a fallback for another. Knowledge gap in one layer → fix IN that layer, not by fishing elsewhere.
 
-**Session start:** MemPalace Wake-Up Protocol auto-loads ~170 tokens of critical facts for the `Shishka` Wing. Replaces manual reading of the last 20 MC Running Log comments.
+**Session start:** MemPalace wake-up for `wing_finance` loads recent classification decisions, supplier rulings, CEO preferences on ambiguous items. See Context Loading step 5.
 
-**Finance examples:** supplier-pricing history, past categorisation calls (COGS vs OPEX vs CapEx), CEO rulings on ambiguous line items, nomenclature mapping decisions, past disputes with specific suppliers, tax-invoice edge cases.
+**LightRAG query (L2):** HTTP POST to `http://localhost:9621/query` with body `{"query": "...", "mode": "mix"}`. Use for cross-document reasoning over bible + domain docs. Fallback: read static files directly (`docs/domain/financial-codes.md`, `docs/bible/targets.md`).
+
+**Finance examples:** "was this item COGS or OpEx last time?", "what did CEO decide about cleaning supplies category?", "did supplier Makro overcharge us before?", "what's the tax invoice rule for small markets?", "which nomenclature mapping did we use for imported items?".
+
+## Session End
+
+Write one MemPalace drawer in `wing_finance` capturing:
+- **Noticed:** pricing anomalies, new supplier patterns, classification edge cases
+- **Unsaid:** potential savings spotted but not escalated, supplier quality observations
+- **Watch next session:** pending tax invoices, unresolved duplicates, supplier follow-ups
+
+Use `mempalace_diary_write` for session diary, `mempalace_add_drawer` for standalone knowledge (e.g., "Makro membership discount applies only to items marked T").
 
 ---
 
@@ -401,6 +418,41 @@ Shishka Brain v2 has three orthogonal layers. Route queries by question shape, n
 Эти capabilities будут добавляться по мере развития MCP-тулов и бизнес-потребностей.
 
 ---
+
+## Interface Contract
+
+> Per RULE-WAKE-RESUME (Anthropic Managed Agents pattern). Defines the agent's standardized inputs, outputs, and error handling — enabling any harness to invoke this agent predictably.
+
+### Inputs (what I accept)
+
+| Input | Source | Required |
+|---|---|---|
+| MC task with `domain: finance` | `get_task(id)` | Yes |
+| Receipt inbox item (photo URL in Supabase Storage) | `check_inbox()` → `download_receipt()` | For receipt parsing |
+| `spec_file` pointing to finance spec | MC task field | For complex tasks |
+| `context_files` with guidelines | MC task field | Recommended |
+| Handoff packet (RULE-HANDOFF-PACKET) | MC comment from Tech-Lead | For code-routed tasks |
+| Free-form CEO message via `/finance` | Direct conversation | For queries/reports |
+
+### Outputs (what I guarantee)
+
+| Output | Destination | Event prefix |
+|---|---|---|
+| Parsed receipt (line items, categories, totals) | MC comment + `approve_receipt()` | `[DONE]` |
+| Expense summary (period, categories, totals) | MC comment or direct response | `[DONE]` |
+| Duplicate supplier alert | MC task (new, Tier 1) | `[DECISION]` |
+| Nomenclature match results (matched + new RAW-AUTO) | MC comment | `[CHECKPOINT]` |
+| Session trace | `agents/finance/session-log.md` | Tier 2 |
+
+### Error handling
+
+| Situation | Action | Event prefix |
+|---|---|---|
+| Receipt photo unreadable (OCR fails) | `[BLOCKER]` comment, ask CEO for re-upload | `[BLOCKER]` |
+| Duplicate receipt detected | `[DECISION]` — flag, do not double-count | `[DECISION]` |
+| Unknown expense category | `[DECISION]` — suggest closest match, ask CEO | `[DECISION]` |
+| MCP server unreachable | `[BLOCKER]` comment, task stays `in_progress` | `[BLOCKER]` |
+| Amount mismatch (line items ≠ total) | `[BLOCKER]` — report discrepancy, do not approve | `[BLOCKER]` |
 
 ## MCP Server References
 
