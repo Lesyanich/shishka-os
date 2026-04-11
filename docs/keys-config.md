@@ -19,7 +19,6 @@
 |---|---|---|
 | `VITE_SUPABASE_URL` | Frontend (.env.local) | Public URL |
 | `VITE_SUPABASE_ANON_KEY` | Frontend (.env.local) | Public anon key |
-| `VITE_OPENAI_API_KEY` | Frontend (.env.local) | OpenAI key for Brain embeddings. **Rotate after this PR** — was exposed in git history. |
 | `SUPABASE_URL` | Edge Functions | Same as VITE_ |
 | `SUPABASE_SERVICE_ROLE_KEY` | Edge Functions | For RLS bypass in update-receipt-job |
 | `GAS_WEB_APP_URL` | Edge Function (parse-receipts) | Pinned GAS deployment URL |
