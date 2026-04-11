@@ -32,3 +32,12 @@ if [ -n "$CHANGED_FILES" ]; then
     echo "$BIBLE_DOMAIN" | sh "$REPO_ROOT/scripts/lightrag-reindex-changed.sh" &
   fi
 fi
+
+# ── Brain: MemPalace session-log auto-ingest ──
+if [ -n "$CHANGED_FILES" ]; then
+  SESSION_LOGS=$(echo "$CHANGED_FILES" | grep -E '^agents/.*/session-log\.md$' || true)
+  if [ -n "$SESSION_LOGS" ]; then
+    echo "[post-commit] Brain: MemPalace session-log ingest triggered"
+    sh "$REPO_ROOT/scripts/mempalace-ingest-session.sh" &
+  fi
+fi
