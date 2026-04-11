@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Check, X, Loader2, FolderOpen, Pencil, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Check, X, Loader2, FolderOpen, Pencil, Plus, Trash2, AlertTriangle, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
 import type { InboxRow } from '../../hooks/useReceiptInbox'
 import { supabase } from '../../lib/supabase'
 
@@ -121,8 +121,40 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [capexChecked, setCapexChecked] = useState<Set<number>>(() => new Set())
   const [opexChecked, setOpexChecked] = useState<Set<number>>(() => new Set())
 
-  // ── Image viewer ──
+  // ── Image viewer with zoom/pan ──
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0)
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
+  const imgContainerRef = useRef<HTMLDivElement>(null)
+
+  const resetView = useCallback(() => { setZoom(1); setPan({ x: 0, y: 0 }) }, [])
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    setZoom((prev) => Math.min(5, Math.max(0.5, prev + (e.deltaY < 0 ? 0.3 : -0.3))))
+  }, [])
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (zoom <= 1) return
+    e.preventDefault()
+    setIsDragging(true)
+    dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
+  }, [zoom, pan])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return
+    setPan({
+      x: dragStart.current.panX + (e.clientX - dragStart.current.x),
+      y: dragStart.current.panY + (e.clientY - dragStart.current.y),
+    })
+  }, [isDragging])
+
+  const handleMouseUp = useCallback(() => { setIsDragging(false) }, [])
+
+  // Reset zoom when switching photos
+  useEffect(() => { resetView() }, [selectedPhotoIdx, resetView])
 
   // ── Edit mode per row ──
   const [editingRows, setEditingRows] = useState<Set<string>>(() => new Set())
@@ -359,19 +391,66 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
 
   return (
     <div className="flex">
-      {/* ── LEFT: Image viewer (sticky) ── */}
+      {/* ── LEFT: Zoomable image viewer (sticky) ── */}
       <div className="w-[340px] shrink-0 self-start sticky top-0 border-r border-slate-800 bg-slate-900/90 p-3">
-        <button
-          type="button"
-          onClick={() => window.open(row.photo_urls[selectedPhotoIdx], '_blank')}
-          className="block w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 hover:border-indigo-500/50 cursor-zoom-in"
+        {/* Zoom controls */}
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.max(0.5, z - 0.5))}
+              className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+              title="Zoom out"
+            >
+              <ZoomOut className="h-3.5 w-3.5" />
+            </button>
+            <span className="min-w-[36px] text-center text-[10px] text-slate-500">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(5, z + 0.5))}
+              className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+              title="Zoom in"
+            >
+              <ZoomIn className="h-3.5 w-3.5" />
+            </button>
+            {zoom !== 1 && (
+              <button
+                type="button"
+                onClick={resetView}
+                className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+                title="Reset zoom"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <span className="text-[9px] text-slate-600">Scroll to zoom</span>
+        </div>
+
+        {/* Image container */}
+        <div
+          ref={imgContainerRef}
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={`h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
         >
           <img
             src={row.photo_urls[selectedPhotoIdx]}
             alt="Receipt"
-            className="h-[500px] w-full object-contain"
+            draggable={false}
+            className="h-full w-full select-none"
+            style={{
+              objectFit: 'contain',
+              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+              transformOrigin: 'center center',
+            }}
           />
-        </button>
+        </div>
+
+        {/* Page thumbnails */}
         {row.photo_urls.length > 1 && (
           <div className="mt-2 flex items-center justify-center gap-1.5">
             {row.photo_urls.map((url, i) => (
@@ -384,12 +463,10 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 <img src={url} alt={`page ${i + 1}`} className="h-full w-full object-cover" />
               </button>
             ))}
+            <p className="ml-1 text-[9px] text-slate-600">
+              {selectedPhotoIdx + 1}/{row.photo_urls.length}
+            </p>
           </div>
-        )}
-        {row.photo_urls.length > 1 && (
-          <p className="mt-1 text-center text-[9px] text-slate-600">
-            Page {selectedPhotoIdx + 1} of {row.photo_urls.length}
-          </p>
         )}
       </div>
 
