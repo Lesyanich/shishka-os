@@ -42,6 +42,7 @@ const BrainPlaceholder = lazy(() => import('./pages/brain').then(m => ({ default
 const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
 const MemPalaceBrowser = lazy(() => import('./pages/brain').then(m => ({ default: m.MemPalaceBrowser })))
 const QualityPage = lazy(() => import('./pages/brain').then(m => ({ default: m.QualityPage })))
+const ApiCostPage = lazy(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
 
 function PageLoader() {
   return (
@@ -103,6 +104,7 @@ function App() {
                   <Route path="analytics" element={<FinanceAnalytics />} />
                 </Route>
                 <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
+                <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
                 <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />

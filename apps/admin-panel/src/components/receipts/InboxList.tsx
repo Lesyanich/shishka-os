@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { ChevronRight, Loader2, RefreshCcw, Trash2 } from 'lucide-react'
-import type { InboxRow } from '../../hooks/useReceiptInbox'
+import { Brain, ChevronRight, Loader2, Play, RefreshCcw, RotateCcw, Trash2, Zap } from 'lucide-react'
+import type { InboxRow, OcrModel } from '../../hooks/useReceiptInbox'
 import { InboxReviewPanel } from './InboxReviewPanel'
 
 /* ────────────────────────── Status config ────────────────────────── */
@@ -16,22 +16,78 @@ const STATUS_BADGE: Record<InboxRow['status'], { label: string; cls: string }> =
 
 /* ────────────────────────── Props ────────────────────────── */
 
+/* ────────────────────────── Model badge helper ────────────────────────── */
+
+function ModelBadge({ model }: { model: string | null }) {
+  if (!model) return <span className="text-slate-600">—</span>
+  if (model.includes('gemini')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-400"><Zap className="h-2.5 w-2.5" />Gemini</span>
+  if (model.includes('sonnet')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-purple-400"><Brain className="h-2.5 w-2.5" />Sonnet</span>
+  if (model.includes('gpt-4o')) return <span className="inline-flex items-center gap-0.5 text-[9px] text-green-400"><Zap className="h-2.5 w-2.5" />GPT-4o</span>
+  if (model === 'claude-subscription') return <span className="text-[9px] text-slate-500">Подписка</span>
+  return <span className="text-[9px] text-slate-500">{model}</span>
+}
+
+/* ────────────────────────── Props ────────────────────────── */
+
 interface InboxListProps {
   rows: InboxRow[]
   isLoading: boolean
   error: string | null
   onRefetch: () => void
+  onParse: (inboxId: string, model: OcrModel) => Promise<{ ok: boolean; error?: string }>
   onApprove: (inboxId: string, payload: Record<string, unknown>) => Promise<{ ok: boolean; error?: string }>
   onSkip: (inboxId: string) => Promise<string | null>
   onReopen: (inboxId: string) => Promise<string | null>
+  onResetToPending: (inboxId: string) => Promise<string | null>
   onDelete: (inboxId: string) => Promise<string | null>
 }
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function InboxList({ rows, isLoading, error, onRefetch, onApprove, onSkip, onReopen, onDelete }: InboxListProps) {
+export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprove, onSkip, onReopen, onResetToPending, onDelete }: InboxListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [parsingId, setParsingId] = useState<string | null>(null)
+  const [bulkParsing, setBulkParsing] = useState<{ current: number; total: number } | null>(null)
+
+  const pendingRows = rows.filter((r) => r.status === 'pending' && r.model_used !== 'claude-subscription')
+
+  const getSelectedModel = (): OcrModel => {
+    const v = localStorage.getItem('receipt-ocr-model')
+    if (v === 'gemini-flash' || v === 'gemini-pro' || v === 'claude-sonnet' || v === 'gpt-4o' || v === 'claude-sub') return v
+    return 'gemini-flash'
+  }
+
+  const handleParse = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    const model = getSelectedModel()
+    if (model === 'claude-sub') {
+      window.alert('Выберите модель API (Sonnet или GPT-4o) для распознавания')
+      return
+    }
+    setParsingId(id)
+    const result = await onParse(id, model)
+    setParsingId(null)
+    if (!result.ok) window.alert(result.error)
+  }
+
+  const handleBulkParse = async () => {
+    const model: OcrModel = (localStorage.getItem('receipt-ocr-model') as OcrModel) || 'claude-sonnet'
+    if (model === 'claude-sub') {
+      window.alert('Выберите модель API (Sonnet ил�� GPT-4o) для пакетной обработки')
+      return
+    }
+    const cost = model === 'claude-sonnet' ? 0.05 : 0.03
+    const est = (pendingRows.length * cost).toFixed(2)
+    if (!window.confirm(`Распознать ${pendingRows.length} чеков через ${model === 'claude-sonnet' ? 'Claude Sonnet' : 'GPT-4o'}?\nОжидаемая стоимость: ~$${est}`)) return
+
+    setBulkParsing({ current: 0, total: pendingRows.length })
+    for (let i = 0; i < pendingRows.length; i++) {
+      setBulkParsing({ current: i + 1, total: pendingRows.length })
+      await onParse(pendingRows[i].id, model)
+    }
+    setBulkParsing(null)
+  }
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -71,13 +127,30 @@ export function InboxList({ rows, isLoading, error, onRefetch, onApprove, onSkip
             {rows.length}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onRefetch}
-          className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300"
-        >
-          <RefreshCcw className="h-3 w-3" /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {bulkParsing && (
+            <span className="flex items-center gap-1 text-[10px] text-blue-400">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {bulkParsing.current}/{bulkParsing.total}
+            </span>
+          )}
+          {pendingRows.length > 0 && !bulkParsing && (
+            <button
+              type="button"
+              onClick={handleBulkParse}
+              className="flex items-center gap-1 rounded-md bg-blue-600/20 px-2 py-1 text-[10px] text-blue-400 hover:bg-blue-600/30"
+            >
+              <Play className="h-3 w-3" /> Распознать все ({pendingRows.length})
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onRefetch}
+            className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300"
+          >
+            <RefreshCcw className="h-3 w-3" /> Refresh
+          </button>
+        </div>
       </header>
 
       {rows.length === 0 ? (
@@ -93,9 +166,11 @@ export function InboxList({ rows, isLoading, error, onRefetch, onApprove, onSkip
                 <th className="px-2 py-2">Кто</th>
                 <th className="px-2 py-2">Поставщик</th>
                 <th className="px-2 py-2 text-right">Сумма</th>
+                <th className="px-2 py-2 text-center">Модель</th>
+                <th className="px-2 py-2 text-right">Цена</th>
                 <th className="px-2 py-2 text-center">Статус</th>
                 <th className="px-2 py-2 text-center">Фото</th>
-                <th className="w-10 px-1 py-2" />
+                <th className="w-16 px-1 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
@@ -140,6 +215,14 @@ export function InboxList({ rows, isLoading, error, onRefetch, onApprove, onSkip
                           : '\u2014'}
                       </td>
                       <td className="px-2 py-2.5 text-center">
+                        <ModelBadge model={r.model_used} />
+                      </td>
+                      <td className="px-2 py-2.5 text-right text-[10px] text-slate-500">
+                        {r.parse_cost_usd != null && r.parse_cost_usd > 0
+                          ? `$${r.parse_cost_usd.toFixed(4)}`
+                          : '—'}
+                      </td>
+                      <td className="px-2 py-2.5 text-center">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-medium ${badge.cls}`}>
                           {badge.label}
                         </span>
@@ -167,29 +250,56 @@ export function InboxList({ rows, isLoading, error, onRefetch, onApprove, onSkip
                           )}
                         </div>
                       </td>
-                      <td className="px-1 py-2.5 text-center">
-                        {r.expense_id ? (
-                          <span className="text-[9px] text-emerald-500/50" title="Записан в систему">✓</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => handleDelete(e, r.id)}
-                            disabled={deletingId === r.id}
-                            className="rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-rose-400 disabled:opacity-40"
-                            title="Удалить чек"
-                          >
-                            {deletingId === r.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        )}
+                      <td className="px-1 py-2.5">
+                        <div className="flex items-center justify-center gap-1">
+                          {r.status === 'pending' && r.model_used !== 'claude-subscription' && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleParse(e, r.id)}
+                              disabled={parsingId === r.id || !!bulkParsing}
+                              className="rounded p-1 text-blue-500 hover:bg-blue-500/10 disabled:opacity-40"
+                              title="Распознать"
+                            >
+                              {parsingId === r.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Play className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          )}
+                          {(r.status === 'error' || r.status === 'processing') && (
+                            <button
+                              type="button"
+                              onClick={async (e) => { e.stopPropagation(); await onResetToPending(r.id) }}
+                              className="rounded p-1 text-amber-500 hover:bg-amber-500/10"
+                              title="Сбросить в ожидание"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {r.expense_id ? (
+                            <span className="text-[9px] text-emerald-500/50" title="Записан в систему">✓</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDelete(e, r.id)}
+                              disabled={deletingId === r.id}
+                              className="rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-rose-400 disabled:opacity-40"
+                              title="Удалить чек"
+                            >
+                              {deletingId === r.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                     {isExpanded && r.parsed_payload && (
                       <tr key={`${r.id}-review`}>
-                        <td colSpan={7} className="border-t border-indigo-500/20 bg-slate-900/80 px-0 py-0">
+                        <td colSpan={9} className="border-t border-indigo-500/20 bg-slate-900/80 px-0 py-0">
                           <InboxReviewPanel row={r} onApprove={onApprove} onSkip={onSkip} onReopen={onReopen} />
                         </td>
                       </tr>

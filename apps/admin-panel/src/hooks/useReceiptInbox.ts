@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 /* ────────────────────────── Types ────────────────────────── */
+
+export type OcrModel = 'gemini-flash' | 'gemini-pro' | 'claude-sonnet' | 'gpt-4o' | 'claude-sub'
 
 export interface InboxRow {
   id: string
@@ -18,6 +20,10 @@ export interface InboxRow {
   parsed_payload: Record<string, unknown> | null
   parsed_at: string | null
   gdrive_paths: string[] | null
+  model_used: string | null
+  parse_cost_usd: number | null
+  parse_tokens_in: number | null
+  parse_tokens_out: number | null
   created_at: string
 }
 
@@ -28,6 +34,7 @@ export interface InboxInsert {
   supplier_hint?: string | null
   amount_hint?: number | null
   notes?: string | null
+  model_used?: string | null
 }
 
 export interface UseReceiptInboxResult {
@@ -36,9 +43,11 @@ export interface UseReceiptInboxResult {
   error: string | null
   refetch: () => void
   insert: (payload: InboxInsert) => Promise<string | null>
+  parseReceipt: (inboxId: string, model: OcrModel) => Promise<{ ok: boolean; error?: string }>
   approve: (inboxId: string, payload: Record<string, unknown>) => Promise<{ ok: boolean; error?: string; expense_id?: string }>
   skip: (inboxId: string) => Promise<string | null>
   reopen: (inboxId: string) => Promise<string | null>
+  resetToPending: (inboxId: string) => Promise<string | null>
   deleteRow: (inboxId: string) => Promise<string | null>
   syncStatus: (inboxId: string) => Promise<string | null>
 }
@@ -82,14 +91,36 @@ export function useReceiptInbox(): UseReceiptInboxResult {
         parsed_payload: (r.parsed_payload ?? null) as Record<string, unknown> | null,
         parsed_at: (r.parsed_at ?? null) as string | null,
         gdrive_paths: (r.gdrive_paths ?? null) as string[] | null,
+        model_used: (r.model_used ?? null) as string | null,
+        parse_cost_usd: r.parse_cost_usd != null ? Number(r.parse_cost_usd) : null,
+        parse_tokens_in: r.parse_tokens_in != null ? Number(r.parse_tokens_in) : null,
+        parse_tokens_out: r.parse_tokens_out != null ? Number(r.parse_tokens_out) : null,
         created_at: r.created_at as string,
       })),
     )
     setIsLoading(false)
   }, [])
 
+  // ── Realtime subscription for live status updates ──
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
   useEffect(() => {
     fetchData()
+
+    const channel = supabase
+      .channel('receipt_inbox_changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'receipt_inbox' },
+        () => { fetchData() },
+      )
+      .subscribe()
+
+    channelRef.current = channel
+
+    return () => {
+      channel.unsubscribe()
+    }
   }, [fetchData])
 
   const insert = useCallback(async (payload: InboxInsert): Promise<string | null> => {
@@ -100,6 +131,33 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     }
     await fetchData()
     return null
+  }, [fetchData])
+
+  const parseReceipt = useCallback(async (inboxId: string, model: OcrModel): Promise<{ ok: boolean; error?: string }> => {
+    if (model === 'claude-sub') {
+      // Just mark as pending with claude-subscription model — agent will handle later
+      const { error: err } = await supabase
+        .from('receipt_inbox')
+        .update({ model_used: 'claude-subscription' })
+        .eq('id', inboxId)
+      if (err) return { ok: false, error: err.message }
+      await fetchData()
+      return { ok: true }
+    }
+
+    try {
+      // Invoke Edge Function (fire-and-forget style, Realtime picks up changes)
+      const { data, error: fnErr } = await supabase.functions.invoke(
+        `ocr-receipt?inbox_id=${inboxId}&model=${model}`,
+      )
+      if (fnErr) return { ok: false, error: fnErr.message }
+      if (data && !data.ok) return { ok: false, error: data.error || 'Parse failed' }
+      // Realtime will update the row, but also refetch to be safe
+      await fetchData()
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
   }, [fetchData])
 
   const approve = useCallback(async (inboxId: string, payload: Record<string, unknown>) => {
@@ -143,6 +201,16 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     return null
   }, [fetchData])
 
+  const resetToPending = useCallback(async (inboxId: string): Promise<string | null> => {
+    const { error: err } = await supabase
+      .from('receipt_inbox')
+      .update({ status: 'pending', error_message: null, model_used: null })
+      .eq('id', inboxId)
+    if (err) return err.message
+    await fetchData()
+    return null
+  }, [fetchData])
+
   const deleteRow = useCallback(async (inboxId: string): Promise<string | null> => {
     const { data, error: err } = await supabase.rpc('fn_delete_inbox_row', {
       p_inbox_id: inboxId,
@@ -163,5 +231,5 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     return null
   }, [fetchData])
 
-  return { rows, isLoading, error, refetch: fetchData, insert, approve, skip, reopen, deleteRow, syncStatus }
+  return { rows, isLoading, error, refetch: fetchData, insert, parseReceipt, approve, skip, reopen, resetToPending, deleteRow, syncStatus }
 }
