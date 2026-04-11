@@ -123,12 +123,28 @@ Code in git worktrees is **invisible to main**. Before ending a session that use
 
 Every migration file **must** end with a self-register `INSERT` into `migration_log`.
 
+**Checksum rule:** Self-register INSERTs **must** use `checksum = NULL`. A file cannot contain its own content hash (chicken-and-egg). `check_migrations.ts` tolerates NULL checksums — drift detection only fires when a non-NULL stored checksum mismatches the file-content MD5.
+
+**Never use `md5('filename_stem')`** — this produces a value that always mismatches the file-content hash, creating permanent false-positive drift.
+
+Template:
+```sql
+INSERT INTO migration_log (filename, applied_by, checksum, notes)
+VALUES (
+  'NNN_description.sql',
+  'claude-code',
+  NULL,
+  'Short description of what this migration does (MC task-id)'
+)
+ON CONFLICT DO NOTHING;
+```
+
 Workflow:
 1. Before applying a migration manually: run `check_migrations()` to see the pending list
 2. After applying: verify the migration registered itself — `check_migrations()` should show it as `applied`
 3. If a migration crashed mid-way: `INSERT` manually with `status='failed'` and `error_msg`
 
-> Origin: Migrations applied in production with no record of which had run. (Legacy: `Boris Rule #16` in `p0-rules.md`.)
+> Origin: Migrations applied in production with no record of which had run. (Legacy: `Boris Rule #16` in `p0-rules.md`.) Checksum rule added 2026-04-11 after migrations 094-100 caused permanent drift noise.
 
 ---
 
