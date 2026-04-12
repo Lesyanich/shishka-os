@@ -115,7 +115,7 @@ function App() {
                       <Suspense fallback={<PageLoader />}>
                         <BrainPlaceholder
                           icon={Code2}
-                          title="Graphify · L2+L3"
+                          title="Graphify"
                           phase="Installed — 1,750 nodes, 1,906 edges"
                           description="Multimodal knowledge graph (code + docs + bible). Interactive viewer coming soon."
                         />

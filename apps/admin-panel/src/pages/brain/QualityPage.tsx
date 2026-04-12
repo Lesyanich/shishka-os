@@ -307,7 +307,7 @@ export function QualityPage() {
                     </td>
                     <td className="py-1.5 pr-3">
                       <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">
-                        {q.layer ?? 'L2'}
+                        {q.layer ?? '—'}
                       </span>
                     </td>
                     <td className="py-1.5 pr-3 text-slate-300">{q.agent_id ?? '—'}</td>
