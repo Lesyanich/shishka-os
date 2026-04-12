@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   Search,
   Plus,
@@ -21,7 +21,14 @@ import {
   StickyNote,
   GitGraph,
   Trash2,
+  Loader2,
 } from 'lucide-react'
+import {
+  saveBrainNote,
+  listBrainNotes,
+  dismissBrainNote,
+  type BrainNote,
+} from '../../api/brainInbox'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -39,12 +46,6 @@ interface GraphNode {
 interface GraphData {
   nodes: GraphNode[]
   edges: { source: string; target: string; relation: string }[]
-}
-
-interface BrainNote {
-  id: string
-  text: string
-  ts: string
 }
 
 interface CategoryDef {
@@ -158,20 +159,6 @@ const CATEGORIES: CategoryDef[] = [
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const NOTES_KEY = 'shishka-brain-notes'
-
-function loadNotes(): BrainNote[] {
-  try {
-    return JSON.parse(localStorage.getItem(NOTES_KEY) || '[]')
-  } catch {
-    return []
-  }
-}
-
-function saveNotes(notes: BrainNote[]) {
-  localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
-}
-
 function categorizeNodes(nodes: GraphNode[]) {
   const result: { def: CategoryDef; nodes: GraphNode[] }[] = CATEGORIES.map((def) => ({
     def,
@@ -209,7 +196,9 @@ export function BrainKnowledgePage() {
   const [graphFullscreen, setGraphFullscreen] = useState(false)
   const [mode, setMode] = useState<'search' | 'add'>('search')
   const [noteText, setNoteText] = useState('')
-  const [notes, setNotes] = useState<BrainNote[]>(loadNotes)
+  const [notes, setNotes] = useState<BrainNote[]>([])
+  const [notesLoading, setNotesLoading] = useState(true)
+  const [notesSaving, setNotesSaving] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   // Load graph.json
@@ -220,6 +209,21 @@ export function BrainKnowledgePage() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  // Load notes from Supabase
+  const fetchNotes = useCallback(async () => {
+    try {
+      setNotesLoading(true)
+      const data = await listBrainNotes()
+      setNotes(data)
+    } catch {
+      // silent — notes are non-critical
+    } finally {
+      setNotesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchNotes() }, [fetchNotes])
 
   // Categorized nodes
   const { categories: cats, other } = useMemo(
@@ -261,21 +265,30 @@ export function BrainKnowledgePage() {
     return counts
   }, [graph])
 
-  // Add note
-  function addNote() {
-    if (!noteText.trim()) return
-    const note: BrainNote = { id: crypto.randomUUID(), text: noteText.trim(), ts: new Date().toISOString() }
-    const updated = [note, ...notes]
-    setNotes(updated)
-    saveNotes(updated)
-    setNoteText('')
-    setMode('search')
+  // Add note to Supabase
+  async function addNote() {
+    if (!noteText.trim() || notesSaving) return
+    setNotesSaving(true)
+    try {
+      await saveBrainNote(noteText.trim())
+      setNoteText('')
+      setMode('search')
+      await fetchNotes()
+    } catch {
+      // silent — user sees the note didn't appear
+    } finally {
+      setNotesSaving(false)
+    }
   }
 
-  function deleteNote(id: string) {
-    const updated = notes.filter((n) => n.id !== id)
-    setNotes(updated)
-    saveNotes(updated)
+  // Soft-delete: set status='dismissed'
+  async function deleteNote(id: string) {
+    setNotes((prev) => prev.filter((n) => n.id !== id))
+    try {
+      await dismissBrainNote(id)
+    } catch {
+      await fetchNotes() // revert optimistic update on error
+    }
   }
 
   // Selected category nodes
@@ -333,9 +346,14 @@ export function BrainKnowledgePage() {
           {mode === 'add' && noteText && (
             <button
               onClick={addNote}
-              className="rounded-lg bg-amber-500/20 px-3 py-1 text-xs font-medium text-amber-300 transition hover:bg-amber-500/30"
+              disabled={notesSaving}
+              className="rounded-lg bg-amber-500/20 px-3 py-1 text-xs font-medium text-amber-300 transition hover:bg-amber-500/30 disabled:opacity-50"
             >
-              <Save className="inline-block h-3 w-3 mr-1" />
+              {notesSaving ? (
+                <Loader2 className="inline-block h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <Save className="inline-block h-3 w-3 mr-1" />
+              )}
               Save
             </button>
           )}
@@ -413,19 +431,22 @@ export function BrainKnowledgePage() {
       )}
 
       {/* ─── Notes (if any) ─── */}
-      {notes.length > 0 && !search && (
+      {!search && (notesLoading || notes.length > 0) && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
           <h3 className="mb-2 flex items-center gap-2 text-xs font-medium text-amber-400">
             <StickyNote className="h-3.5 w-3.5" />
-            My notes ({notes.length})
-            <span className="text-[10px] font-normal text-amber-600">localStorage — sync coming soon</span>
+            My notes {!notesLoading && `(${notes.length})`}
+            {notesLoading && <Loader2 className="h-3 w-3 animate-spin text-amber-600" />}
           </h3>
+          {!notesLoading && notes.length === 0 && (
+            <p className="py-2 text-xs text-slate-600">No notes yet. Switch to + Note mode to add one.</p>
+          )}
           <div className="space-y-1.5">
             {notes.slice(0, 5).map((n) => (
               <div key={n.id} className="group flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-amber-500/5">
                 <p className="flex-1 text-xs text-slate-300">{n.text}</p>
                 <span className="shrink-0 text-[10px] text-slate-600">
-                  {new Date(n.ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                  {new Date(n.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
                 </span>
                 <button
                   onClick={() => deleteNote(n.id)}
