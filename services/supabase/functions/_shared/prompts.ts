@@ -42,7 +42,7 @@ QUANTITY | BARCODE + Thai_description - English_description | PACKS | UNIT PRICE
 
 ### IMPORTANT: translated_name is MANDATORY
 - If the OCR text contains English text after " - " (e.g., "ดีเวลล่า... - DIVELLA DURUM WHEAT SEMOLINA 500G"), copy it EXACTLY.
-- If there is NO English text in the OCR, TRANSLATE the Thai name to English yourself. Example: "เอโร่ มอสซาเรลล่า��ูดเส้น500ก." → "ARO Shredded Mozzarella 500g"
+- If there is NO English text in the OCR, TRANSLATE the Thai name to English yourself. Example: "เอโร่ มอสซาเรลล่าชูดเส้น500ก." → "ARO Shredded Mozzarella 500g"
 - translated_name must NEVER be null.
 
 ### Real example from a Makro receipt:
@@ -196,3 +196,31 @@ export const MODEL_MAP: Record<string, { provider: 'anthropic' | 'openai' | 'goo
   'gemini-flash-lite': { provider: 'google', modelId: 'gemini-2.5-flash-lite' },
   'gemini-3-flash': { provider: 'google', modelId: 'gemini-3-flash-preview' },
 }
+
+// Triage prompt for batch receipt processing
+export const TRIAGE_PROMPT = `You are a receipt sorting assistant. I have OCR text from {N} images uploaded together.
+For each image, extract ONLY the header metadata — do NOT parse individual line items.
+
+Return a JSON array:
+[
+  {
+    "image_index": 0,
+    "receipt_number": "062501126001" or null,
+    "date": "2026-04-10" or null,
+    "supplier_name": "SIAM MAKRO" or null,
+    "document_type": "tax_invoice|receipt|handwritten|bank_slip|delivery|unknown",
+    "page_hint": "1/3" or null,
+    "is_multi_receipt": false,
+    "receipts_on_image": 1,
+    "notes": "optional clarification"
+  }
+]
+
+Rules:
+- Thai Buddhist Era: subtract 543 from year (2569 → 2026)
+- If text looks like page 2/3 of same receipt (same supplier, same receipt number, continuing items) → set page_hint
+- If image contains TWO separate receipts side by side → is_multi_receipt: true, receipts_on_image: 2
+- If handwritten → document_type: "handwritten"
+- If image is unreadable or not a receipt → document_type: "unknown"
+- For Makro receipts: receipt_number is the TAX INVOICE number (e.g., "062501126001"), NOT the member card
+- supplier_name should be in English (e.g., "SIAM MAKRO", not Thai name)`
