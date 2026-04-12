@@ -102,7 +102,7 @@ export function MagicDropzone({ onUrlsReady, onJobCreated, isPending }: MagicDro
   const [isUploading, setIsUploading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [model, setModel] = useState<GeminiModel>(() => {
-    return (localStorage.getItem('receiptModel') as GeminiModel) || 'gemini-2.5-pro'
+    return (localStorage.getItem('receiptModel') as GeminiModel) || 'gemini-2.5-flash'
   })
   const inputRef = useRef<HTMLInputElement>(null)
 

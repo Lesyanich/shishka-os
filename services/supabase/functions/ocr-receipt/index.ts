@@ -300,7 +300,7 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url)
     const inboxId = url.searchParams.get("inbox_id")?.trim()
-    const modelKey = url.searchParams.get("model")?.trim() || "gemini-pro"
+    const modelKey = url.searchParams.get("model")?.trim() || "gemini-flash"
 
     if (!inboxId) return json({ error: "inbox_id query parameter is required" }, 400)
 
