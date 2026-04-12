@@ -26,10 +26,10 @@ fi
 
 # ── Brain: LightRAG auto-reindex on bible/domain change ──
 if [ -n "$CHANGED_FILES" ]; then
-  BIBLE_DOMAIN=$(echo "$CHANGED_FILES" | grep -E '^docs/(bible|domain)/.*\.md$' || true)
-  if [ -n "$BIBLE_DOMAIN" ]; then
+  DOCS_MD=$(echo "$CHANGED_FILES" | grep -E '^docs/.*\.md$' || true)
+  if [ -n "$DOCS_MD" ]; then
     echo "[post-commit] Brain: LightRAG reindex triggered"
-    echo "$BIBLE_DOMAIN" | sh "$REPO_ROOT/scripts/lightrag-reindex-changed.sh" &
+    echo "$DOCS_MD" | sh "$REPO_ROOT/scripts/lightrag-reindex-changed.sh" &
   fi
 fi
 
