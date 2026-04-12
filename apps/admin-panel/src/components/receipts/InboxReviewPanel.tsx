@@ -122,6 +122,46 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [capexChecked, setCapexChecked] = useState<Set<number>>(() => new Set())
   const [opexChecked, setOpexChecked] = useState<Set<number>>(() => new Set())
 
+  // ── Auto-save edits on unmount (prevents data loss on row switch) ──
+  const isDirty = useRef(false)
+  const isInitialRender = useRef(true)
+  const latestPayload = useRef(p)
+
+  useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false
+      return
+    }
+    if (!p) return
+    latestPayload.current = {
+      ...p,
+      supplier_name: supplierName,
+      transaction_date: transactionDate,
+      amount_original: receiptTotal,
+      invoice_number: invoiceNumber || null,
+      food_items: foodItems,
+      capex_items: capexItems,
+      opex_items: opexItems,
+    }
+    isDirty.current = true
+  }, [supplierName, transactionDate, receiptTotal, invoiceNumber, foodItems, capexItems, opexItems]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const rowId = row.id
+    return () => {
+      if (isDirty.current && latestPayload.current) {
+        supabase
+          .from('receipt_inbox')
+          .update({ parsed_payload: latestPayload.current })
+          .eq('id', rowId)
+          .then(({ error: err }) => {
+            if (err) console.error('[InboxReviewPanel] Auto-save failed:', err.message)
+            else console.log('[InboxReviewPanel] Auto-saved edits for', rowId)
+          })
+      }
+    }
+  }, [row.id])
+
   // ── Image viewer with zoom/pan ──
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0)
   const [zoom, setZoom] = useState(1)
@@ -320,7 +360,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     return errs
   }
 
-  const handleApproveClick = () => {
+  const handleApproveClick = async () => {
     setError(null)
     const errs = validate()
     if (errs.length > 0) {
@@ -328,6 +368,54 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       return
     }
     setValidationErrors([])
+
+    // ── Duplicate detection before confirm dialog ──
+    try {
+      if (invoiceNumber) {
+        // Check by invoice number (exact match)
+        const { data: dupes } = await supabase
+          .from('expense_ledger')
+          .select('id, details, transaction_date, amount_original')
+          .eq('invoice_number', invoiceNumber)
+          .limit(3)
+
+        if (dupes && dupes.length > 0) {
+          const dupeInfo = dupes.map(d =>
+            `${d.transaction_date} — ฿${d.amount_original} (${d.details})`
+          ).join('\n')
+
+          const proceed = window.confirm(
+            `Possible duplicate!\n\nReceipt "${invoiceNumber}" already exists in ledger:\n${dupeInfo}\n\nProceed anyway?`
+          )
+          if (!proceed) return
+        }
+      } else if (supplierName && receiptTotal > 0 && transactionDate) {
+        // Fallback: check by supplier + amount + date
+        const { data: dupes } = await supabase
+          .from('expense_ledger')
+          .select('id, details, transaction_date, amount_original, invoice_number')
+          .eq('transaction_date', transactionDate)
+          .gte('amount_original', receiptTotal - 1)
+          .lte('amount_original', receiptTotal + 1)
+          .ilike('details', `%${supplierName.slice(0, 20)}%`)
+          .limit(3)
+
+        if (dupes && dupes.length > 0) {
+          const dupeInfo = dupes.map(d =>
+            `${d.transaction_date} — ฿${d.amount_original} (${d.details})`
+          ).join('\n')
+
+          const proceed = window.confirm(
+            `Possible duplicate!\n\nSimilar expense found:\n${dupeInfo}\n\nProceed anyway?`
+          )
+          if (!proceed) return
+        }
+      }
+    } catch (err) {
+      // Non-blocking: if dupe check fails, still allow approval
+      console.warn('[InboxReviewPanel] Duplicate check failed:', err)
+    }
+
     setShowConfirm(true)
   }
 
@@ -391,9 +479,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   )
 
   return (
-    <div className="flex">
+    <div className="flex flex-col lg:flex-row">
       {/* ── LEFT: Zoomable image viewer (sticky) ── */}
-      <div className="w-[340px] shrink-0 self-start sticky top-0 border-r border-slate-800 bg-slate-900/90 p-3">
+      <div className="w-full lg:w-[340px] lg:shrink-0 lg:self-start lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-900/90 p-3">
         {/* Zoom controls */}
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-1">
@@ -437,7 +525,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            className={`h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
+            className={`h-[300px] lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
           >
             <img
               src={row.photo_urls[selectedPhotoIdx]}
@@ -527,7 +615,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs">
             <div>
               <span className="text-slate-500">Date: </span>
               {editingHeader ? (
@@ -555,7 +643,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           </div>
 
           {/* Totals bar */}
-          <div className="flex items-center gap-4 rounded-lg bg-slate-800/60 px-3 py-2 text-xs">
+          <div className="flex flex-wrap items-center gap-4 rounded-lg bg-slate-800/60 px-3 py-2 text-xs">
             <div>
               <span className="text-slate-500">Receipt: </span>
               {editingHeader ? (
@@ -612,7 +700,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               )}
             </h4>
           </div>
-          <div className="max-h-[28rem] overflow-y-auto rounded-lg border border-slate-800">
+          <div className="max-h-[28rem] overflow-y-auto overflow-x-auto rounded-lg border border-slate-800">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-slate-900 text-[9px] uppercase tracking-wide text-slate-500">
                 <tr>
@@ -742,7 +830,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               )}
             </h4>
           </div>
-          <div className="rounded-lg border border-slate-800">
+          <div className="overflow-x-auto rounded-lg border border-slate-800">
             <table className="w-full text-xs">
               <thead className="bg-slate-900 text-[9px] uppercase tracking-wide text-slate-500">
                 <tr>
@@ -809,7 +897,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               )}
             </h4>
           </div>
-          <div className="rounded-lg border border-slate-800">
+          <div className="overflow-x-auto rounded-lg border border-slate-800">
             <table className="w-full text-xs">
               <thead className="bg-slate-900 text-[9px] uppercase tracking-wide text-slate-500">
                 <tr>
@@ -918,7 +1006,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       {showConfirm && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-xs">
           <div className="mb-2 font-medium text-slate-200">Confirm approval:</div>
-          <div className="mb-3 grid grid-cols-2 gap-x-6 gap-y-1 text-slate-400">
+          <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-slate-400">
             <div>Supplier: <span className="text-slate-200">{supplierName}</span></div>
             <div>Date: <span className="text-slate-200">{transactionDate}</span></div>
             <div>Amount: <span className="text-slate-200">{'\u0E3F'}{fmt(receiptTotal)}</span></div>

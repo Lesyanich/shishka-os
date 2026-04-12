@@ -237,14 +237,14 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
   return (
     <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60 shadow-sm">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-4 py-3">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold text-slate-100">Receipt Inbox</h2>
           <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
             {rows.length}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {selectedIds.size > 0 && (
             <button
               type="button"
@@ -313,7 +313,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
           No receipts uploaded yet
         </div>
       ) : (
-        <div className="max-h-[520px] overflow-y-auto">
+        <div className="max-h-[520px] overflow-y-auto overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 z-10 bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500">
               <tr>
@@ -329,10 +329,10 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                 <th className="px-2 py-2">By</th>
                 <th className="px-2 py-2">Supplier</th>
                 <th className="px-2 py-2 text-right">Amount</th>
-                <th className="px-2 py-2 text-center">Model / Cost</th>
+                <th className="hidden md:table-cell px-2 py-2 text-center">Model / Cost</th>
                 <th className="px-2 py-2 text-center">Status</th>
-                <th className="px-2 py-2 text-center">Recognized</th>
-                <th className="px-2 py-2">Invoice #</th>
+                <th className="hidden md:table-cell px-2 py-2 text-center">Recognized</th>
+                <th className="hidden lg:table-cell px-2 py-2">Invoice #</th>
                 <th className="w-16 px-1 py-2" />
               </tr>
             </thead>
@@ -383,7 +383,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                           ? `\u0E3F${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                           : '\u2014'}
                       </td>
-                      <td className="px-2 py-2.5 text-center">
+                      <td className="hidden md:table-cell px-2 py-2.5 text-center">
                         <div className="flex flex-col items-center">
                           <ModelBadge model={r.model_used} />
                           {r.parse_cost_usd != null && r.parse_cost_usd > 0 && (
@@ -397,11 +397,11 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                         </span>
                       </td>
                       {/* Recognized date */}
-                      <td className="px-2 py-2.5 text-center text-[10px] text-slate-500">
+                      <td className="hidden md:table-cell px-2 py-2.5 text-center text-[10px] text-slate-500">
                         {r.parsed_at ? fmtDateShort(r.parsed_at) : '—'}
                       </td>
                       {/* Invoice # */}
-                      <td className="px-2 py-2.5 text-[10px] text-slate-400 truncate max-w-[80px]">
+                      <td className="hidden lg:table-cell px-2 py-2.5 text-[10px] text-slate-400 truncate max-w-[80px]">
                         {pp?.invoice_number || '—'}
                       </td>
                       {/* Actions */}

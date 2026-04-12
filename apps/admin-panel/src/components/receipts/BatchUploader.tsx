@@ -144,20 +144,29 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
       const photoUrls = await uploadFiles()
       if (!photoUrls) return
 
-      // Create one inbox row with all photos, status = pending
-      const err = await onInsert({
-        uploaded_by: uploadedBy,
-        photo_urls: photoUrls,
-      })
+      // Create one inbox row PER photo so each receipt can be parsed independently
+      let successCount = 0
+      let lastError: string | null = null
+      for (const url of photoUrls) {
+        const err = await onInsert({
+          uploaded_by: uploadedBy,
+          photo_urls: [url],
+        })
+        if (err) {
+          lastError = err
+        } else {
+          successCount++
+        }
+      }
 
-      if (err) {
+      if (successCount === 0 && lastError) {
         setStep('error')
-        setToast({ type: 'err', msg: err })
+        setToast({ type: 'err', msg: lastError })
         return
       }
 
       setStep('done')
-      setToast({ type: 'ok', msg: `Uploaded ${photoUrls.length} file(s) — parse later from the list` })
+      setToast({ type: 'ok', msg: `Uploaded ${successCount} receipt(s) — parse from the list` })
       setProgress('')
       for (const f of files) if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
       setFiles([])
@@ -314,7 +323,7 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
         )}
 
         {/* ── Controls ── */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Auto-sort toggle */}
           <label className="flex cursor-pointer items-center gap-1.5 select-none">
             <input
