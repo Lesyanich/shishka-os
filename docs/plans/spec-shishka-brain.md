@@ -27,9 +27,10 @@ Each layer answers a different kind of question. None of them replaces another.
 
 | Layer | Tool | Stores | Answers | Phase |
 |---|---|---|---|---|
-| **L1 Conversations** | MemPalace | Verbatim agent↔CEO transcripts, decisions, preferences, session artefacts | "What did we decide last time about X?" "What does the CEO hate in Y?" "Why did we pick Z three months ago?" | **Phase 2** |
-| **L2 Project Knowledge** | LightRAG | `docs/bible/`, `docs/domain/`, business rules, SOPs | "What is L1-BL-FRZ-790-66?" "What fats are allowed in the kitchen?" "What is our language contract?" | **Phase 1 ✅** |
-| **L3 Code Structure** | Graphify | `apps/`, `services/`, code AST, call graphs, module deps | "Where is receipt parsing defined?" "What calls `emit_business_task`?" "Show me the dead-code clusters" | **Phase 3** |
+| **L1 Conversations** | MemPalace | Verbatim agent↔CEO transcripts, decisions, preferences, session artefacts | "What did we decide last time about X?" "What does the CEO hate in Y?" "Why did we pick Z three months ago?" | **Phase 2 ✅** |
+| **L2+L3 Project Knowledge + Code** | Graphify | Full project: code + docs + bible + agents + PDFs + images. 1,750 nodes, 1,906 edges, 304 communities. | "What fats are allowed?" "Where is receipt parsing?" "How does brain architecture work?" | **Installed 2026-04-12 ✅** |
+
+> **LightRAG (former L2) — DECOMMISSIONED 2026-04-12.** Replaced by Graphify which covers the same corpus plus code, images, and PDFs in a single local graph. GCP VM `shishka-production` stopped. Supabase `LIGHTRAG_*` tables retained for 30-day grace period. Archived to `_archive/services/lightrag/`.
 
 **Not a memory layer** (deliberate):
 
@@ -58,31 +59,29 @@ Architectural decisions live in `docs/plans/spec-*.md`, not in MC comments. Inli
 
 ## 4. Phase Order and Rationale
 
-### Phase 1 — LightRAG (L2 Project Knowledge) — ✅ DONE
-- Indexes `docs/bible/` + `docs/domain/` (19 files, 43 nodes, 18 edges)
-- Server on `:9621`, `gemma4:e2b` + `bge-m3`, Supabase pgvector backend
-- Phase 1 quality gate still pending (Q1 forbidden ingredients, Q2 fats synthesis, Q3-A operations.md)
-- PR #29 open, awaiting merge
-- **Known limitation:** `operations.md` injected via `ainsert_custom_kg` (Option E), absent from `GET /documents`. Brain View must handle gracefully.
-- **Phase 1.5 trigger:** if quality gate fails on Q2, re-ingest through Anthropic API + Claude Haiku as extraction LLM. See `docs/plans/spec-lightrag.md` §Phase 1.5.
+### Phase 1 — LightRAG (L2 Project Knowledge) — ⛔ DECOMMISSIONED
+- Was: indexes `docs/bible/` + `docs/domain/` (19 files, 511 entities, 252 edges) on GCP VM
+- **Decommissioned 2026-04-12:** replaced by Graphify which covers the same corpus plus code, images, PDFs in a single local graph with 93.5x token reduction
+- GCP VM `shishka-production` stopped. Service archived to `_archive/services/lightrag/`
+- Supabase `LIGHTRAG_*` tables retained for 30-day grace period, then DROP
 
 ### Phase 2 — MemPalace (L1 Conversations) — ✅ DONE
-**Why Phase 2, not Graphify:** MemPalace bites the bigger pain. Cross-session context loss is the exact thing COO Running Log fights manually every session. Graphify is a code-intelligence tool — useful but not critical-path until we are actively refactoring multi-module code with agents.
+See `docs/plans/spec-mempalace-phase2.md`. Shipped on `feature/shared/mempalace-phase2` (MC `30f177b3`). All §6 acceptance criteria met.
 
-See `docs/plans/spec-mempalace-phase2.md` for install, storage, and spike plan. Shipped on `feature/shared/mempalace-phase2` (MC `30f177b3`). All §6 acceptance criteria met: backup round-trip green, pre-ingest filter rejects known-secrets fixture, agent routing tables added to COO/Chef/Finance, CLAUDE.md L0 wake-up step wired, Session 5 bootstrap ingested into wing `Shishka` (32 drawers across `technical`/`architecture`/`general` rooms), all three CEO quality-gate questions answered with source attribution.
-
-### Phase 3 — Graphify (L3 Code Structure) — DEFERRED
-Timebox: 1-day spike after Phase 2 ships. Criteria: adopt / wait / drop. Not blocking any current operational work. See `docs/plans/spec-graphify-phase3.md`.
+### Phase 3 — Graphify (L2+L3 Unified Knowledge Graph) — ✅ DONE
+- **Installed 2026-04-12.** Verdict: ADOPT (exceeded original scope)
+- Original spec planned code-only (AST + call graphs). Actual capability: multimodal knowledge graph (code + docs + bible + agents + PDFs + images)
+- Result: 1,750 nodes, 1,906 edges, 304 communities, 93.5x token reduction
+- Installed in `services/graphify/.venv`, output in `graphify-out/`
+- Built-in `--mcp` mode for agent access, `--update` for incremental re-index
+- See `docs/plans/spec-graphify-phase3.md` for original spike plan
 
 ## 5. Storage Architecture (per layer)
 
 | Layer | Live Data | Backup | Keys |
 |---|---|---|---|
 | **L1 MemPalace** | `~/.mempalace/` on Mac (FileVault ✅ on) | nightly `age`-encrypted tarball → `_backups/mempalace/*.tar.age` on GDrive | Apple Keychain Secure Note "MemPalace age private key" |
-| **L2 LightRAG** | Supabase Postgres + pgvector (`public.lightrag_*`, workspace `lightrag`) | Supabase native backups | Supabase service keys (already in `.env`) |
-| **L3 Graphify** | Local `graph.json` + HTML views (path TBD during spike) | trivial — regenerate from code anytime | none — no secrets stored |
-
-**⚠ Watch: LightRAG `services/lightrag/rag_storage/` is currently on GDrive.** Pgvector itself is in Supabase (safe), but the local KV state (graph file, logs, cache) sits on a synced folder. Low-risk for now (not a multi-file transactional DB), but unhealthy as a pattern. Track as a separate post-Phase-1 cleanup task.
+| **L2+L3 Graphify** | `graphify-out/graph.json` + `graphify-out/cache/` (local) | trivial — regenerate from source anytime via `graphify --update` | none — no secrets stored |
 
 ## 6. Security Posture
 
@@ -94,29 +93,23 @@ Timebox: 1-day spike after Phase 2 ships. Criteria: adopt / wait / drop. Not blo
 
 ## 7. Access Pattern — Future MCP Gateway (Phase 4, not scoped yet)
 
-Once all three layers are live, a unified MCP server `shishka-brain` will front them:
+With Graphify covering L2+L3 natively, the gateway simplifies to two MCP servers:
 
 ```
 agent asks: "how did we fix the gemma4 OOM crash?"
               ↓
-shishka-brain router
-              ↓
-  ├── L1 MemPalace  (keyword "gemma4 crash" → session transcripts)
-  ├── L2 LightRAG   (semantic "ollama model memory" → bible/engineering-rules)
-  └── L3 Graphify   (identifier "gemma4" → code refs)
-              ↓
-    unified response with source attribution per layer
+  ├── L1 MemPalace MCP  (keyword "gemma4 crash" → session transcripts)
+  └── L2+L3 Graphify    (`graphify query` or `--mcp` → code + docs + bible)
 ```
 
-**Not building this yet.** Phase 4 spec comes after all three layers are individually proven.
+**No custom `shishka-brain` gateway needed.** Graphify's built-in `--mcp` mode provides agent access to the unified knowledge graph. Phase 4 task cancelled.
 
 ## 8. Success Criteria for the Overall Initiative
 
-- [ ] All three layers installed, running, backed up
-- [ ] Each layer passes its own quality gate (see per-phase specs)
-- [ ] Brain View (`efebcbb1`) renders at least L2 graph and L1 conversation clusters
-- [ ] Pre-ingest filter implemented and tested with a known-secret corpus
-- [ ] `agents/*/AGENT.md` updated to query the right layer per question class
+- [x] Both layers installed and running (MemPalace ✅, Graphify ✅)
+- [ ] Brain View renders Graphify graph and L1 conversation clusters
+- [x] Pre-ingest filter implemented (MemPalace pre-ingest filter ✅)
+- [ ] `agents/*/AGENT.md` updated to query Graphify via `--mcp` or CLI
 - [ ] COO Running Log becomes optional — sessions start by querying MemPalace instead of reading 15+ manual comments
 
 ## 9. Explicit Non-Goals

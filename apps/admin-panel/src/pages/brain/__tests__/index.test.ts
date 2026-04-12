@@ -4,9 +4,8 @@ import { describe, it, expect } from 'vitest'
 import * as Brain from '../index'
 
 describe('brain barrel', () => {
-  it('re-exports BrainPage, LightragGraph, BrainPlaceholder', () => {
+  it('re-exports BrainPage, BrainPlaceholder', () => {
     expect(Brain.BrainPage).toBeDefined()
-    expect(Brain.LightragGraph).toBeDefined()
     expect(Brain.BrainPlaceholder).toBeDefined()
   })
 })

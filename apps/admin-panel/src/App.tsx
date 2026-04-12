@@ -37,7 +37,6 @@ const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').t
 const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
 const MissionControl = lazy(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
 const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
-const LightragGraph = lazy(() => import('./pages/brain').then(m => ({ default: m.LightragGraph })))
 const BrainPlaceholder = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPlaceholder })))
 const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
 const MemPalaceBrowser = lazy(() => import('./pages/brain').then(m => ({ default: m.MemPalaceBrowser })))
@@ -109,23 +108,22 @@ function App() {
                 <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
                 <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
                 <Route path="/brain" element={<Suspense fallback={<PageLoader />}><BrainPage /></Suspense>}>
-                  <Route index element={<Navigate to="lightrag" replace />} />
-                  <Route path="lightrag" element={<Suspense fallback={<PageLoader />}><LightragGraph /></Suspense>} />
-                  <Route path="cost" element={<Suspense fallback={<PageLoader />}><BrainCostPage /></Suspense>} />
-                  <Route path="mempalace" element={<Suspense fallback={<PageLoader />}><MemPalaceBrowser /></Suspense>} />
+                  <Route index element={<Navigate to="graphify" replace />} />
                   <Route
-                    path="code"
+                    path="graphify"
                     element={
                       <Suspense fallback={<PageLoader />}>
                         <BrainPlaceholder
                           icon={Code2}
-                          title="Graphify · L3"
-                          phase="Phase 3 — deferred"
-                          description="Code structure graph (AST + call graphs) will render here after the Graphify spike."
+                          title="Graphify · L2+L3"
+                          phase="Installed — 1,750 nodes, 1,906 edges"
+                          description="Multimodal knowledge graph (code + docs + bible). Interactive viewer coming soon."
                         />
                       </Suspense>
                     }
                   />
+                  <Route path="cost" element={<Suspense fallback={<PageLoader />}><BrainCostPage /></Suspense>} />
+                  <Route path="mempalace" element={<Suspense fallback={<PageLoader />}><MemPalaceBrowser /></Suspense>} />
                   <Route path="quality" element={<Suspense fallback={<PageLoader />}><QualityPage /></Suspense>} />
                 </Route>
                 <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
