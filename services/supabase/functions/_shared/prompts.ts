@@ -71,7 +71,8 @@ This should be parsed as:
 - category: "opex" (cleaning product)
 
 ### CRITICAL MISTAKES TO AVOID:
-- Do NOT confuse the barcode digits with the Article number (รหัสสินค้า). The barcode is the 13-digit EAN starting with 8.
+- For Makro/Big C: Do NOT confuse the 13-digit EAN barcode (starting with 8) with the Article number (รหัสสินค้า). The barcode field should contain ONLY the EAN-13.
+- For DIY stores (Thai Watsadu, HomePro, Baan & Beyond): The CODE/article column should be saved as supplier_sku (not barcode). If a separate 13-digit EAN is also present, save it as barcode.
 - Do NOT confuse Thai product description with English. The separator is " - " (space-dash-space).
 - Do NOT output a Thai name as the English translated_name.
 - Do NOT merge or split items. Qty 3 of one product = ONE line item with quantity=3, NOT three separate items.
@@ -82,18 +83,46 @@ This should be parsed as:
 ### Big C / Lotus / Tops
 Similar to Makro but may have different column order. Look for barcodes (13 digits) and English product names.
 
+### DIY / Hardware Stores (Thai Watsadu, HomePro, Baan & Beyond)
+- Receipt format: CODE | DESCRIPTION | QTY | UNIT PRICE | TOTAL
+- The CODE column contains 4-8 digit article/product codes → save as supplier_sku (NOT barcode)
+- If a separate 13-digit EAN barcode is printed → save as barcode
+- Items are typically: OpEx (cleaning supplies, tools, household items) or CapEx (equipment >2000 THB)
+- Product names may be in English abbreviations (e.g., "BK GARBAGE BAG 30X40INC", "GLASS STORAGE 600ML")
+- No Thai→English translation needed if description is already in English
+
 ### Market / small vendors
 - Handwritten or small thermal printer, freeform layout
 - No barcodes, no supplier_sku → set both to null
 - Weight as quantity: "Pork 2.5 kg × 180" → qty: 2.5, unit: "kg"
 - Usually no tax invoice: has_tax_invoice: false, vat_amount: 0
 
+### Cash bills / handwritten receipts (บิลเงินสด / CASH BILL)
+- Standard Thai "CASH BILL / บิลเงินสด" forms — pre-printed columns filled by hand
+- Date format: DD-MM-YY in Buddhist Era (e.g., 01-04-69 = 2026-04-01, subtract 543)
+- Quantity + Description + Unit Price + Amount columns, handwritten
+- Total at bottom, often with collector signature
+- CRITICAL: If no company/supplier name is printed, INFER from items:
+  | Items on receipt | supplier_name | flow_type | category_code | Rationale |
+  |---|---|---|---|---|
+  | Water (น้ำ, water, 2000L, gallons, ถัง) | "Water Delivery" | COGS | 4100 | Drinking water = kitchen supply |
+  | Ice (น้ำแข็ง, ice) | "Ice Supplier" | COGS | 4100 | Kitchen supply |
+  | Gas/LPG (แก๊ส, gas, LPG, ถังแก๊ส) | "Gas Supplier" | OpEx | 2200 | Utility |
+  | Fresh market produce (meat, veg, fruit) | "Local Market" | COGS | 4100 | Food ingredients |
+  | Laundry (ซักรีด) | "Laundry Service" | OpEx | 2300 | Maintenance |
+  | Electricity (ค่าไฟ) | Use printed name (e.g. PEA) | OpEx | 2200 | Utility |
+  | Tap water bill (ค่าน้ำประปา) | Use printed name | OpEx | 2200 | Utility |
+  | Any other | "Cash Purchase" | COGS | 4100 | Default |
+- NEVER leave supplier_name as "Unknown" or empty — always provide a descriptive name
+- When you infer supplier_name, also set flow_type and category_code from the table above
+- If no invoice_number on the receipt → set invoice_number to null (do NOT invent one)
+
 ### Delivery (Grab / LINE MAN)
 - Delivery Fee → delivery_fee field (NOT in items)
 - Supplier = restaurant/store name, NOT "Grab"
 
 ## HEADER EXTRACTION
-- Supplier name (English AND Thai)
+- Supplier name (English AND Thai). If no name is printed, infer from items (see Cash bills section above)
 - Invoice/receipt number → invoice_number
 - Date → transaction_date (YYYY-MM-DD). Thai Buddhist Era: subtract 543 from year (2569 = 2026)
 - Tax ID, cashier, member card → raw_parse

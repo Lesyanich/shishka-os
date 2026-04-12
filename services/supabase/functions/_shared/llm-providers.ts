@@ -7,8 +7,28 @@ export interface ApiResult {
   tokensOut: number
 }
 
-export async function callAnthropic(modelId: string, systemPrompt: string, userText: string): Promise<ApiResult> {
+/** Base64-encoded image for vision-capable LLM calls */
+export interface ImageInput {
+  base64: string
+  mimeType: string // "image/jpeg" | "image/png" | "image/webp"
+}
+
+export async function callAnthropic(modelId: string, systemPrompt: string, userText: string, images?: ImageInput[]): Promise<ApiResult> {
   if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
+
+  // When images are provided, use content array format for vision
+  type AnthropicBlock =
+    | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+    | { type: "text"; text: string }
+  let userContent: string | AnthropicBlock[] = userText
+  if (images?.length) {
+    const blocks: AnthropicBlock[] = []
+    for (const img of images) {
+      blocks.push({ type: "image", source: { type: "base64", media_type: img.mimeType, data: img.base64 } })
+    }
+    blocks.push({ type: "text", text: userText })
+    userContent = blocks
+  }
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -21,7 +41,7 @@ export async function callAnthropic(modelId: string, systemPrompt: string, userT
       model: modelId,
       max_tokens: 8192,
       system: systemPrompt,
-      messages: [{ role: "user", content: userText }],
+      messages: [{ role: "user", content: userContent }],
     }),
   })
 
@@ -38,8 +58,22 @@ export async function callAnthropic(modelId: string, systemPrompt: string, userT
   }
 }
 
-export async function callOpenAI(modelId: string, systemPrompt: string, userText: string): Promise<ApiResult> {
+export async function callOpenAI(modelId: string, systemPrompt: string, userText: string, images?: ImageInput[]): Promise<ApiResult> {
   if (!openaiKey) throw new Error("OPENAI_API_KEY not configured")
+
+  // When images are provided, use content array format for GPT-4o vision
+  type OpenAIBlock =
+    | { type: "image_url"; image_url: { url: string } }
+    | { type: "text"; text: string }
+  let userContent: string | OpenAIBlock[] = userText
+  if (images?.length) {
+    const blocks: OpenAIBlock[] = []
+    for (const img of images) {
+      blocks.push({ type: "image_url", image_url: { url: `data:${img.mimeType};base64,${img.base64}` } })
+    }
+    blocks.push({ type: "text", text: userText })
+    userContent = blocks
+  }
 
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -53,7 +87,7 @@ export async function callOpenAI(modelId: string, systemPrompt: string, userText
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userText },
+        { role: "user", content: userContent },
       ],
     }),
   })
@@ -71,8 +105,20 @@ export async function callOpenAI(modelId: string, systemPrompt: string, userText
   }
 }
 
-export async function callGemini(modelId: string, systemPrompt: string, userText: string): Promise<ApiResult> {
+export async function callGemini(modelId: string, systemPrompt: string, userText: string, images?: ImageInput[]): Promise<ApiResult> {
   if (!googleKey) throw new Error("GOOGLE_API_KEY not configured")
+
+  // Build parts array — images first (inline_data), then text
+  type GeminiPart =
+    | { inline_data: { mime_type: string; data: string } }
+    | { text: string }
+  const parts: GeminiPart[] = []
+  if (images?.length) {
+    for (const img of images) {
+      parts.push({ inline_data: { mime_type: img.mimeType, data: img.base64 } })
+    }
+  }
+  parts.push({ text: userText })
 
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${googleKey}`,
@@ -81,7 +127,7 @@ export async function callGemini(modelId: string, systemPrompt: string, userText
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: "user", parts: [{ text: userText }] }],
+        contents: [{ role: "user", parts }],
         generationConfig: {
           responseMimeType: "application/json",
           maxOutputTokens: 65536,
@@ -105,17 +151,17 @@ export async function callGemini(modelId: string, systemPrompt: string, userText
 }
 
 /** Dispatch to the correct LLM provider based on model key */
-export async function callLLM(modelKey: string, systemPrompt: string, userText: string): Promise<ApiResult> {
+export async function callLLM(modelKey: string, systemPrompt: string, userText: string, images?: ImageInput[]): Promise<ApiResult> {
   const modelConfig = MODEL_MAP[modelKey]
   if (!modelConfig) {
     throw new Error(`Unknown model: ${modelKey}. Options: ${Object.keys(MODEL_MAP).join(", ")}`)
   }
 
   if (modelConfig.provider === "anthropic") {
-    return callAnthropic(modelConfig.modelId, systemPrompt, userText)
+    return callAnthropic(modelConfig.modelId, systemPrompt, userText, images)
   } else if (modelConfig.provider === "google") {
-    return callGemini(modelConfig.modelId, systemPrompt, userText)
+    return callGemini(modelConfig.modelId, systemPrompt, userText, images)
   } else {
-    return callOpenAI(modelConfig.modelId, systemPrompt, userText)
+    return callOpenAI(modelConfig.modelId, systemPrompt, userText, images)
   }
 }

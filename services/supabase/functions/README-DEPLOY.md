@@ -59,3 +59,12 @@ curl -X POST \
   "opex_items": [...]
 }
 ```
+
+---
+
+## Deploy Log
+
+| Date | Function | Action | Notes |
+|------|----------|--------|-------|
+| 2026-04-12 | `receipt-batch-process` | Initial deploy | New function from commit 42e6187. `--no-verify-jwt` |
+| 2026-04-12 | `ocr-receipt` | Redeploy | Refactored to use `_shared/` imports (commit 42e6187). `--no-verify-jwt` |

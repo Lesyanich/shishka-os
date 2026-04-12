@@ -12,7 +12,7 @@ import { CORS, json } from "../_shared/cors.ts"
 import { db } from "../_shared/supabase.ts"
 import { downloadImageAsBase64, extractTextViaGCV } from "../_shared/gcv.ts"
 import { callLLM } from "../_shared/llm-providers.ts"
-import type { ApiResult } from "../_shared/llm-providers.ts"
+import type { ApiResult, ImageInput } from "../_shared/llm-providers.ts"
 import { SYSTEM_PROMPT, OUTPUT_SCHEMA, MODEL_PRICING, MODEL_MAP } from "../_shared/prompts.ts"
 import { resolveSupplier, matchNomenclature, classifyItems, determineFlowType } from "../_shared/nomenclature.ts"
 
@@ -67,24 +67,38 @@ Deno.serve(async (req: Request) => {
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
         console.error(`[ocr-receipt] GCV failed for ${photoUrl}: ${errMsg}`)
-        if (ocrTexts.length === 0) {
-          await db.from("receipt_inbox")
-            .update({ status: "error", error_message: `GCV OCR failed: ${errMsg.slice(0, 500)}` })
-            .eq("id", inboxId)
-          return json({ error: `GCV OCR failed: ${errMsg}` }, 500)
-        }
+        // Continue — vision fallback will handle images with no OCR text
       }
     }
 
     if (ocrTexts.length === 0) {
-      await db.from("receipt_inbox")
-        .update({ status: "error", error_message: "OCR failed: no text extracted from images" })
-        .eq("id", inboxId)
-      return json({ error: "OCR failed: no text extracted" }, 500)
+      // No OCR text at all — will fall through to vision fallback below
+      console.log(`[ocr-receipt] No OCR text extracted — will attempt vision fallback`)
     }
 
     const fullOcrText = ocrTexts.join("\n\n--- PAGE BREAK ---\n\n")
     console.log(`[ocr-receipt] Stage 1 done: ${fullOcrText.length} total chars`)
+
+    // ── Vision fallback for handwritten/low-OCR receipts ──
+    const MIN_OCR_CHARS = 50 // Below this threshold, OCR probably failed
+    const totalOcrChars = ocrTexts.reduce((sum, t) => sum + t.length, 0)
+    const useVisionFallback = totalOcrChars < MIN_OCR_CHARS
+
+    let visionImages: ImageInput[] | undefined
+    if (useVisionFallback) {
+      console.log(`[ocr-receipt] OCR too short (${totalOcrChars} chars) — falling back to vision mode`)
+      visionImages = []
+      for (const photoUrl of row.photo_urls) {
+        try {
+          const img = await downloadImageAsBase64(photoUrl)
+          visionImages.push({ base64: img.data, mimeType: img.mediaType || "image/jpeg" })
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          console.error(`[ocr-receipt] Failed to download image for vision: ${msg}`)
+        }
+      }
+      if (visionImages.length === 0) visionImages = undefined // no images downloaded — fall through to text-only
+    }
 
     // ══════════════════════════════════════════
     // STAGE 2: LLM structuring + translation
@@ -96,15 +110,20 @@ Deno.serve(async (req: Request) => {
     if (row.receipt_date) hints.push(`Receipt date hint: ${row.receipt_date}`)
     if (row.amount_hint) hints.push(`Expected total: ${row.amount_hint} THB`)
 
-    const userPrompt = `Here is the raw OCR text extracted from the receipt image(s). Parse it into the required JSON format.
+    const userPrompt = visionImages
+      ? `The OCR text extraction failed or returned very little text for this receipt. Please look at the attached image(s) directly and parse the receipt into the required JSON format.
+
+${hints.length > 0 ? hints.join("\n") + "\n\n" : ""}${totalOcrChars > 0 ? `Partial OCR text (may be incomplete):\n${fullOcrText}\n` : ""}`
+      : `Here is the raw OCR text extracted from the receipt image(s). Parse it into the required JSON format.
 
 ${hints.length > 0 ? hints.join("\n") + "\n\n" : ""}--- RAW OCR TEXT ---
 ${fullOcrText}
 --- END OCR TEXT ---`
 
-    console.log(`[ocr-receipt] Stage 2: LLM structuring via ${modelConfig.provider}/${modelConfig.modelId}...`)
+    const pipelineMode = visionImages ? "vision" : "gcv+llm"
+    console.log(`[ocr-receipt] Stage 2: LLM structuring via ${modelConfig.provider}/${modelConfig.modelId} (${pipelineMode})...`)
 
-    const result: ApiResult = await callLLM(modelKey, fullSystemPrompt, userPrompt)
+    const result: ApiResult = await callLLM(modelKey, fullSystemPrompt, userPrompt, visionImages)
 
     console.log(`[ocr-receipt] Stage 2 done: ${result.tokensIn} in, ${result.tokensOut} out`)
 
@@ -152,7 +171,7 @@ ${fullOcrText}
       transaction_date: parsed.transaction_date,
       flow_type: flowType,
       category_code: flowType === "COGS" ? 4100 : flowType === "CapEx" ? 1100 : 2100,
-      details: `${supplierName} — OCR+${modelKey}`,
+      details: `${supplierName} — ${pipelineMode === "vision" ? "Vision" : "OCR"}+${modelKey}`,
       amount_original: footer.grand_total || 0,
       discount_total: footer.discount_total || 0,
       vat_amount: footer.vat_amount || 0,
@@ -210,19 +229,19 @@ ${fullOcrText}
         duration_ms: durationMs,
         items_parsed: lineItems.length,
         nomenclature_matched: lineItems.filter((i) => i.nomenclature_id).length,
-        pipeline: "gcv+llm",
+        pipeline: pipelineMode,
       },
     })
 
     console.log(
-      `[ocr-receipt] DONE inbox_id=${inboxId} items=${lineItems.length} ocr=${fullOcrText.length}chars cost=$${totalCost.toFixed(4)} (gcv=$${gcvCost.toFixed(4)} llm=$${llmCost.toFixed(4)}) ${durationMs}ms`,
+      `[ocr-receipt] DONE inbox_id=${inboxId} pipeline=${pipelineMode} items=${lineItems.length} ocr=${fullOcrText.length}chars cost=$${totalCost.toFixed(4)} (gcv=$${gcvCost.toFixed(4)} llm=$${llmCost.toFixed(4)}) ${durationMs}ms`,
     )
 
     return json({
       ok: true,
       inbox_id: inboxId,
       model: modelConfig.modelId,
-      pipeline: "gcv+llm",
+      pipeline: pipelineMode,
       items_parsed: lineItems.length,
       nomenclature_matched: lineItems.filter((i) => i.nomenclature_id).length,
       ocr_chars: fullOcrText.length,
