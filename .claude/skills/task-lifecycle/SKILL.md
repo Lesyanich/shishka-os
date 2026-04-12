@@ -41,6 +41,18 @@ These run automatically via git hooks — you don't need to think about them:
 
 If a commit is blocked → read the error, fix the issue, re-commit.
 
+## Post-Action Notes Update (CEO-Gated Steps)
+
+When you perform a **CEO-gated action** — any step that was explicitly approved or requested by the CEO (apply migration, deploy, enable feature flag, run destructive command) — you MUST update MC task notes with the outcome **immediately after the action**, before moving on to the next step or marking done.
+
+```
+update_task(task_id="...", notes="Applied: [action]. Result: [outcome/output]. Timestamp: [now].")
+```
+
+**Why:** If you skip this, task notes stay stuck at an intermediate state (e.g. "needs manual apply") even after the action succeeded. The next agent or the CEO reading the task will see stale info.
+
+**Rule:** action → verify result → update_task(notes) → continue. Never defer the notes update to the completion checklist.
+
 ## Task Completion Checklist
 
 When you believe the task is done, go through this checklist IN ORDER:
