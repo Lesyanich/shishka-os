@@ -4,6 +4,7 @@ import { useBatches } from '../hooks/useBatches'
 import { useRecipeSteps, type RecipeStep } from '../hooks/useRecipeSteps'
 import { TaskExecutionCard } from '../components/kds/TaskExecutionCard'
 import { RecipeStepCard } from '../components/kds/RecipeStepCard'
+import { BatchCompleteModal } from '../components/kds/BatchCompleteModal'
 import { KitchenNav } from '../components/KitchenNav'
 import { ChefHat, ArrowLeft } from 'lucide-react'
 
@@ -15,10 +16,29 @@ export function CookStation() {
   const [activeTask, setActiveTask] = useState<CookTask | null>(null)
   const [currentStepIdx, setCurrentStepIdx] = useState(0)
   const [recipeSteps, setRecipeSteps] = useState<RecipeStep[]>([])
+  const [showBatchModal, setShowBatchModal] = useState(false)
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending')
   const activeTasks = tasks.filter((t) => t.status === 'in_progress')
 
+  // Start task and auto-launch wizard if recipe steps exist
+  const handleStartTask = useCallback(async (taskId: string) => {
+    const result = await startTask(taskId)
+    if (!result.ok) return result
+    // Find the task to get nomenclature_id
+    const task = tasks.find((t) => t.id === taskId)
+    if (task?.target_nomenclature_id) {
+      const loaded = await fetchSteps(task.target_nomenclature_id)
+      if (loaded.length > 0) {
+        setRecipeSteps(loaded)
+        setActiveTask(task)
+        setCurrentStepIdx(0)
+      }
+    }
+    return result
+  }, [startTask, tasks, fetchSteps])
+
+  // Resume wizard for an already in_progress task
   const openRecipe = useCallback(async (task: CookTask) => {
     if (!task.target_nomenclature_id) return
     const loaded = await fetchSteps(task.target_nomenclature_id)
@@ -83,8 +103,22 @@ export function CookStation() {
               if (currentStepIdx < recipeSteps.length - 1) {
                 setCurrentStepIdx((i) => i + 1)
               } else {
-                closeRecipe()
+                // Last step done → open batch completion
+                setShowBatchModal(true)
               }
+            }}
+          />
+        )}
+
+        {/* Batch complete modal after wizard finishes */}
+        {showBatchModal && activeTask && (
+          <BatchCompleteModal
+            taskId={activeTask.id}
+            theoreticalYield={activeTask.theoretical_yield}
+            onCompleteBatches={createBatchesFromTask}
+            onClose={() => {
+              setShowBatchModal(false)
+              closeRecipe()
             }}
           />
         )}
@@ -134,18 +168,22 @@ export function CookStation() {
             <div key={task.id} className="space-y-1">
               <TaskExecutionCard
                 task={task}
-                onStart={startTask}
+                onStart={handleStartTask}
                 onCompleteBatches={createBatchesFromTask}
               />
-              {task.target_nomenclature_id && (
+              {task.target_nomenclature_id ? (
                 <button
                   type="button"
                   onClick={() => openRecipe(task)}
                   disabled={stepsLoading}
                   className="w-full rounded-lg border border-sky-500/20 bg-sky-500/5 py-1.5 text-[11px] text-sky-400 hover:bg-sky-500/10 transition-colors"
                 >
-                  Open Recipe Steps
+                  {stepsLoading ? 'Loading…' : 'Resume Recipe Steps'}
                 </button>
+              ) : (
+                <p className="text-center text-[11px] text-slate-500">
+                  No process steps defined
+                </p>
               )}
             </div>
           ))}
@@ -162,7 +200,7 @@ export function CookStation() {
             <TaskExecutionCard
               key={task.id}
               task={task}
-              onStart={startTask}
+              onStart={handleStartTask}
               onCompleteBatches={createBatchesFromTask}
             />
           ))}

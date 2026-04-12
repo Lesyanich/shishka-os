@@ -208,6 +208,14 @@ export function RecipeStepCard({
         </div>
       )}
 
+      {/* Passive step — take another task badge */}
+      {step.is_passive && (
+        <div className="flex items-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/5 p-2.5 text-xs text-sky-300">
+          <span className="text-base">💤</span>
+          <span>Passive step — you&apos;re free until the timer ends. Take another task!</span>
+        </div>
+      )}
+
       {/* Navigation */}
       <div className="flex items-center justify-between pt-1">
         <button
