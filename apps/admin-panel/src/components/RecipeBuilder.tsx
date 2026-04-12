@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { ProcessTab } from './bom/ProcessTab'
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -792,6 +793,13 @@ export function RecipeBuilder() {
 
   const [newIngredientId, setNewIngredientId] = useState<string>('')
 
+  // Right panel tab
+  type RightTab = 'bom' | 'process'
+  const [rightTab, setRightTab] = useState<RightTab>('bom')
+
+  // Process step counts for completeness badges (SALE + PF only)
+  const [processStepCounts, setProcessStepCounts] = useState<Record<string, number>>({})
+
   // Modal state
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState<NomItem | null>(null)
@@ -848,6 +856,35 @@ export function RecipeBuilder() {
     setBomItems([])
     fetchDishes()
   }, [fetchDishes])
+
+  // Load process step counts for completeness badges (SALE + PF only)
+  useEffect(() => {
+    if (activeFilter !== 'sales' && activeFilter !== 'pf') {
+      setProcessStepCounts({})
+      return
+    }
+    if (dishes.length === 0) return
+
+    const ids = dishes.map((d) => d.id)
+    ;(async () => {
+      const { data, error: err } = await supabase
+        .from('recipes_flow')
+        .select('nomenclature_id')
+        .in('nomenclature_id', ids)
+
+      if (err) {
+        console.error('[RecipeBuilder] Failed to load process counts', err)
+        return
+      }
+
+      const counts: Record<string, number> = {}
+      for (const row of data ?? []) {
+        const nid = row.nomenclature_id as string
+        counts[nid] = (counts[nid] ?? 0) + 1
+      }
+      setProcessStepCounts(counts)
+    })()
+  }, [dishes, activeFilter])
 
   // Load available ingredients for the Add Ingredient dropdown
   useEffect(() => {
@@ -1193,6 +1230,20 @@ export function RecipeBuilder() {
                             {dish.product_code}
                           </span>
                           <div className="flex items-center gap-1.5">
+                            {(activeFilter === 'sales' || activeFilter === 'pf') && (
+                              <span
+                                className={`h-2 w-2 shrink-0 rounded-full ${
+                                  (processStepCounts[dish.id] ?? 0) > 0
+                                    ? 'bg-emerald-500'
+                                    : 'bg-rose-500'
+                                }`}
+                                title={
+                                  (processStepCounts[dish.id] ?? 0) > 0
+                                    ? `${processStepCounts[dish.id]} process steps`
+                                    : 'No process steps'
+                                }
+                              />
+                            )}
                             {dish.cost_per_unit > 0 && (
                               <span className="text-[10px] text-amber-400">
                                 {dish.cost_per_unit.toFixed(0)} THB
@@ -1223,23 +1274,38 @@ export function RecipeBuilder() {
           </div>
         </section>
 
-        {/* Right: BOM Specification */}
+        {/* Right: BOM / Process */}
         <section className="flex min-h-[480px] flex-col rounded-xl border border-slate-800 bg-slate-900/50 shadow-sm">
-          <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-100">
-                BOM Specification
-              </h2>
-              <p className="text-xs text-slate-500">
-                Edit ingredients, quantities, and cost breakdown.
-              </p>
+          <header className="border-b border-slate-800 px-4 py-3">
+            <div className="flex items-center gap-4">
+              {(['bom', 'process'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setRightTab(tab)}
+                  className={`pb-1 text-sm font-semibold transition ${
+                    rightTab === tab
+                      ? 'border-b-2 border-emerald-500 text-slate-100'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab === 'bom' ? 'BOM' : 'Process'}
+                </button>
+              ))}
             </div>
+            <p className="mt-1 text-xs text-slate-500">
+              {rightTab === 'bom'
+                ? 'Edit ingredients, quantities, and cost breakdown.'
+                : 'Recipe flow timeline and equipment.'}
+            </p>
           </header>
 
           {!selectedDish ? (
             <div className="flex flex-1 items-center justify-center px-6 text-center text-xs text-slate-500">
-              Select a node on the left to inspect or edit its BOM.
+              Select a node on the left to inspect or edit its {rightTab === 'bom' ? 'BOM' : 'process'}.
             </div>
+          ) : rightTab === 'process' ? (
+            <ProcessTab nomenclatureId={selectedDish.id} />
           ) : (
             <>
               {/* Selected item header */}
