@@ -5,7 +5,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { RoleProvider } from './contexts/RoleContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppShell } from './layouts/AppShell'
-import { Loader2, Code2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 // Static — always in main bundle (login + first screen)
 import { LoginPage } from './pages/LoginPage'
@@ -37,10 +37,10 @@ const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').t
 const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
 const MissionControl = lazy(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
 const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
-const BrainPlaceholder = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPlaceholder })))
 const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
 const MemPalaceBrowser = lazy(() => import('./pages/brain').then(m => ({ default: m.MemPalaceBrowser })))
 const QualityPage = lazy(() => import('./pages/brain').then(m => ({ default: m.QualityPage })))
+const GraphifyViewer = lazy(() => import('./pages/brain/GraphifyViewer').then(m => ({ default: m.GraphifyViewer })))
 const ApiCostPage = lazy(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
 
 function PageLoader() {
@@ -113,12 +113,7 @@ function App() {
                     path="graphify"
                     element={
                       <Suspense fallback={<PageLoader />}>
-                        <BrainPlaceholder
-                          icon={Code2}
-                          title="Graphify · L2+L3"
-                          phase="Installed — 1,750 nodes, 1,906 edges"
-                          description="Multimodal knowledge graph (code + docs + bible). Interactive viewer coming soon."
-                        />
+                        <GraphifyViewer />
                       </Suspense>
                     }
                   />

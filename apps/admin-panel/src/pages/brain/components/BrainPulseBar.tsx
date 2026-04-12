@@ -64,7 +64,7 @@ export function BrainPulseBar() {
       {/* Server status */}
       <span className="flex items-center gap-1.5 text-slate-400">
         <Dot ok={pulse.l1Up} />
-        L1 MemPalace
+        MemPalace
       </span>
 
       {/* Knowledge size */}

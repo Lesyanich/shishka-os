@@ -2,8 +2,8 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { Brain, Network, GitGraph, DollarSign, Activity } from 'lucide-react'
 
 const TABS = [
-  { to: '/brain/graphify', label: 'L2+L3 · Graphify', icon: GitGraph },
-  { to: '/brain/mempalace', label: 'L1 · Memory', icon: Network },
+  { to: '/brain/graphify', label: 'Graphify', icon: GitGraph },
+  { to: '/brain/mempalace', label: 'MemPalace', icon: Network },
   { to: '/brain/cost', label: 'Cost', icon: DollarSign },
   { to: '/brain/quality', label: 'Quality', icon: Activity },
 ]
@@ -18,7 +18,7 @@ export function BrainPage() {
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Brain</h1>
           <p className="text-xs text-slate-500">
-            Two-layer knowledge graph · L1 MemPalace · L2+L3 Graphify
+            Two-layer knowledge graph · MemPalace · Graphify
           </p>
         </div>
       </header>
