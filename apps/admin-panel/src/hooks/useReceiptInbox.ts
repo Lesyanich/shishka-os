@@ -37,6 +37,16 @@ export interface InboxInsert {
   model_used?: string | null
 }
 
+export interface BatchProcessResult {
+  ok: boolean
+  groups?: Array<{ inbox_id: string; supplier: string; images: number; items: number; error?: string }>
+  total_receipts?: number
+  total_images?: number
+  total_cost_usd?: number
+  duration_ms?: number
+  error?: string
+}
+
 export interface UseReceiptInboxResult {
   rows: InboxRow[]
   isLoading: boolean
@@ -44,6 +54,7 @@ export interface UseReceiptInboxResult {
   refetch: () => void
   insert: (payload: InboxInsert) => Promise<string | null>
   parseReceipt: (inboxId: string, model: OcrModel) => Promise<{ ok: boolean; error?: string }>
+  batchProcess: (photoUrls: string[], uploadedBy: string, model: OcrModel) => Promise<BatchProcessResult>
   approve: (inboxId: string, payload: Record<string, unknown>) => Promise<{ ok: boolean; error?: string; expense_id?: string }>
   skip: (inboxId: string) => Promise<string | null>
   reopen: (inboxId: string) => Promise<string | null>
@@ -198,6 +209,27 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     }
   }, [])
 
+  const batchProcess = useCallback(async (photoUrls: string[], uploadedBy: string, model: OcrModel): Promise<BatchProcessResult> => {
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('receipt-batch-process', {
+        body: { photo_urls: photoUrls, uploaded_by: uploadedBy, model },
+      })
+      if (fnErr) return { ok: false, error: fnErr.message }
+      if (data && !data.ok) return { ok: false, error: data.error || 'Batch processing failed' }
+      // Realtime will add the new rows as they're created
+      return {
+        ok: true,
+        groups: data.groups,
+        total_receipts: data.total_receipts,
+        total_images: data.total_images,
+        total_cost_usd: data.total_cost_usd,
+        duration_ms: data.duration_ms,
+      }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  }, [])
+
   const approve = useCallback(async (inboxId: string, payload: Record<string, unknown>) => {
     try {
       const { data, error: rpcErr } = await supabase.rpc('fn_approve_receipt', {
@@ -334,5 +366,5 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     return null
   }, [])
 
-  return { rows, isLoading, error, refetch: fetchData, insert, parseReceipt, approve, skip, reopen, resetToPending, deleteRow, deleteManyRows, approveManyRows, syncStatus }
+  return { rows, isLoading, error, refetch: fetchData, insert, parseReceipt, batchProcess, approve, skip, reopen, resetToPending, deleteRow, deleteManyRows, approveManyRows, syncStatus }
 }

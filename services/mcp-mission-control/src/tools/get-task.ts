@@ -15,10 +15,22 @@ async function resolveTaskId(
     return { id: null, error: `Invalid task ID or prefix: ${raw}` };
   }
 
+  // Pad prefix to full 32-hex UUID format for range query.
+  // UUID = 32 hex chars (without dashes). Pad with 0s for lower bound, fs for upper bound.
+  const lo = (prefix + "0".repeat(32 - prefix.length)).replace(
+    /^(.{8})(.{4})(.{4})(.{4})(.{12})$/,
+    "$1-$2-$3-$4-$5"
+  );
+  const hi = (prefix + "f".repeat(32 - prefix.length)).replace(
+    /^(.{8})(.{4})(.{4})(.{4})(.{12})$/,
+    "$1-$2-$3-$4-$5"
+  );
+
   const { data, error } = await sb
     .from("business_tasks")
     .select("id")
-    .filter("id::text", "like", `${prefix}%`)
+    .gte("id", lo)
+    .lte("id", hi)
     .limit(2);
 
   if (error) return { id: null, error: error.message };

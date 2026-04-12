@@ -165,6 +165,27 @@ Ollama model tags are **not safe** to paste directly into anything that becomes 
 
 ---
 
+## RULE-SUPABASE-UUID-OPERATORS
+
+Supabase JS client **does not support PostgreSQL type casting** (`::text`) in `.filter()` or `.ilike()` method column names. Attempting `.filter("id::text", "like", ...)` on a UUID column throws `operator does not exist: uuid ~~ unknown`.
+
+**For UUID prefix lookup**, use range queries instead:
+```typescript
+// Pad prefix to 32 hex chars, format as UUID
+const lo = (prefix + "0".repeat(32 - prefix.length))
+  .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+const hi = (prefix + "f".repeat(32 - prefix.length))
+  .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+
+const { data } = await sb.from("table").select("id").gte("id", lo).lte("id", hi).limit(2);
+```
+
+**Scope:** Any Supabase JS query that needs to match a UUID by prefix, substring, or pattern. Applies to all MCP servers.
+
+> Origin: 2026-04-12. `get_task` prefix lookup failed every session for weeks — every agent worked around it by manually finding full UUIDs. RULE-SELF-HEAL-TOOLING triggered fix. (MC task `44a6dc52`.)
+
+---
+
 ## RULE-MINIMAL-CORRECT-CHANGE
 
 Every code change must be:
