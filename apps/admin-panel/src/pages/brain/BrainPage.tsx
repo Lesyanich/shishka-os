@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Brain, Network, GitGraph, DollarSign, Activity } from 'lucide-react'
+import { Brain, Network, Sparkles, DollarSign, Activity } from 'lucide-react'
+import { BrainPulseBar } from './components/BrainPulseBar'
 
 const TABS = [
-  { to: '/brain/graphify', label: 'Graphify', icon: GitGraph },
+  { to: '/brain/knowledge', label: 'Knowledge', icon: Sparkles },
   { to: '/brain/mempalace', label: 'MemPalace', icon: Network },
   { to: '/brain/cost', label: 'Cost', icon: DollarSign },
   { to: '/brain/quality', label: 'Quality', icon: Activity },
@@ -18,10 +19,14 @@ export function BrainPage() {
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Brain</h1>
           <p className="text-xs text-slate-500">
-            Two-layer knowledge graph · MemPalace · Graphify
+            Knowledge graph · MemPalace · Graphify
           </p>
         </div>
       </header>
+
+      <div className="mb-3">
+        <BrainPulseBar />
+      </div>
 
       <nav className="mb-4 flex gap-1 border-b border-slate-800">
         {TABS.map(({ to, label, icon: Icon }) => (

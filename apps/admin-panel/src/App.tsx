@@ -40,7 +40,7 @@ const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.Bra
 const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
 const MemPalaceBrowser = lazy(() => import('./pages/brain').then(m => ({ default: m.MemPalaceBrowser })))
 const QualityPage = lazy(() => import('./pages/brain').then(m => ({ default: m.QualityPage })))
-const GraphifyViewer = lazy(() => import('./pages/brain/GraphifyViewer').then(m => ({ default: m.GraphifyViewer })))
+const BrainKnowledgePage = lazy(() => import('./pages/brain/BrainKnowledgePage').then(m => ({ default: m.BrainKnowledgePage })))
 const ApiCostPage = lazy(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
 
 function PageLoader() {
@@ -108,15 +108,8 @@ function App() {
                 <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
                 <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
                 <Route path="/brain" element={<Suspense fallback={<PageLoader />}><BrainPage /></Suspense>}>
-                  <Route index element={<Navigate to="graphify" replace />} />
-                  <Route
-                    path="graphify"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <GraphifyViewer />
-                      </Suspense>
-                    }
-                  />
+                  <Route index element={<Navigate to="knowledge" replace />} />
+                  <Route path="knowledge" element={<Suspense fallback={<PageLoader />}><BrainKnowledgePage /></Suspense>} />
                   <Route path="cost" element={<Suspense fallback={<PageLoader />}><BrainCostPage /></Suspense>} />
                   <Route path="mempalace" element={<Suspense fallback={<PageLoader />}><MemPalaceBrowser /></Suspense>} />
                   <Route path="quality" element={<Suspense fallback={<PageLoader />}><QualityPage /></Suspense>} />
