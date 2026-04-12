@@ -6,8 +6,49 @@ interface AddCommentArgs {
   body: string;
 }
 
+// RULE-HANDOFF-PACKET required sections (case-insensitive header match)
+const HANDOFF_REQUIRED_SECTIONS = [
+  "Lane",
+  "Scope — files",
+  "Scope — excluded",
+  "Commit/PR plan",
+  "Commit message template",
+  "Steps",
+  "Skills to load",
+  "Acceptance criteria",
+  "FORBIDDEN",
+  "Blocks / blocked-by",
+] as const;
+
+function validateHandoffPacket(body: string): string[] {
+  const missing: string[] = [];
+  for (const section of HANDOFF_REQUIRED_SECTIONS) {
+    // Match as markdown heading (## or **) or standalone label with colon
+    const escaped = section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(
+      `(^|\\n)\\s*(#{1,4}\\s*${escaped}|\\*\\*${escaped}\\**)\\s*[:：]?`,
+      "i"
+    );
+    if (!pattern.test(body)) {
+      missing.push(section);
+    }
+  }
+  return missing;
+}
+
 export async function addComment(args: AddCommentArgs) {
   const sb = getSupabase();
+
+  // Validate [HANDOFF] packets per RULE-HANDOFF-PACKET
+  if (args.body.trimStart().startsWith("[HANDOFF]")) {
+    const missing = validateHandoffPacket(args.body);
+    if (missing.length > 0) {
+      return {
+        error: `RULE-HANDOFF-PACKET violation — missing: ${missing.join(", ")}. Rewrite required.`,
+        missing_fields: missing,
+      };
+    }
+  }
 
   // Verify task exists
   const { data: task, error: taskErr } = await sb
