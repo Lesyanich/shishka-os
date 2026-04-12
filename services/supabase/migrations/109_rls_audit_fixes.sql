@@ -116,7 +116,7 @@ CREATE POLICY "recipes_flow_auth_full"
 -- ============================================================
 -- Self-register in migration_log (RULE-MIGRATION-TRACKING)
 -- ============================================================
-INSERT INTO public.migration_log (filename, description, checksum)
+INSERT INTO public.migration_log (filename, notes, checksum)
 VALUES (
   '109_rls_audit_fixes.sql',
   'RLS audit fixes: enable RLS on business_tasks/initiatives, close anon CRUD on receipt_inbox/sprints/task_comments/cook_feedback, remove anon SELECT from staff/recipes_flow',
