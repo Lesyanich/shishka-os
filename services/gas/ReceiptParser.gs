@@ -28,7 +28,7 @@
 //      with --no-verify-jwt
 // ═══════════════════════════════════════════════════════════
 
-var GEMINI_MODEL = "gemini-2.5-pro";
+var GEMINI_MODEL = "gemini-2.5-flash";
 
 // ── Debug log accumulator ──
 var debugLog = [];

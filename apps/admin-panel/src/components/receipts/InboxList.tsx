@@ -120,12 +120,12 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
   }
 
   const handleBulkParse = async () => {
-    const model: OcrModel = (localStorage.getItem('receipt-ocr-model') as OcrModel) || 'claude-sonnet'
+    const model: OcrModel = (localStorage.getItem('receipt-ocr-model') as OcrModel) || 'gemini-flash'
     if (model === 'claude-sub') {
       window.alert('Select an API model for bulk parsing')
       return
     }
-    const cost = model === 'claude-sonnet' ? 0.05 : 0.03
+    const cost = model.startsWith('claude') ? 0.05 : model.startsWith('gpt') ? 0.03 : 0.008
     const est = (pendingRows.length * cost).toFixed(2)
     if (!window.confirm(`Parse ${pendingRows.length} receipts via ${model}?\nEstimated cost: ~$${est}`)) return
 
