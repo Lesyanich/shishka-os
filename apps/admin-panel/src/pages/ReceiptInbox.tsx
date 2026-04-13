@@ -1,5 +1,6 @@
 import { useReceiptInbox } from '../hooks/useReceiptInbox'
 import { BatchUploader } from '../components/receipts/BatchUploader'
+import { QuickExpenseInput } from '../components/receipts/QuickExpenseInput'
 import { InboxList } from '../components/receipts/InboxList'
 
 export function ReceiptInbox() {
@@ -14,6 +15,9 @@ export function ReceiptInbox() {
           Upload receipt photos — AI parses them in real time.
         </p>
       </div>
+
+      {/* Quick expense entry (voice/text) */}
+      <QuickExpenseInput onInsert={insert} />
 
       {/* Uploader */}
       <BatchUploader onBatchProcess={batchProcess} onInsert={insert} />
