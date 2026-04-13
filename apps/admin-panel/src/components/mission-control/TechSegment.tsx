@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Cpu, Plus, Search, Zap, Star } from 'lucide-react'
+import { Cpu, Plus, Search, Zap, Star, Layers } from 'lucide-react'
 import type { BusinessTask, TaskPriority } from '../../hooks/useBusinessTasks'
 import { FocusCard } from './FocusCard'
+import { ProjectGroupView } from './ProjectGroupView'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,10 +137,13 @@ function EpicCard({ task, onClick }: { task: BusinessTask; onClick: (t: Business
 
 // ── Main component ───────────────────────────────────────────────────────────
 
+type ViewMode = 'flat' | 'projects'
+
 export function TechSegment({ tasks, onOpenDetail }: TechSegmentProps) {
   const [agentFilter, setAgentFilter] = useState<AgentFilter>('all')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('flat')
 
   // Only code/agent executor_type tasks
   const techTasks = tasks.filter(t => t.executor_type === 'code' || t.executor_type === 'agent')
@@ -239,6 +243,19 @@ export function TechSegment({ tasks, onOpenDetail }: TechSegmentProps) {
           })}
         </div>
 
+        {/* View mode toggle */}
+        <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2">
+          <Layers className="h-3 w-3 text-slate-500" />
+          <select
+            value={viewMode}
+            onChange={e => setViewMode(e.target.value as ViewMode)}
+            className="bg-transparent py-1.5 pr-1 text-[11px] text-slate-300 focus:outline-none"
+          >
+            <option value="flat">Flat view</option>
+            <option value="projects">By project</option>
+          </select>
+        </div>
+
         {/* Search */}
         <div className="relative ml-auto">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
@@ -302,6 +319,8 @@ export function TechSegment({ tasks, onOpenDetail }: TechSegmentProps) {
             <Star className="h-4 w-4 text-slate-600" />
             <span>Backlog is clear.</span>
           </div>
+        ) : viewMode === 'projects' ? (
+          <ProjectGroupView tasks={filtered} onOpenDetail={onOpenDetail} />
         ) : (
           <div className="grid grid-cols-[1fr_1.6fr] gap-4">
             {/* Left: Quick Wins & Tech Debt */}
