@@ -143,7 +143,7 @@ export function TechSegment({ tasks, onOpenDetail }: TechSegmentProps) {
   const [agentFilter, setAgentFilter] = useState<AgentFilter>('all')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [search, setSearch] = useState('')
-  const [viewMode, setViewMode] = useState<ViewMode>('flat')
+  const [viewMode, setViewMode] = useState<ViewMode>('projects')
 
   // Only code/agent executor_type tasks
   const techTasks = tasks.filter(t => t.executor_type === 'code' || t.executor_type === 'agent')
