@@ -106,7 +106,9 @@ export function deriveProjectGroups(tasks: BusinessTask[], allTasks?: BusinessTa
       childrenMap.get(task.parent_task_id)!.push(task)
       // Create a synthetic parent if we haven't seen it
       if (!parentMap.has(task.parent_task_id)) {
-        parentMap.set(task.parent_task_id, {
+        // Try to find real parent in lookupSource for its title
+        const realParent = lookupSource.find(t => t.id === task.parent_task_id)
+        parentMap.set(task.parent_task_id, realParent ?? {
           id: task.parent_task_id,
           title: `Project ${task.parent_task_id.slice(0, 8)}`,
           description: null,
