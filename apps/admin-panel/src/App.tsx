@@ -36,12 +36,14 @@ const BatchPlanner = lazy(() => import('./pages/BatchPlanner').then(m => ({ defa
 const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
 const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
 const MissionControl = lazy(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
+const MenuPage = lazy(() => import('./pages/menu/MenuPage').then(m => ({ default: m.MenuPage })))
 const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
 const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
 const MemPalaceBrowser = lazy(() => import('./pages/brain').then(m => ({ default: m.MemPalaceBrowser })))
 const QualityPage = lazy(() => import('./pages/brain').then(m => ({ default: m.QualityPage })))
 const BrainKnowledgePage = lazy(() => import('./pages/brain/BrainKnowledgePage').then(m => ({ default: m.BrainKnowledgePage })))
 const ApiCostPage = lazy(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
+const ProductionTargets = lazy(() => import('./pages/ProductionTargets').then(m => ({ default: m.ProductionTargets })))
 
 function PageLoader() {
   return (
@@ -92,6 +94,7 @@ function App() {
                 <Route path="/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
                 <Route path="/logistics" element={<Suspense fallback={<PageLoader />}><LogisticsScanner /></Suspense>} />
                 <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
+                <Route path="/menu" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />
                 <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
                 <Route path="/orders" element={<Suspense fallback={<PageLoader />}><OrderManager /></Suspense>} />
                 <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
@@ -106,6 +109,7 @@ function App() {
                 <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
+                <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
                 <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
                 <Route path="/brain" element={<Suspense fallback={<PageLoader />}><BrainPage /></Suspense>}>
                   <Route index element={<Navigate to="knowledge" replace />} />
