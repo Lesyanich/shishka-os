@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { SprayCanIcon } from 'lucide-react'
 
 interface CleanScreenOverlayProps {
@@ -7,6 +7,7 @@ interface CleanScreenOverlayProps {
 
 export function CleanScreenOverlay({ onDone }: CleanScreenOverlayProps) {
   const [secondsLeft, setSecondsLeft] = useState(15)
+  const lastTapRef = useRef(0)
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -22,12 +23,22 @@ export function CleanScreenOverlay({ onDone }: CleanScreenOverlayProps) {
     return () => clearInterval(interval)
   }, [onDone])
 
+  const handleTap = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault()
+    const now = Date.now()
+    if (now - lastTapRef.current < 400) {
+      // Double tap detected — cancel cleaning mode
+      onDone()
+    }
+    lastTapRef.current = now
+  }, [onDone])
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900"
-      onTouchStart={e => e.preventDefault()}
+      onTouchStart={handleTap}
       onTouchMove={e => e.preventDefault()}
-      onClick={e => e.preventDefault()}
+      onClick={handleTap}
     >
       <SprayCanIcon className="mb-6 h-16 w-16 text-sky-400" />
       <h1 className="mb-2 text-3xl font-bold text-slate-100">Cleaning Mode</h1>
@@ -39,6 +50,7 @@ export function CleanScreenOverlay({ onDone }: CleanScreenOverlayProps) {
           style={{ width: `${((15 - secondsLeft) / 15) * 100}%` }}
         />
       </div>
+      <p className="mt-8 text-sm text-slate-600">Double-tap to cancel</p>
     </div>
   )
 }
