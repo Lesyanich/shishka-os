@@ -96,7 +96,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<string | null>(null)
   const [nomMap, setNomMap] = useState<Record<string, { code: string; name: string }>>({})
-  const [showConfirm, setShowConfirm] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   // NOTE: All hooks must run unconditionally (react-hooks/rules-of-hooks).
@@ -110,6 +109,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [transactionDate, setTransactionDate] = useState<string>(p?.transaction_date || '')
   const [receiptTotal, setReceiptTotal] = useState<number>(p?.amount_original ?? 0)
   const [invoiceNumber, setInvoiceNumber] = useState<string>(p?.invoice_number || '')
+  const [hasTaxInvoice, setHasTaxInvoice] = useState<boolean>(p?.has_tax_invoice ?? false)
   const [editingHeader, setEditingHeader] = useState(false)
 
   // ── Editable item state ──
@@ -139,12 +139,13 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       transaction_date: transactionDate,
       amount_original: receiptTotal,
       invoice_number: invoiceNumber || null,
+      has_tax_invoice: hasTaxInvoice,
       food_items: foodItems,
       capex_items: capexItems,
       opex_items: opexItems,
     }
     isDirty.current = true
-  }, [supplierName, transactionDate, receiptTotal, invoiceNumber, foodItems, capexItems, opexItems]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supplierName, transactionDate, receiptTotal, invoiceNumber, hasTaxInvoice, foodItems, capexItems, opexItems]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const rowId = row.id
@@ -216,8 +217,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const opexTotal = opexItems.reduce((s, it) => s + (it.total_price || 0), 0)
   const calculatedTotal = foodTotal + capexTotal + opexTotal
   const discountAmount = Math.abs(p?.discount_total || 0)
-  // Receipt total = items - discount, so compare accordingly
-  const expectedReceiptTotal = calculatedTotal - discountAmount
+  const vatAmount = p?.vat_amount || 0
+  // Receipt total = items - discount + VAT (VAT may be a separate line, not baked into item prices)
+  const expectedReceiptTotal = calculatedTotal - discountAmount + vatAmount
   const totalMismatch = Math.abs(expectedReceiptTotal - receiptTotal) > 0.5
   const totalItems = foodItems.length + capexItems.length + opexItems.length
   const totalChecked = foodChecked.size + capexChecked.size + opexChecked.size
@@ -416,26 +418,25 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       console.warn('[InboxReviewPanel] Duplicate check failed:', err)
     }
 
-    setShowConfirm(true)
-  }
-
-  const handleApproveConfirm = async () => {
-    setShowConfirm(false)
+    // Go straight to approve (no extra confirm dialog)
     setIsApproving(true)
     setError(null)
     const photos = row.photo_urls || []
+    // Auto-generate invoice number if empty (REC-YYYYMMDD-XXXXXX)
+    const finalInvoice = invoiceNumber || `REC-${transactionDate.replace(/-/g, '')}-${row.id.slice(0, 6)}`
     const editedPayload = {
       ...p,
       supplier_name: supplierName,
       transaction_date: transactionDate,
       amount_original: receiptTotal,
-      invoice_number: invoiceNumber || null,
+      invoice_number: finalInvoice,
+      has_tax_invoice: hasTaxInvoice,
       food_items: foodItems,
       capex_items: capexItems,
       opex_items: opexItems,
       receipt_supplier_url: p.receipt_supplier_url || photos[0] || null,
       receipt_bank_url: p.receipt_bank_url || (photos[1] && photos[1] !== photos[0] ? photos[1] : null),
-      tax_invoice_url: p.tax_invoice_url || (p.has_tax_invoice && photos.length > 1 ? photos[1] : null),
+      tax_invoice_url: p.tax_invoice_url || (hasTaxInvoice && photos.length > 1 ? photos[1] : null),
     }
     const res = await onApprove(row.id, editedPayload)
     setIsApproving(false)
@@ -636,10 +637,17 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               <span className="text-slate-500">Paid by: </span>
               <span className="text-slate-200">{[p.payment_method, p.paid_by].filter(Boolean).join(' · ') || '—'}</span>
             </div>
-            <div>
+            <label className="flex cursor-pointer items-center gap-1.5">
               <span className="text-slate-500">Tax invoice: </span>
-              <span className="text-slate-200">{p.has_tax_invoice ? 'Yes' : 'No'}</span>
-            </div>
+              <input
+                type="checkbox"
+                checked={hasTaxInvoice}
+                onChange={(e) => setHasTaxInvoice(e.target.checked)}
+                disabled={isReadOnly}
+                className="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-emerald-500 accent-emerald-500 disabled:opacity-50"
+              />
+              <span className="text-slate-200">{hasTaxInvoice ? 'Yes' : 'No'}</span>
+            </label>
           </div>
 
           {/* Totals bar */}
@@ -682,7 +690,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           {totalMismatch && (
             <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
               <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              Items ({'\u0E3F'}{fmt(calculatedTotal)}) − discount ({'\u0E3F'}{fmt(discountAmount)}) = {'\u0E3F'}{fmt(expectedReceiptTotal)} ≠ receipt ({'\u0E3F'}{fmt(receiptTotal)}).
+              Items ({'\u0E3F'}{fmt(calculatedTotal)}) − discount ({'\u0E3F'}{fmt(discountAmount)}){vatAmount ? ` + VAT (฿${fmt(vatAmount)})` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} ≠ receipt ({'\u0E3F'}{fmt(receiptTotal)}).
               Diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))}
             </div>
           )}
@@ -1002,43 +1010,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
         </div>
       )}
 
-      {/* ── Confirmation dialog ── */}
-      {showConfirm && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-xs">
-          <div className="mb-2 font-medium text-slate-200">Confirm approval:</div>
-          <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-slate-400">
-            <div>Supplier: <span className="text-slate-200">{supplierName}</span></div>
-            <div>Date: <span className="text-slate-200">{transactionDate}</span></div>
-            <div>Amount: <span className="text-slate-200">{'\u0E3F'}{fmt(receiptTotal)}</span></div>
-            <div>Items: <span className="text-slate-200">{foodItems.length} food, {capexItems.length} capex, {opexItems.length} opex</span></div>
-            {totalMismatch && (
-              <div className="col-span-2 text-amber-400">
-                <AlertTriangle className="mr-1 inline h-3 w-3" />
-                Items total mismatch (diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))})
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={isApproving}
-              onClick={handleApproveConfirm}
-              className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
-            >
-              {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              Yes, approve
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowConfirm(false)}
-              className="rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-xs text-slate-400 hover:bg-slate-700"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── Error / Result ── */}
       {error && (
         <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">{error}</div>
@@ -1075,7 +1046,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           <>
             <button
               type="button"
-              disabled={isApproving || !!result || showConfirm}
+              disabled={isApproving || !!result}
               onClick={handleApproveClick}
               className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
             >

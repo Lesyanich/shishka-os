@@ -54,7 +54,7 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
   const [step, setStep] = useState<BatchStep>('idle')
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
   const [progress, setProgress] = useState('')
-  const [autoSort, setAutoSort] = useState(true)
+  const [oneReceipt, setOneReceipt] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [model, setModel] = useState<OcrModel>(getStoredModel)
@@ -207,7 +207,7 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
 
       localStorage.setItem('receipt-ocr-model', model)
 
-      if (autoSort && photoUrls.length > 1) {
+      if (!oneReceipt && photoUrls.length > 1) {
         // Batch process with triage
         setStep('analyzing')
         setProgress(`Analyzing ${photoUrls.length} images — grouping receipts...`)
@@ -341,16 +341,16 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
 
         {/* ── Controls ── */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* Auto-sort toggle */}
+          {/* One receipt toggle */}
           <label className="flex cursor-pointer items-center gap-1.5 select-none">
             <input
               type="checkbox"
-              checked={autoSort}
-              onChange={(e) => setAutoSort(e.target.checked)}
+              checked={oneReceipt}
+              onChange={(e) => setOneReceipt(e.target.checked)}
               disabled={isProcessing}
               className="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-0 focus:ring-offset-0 disabled:opacity-40"
             />
-            <span className="text-[11px] text-slate-400">Auto-sort by supplier</span>
+            <span className="text-[11px] text-slate-400">One receipt (multi-page)</span>
           </label>
 
           {/* Model selector */}
@@ -367,39 +367,16 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
 
           <div className="flex-1" />
 
-          {/* Upload only — single vs split */}
-          {files.length > 1 ? (
-            <>
-              <button
-                type="button"
-                onClick={() => handleUploadOnly(false)}
-                disabled={isProcessing}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100 disabled:opacity-30"
-              >
-                <UploadCloud className="h-3.5 w-3.5" />
-                1 receipt
-              </button>
-              <button
-                type="button"
-                onClick={() => handleUploadOnly(true)}
-                disabled={isProcessing}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100 disabled:opacity-30"
-              >
-                <UploadCloud className="h-3.5 w-3.5" />
-                {files.length} receipts
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => handleUploadOnly(false)}
-              disabled={isProcessing || files.length === 0}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100 disabled:opacity-30"
-            >
-              <UploadCloud className="h-3.5 w-3.5" />
-              Upload only
-            </button>
-          )}
+          {/* Upload only — uses oneReceipt toggle for split logic */}
+          <button
+            type="button"
+            onClick={() => handleUploadOnly(!oneReceipt)}
+            disabled={isProcessing || files.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100 disabled:opacity-30"
+          >
+            <UploadCloud className="h-3.5 w-3.5" />
+            Upload only
+          </button>
 
           {/* Upload & process */}
           <button
