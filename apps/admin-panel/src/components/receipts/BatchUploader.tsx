@@ -133,7 +133,7 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
   }
 
   /* ── Upload only (no parse) ── */
-  const handleUploadOnly = async () => {
+  const handleUploadOnly = async (splitPerPhoto: boolean) => {
     if (files.length === 0) {
       setToast({ type: 'err', msg: 'Add at least one photo' })
       return
@@ -144,29 +144,46 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
       const photoUrls = await uploadFiles()
       if (!photoUrls) return
 
-      // Create one inbox row PER photo so each receipt can be parsed independently
-      let successCount = 0
-      let lastError: string | null = null
-      for (const url of photoUrls) {
+      if (splitPerPhoto) {
+        // One inbox row PER photo — each is a separate receipt
+        let successCount = 0
+        let lastError: string | null = null
+        for (const url of photoUrls) {
+          const err = await onInsert({
+            uploaded_by: uploadedBy,
+            photo_urls: [url],
+          })
+          if (err) {
+            lastError = err
+          } else {
+            successCount++
+          }
+        }
+
+        if (successCount === 0 && lastError) {
+          setStep('error')
+          setToast({ type: 'err', msg: lastError })
+          return
+        }
+
+        setStep('done')
+        setToast({ type: 'ok', msg: `Uploaded ${successCount} receipt(s) — parse from the list` })
+      } else {
+        // All photos → one inbox row (single receipt, multiple pages)
         const err = await onInsert({
           uploaded_by: uploadedBy,
-          photo_urls: [url],
+          photo_urls: photoUrls,
         })
         if (err) {
-          lastError = err
-        } else {
-          successCount++
+          setStep('error')
+          setToast({ type: 'err', msg: err })
+          return
         }
+
+        setStep('done')
+        setToast({ type: 'ok', msg: `Uploaded 1 receipt (${photoUrls.length} photos) — parse from the list` })
       }
 
-      if (successCount === 0 && lastError) {
-        setStep('error')
-        setToast({ type: 'err', msg: lastError })
-        return
-      }
-
-      setStep('done')
-      setToast({ type: 'ok', msg: `Uploaded ${successCount} receipt(s) — parse from the list` })
       setProgress('')
       for (const f of files) if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
       setFiles([])
@@ -350,16 +367,39 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
 
           <div className="flex-1" />
 
-          {/* Upload only */}
-          <button
-            type="button"
-            onClick={handleUploadOnly}
-            disabled={isProcessing || files.length === 0}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100 disabled:opacity-30"
-          >
-            <UploadCloud className="h-3.5 w-3.5" />
-            Upload only
-          </button>
+          {/* Upload only — single vs split */}
+          {files.length > 1 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => handleUploadOnly(false)}
+                disabled={isProcessing}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100 disabled:opacity-30"
+              >
+                <UploadCloud className="h-3.5 w-3.5" />
+                1 receipt
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUploadOnly(true)}
+                disabled={isProcessing}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100 disabled:opacity-30"
+              >
+                <UploadCloud className="h-3.5 w-3.5" />
+                {files.length} receipts
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleUploadOnly(false)}
+              disabled={isProcessing || files.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100 disabled:opacity-30"
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Upload only
+            </button>
+          )}
 
           {/* Upload & process */}
           <button
