@@ -5,7 +5,7 @@ import type { MenuDish } from '../../../hooks/useMenuDishes'
 interface OwnerTableProps {
   dishes: MenuDish[]
   selectedCategory: string | null
-  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
+  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
 }
 
 function foodCostColor(pct: number): string {
@@ -22,7 +22,6 @@ function formatThb(v: number | null): string {
 interface EditState {
   id: string
   name: string
-  description: string
   price: string
 }
 
@@ -43,7 +42,6 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
     setEditing({
       id: dish.id,
       name: dish.name,
-      description: dish.description ?? '',
       price: dish.price?.toString() ?? '',
     })
   }, [])
@@ -54,12 +52,11 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
 
   const saveEdit = useCallback(async () => {
     if (!editing) return
-    const patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price'>> = {}
+    const patch: Partial<Pick<MenuDish, 'name' | 'price'>> = {}
     const original = filtered.find((d) => d.id === editing.id)
     if (!original) return
 
     if (editing.name !== original.name) patch.name = editing.name
-    if (editing.description !== (original.description ?? '')) patch.description = editing.description || null
     const newPrice = editing.price ? Number(editing.price) : null
     if (newPrice !== original.price) patch.price = newPrice
 
@@ -129,7 +126,7 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
                 {/* Name */}
                 <td className="px-3 py-2">
                   {isEditing ? (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1">
                       <input
                         value={editing.name}
                         onChange={(e) => setEditing({ ...editing, name: e.target.value })}
@@ -137,31 +134,19 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
                         className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
                         autoFocus
                       />
-                      <input
-                        value={editing.description}
-                        onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Description..."
-                        className="w-full rounded border border-slate-700 bg-slate-800/50 px-2 py-1 text-[10px] text-slate-400 focus:border-emerald-500 focus:outline-none"
-                      />
-                      <div className="flex gap-1">
-                        <button onClick={saveEdit} className="rounded bg-emerald-600 p-0.5 text-white hover:bg-emerald-500">
-                          <Check className="h-3 w-3" />
-                        </button>
-                        <button onClick={cancelEdit} className="rounded bg-slate-700 p-0.5 text-slate-300 hover:bg-slate-600">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
+                      <button onClick={saveEdit} className="rounded bg-emerald-600 p-0.5 text-white hover:bg-emerald-500">
+                        <Check className="h-3 w-3" />
+                      </button>
+                      <button onClick={cancelEdit} className="rounded bg-slate-700 p-0.5 text-slate-300 hover:bg-slate-600">
+                        <X className="h-3 w-3" />
+                      </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => startEdit(dish)}
-                      className="text-left"
+                      className="text-left font-medium text-slate-100"
                     >
-                      <span className="font-medium text-slate-100">{dish.name}</span>
-                      {dish.description && (
-                        <span className="block text-[10px] text-slate-500 truncate max-w-[200px]">{dish.description}</span>
-                      )}
+                      {dish.name}
                     </button>
                   )}
                 </td>

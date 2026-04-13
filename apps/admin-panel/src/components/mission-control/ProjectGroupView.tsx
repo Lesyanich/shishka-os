@@ -180,11 +180,12 @@ function ProjectAccordion({
 
 export interface ProjectGroupViewProps {
   tasks: BusinessTask[]
+  allTasks?: BusinessTask[]
   onOpenDetail: (task: BusinessTask) => void
 }
 
-export function ProjectGroupView({ tasks, onOpenDetail }: ProjectGroupViewProps) {
-  const { projects, orphans } = useMemo(() => deriveProjectGroups(tasks), [tasks])
+export function ProjectGroupView({ tasks, allTasks, onOpenDetail }: ProjectGroupViewProps) {
+  const { projects, orphans } = useMemo(() => deriveProjectGroups(tasks, allTasks), [tasks, allTasks])
 
   if (projects.length === 0 && orphans.length === 0) {
     return (
