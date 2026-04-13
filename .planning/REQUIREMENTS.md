@@ -88,8 +88,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | MENU-04 | Phase 1 | Pending |
 | OWN-01 | Phase 1 | Pending |
 | OWN-02 | Phase 1 | Pending |
-| OWN-03 | Phase 1 | Pending |
-| OWN-04 | Phase 1 | Pending |
+| OWN-03 | Phase 3 | Pending |
+| OWN-04 | Phase 3 | Pending |
 | OWN-05 | Phase 1 | Pending |
 | PREV-01 | Phase 2 | Pending |
 | PREV-02 | Phase 2 | Pending |
@@ -116,4 +116,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-04-13*
-*Last updated: 2026-04-13 after initial definition*
+*Last updated: 2026-04-13 after roadmap creation (OWN-03, OWN-04 moved to Phase 3 — they are write operations, not display-only)*
