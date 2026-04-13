@@ -1,6 +1,8 @@
 -- Migration 112: Scheduling core tables
 -- Creates production_targets, schedule_runs, equipment_bookings
 
+BEGIN;
+
 -- ─── 1. production_targets ───
 CREATE TABLE IF NOT EXISTS public.production_targets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -16,10 +18,14 @@ CREATE TABLE IF NOT EXISTS public.production_targets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_pt_date ON public.production_targets(date);
-CREATE INDEX idx_pt_status ON public.production_targets(status);
+CREATE INDEX IF NOT EXISTS idx_ptgt_date ON public.production_targets(date);
+CREATE INDEX IF NOT EXISTS idx_ptgt_status ON public.production_targets(status);
 
 COMMENT ON TABLE public.production_targets IS 'Su-chef daily planning: what to produce, how much, by when';
+
+CREATE TRIGGER trg_production_targets_updated_at
+  BEFORE UPDATE ON public.production_targets
+  FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 
 -- ─── 2. schedule_runs ───
 CREATE TABLE IF NOT EXISTS public.schedule_runs (
@@ -49,8 +55,8 @@ CREATE TABLE IF NOT EXISTS public.equipment_bookings (
   CONSTRAINT valid_slot CHECK (slot_end > slot_start)
 );
 
-CREATE INDEX idx_eb_equipment_slot ON public.equipment_bookings(equipment_id, slot_start, slot_end);
-CREATE INDEX idx_eb_task ON public.equipment_bookings(production_task_id);
+CREATE INDEX IF NOT EXISTS idx_eb_equipment_slot ON public.equipment_bookings(equipment_id, slot_start, slot_end);
+CREATE INDEX IF NOT EXISTS idx_eb_task ON public.equipment_bookings(production_task_id);
 
 COMMENT ON TABLE public.equipment_bookings IS 'Equipment time-slot reservations with capacity tracking';
 
@@ -58,27 +64,27 @@ COMMENT ON TABLE public.equipment_bookings IS 'Equipment time-slot reservations 
 ALTER PUBLICATION supabase_realtime ADD TABLE public.production_targets;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.equipment_bookings;
 
+-- Note: schedule_runs intentionally excluded from realtime — generated in background, no live UI updates needed
+
 -- ─── 5. RLS ───
 ALTER TABLE public.production_targets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.equipment_bookings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Authenticated users can read production_targets"
-  ON public.production_targets FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert production_targets"
-  ON public.production_targets FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Authenticated users can update production_targets"
-  ON public.production_targets FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "production_targets_auth_full"
+  ON public.production_targets FOR ALL TO public
+  USING (fn_is_authenticated())
+  WITH CHECK (fn_is_authenticated());
 
-CREATE POLICY "Authenticated users can read schedule_runs"
-  ON public.schedule_runs FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert schedule_runs"
-  ON public.schedule_runs FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "schedule_runs_auth_full"
+  ON public.schedule_runs FOR ALL TO public
+  USING (fn_is_authenticated())
+  WITH CHECK (fn_is_authenticated());
 
-CREATE POLICY "Authenticated users can read equipment_bookings"
-  ON public.equipment_bookings FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can manage equipment_bookings"
-  ON public.equipment_bookings FOR ALL TO authenticated USING (true);
+CREATE POLICY "equipment_bookings_auth_full"
+  ON public.equipment_bookings FOR ALL TO public
+  USING (fn_is_authenticated())
+  WITH CHECK (fn_is_authenticated());
 
 -- ─── 6. Self-register in migration_log ───
 INSERT INTO public.migration_log (filename, notes, checksum)
@@ -88,3 +94,5 @@ VALUES (
   NULL
 )
 ON CONFLICT (filename) DO NOTHING;
+
+COMMIT;
