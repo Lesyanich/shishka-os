@@ -177,6 +177,7 @@ ${fullOcrText}
       vat_amount: footer.vat_amount || 0,
       delivery_fee: footer.delivery_fee || 0,
       has_tax_invoice: parsed.has_tax_invoice || false,
+      vat_included: parsed.vat_included !== false,
       currency: "THB",
       food_items,
       capex_items,

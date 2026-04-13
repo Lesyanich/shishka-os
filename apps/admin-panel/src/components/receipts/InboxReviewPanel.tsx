@@ -122,6 +122,67 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [capexChecked, setCapexChecked] = useState<Set<number>>(() => new Set())
   const [opexChecked, setOpexChecked] = useState<Set<number>>(() => new Set())
 
+  // ── Duplicate detection ──
+  const [dupeWarnings, setDupeWarnings] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!p) return
+    const inv = p.invoice_number as string | null
+    const date = p.transaction_date as string | null
+    const amount = p.amount_original as number | null
+
+    async function checkDuplicates() {
+      const warnings: string[] = []
+      try {
+        if (inv) {
+          // Check inbox for same invoice_number (other rows)
+          const { data: inboxDupes } = await supabase
+            .from('receipt_inbox')
+            .select('id, created_at, status')
+            .neq('id', row.id)
+            .neq('status', 'skipped')
+            .filter('parsed_payload->>invoice_number', 'eq', inv)
+            .limit(5)
+          if (inboxDupes?.length) {
+            for (const d of inboxDupes) {
+              warnings.push(`Inbox duplicate: receipt ${inv} also in row ${d.id.slice(0, 8)}… (${d.status}, ${new Date(d.created_at).toLocaleDateString()})`)
+            }
+          }
+          // Check ledger for already-approved
+          const { data: ledgerDupes } = await supabase
+            .from('expense_ledger')
+            .select('id, transaction_date, amount_original, details')
+            .eq('invoice_number', inv)
+            .limit(5)
+          if (ledgerDupes?.length) {
+            for (const d of ledgerDupes) {
+              warnings.push(`Already approved: ${inv} on ${d.transaction_date} — ฿${d.amount_original?.toLocaleString()} (${d.details})`)
+            }
+          }
+        } else if (date && amount && amount > 0) {
+          // Fallback: date + amount + supplier fuzzy match
+          const { data: fuzzyDupes } = await supabase
+            .from('expense_ledger')
+            .select('id, transaction_date, amount_original, details')
+            .eq('transaction_date', date)
+            .gte('amount_original', amount - 1)
+            .lte('amount_original', amount + 1)
+            .limit(5)
+          if (fuzzyDupes?.length) {
+            for (const d of fuzzyDupes) {
+              warnings.push(`Possible duplicate: ${d.transaction_date} — ฿${d.amount_original?.toLocaleString()} (${d.details})`)
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[InboxReviewPanel] Duplicate check failed:', err)
+      }
+      setDupeWarnings(warnings)
+    }
+
+    checkDuplicates()
+  }, [row.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Auto-save edits on unmount (prevents data loss on row switch) ──
   const isDirty = useRef(false)
   const isInitialRender = useRef(true)
@@ -218,8 +279,11 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const calculatedTotal = foodTotal + capexTotal + opexTotal
   const discountAmount = Math.abs(p?.discount_total || 0)
   const vatAmount = p?.vat_amount || 0
-  // Receipt total = items - discount + VAT (VAT may be a separate line, not baked into item prices)
-  const expectedReceiptTotal = calculatedTotal - discountAmount + vatAmount
+  const vatIncluded = p?.vat_included !== false // default true — most Thai receipts include VAT in item prices
+  // If VAT is included in item prices → don't add it again. If separate line → add on top.
+  const expectedReceiptTotal = vatIncluded
+    ? calculatedTotal - discountAmount
+    : calculatedTotal - discountAmount + vatAmount
   const totalMismatch = Math.abs(expectedReceiptTotal - receiptTotal) > 0.5
   const totalItems = foodItems.length + capexItems.length + opexItems.length
   const totalChecked = foodChecked.size + capexChecked.size + opexChecked.size
@@ -585,6 +649,17 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
 
       {/* ── RIGHT: Parsed data ── */}
       <div className="flex-1 space-y-4 px-4 py-4">
+      {/* ── Duplicate warning banner ── */}
+      {dupeWarnings.length > 0 && (
+        <div className="space-y-1">
+          {dupeWarnings.map((w, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-rose-400" />
+              <span>{w}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {/* ── Header: receipt summary ── */}
       <div>
         <div className="space-y-2">
@@ -674,7 +749,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             )}
             {p.vat_amount ? (
               <div>
-                <span className="text-slate-500">VAT: </span>
+                <span className="text-slate-500">VAT{vatIncluded ? ' (incl.)' : ' (separate)'}: </span>
                 <span className="text-slate-300">{fmt(p.vat_amount)}</span>
               </div>
             ) : null}
@@ -690,7 +765,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           {totalMismatch && (
             <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
               <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              Items ({'\u0E3F'}{fmt(calculatedTotal)}) − discount ({'\u0E3F'}{fmt(discountAmount)}){vatAmount ? ` + VAT (฿${fmt(vatAmount)})` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} ≠ receipt ({'\u0E3F'}{fmt(receiptTotal)}).
+              Items ({'\u0E3F'}{fmt(calculatedTotal)}) − discount ({'\u0E3F'}{fmt(discountAmount)}){!vatIncluded && vatAmount ? ` + VAT (฿${fmt(vatAmount)})` : ''}{vatIncluded && vatAmount ? ` [VAT ฿${fmt(vatAmount)} incl.]` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} ≠ receipt ({'\u0E3F'}{fmt(receiptTotal)}).
               Diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))}
             </div>
           )}
