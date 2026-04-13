@@ -1,3 +1,4 @@
+import { Flame, Snowflake } from 'lucide-react'
 import type { GanttTask, GanttConflict } from '../../hooks/useGanttTasks'
 
 interface GanttTaskBarProps {
@@ -25,16 +26,30 @@ export function GanttTaskBar({ task, dayStartMs, isConflict, conflicts }: GanttT
   const clampedLeft = Math.max(0, Math.min(leftPct, 100))
   const clampedWidth = Math.max(0.3, Math.min(widthPct, 100 - clampedLeft))
 
-  const colorClass = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending
   const conflictOverlap = conflicts.find(
     (c) => c.taskA === task.id || c.taskB === task.id,
   )
 
+  // Preheat/defrost override styles
+  const isPreheat = task.is_preheat === true
+  const isDefrost = task.is_defrost === true
+
+  let colorClass = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending
+  let extraClasses = ''
+
+  if (isPreheat) {
+    colorClass = 'bg-orange-500/20 border-orange-500/60 text-orange-200'
+    extraClasses = 'border-dashed'
+  } else if (isDefrost) {
+    colorClass = 'bg-cyan-500/30 border-cyan-500/50 text-cyan-200'
+  }
+
   return (
     <div
       className={[
-        'absolute top-1 bottom-1 flex items-center overflow-hidden rounded border px-1.5 text-[10px] font-medium',
+        'absolute top-1 bottom-1 flex items-center gap-1 overflow-hidden rounded border px-1.5 text-[10px] font-medium',
         colorClass,
+        extraClasses,
         isConflict ? 'ring-2 ring-rose-500/60' : '',
       ].join(' ')}
       style={{
@@ -44,6 +59,8 @@ export function GanttTaskBar({ task, dayStartMs, isConflict, conflicts }: GanttT
       }}
       title={[
         task.target_nomenclature?.name ?? task.description ?? 'Task',
+        isPreheat ? 'Preheat task' : '',
+        isDefrost ? 'Defrost task' : '',
         task.target_quantity ? `Target: ${task.target_quantity} kg` : '',
         `Status: ${task.status}`,
         task.duration_min ? `${task.duration_min} min` : '',
@@ -52,6 +69,8 @@ export function GanttTaskBar({ task, dayStartMs, isConflict, conflicts }: GanttT
         .filter(Boolean)
         .join('\n')}
     >
+      {isPreheat && <Flame className="h-2.5 w-2.5 shrink-0" />}
+      {isDefrost && <Snowflake className="h-2.5 w-2.5 shrink-0" />}
       <span className="truncate">
         {task.target_nomenclature?.name ?? task.description ?? task.id.slice(0, 8)}
       </span>

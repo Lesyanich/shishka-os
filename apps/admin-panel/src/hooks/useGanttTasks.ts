@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import type { EquipmentBooking } from '../types/scheduling'
 
 export interface GanttTask {
   id: string
@@ -15,6 +16,8 @@ export interface GanttTask {
   target_nomenclature_id: string | null
   target_quantity: number | null
   target_nomenclature: { name: string; product_code: string } | null
+  is_preheat: boolean | null
+  is_defrost: boolean | null
 }
 
 export interface GanttConflict {
@@ -71,6 +74,7 @@ function detectConflicts(tasks: GanttTask[]): GanttConflict[] {
 export interface UseGanttTasksResult {
   tasks: GanttTask[]
   conflicts: GanttConflict[]
+  bookings: EquipmentBooking[]
   isLoading: boolean
   error: string | null
   refetch: () => void
@@ -78,6 +82,7 @@ export interface UseGanttTasksResult {
 
 export function useGanttTasks(): UseGanttTasksResult {
   const [tasks, setTasks] = useState<GanttTask[]>([])
+  const [bookings, setBookings] = useState<EquipmentBooking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -85,24 +90,34 @@ export function useGanttTasks(): UseGanttTasksResult {
     setIsLoading(true)
     setError(null)
 
-    const { data, error: fetchError } = await supabase
-      .from('production_tasks')
-      .select(
-        'id, description, status, scheduled_start, duration_min, equipment_id, actual_start, actual_end, actual_weight, theoretical_yield, target_nomenclature_id, target_quantity, nomenclature!target_nomenclature_id(name, product_code)',
-      )
-      .not('scheduled_start', 'is', null)
-      .order('scheduled_start', { ascending: true })
+    const [tasksResult, bookingsResult] = await Promise.all([
+      supabase
+        .from('production_tasks')
+        .select(
+          'id, description, status, scheduled_start, duration_min, equipment_id, actual_start, actual_end, actual_weight, theoretical_yield, target_nomenclature_id, target_quantity, is_preheat, is_defrost, nomenclature!target_nomenclature_id(name, product_code)',
+        )
+        .not('scheduled_start', 'is', null)
+        .order('scheduled_start', { ascending: true }),
+      supabase
+        .from('equipment_bookings')
+        .select('id, equipment_id, production_task_id, slot_start, slot_end, capacity_used, product_category')
+        .order('slot_start', { ascending: true }),
+    ])
 
-    if (fetchError) {
-      console.error('[useGanttTasks] fetch error', fetchError)
-      setError(fetchError.message)
+    if (tasksResult.error) {
+      console.error('[useGanttTasks] fetch error', tasksResult.error)
+      setError(tasksResult.error.message)
     } else {
-      const mapped = (data ?? []).map((row: Record<string, unknown>) => ({
+      const mapped = (tasksResult.data ?? []).map((row: Record<string, unknown>) => ({
         ...row,
         target_nomenclature: row.nomenclature as { name: string; product_code: string } | null,
         nomenclature: undefined,
       })) as unknown as GanttTask[]
       setTasks(mapped)
+    }
+
+    if (!bookingsResult.error) {
+      setBookings((bookingsResult.data ?? []) as unknown as EquipmentBooking[])
     }
 
     setIsLoading(false)
@@ -112,7 +127,7 @@ export function useGanttTasks(): UseGanttTasksResult {
   useEffect(() => {
     fetchTasks()
 
-    const channel = supabase
+    const tasksChannel = supabase
       .channel('gantt-tasks')
       .on(
         'postgres_changes',
@@ -127,12 +142,28 @@ export function useGanttTasks(): UseGanttTasksResult {
       )
       .subscribe()
 
+    const bookingsChannel = supabase
+      .channel('gantt-bookings')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'equipment_bookings',
+        },
+        () => {
+          fetchTasks()
+        },
+      )
+      .subscribe()
+
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(tasksChannel)
+      supabase.removeChannel(bookingsChannel)
     }
   }, [fetchTasks])
 
   const conflicts = detectConflicts(tasks)
 
-  return { tasks, conflicts, isLoading, error, refetch: fetchTasks }
+  return { tasks, conflicts, bookings, isLoading, error, refetch: fetchTasks }
 }
