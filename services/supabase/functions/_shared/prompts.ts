@@ -162,8 +162,8 @@ Thai receipts use Buddhist Era years. SUBTRACT 543 to convert:
 - Subtotal (before discount)
 - Discount (MEM.DISC): ALWAYS negative (e.g., -134)
 - VAT 7%: if printed, use printed value; otherwise calculate: total × 7 / 107
-  - IMPORTANT: If VAT is listed as a SEPARATE line (not included in item prices), set vat_amount to that value. The grand_total = subtotal - discount + vat_amount.
-  - If VAT is INCLUDED in item prices (VAT code "2"), vat_amount = total × 7 / 107 (for display only, already in prices).
+  - IMPORTANT: If VAT is listed as a SEPARATE line (not included in item prices), set vat_included: false and vat_amount to that printed value. The grand_total = subtotal - discount + vat_amount.
+  - If VAT is INCLUDED in item prices (VAT code "2", most Makro/BigC receipts), set vat_included: true and vat_amount = total × 7 / 107 (for display only, already in prices). The grand_total = subtotal - discount (NO separate VAT addition).
 - TOTAL → amount_original
 - Payment method
 
@@ -195,6 +195,7 @@ export const OUTPUT_SCHEMA = `Return ONLY a valid JSON object (no markdown fence
   "invoice_number": "receipt number or null",
   "transaction_date": "YYYY-MM-DD",
   "has_tax_invoice": false,
+  "vat_included": true,
   "item_count_observed": 4,
   "footer": {
     "subtotal": 0,
