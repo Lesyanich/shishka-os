@@ -23,7 +23,7 @@ const OrderManager = lazy(() => import('./pages/OrderManager').then(m => ({ defa
 const MasterPlanner = lazy(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
 const FinanceLayout = lazy(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
 const FinanceLedger = lazy(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
-const FinanceEntry = lazy(() => import('./pages/FinanceEntry').then(m => ({ default: m.FinanceEntry })))
+
 const FinanceAnalytics = lazy(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
 const ReceivingStation = lazy(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
@@ -102,7 +102,7 @@ function App() {
                 <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
                   <Route index element={<Navigate to="ledger" replace />} />
                   <Route path="ledger" element={<FinanceLedger />} />
-                  <Route path="entry" element={<FinanceEntry />} />
+
                   <Route path="analytics" element={<FinanceAnalytics />} />
                 </Route>
                 <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />

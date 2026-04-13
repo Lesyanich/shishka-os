@@ -9,7 +9,6 @@ import {
   Inbox,
   LayoutDashboard,
   LogOut,
-  PlusCircle,
   Rewind,
   ScanLine,
   Table2,
@@ -62,7 +61,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/targets', icon: Target, label: 'Targets', enabled: true },
   { path: '/receive', icon: ClipboardCheck, label: 'Receiving', enabled: true },
   { path: '/finance/ledger', icon: Table2, label: 'Ledger', enabled: true },
-  { path: '/finance/entry', icon: PlusCircle, label: 'New Entry', enabled: true },
+
   { path: '/finance/analytics', icon: BarChart3, label: 'Analytics', enabled: true },
   { path: '/receipts', icon: Inbox, label: 'Receipt Inbox', enabled: true },
   { path: '/api-costs', icon: DollarSign, label: 'API Costs', enabled: true },

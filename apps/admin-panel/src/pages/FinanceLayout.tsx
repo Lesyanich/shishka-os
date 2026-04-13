@@ -1,10 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Table2, PlusCircle, BarChart3 } from 'lucide-react'
+import { Table2, BarChart3 } from 'lucide-react'
 import { FinanceProvider } from '../contexts/FinanceContext'
 
 const TABS = [
   { to: '/finance/ledger', icon: Table2, label: 'Ledger' },
-  { to: '/finance/entry', icon: PlusCircle, label: 'New Entry' },
   { to: '/finance/analytics', icon: BarChart3, label: 'Analytics' },
 ] as const
 

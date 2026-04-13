@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { Brain, Check, ChevronRight, Loader2, Play, RefreshCcw, Trash2, Zap } from 'lucide-react'
+import { Brain, Check, ChevronRight, Loader2, Play, RefreshCcw, Search, Trash2, X, Zap } from 'lucide-react'
 import type { InboxRow, OcrModel } from '../../hooks/useReceiptInbox'
 import { InboxReviewPanel } from './InboxReviewPanel'
 
@@ -84,10 +84,25 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [bulkApproving, setBulkApproving] = useState(false)
   const [selectedParsing, setSelectedParsing] = useState<{ current: number; total: number } | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const selectableRows = rows.filter((r) => !r.expense_id)
-  const pendingRows = rows.filter((r) => r.status === 'pending' && r.model_used !== 'claude-subscription')
-  const selectedParsedCount = rows.filter((r) => selectedIds.has(r.id) && r.status === 'parsed').length
+  // ── Search filter ──
+  const filteredRows = searchQuery.trim()
+    ? rows.filter((r) => {
+        const q = searchQuery.toLowerCase()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pp = r.parsed_payload as Record<string, any> | null
+        const supplier = (pp?.supplier_name || r.supplier_hint || '').toLowerCase()
+        const invoice = (pp?.invoice_number || '').toLowerCase()
+        const date = (pp?.transaction_date || r.receipt_date || '').toLowerCase()
+        const uploadDate = r.created_at.toLowerCase()
+        return supplier.includes(q) || invoice.includes(q) || date.includes(q) || uploadDate.includes(q)
+      })
+    : rows
+
+  const selectableRows = filteredRows.filter((r) => !r.expense_id)
+  const pendingRows = filteredRows.filter((r) => r.status === 'pending' && r.model_used !== 'claude-subscription')
+  const selectedParsedCount = filteredRows.filter((r) => selectedIds.has(r.id) && r.status === 'parsed').length
 
   // Clean up stale selections when rows change
   useEffect(() => {
@@ -241,8 +256,28 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold text-slate-100">Receipt Inbox</h2>
           <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
-            {rows.length}
+            {filteredRows.length}{searchQuery && ` / ${rows.length}`}
           </span>
+          {/* Search */}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search supplier, invoice, date..."
+              className="h-7 w-48 rounded-md border border-slate-700 bg-slate-800 pl-7 pr-7 text-[11px] text-slate-200 placeholder:text-slate-600 outline-none focus:border-indigo-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 hover:text-slate-300"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {selectedIds.size > 0 && (
@@ -308,9 +343,9 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
         </div>
       </header>
 
-      {rows.length === 0 ? (
+      {filteredRows.length === 0 ? (
         <div className="py-10 text-center text-xs text-slate-500">
-          No receipts uploaded yet
+          {searchQuery ? 'No receipts match your search' : 'No receipts uploaded yet'}
         </div>
       ) : (
         <div className="max-h-[520px] overflow-y-auto overflow-x-auto">
@@ -337,7 +372,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
-              {rows.map((r) => {
+              {filteredRows.map((r) => {
                 const badge = STATUS_BADGE[r.status]
                 const isExpanded = expandedId === r.id
                 const canExpand = r.parsed_payload && ['parsed', 'processed', 'skipped', 'error'].includes(r.status)
