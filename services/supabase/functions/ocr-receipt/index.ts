@@ -153,6 +153,7 @@ ${fullOcrText}
         barcode: item.barcode as string | null,
         supplier_sku: item.supplier_sku as string | null,
         translated_name: item.translated_name as string,
+        original_name: item.original_name as string | null,
       })
       item.nomenclature_id = match.nomenclature_id
       item.sku_id = match.sku_id
