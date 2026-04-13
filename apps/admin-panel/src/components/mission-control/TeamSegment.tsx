@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Search, Zap, List, Layers } from 'lucide-react'
 import { FocusCard } from './FocusCard'
 import { GroupedTaskList } from './GroupedTaskList'
+import { ProjectGroupView } from './ProjectGroupView'
 import type { BusinessTask, TaskDomain } from '../../hooks/useBusinessTasks'
 import type { GroupBy } from '../../utils/taskGrouping'
 
@@ -182,6 +183,7 @@ export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
             className="bg-transparent py-1.5 pr-1 text-[11px] text-slate-300 focus:outline-none"
           >
             <option value="none">No grouping</option>
+            <option value="project">Group by project</option>
             <option value="topic">Group by topic</option>
             <option value="agent">Group by agent</option>
           </select>
@@ -255,11 +257,15 @@ export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
 
         {/* Task list */}
         {allHumanTasks.length > 0 ? (
-          <GroupedTaskList
-            tasks={allHumanTasks}
-            groupBy={groupBy}
-            renderItem={(task) => <TaskRow key={task.id} task={task} onClick={() => onOpenDetail(task)} />}
-          />
+          groupBy === 'project' ? (
+            <ProjectGroupView tasks={allHumanTasks} onOpenDetail={onOpenDetail} />
+          ) : (
+            <GroupedTaskList
+              tasks={allHumanTasks}
+              groupBy={groupBy}
+              renderItem={(task) => <TaskRow key={task.id} task={task} onClick={() => onOpenDetail(task)} />}
+            />
+          )
         ) : (
           <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-800/60 bg-slate-900/20 px-6 py-8">
             <p className="text-[12px] text-slate-600">
