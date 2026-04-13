@@ -258,7 +258,7 @@ export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
         {/* Task list */}
         {allHumanTasks.length > 0 ? (
           groupBy === 'project' ? (
-            <ProjectGroupView tasks={allHumanTasks} allTasks={tasks} onOpenDetail={onOpenDetail} />
+            <ProjectGroupView tasks={allHumanTasks} onOpenDetail={onOpenDetail} />
           ) : (
             <GroupedTaskList
               tasks={allHumanTasks}

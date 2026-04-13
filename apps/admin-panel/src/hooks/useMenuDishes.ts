@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 export interface MenuDish {
   id: string
   name: string
+  description: string | null
   product_code: string
   price: number | null
   cost_per_unit: number | null
@@ -39,7 +40,7 @@ export interface UseMenuDishesResult {
   categories: MenuCategory[]
   isLoading: boolean
   error: string | null
-  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
+  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
   refetch: () => void
 }
 
@@ -57,7 +58,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       supabase
         .from('nomenclature')
         .select(`
-          id, name, product_code, price, cost_per_unit,
+          id, name, description, product_code, price, cost_per_unit,
           is_available, is_featured, image_url,
           calories, protein, carbs, fat,
           category_id,
@@ -101,6 +102,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       return {
         id: d.id,
         name: d.name,
+        description: d.description,
         product_code: d.product_code,
         price: d.price ? Number(d.price) : null,
         cost_per_unit: d.cost_per_unit ? Number(d.cost_per_unit) : null,
@@ -132,10 +134,11 @@ export function useMenuDishes(): UseMenuDishesResult {
   const updateDish = useCallback(
     async (
       id: string,
-      patch: Partial<Pick<MenuDish, 'name' | 'price' | 'is_available' | 'is_featured'>>,
+      patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>,
     ): Promise<{ ok: boolean; error?: string }> => {
       const updates: Record<string, unknown> = {}
       if (patch.name !== undefined) updates.name = patch.name.trim()
+      if (patch.description !== undefined) updates.description = patch.description?.trim() || null
       if (patch.price !== undefined) updates.price = patch.price
       if (patch.is_available !== undefined) updates.is_available = patch.is_available
       if (patch.is_featured !== undefined) updates.is_featured = patch.is_featured
