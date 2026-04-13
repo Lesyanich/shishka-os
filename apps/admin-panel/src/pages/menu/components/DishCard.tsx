@@ -38,9 +38,6 @@ export function DishCard({ dish }: DishCardProps) {
       {/* Content */}
       <div className="flex flex-1 flex-col gap-2 p-3">
         <h3 className="text-sm font-semibold text-slate-100 leading-tight">{dish.name}</h3>
-        {dish.description && (
-          <p className="text-[11px] leading-relaxed text-slate-400 line-clamp-2">{dish.description}</p>
-        )}
 
         {/* Nutrition */}
         <NutritionBadges
