@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import type { GanttTask, GanttConflict } from '../../hooks/useGanttTasks'
 import type { EquipmentItem } from '../../hooks/useEquipmentCategories'
+import type { EquipmentBooking } from '../../types/scheduling'
 import { TimeHeader } from './TimeHeader'
 import { GanttRow } from './GanttRow'
+import { EquipmentCapacityBar } from '../scheduling/EquipmentCapacityBar'
 import { AlertTriangle, Clock, Wrench, ChevronDown, ChevronUp } from 'lucide-react'
 
 function useIsMobile(breakpoint = 640) {
@@ -22,6 +24,7 @@ interface GanttTimelineProps {
   conflicts: GanttConflict[]
   isLoading: boolean
   error: string | null
+  bookings?: EquipmentBooking[]
 }
 
 export function GanttTimeline({
@@ -30,6 +33,7 @@ export function GanttTimeline({
   conflicts,
   isLoading,
   error,
+  bookings = [],
 }: GanttTimelineProps) {
   const isMobile = useIsMobile()
   const [showConflictDetails, setShowConflictDetails] = useState(false)
@@ -45,6 +49,13 @@ export function GanttTimeline({
     const eqId = t.equipment_id ?? '__unassigned'
     if (!tasksByEquipment[eqId]) tasksByEquipment[eqId] = []
     tasksByEquipment[eqId].push(t)
+  }
+
+  // Group bookings by equipment_id
+  const bookingsByEquipment: Record<string, EquipmentBooking[]> = {}
+  for (const b of bookings) {
+    if (!bookingsByEquipment[b.equipment_id]) bookingsByEquipment[b.equipment_id] = []
+    bookingsByEquipment[b.equipment_id].push(b)
   }
 
   // Filter equipment to only those with tasks or all if no tasks
@@ -195,17 +206,31 @@ export function GanttTimeline({
       </div>
 
       {/* Equipment rows */}
-      {displayEquipment.map((eq) => (
-        <GanttRow
-          key={eq.id}
-          equipment={eq}
-          tasks={tasksByEquipment[eq.id] ?? []}
-          conflicts={conflicts.filter(
-            (c) => c.equipment_id === eq.id,
-          )}
-          dayStartMs={dayStartMs}
-        />
-      ))}
+      {displayEquipment.map((eq) => {
+        const eqBookings = bookingsByEquipment[eq.id]
+        return (
+          <div key={eq.id}>
+            <GanttRow
+              equipment={eq}
+              tasks={tasksByEquipment[eq.id] ?? []}
+              conflicts={conflicts.filter((c) => c.equipment_id === eq.id)}
+              dayStartMs={dayStartMs}
+            />
+            {eqBookings && eqBookings.length > 0 && (
+              <div className="flex border-b border-slate-800/50">
+                <div className="w-36 shrink-0 border-r border-slate-800 lg:w-48" />
+                <div className="flex-1 px-2 py-1">
+                  <EquipmentCapacityBar
+                    bookings={eqBookings}
+                    equipmentName={eq.name}
+                    dayStartMs={dayStartMs}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
 
       {emptyState}
     </div>
