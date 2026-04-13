@@ -1,14 +1,17 @@
 import { useState } from 'react'
-import { Eye, Table2, Loader2 } from 'lucide-react'
+import { Eye, Table2, LayoutGrid, Loader2 } from 'lucide-react'
 import { useMenuDishes } from '../../hooks/useMenuDishes'
 import { OwnerTable } from './components/OwnerTable'
+import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
 
 type ViewMode = 'owner' | 'customer'
+type OwnerLayout = 'table' | 'gallery'
 
 export function MenuPage() {
   const { dishes, categories, isLoading, error, updateDish } = useMenuDishes()
   const [view, setView] = useState<ViewMode>('owner')
+  const [ownerLayout, setOwnerLayout] = useState<OwnerLayout>('table')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   // Stats
@@ -32,30 +35,59 @@ export function MenuPage() {
           </p>
         </div>
 
-        {/* View toggle */}
-        <div className="flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
-          <button
-            onClick={() => setView('owner')}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
-              view === 'owner'
-                ? 'bg-slate-700 text-slate-100'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Table2 className="h-3.5 w-3.5" />
-            Owner
-          </button>
-          <button
-            onClick={() => setView('customer')}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
-              view === 'customer'
-                ? 'bg-slate-700 text-slate-100'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Eye className="h-3.5 w-3.5" />
-            Customer Preview
-          </button>
+        <div className="flex items-center gap-2">
+          {/* Owner layout toggle */}
+          {view === 'owner' && (
+            <div className="flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
+              <button
+                onClick={() => setOwnerLayout('table')}
+                className={`flex items-center rounded-md p-1.5 transition ${
+                  ownerLayout === 'table'
+                    ? 'bg-slate-700 text-slate-100'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+                title="Table view"
+              >
+                <Table2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setOwnerLayout('gallery')}
+                className={`flex items-center rounded-md p-1.5 transition ${
+                  ownerLayout === 'gallery'
+                    ? 'bg-slate-700 text-slate-100'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+                title="Gallery view"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* View toggle */}
+          <div className="flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
+            <button
+              onClick={() => setView('owner')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                view === 'owner'
+                  ? 'bg-slate-700 text-slate-100'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Owner
+            </button>
+            <button
+              onClick={() => setView('customer')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                view === 'customer'
+                  ? 'bg-slate-700 text-slate-100'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Customer
+            </button>
+          </div>
         </div>
       </div>
 
@@ -98,8 +130,14 @@ export function MenuPage() {
         <div className="rounded-lg border border-rose-800/50 bg-rose-950/30 p-4 text-sm text-rose-300">
           Failed to load menu: {error}
         </div>
-      ) : view === 'owner' ? (
+      ) : view === 'owner' && ownerLayout === 'table' ? (
         <OwnerTable
+          dishes={dishes}
+          selectedCategory={selectedCategory}
+          onUpdate={updateDish}
+        />
+      ) : view === 'owner' && ownerLayout === 'gallery' ? (
+        <OwnerGallery
           dishes={dishes}
           selectedCategory={selectedCategory}
           onUpdate={updateDish}

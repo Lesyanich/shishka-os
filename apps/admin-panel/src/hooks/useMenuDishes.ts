@@ -77,7 +77,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       return
     }
 
-    // Build tag map: nomenclature_id → tags[]
+    // Build tag map: nomenclature_id -> tags[]
     const tagMap = new Map<string, MenuTag[]>()
     for (const row of tagResult.data ?? []) {
       const t = row.tags as unknown as MenuTag | null

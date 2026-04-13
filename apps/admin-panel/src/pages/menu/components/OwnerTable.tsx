@@ -52,7 +52,7 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
 
   const saveEdit = useCallback(async () => {
     if (!editing) return
-    const patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price'>> = {}
+    const patch: Partial<Pick<MenuDish, 'name' | 'price'>> = {}
     const original = filtered.find((d) => d.id === editing.id)
     if (!original) return
 
