@@ -320,7 +320,7 @@ export function TechSegment({ tasks, onOpenDetail }: TechSegmentProps) {
             <span>Backlog is clear.</span>
           </div>
         ) : viewMode === 'projects' ? (
-          <ProjectGroupView tasks={filtered} onOpenDetail={onOpenDetail} />
+          <ProjectGroupView tasks={filtered} allTasks={tasks} onOpenDetail={onOpenDetail} />
         ) : (
           <div className="grid grid-cols-[1fr_1.6fr] gap-4">
             {/* Left: Quick Wins & Tech Debt */}
