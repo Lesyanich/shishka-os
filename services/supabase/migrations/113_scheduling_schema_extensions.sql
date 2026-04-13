@@ -6,12 +6,12 @@ BEGIN;
 -- ─── 1. equipment extensions ───
 ALTER TABLE public.equipment
   ADD COLUMN IF NOT EXISTS preheat_min INT DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS capacity_unit TEXT,
   ADD COLUMN IF NOT EXISTS product_category_group TEXT,
   ADD COLUMN IF NOT EXISTS cleaning_time_min INT DEFAULT 10;
 
+-- NOTE: capacity_unit already exists in the original schema (see 070_equipment_enrichment.sql)
+
 COMMENT ON COLUMN public.equipment.preheat_min IS 'Minutes needed to preheat (0 for non-thermal)';
-COMMENT ON COLUMN public.equipment.capacity_unit IS 'Unit of capacity measurement: GN 1/1, kg, liters';
 COMMENT ON COLUMN public.equipment.product_category_group IS 'For contamination buffer: fish, meat, bakery, vegan';
 COMMENT ON COLUMN public.equipment.cleaning_time_min IS 'Deep clean time in minutes when product category changes';
 
@@ -40,6 +40,8 @@ ALTER TABLE public.recipes_flow
   ADD COLUMN IF NOT EXISTS scaling_rule TEXT DEFAULT 'linear'
     CHECK (scaling_rule IN ('linear','none','custom')),
   ADD COLUMN IF NOT EXISTS target_equipment_category_id UUID,
+  -- NOTE: target_equipment_category_id is UUID per spec; equipment.category is currently TEXT.
+  -- A lookup table may be introduced later. For now this is a soft reference.
   ADD COLUMN IF NOT EXISTS transition_time_max INTERVAL;
 
 COMMENT ON COLUMN public.recipes_flow.media_url IS 'Photo or video URL for step reference';
@@ -49,7 +51,7 @@ COMMENT ON COLUMN public.recipes_flow.transition_time_max IS 'Max allowed delay 
 
 -- ─── 4. staff extensions ───
 ALTER TABLE public.staff
-  ADD COLUMN IF NOT EXISTS assigned_zone_id UUID;
+  ADD COLUMN IF NOT EXISTS assigned_zone_id UUID REFERENCES public.locations(id);
 
 COMMENT ON COLUMN public.staff.assigned_zone_id IS 'Current shift zone assignment (FK to locations)';
 
@@ -68,6 +70,12 @@ COMMENT ON COLUMN public.production_tasks.batch_group_key IS 'Key for merged bat
 COMMENT ON COLUMN public.production_tasks.is_preheat IS 'Auto-generated preheat micro-task';
 COMMENT ON COLUMN public.production_tasks.is_defrost IS 'Auto-generated D-1 defrost task';
 COMMENT ON COLUMN public.production_tasks.parent_target_id IS 'Which production target originated this task';
+
+CREATE INDEX IF NOT EXISTS idx_pt_schedule_run ON public.production_tasks(schedule_run_id)
+  WHERE schedule_run_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_pt_parent_target ON public.production_tasks(parent_target_id)
+  WHERE parent_target_id IS NOT NULL;
 
 -- ─── 6. Self-register in migration_log ───
 INSERT INTO public.migration_log (filename, notes, checksum)
