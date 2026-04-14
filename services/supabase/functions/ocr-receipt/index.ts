@@ -14,7 +14,7 @@ import { downloadImageAsBase64, extractTextViaGCV } from "../_shared/gcv.ts"
 import { callLLM } from "../_shared/llm-providers.ts"
 import type { ApiResult, ImageInput } from "../_shared/llm-providers.ts"
 import { SYSTEM_PROMPT, OUTPUT_SCHEMA, MODEL_PRICING, MODEL_MAP } from "../_shared/prompts.ts"
-import { resolveSupplier, matchNomenclature, classifyItems, determineFlowType } from "../_shared/nomenclature.ts"
+import { resolveSupplier, resolveSupplierWithProfile, matchNomenclature, classifyItems, determineFlowType } from "../_shared/nomenclature.ts"
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -101,9 +101,41 @@ Deno.serve(async (req: Request) => {
     }
 
     // ══════════════════════════════════════════
+    // STAGE 1.5: Supplier profile lookup
+    // ══════════════════════════════════════════
+    let supplierProfile: Record<string, unknown> | null = null
+    if (row.supplier_hint) {
+      const resolved = await resolveSupplierWithProfile(row.supplier_hint)
+      supplierProfile = resolved.ocr_profile
+      if (supplierProfile) {
+        console.log(`[ocr-receipt] Found OCR profile for "${row.supplier_hint}"`)
+      }
+    }
+
+    // ══════════════════════════════════════════
     // STAGE 2: LLM structuring + translation
     // ══════════════════════════════════════════
-    const fullSystemPrompt = SYSTEM_PROMPT + "\n\n" + OUTPUT_SCHEMA
+
+    // Build system prompt with optional supplier profile
+    let systemPromptWithProfile = SYSTEM_PROMPT
+    if (supplierProfile) {
+      const profileLines = ["\n\n## SUPPLIER-SPECIFIC PROFILE (learned from previous receipts)"]
+      if (supplierProfile.format_hint) profileLines.push(`Receipt format: ${supplierProfile.format_hint}`)
+      if (supplierProfile.vat_mode) profileLines.push(`VAT mode: ${supplierProfile.vat_mode}`)
+      if (supplierProfile.barcode_format) profileLines.push(`Barcode format: ${supplierProfile.barcode_format}`)
+      if (supplierProfile.has_tax_invoice != null) profileLines.push(`Tax invoice: ${supplierProfile.has_tax_invoice}`)
+      const rules = supplierProfile.rules as string[] | undefined
+      if (rules?.length) {
+        profileLines.push("Supplier-specific rules:")
+        for (const rule of rules) profileLines.push(`- ${rule}`)
+      }
+      const examples = supplierProfile.example_items as Record<string, unknown>[] | undefined
+      if (examples?.length) {
+        profileLines.push(`\nExample items from previous receipts:\n\`\`\`json\n${JSON.stringify(examples.slice(0, 3), null, 2)}\n\`\`\``)
+      }
+      systemPromptWithProfile += profileLines.join("\n")
+    }
+    const fullSystemPrompt = systemPromptWithProfile + "\n\n" + OUTPUT_SCHEMA
 
     const hints: string[] = []
     if (row.supplier_hint) hints.push(`Supplier hint: ${row.supplier_hint}`)
@@ -234,6 +266,39 @@ ${fullOcrText}
         pipeline: pipelineMode,
       },
     })
+
+    // ── Auto-learn: update supplier ocr_profile with example items ──
+    if (supplierId && lineItems.length > 0) {
+      try {
+        const exampleItems = lineItems.slice(0, 3).map((it) => ({
+          barcode: it.barcode,
+          original_name: it.original_name,
+          translated_name: it.translated_name,
+          unit: it.unit,
+          category: it.category,
+        }))
+        // Merge: keep existing rules/format_hint, update example_items + last_seen
+        const { data: existing } = await db
+          .from("suppliers")
+          .select("ocr_profile")
+          .eq("id", supplierId)
+          .single()
+        const currentProfile = (existing?.ocr_profile as Record<string, unknown>) || {}
+        await db.from("suppliers")
+          .update({
+            ocr_profile: {
+              ...currentProfile,
+              example_items: exampleItems,
+              last_learned_at: new Date().toISOString(),
+              last_learned_from: inboxId,
+            },
+          })
+          .eq("id", supplierId)
+        console.log(`[ocr-receipt] Auto-learned profile for supplier ${supplierId} (${exampleItems.length} examples)`)
+      } catch (e) {
+        console.warn(`[ocr-receipt] Auto-learn failed:`, e)
+      }
+    }
 
     console.log(
       `[ocr-receipt] DONE inbox_id=${inboxId} pipeline=${pipelineMode} items=${lineItems.length} ocr=${fullOcrText.length}chars cost=$${totalCost.toFixed(4)} (gcv=$${gcvCost.toFixed(4)} llm=$${llmCost.toFixed(4)}) ${durationMs}ms`,
