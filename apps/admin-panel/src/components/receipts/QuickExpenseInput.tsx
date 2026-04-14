@@ -4,7 +4,7 @@ import { parseQuickExpense } from '../../utils/parseQuickExpense'
 import type { InboxInsert } from '../../hooks/useReceiptInbox'
 
 interface Props {
-  onInsert: (payload: InboxInsert) => Promise<string | null>
+  onInsert: (payload: InboxInsert) => Promise<{ id?: string; error?: string }>
 }
 
 // SpeechRecognition type shim for browsers
@@ -83,11 +83,11 @@ export function QuickExpenseInput({ onInsert }: Props) {
       notes: `[quick-entry] ${parsed.raw_text}`,
     }
 
-    const err = await onInsert(payload)
+    const res = await onInsert(payload)
     setIsSending(false)
 
-    if (err) {
-      setFeedback({ type: 'err', msg: err })
+    if (res.error) {
+      setFeedback({ type: 'err', msg: res.error })
     } else {
       const parts = []
       if (parsed.supplier_hint) parts.push(parsed.supplier_hint)

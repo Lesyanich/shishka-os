@@ -12,6 +12,7 @@ import {
   Receipt,
   Upload,
   Save,
+  Trash2,
   X,
 } from 'lucide-react'
 import type { ExpenseRow, ExpenseUpdatePayload, FinCategory, FinSubCategory, Supplier } from '../../hooks/useExpenseLedger'
@@ -39,6 +40,7 @@ export interface ExpenseHistoryProps {
   onReceiptClick: (url: string) => void
   onEditClick: (row: ExpenseRow) => void
   onUpdateExpense: (id: string, payload: ExpenseUpdatePayload) => Promise<string | null>
+  onDeleteExpense?: (id: string) => Promise<string | null>
 }
 
 /* ── Sort types ── */
@@ -56,6 +58,7 @@ export function ExpenseHistory({
   onReceiptClick,
   onEditClick,
   onUpdateExpense,
+  onDeleteExpense,
 }: ExpenseHistoryProps) {
   /* ── Filter state ── */
   const [filters, setFilters] = useState<ExpenseFilters>(EMPTY_FILTERS)
@@ -283,6 +286,7 @@ export function ExpenseHistory({
                     subCategories={subCategories}
                     suppliers={suppliers}
                     onUpdateExpense={onUpdateExpense}
+                    onDeleteExpense={onDeleteExpense}
                     onRefetch={onRefetch}
                   />
                 )
@@ -342,6 +346,7 @@ function TableRowWithSpoke({
   subCategories,
   suppliers,
   onUpdateExpense,
+  onDeleteExpense,
   onRefetch,
 }: {
   row: ExpenseRow
@@ -353,6 +358,7 @@ function TableRowWithSpoke({
   subCategories: FinSubCategory[]
   suppliers: Supplier[]
   onUpdateExpense: (id: string, payload: ExpenseUpdatePayload) => Promise<string | null>
+  onDeleteExpense?: (id: string) => Promise<string | null>
   onRefetch: () => void
 }) {
   // Use receipt_pages if available, fallback to legacy 3 URL fields
@@ -465,6 +471,7 @@ function TableRowWithSpoke({
               subCategories={subCategories}
               suppliers={suppliers}
               onUpdateExpense={onUpdateExpense}
+              onDeleteExpense={onDeleteExpense}
               onReceiptClick={onReceiptClick}
               onRefetch={onRefetch}
             />
@@ -486,6 +493,7 @@ function ExpandedExpensePanel({
   subCategories: _subCategories,
   suppliers: _suppliers,
   onUpdateExpense,
+  onDeleteExpense,
   onReceiptClick,
   onRefetch,
 }: {
@@ -494,11 +502,13 @@ function ExpandedExpensePanel({
   subCategories: FinSubCategory[]
   suppliers: Supplier[]
   onUpdateExpense: (id: string, payload: ExpenseUpdatePayload) => Promise<string | null>
+  onDeleteExpense?: (id: string) => Promise<string | null>
   onReceiptClick: (url: string) => void
   onRefetch: () => void
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
   // Edit form state
@@ -681,6 +691,27 @@ function ExpandedExpensePanel({
 
       {/* ── Spoke detail (line items) ── */}
       <SpokeDetail expenseId={row.id} />
+
+      {/* ── Delete ── */}
+      {onDeleteExpense && (
+        <div className="flex justify-end border-t border-slate-800/40 pt-3">
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={async () => {
+              if (!window.confirm(`Delete this expense (${row.details || row.id.slice(0, 8)})? This cannot be undone.`)) return
+              setIsDeleting(true)
+              const err = await onDeleteExpense(row.id)
+              setIsDeleting(false)
+              if (err) console.error('[ExpandedExpensePanel] delete failed:', err)
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[10px] font-medium text-rose-400 transition hover:bg-rose-500/20 disabled:opacity-50"
+          >
+            {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+            Delete expense
+          </button>
+        </div>
+      )}
     </div>
   )
 }

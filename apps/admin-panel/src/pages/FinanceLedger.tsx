@@ -23,6 +23,7 @@ export function FinanceLedger() {
     error,
     refetch,
     updateExpense,
+    deleteExpense,
   } = useFinance()
 
   const [galleryPages, setGalleryPages] = useState<string[]>([])
@@ -87,6 +88,7 @@ export function FinanceLedger() {
         isLoading={isLoading}
         error={error}
         onRefetch={refetch}
+        onDeleteExpense={deleteExpense}
         onReceiptClick={(url) => {
           // Find the row that contains this URL and open gallery
           const row = rows.find(

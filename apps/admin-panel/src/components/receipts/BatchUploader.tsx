@@ -61,12 +61,13 @@ interface DroppedFile {
 
 interface BatchUploaderProps {
   onBatchProcess: (photoUrls: string[], uploadedBy: string, model: OcrModel) => Promise<BatchProcessResult>
-  onInsert: (payload: InboxInsert) => Promise<string | null>
+  onInsert: (payload: InboxInsert) => Promise<{ id?: string; error?: string }>
+  onParse?: (inboxId: string, model: OcrModel) => Promise<{ ok: boolean; error?: string }>
 }
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) {
+export function BatchUploader({ onBatchProcess, onInsert, onParse }: BatchUploaderProps) {
   const { role, staffName } = useAppRole()
   const uploadedBy = staffName || ROLE_TO_UPLOADER[role] || 'Admin'
 
@@ -179,10 +180,10 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
     setStep('uploading')
     setToast(null)
     const payload = buildInsert([])
-    const err = await onInsert(payload)
-    if (err) {
+    const res = await onInsert(payload)
+    if (res.error) {
       setStep('error')
-      setToast({ type: 'err', msg: err })
+      setToast({ type: 'err', msg: res.error })
     } else {
       const parsed = parseQuickExpense(text)
       const parts: string[] = []
@@ -238,9 +239,9 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
         let successCount = 0
         let lastError: string | null = null
         for (const url of photoUrls) {
-          const err = await onInsert(buildInsert([url]))
-          if (err) {
-            lastError = err
+          const res = await onInsert(buildInsert([url]))
+          if (res.error) {
+            lastError = res.error
           } else {
             successCount++
           }
@@ -256,10 +257,10 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
         setToast({ type: 'ok', msg: `Uploaded ${successCount} receipt(s) — parse from the list` })
       } else {
         // All photos → one inbox row (single receipt, multiple pages)
-        const err = await onInsert(buildInsert(photoUrls))
-        if (err) {
+        const res = await onInsert(buildInsert(photoUrls))
+        if (res.error) {
           setStep('error')
-          setToast({ type: 'err', msg: err })
+          setToast({ type: 'err', msg: res.error })
           return
         }
 
@@ -313,18 +314,32 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
         if (errorGroups.length > 0) msg += `. ${errorGroups.length} failed.`
         setToast({ type: successGroups.length > 0 ? 'ok' : 'err', msg })
       } else {
-        // Single receipt mode — insert + parse inline (no triage needed)
+        // Single receipt mode — insert + auto-parse
         setStep('analyzing')
-        setProgress('Parsing receipt...')
+        setProgress('Uploading receipt...')
 
-        const err = await onInsert(buildInsert(photoUrls))
-        if (err) {
+        const res = await onInsert(buildInsert(photoUrls))
+        if (res.error || !res.id) {
           setStep('error')
-          setToast({ type: 'err', msg: err })
+          setToast({ type: 'err', msg: res.error || 'Insert failed — no ID returned' })
           return
         }
-        setStep('done')
-        setToast({ type: 'ok', msg: 'Uploaded! Parsing will start from the list.' })
+
+        // Auto-trigger parsing if onParse is available
+        if (onParse) {
+          setProgress('Parsing receipt with AI...')
+          const parseRes = await onParse(res.id, model)
+          if (!parseRes.ok) {
+            setStep('error')
+            setToast({ type: 'err', msg: parseRes.error || 'Parse failed' })
+            return
+          }
+          setStep('done')
+          setToast({ type: 'ok', msg: 'Uploaded & parsing started! Check the list below.' })
+        } else {
+          setStep('done')
+          setToast({ type: 'ok', msg: 'Uploaded! Parse from the list.' })
+        }
       }
 
       setProgress('')

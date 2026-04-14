@@ -25,6 +25,7 @@ interface CapexItem {
   quantity: number
   unit_price: number
   total_price: number
+  barcode?: string | null
 }
 
 interface OpexItem {
@@ -920,6 +921,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                   {checkboxTh(capexChecked, setCapexChecked, capexItems.length)}
                   <th className="w-8 px-2 py-1.5 text-left">#</th>
                   <th className="px-2 py-1.5 text-left">Equipment</th>
+                  <th className="min-w-[100px] px-2 py-1.5 text-left">Barcode</th>
                   <th className="w-16 px-2 py-1.5 text-right">Qty</th>
                   <th className="w-20 px-2 py-1.5 text-right">Price</th>
                   <th className="w-20 px-2 py-1.5 text-right">Total</th>
@@ -939,6 +941,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                       <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
                       <td className="px-2 py-1.5">
                         {editing ? <input value={item.name} onChange={(e) => updateCapex(i, 'name', e.target.value)} className={inputCls} /> : <span className="text-slate-200">{item.name}</span>}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {editing ? <input value={item.barcode || ''} onChange={(e) => updateCapex(i, 'barcode', e.target.value || null)} className={`${inputCls} font-mono`} placeholder="barcode" /> : <span className="font-mono text-[10px] text-slate-400">{item.barcode || '\u2014'}</span>}
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         {editing ? <input type="number" step="any" value={item.quantity} onChange={(e) => updateCapex(i, 'quantity', Number(e.target.value))} className={`${numInputCls} w-16`} /> : <span className="text-slate-300">{item.quantity}</span>}

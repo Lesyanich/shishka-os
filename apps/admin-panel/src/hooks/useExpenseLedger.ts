@@ -90,6 +90,7 @@ export interface UseExpenseLedgerResult {
   error: string | null
   refetch: () => void
   updateExpense: (id: string, payload: ExpenseUpdatePayload) => Promise<string | null>
+  deleteExpense: (id: string) => Promise<string | null>
 }
 
 /* ──────────────────────── Hook ──────────────────────── */
@@ -224,6 +225,25 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
     [fetchData],
   )
 
+  /** Delete a single expense row. Returns error message or null on success. */
+  const deleteExpense = useCallback(
+    async (id: string): Promise<string | null> => {
+      const { error: deleteErr } = await supabase
+        .from('expense_ledger')
+        .delete()
+        .eq('id', id)
+
+      if (deleteErr) {
+        console.error('[useExpenseLedger] delete error', deleteErr)
+        return deleteErr.message
+      }
+
+      await fetchData()
+      return null
+    },
+    [fetchData],
+  )
+
   return {
     rows,
     categories,
@@ -235,5 +255,6 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
     error,
     refetch: fetchData,
     updateExpense,
+    deleteExpense,
   }
 }
