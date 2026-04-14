@@ -17,20 +17,14 @@ const BOMHub = lazy(() => import('./pages/BOMHub').then(m => ({ default: m.BOMHu
 const KDSBoard = lazy(() => import('./pages/KDSBoard').then(m => ({ default: m.KDSBoard })))
 const CookStation = lazy(() => import('./pages/CookStation').then(m => ({ default: m.CookStation })))
 const WasteTracker = lazy(() => import('./pages/WasteTracker').then(m => ({ default: m.WasteTracker })))
-const LogisticsScanner = lazy(() => import('./pages/LogisticsScanner').then(m => ({ default: m.LogisticsScanner })))
 const Procurement = lazy(() => import('./pages/Procurement').then(m => ({ default: m.Procurement })))
 const SkuManagerPage = lazy(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
-const OrderManager = lazy(() => import('./pages/OrderManager').then(m => ({ default: m.OrderManager })))
 const MasterPlanner = lazy(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
 const FinanceLayout = lazy(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
 const FinanceLedger = lazy(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
 const FinanceAnalytics = lazy(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
 const ReceivingStation = lazy(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
-const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })))
-const CookLogin = lazy(() => import('./pages/CookLogin').then(m => ({ default: m.CookLogin })))
-const MyTasks = lazy(() => import('./pages/MyTasks').then(m => ({ default: m.MyTasks })))
-const KitchenLive = lazy(() => import('./pages/KitchenLive').then(m => ({ default: m.KitchenLive })))
 const ScheduleManager = lazy(() => import('./pages/ScheduleManager').then(m => ({ default: m.ScheduleManager })))
 const BatchPlanner = lazy(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
 const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
@@ -42,7 +36,6 @@ const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m
 const MemPalaceBrowser = lazy(() => import('./pages/brain').then(m => ({ default: m.MemPalaceBrowser })))
 const QualityPage = lazy(() => import('./pages/brain').then(m => ({ default: m.QualityPage })))
 const BrainKnowledgePage = lazy(() => import('./pages/brain/BrainKnowledgePage').then(m => ({ default: m.BrainKnowledgePage })))
-const ApiCostPage = lazy(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
 const ProductionTargets = lazy(() => import('./pages/ProductionTargets').then(m => ({ default: m.ProductionTargets })))
 
 function PageLoader() {
@@ -79,12 +72,6 @@ function App() {
         <Sentry.ErrorBoundary fallback={FallbackError}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/cook-login" element={<Suspense fallback={<PageLoader />}><CookLogin /></Suspense>} />
-            {/* /kitchen → redirect to /dashboard (legacy fix) */}
-            <Route path="/kitchen" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
-            <Route path="/tasks" element={<Suspense fallback={<PageLoader />}><MyTasks /></Suspense>} />
-            <Route path="/live" element={<Suspense fallback={<PageLoader />}><KitchenLive /></Suspense>} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
                 {/* ── Owner-only routes ── */}
@@ -101,21 +88,18 @@ function App() {
                   <Route path="/menu" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />
                   <Route path="/bom" element={<Suspense fallback={<PageLoader />}><BOMHub /></Suspense>} />
                   <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
-                  <Route path="/logistics" element={<Suspense fallback={<PageLoader />}><LogisticsScanner /></Suspense>} />
-                  <Route path="/orders" element={<Suspense fallback={<PageLoader />}><OrderManager /></Suspense>} />
                   <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
                     <Route index element={<Navigate to="ledger" replace />} />
                     <Route path="ledger" element={<FinanceLedger />} />
                     <Route path="analytics" element={<FinanceAnalytics />} />
                   </Route>
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
-                  <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
                 </Route>
 
                 {/* ── Kitchen + Production — accessible to all authenticated ── */}
                 <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
                 <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
-                <Route path="/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
+                <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
                 <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
                 <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
                 <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
@@ -123,9 +107,6 @@ function App() {
                 <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
-                {/* Legacy redirects */}
-                <Route path="/kds" element={<Navigate to="/kitchen/schedule" replace />} />
-                <Route path="/cook" element={<Navigate to="/kitchen/tasks" replace />} />
                 <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
               </Route>
             </Route>
