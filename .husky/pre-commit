@@ -36,7 +36,36 @@ if git diff --cached --name-only --diff-filter=ACMR | grep -q "^apps/admin-panel
   echo "[eslint] OK"
 fi
 
-# --- 2b. ESLint domain boundaries (MCP services) ---
+# --- 2a. TypeScript strict check (kds) ---
+if git diff --cached --name-only | grep -q "^apps/kds/"; then
+  echo "[tsc] Checking kds types..."
+  cd apps/kds
+  npx tsc --noEmit
+  KDS_TSC_EXIT=$?
+  cd ../..
+  if [ $KDS_TSC_EXIT -ne 0 ]; then
+    echo "BLOCKED: TypeScript errors in kds. Fix before committing."
+    exit 1
+  fi
+  echo "[tsc] OK"
+fi
+
+# --- 2b. ESLint with zero warnings (kds) ---
+# --diff-filter=ACMR excludes deleted files (D) so lint doesn't choke on them
+if git diff --cached --name-only --diff-filter=ACMR | grep -q "^apps/kds/.*\.\(ts\|tsx\)$"; then
+  echo "[eslint] Linting kds..."
+  cd apps/kds
+  npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only --diff-filter=ACMR | grep "^apps/kds/.*\.\(ts\|tsx\)$" | sed 's|^apps/kds/||')
+  KDS_ESLINT_EXIT=$?
+  cd ../..
+  if [ $KDS_ESLINT_EXIT -ne 0 ]; then
+    echo "BLOCKED: ESLint errors in kds. Fix before committing."
+    exit 1
+  fi
+  echo "[eslint] OK"
+fi
+
+# --- 2c. ESLint domain boundaries (MCP services) ---
 for MCP_SVC in mcp-chef mcp-finance mcp-mission-control; do
   if git diff --cached --name-only --diff-filter=ACMR | grep -q "^services/${MCP_SVC}/src/.*\.ts$"; then
     echo "[eslint] Linting ${MCP_SVC} domain boundaries..."
