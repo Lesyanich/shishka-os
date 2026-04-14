@@ -8,7 +8,7 @@ interface Props {
 }
 
 // SpeechRecognition type shim for browsers
-type SpeechRecognitionInstance = InstanceType<typeof window.SpeechRecognition> & {
+interface SpeechRecognitionInstance {
   continuous: boolean
   interimResults: boolean
   lang: string
@@ -49,12 +49,12 @@ export function QuickExpenseInput({ onInsert }: Props) {
     recognition.interimResults = false
     recognition.lang = 'ru-RU' // Primary: Russian. Also picks up English/Thai words.
 
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: { results: SpeechRecognitionResultList }) => {
       const transcript = event.results[0]?.[0]?.transcript ?? ''
       setText((prev) => (prev ? prev + ' ' + transcript : transcript).trim())
       setIsListening(false)
     }
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: { error: string }) => {
       console.warn('[QuickExpense] Speech error:', event.error)
       setIsListening(false)
     }

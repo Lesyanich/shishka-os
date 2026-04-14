@@ -31,12 +31,12 @@ const SUPPLIER_ALIASES: [RegExp, string][] = [
 const AMOUNT_RE = /(?:฿\s*)?(\d[\d,]*(?:\.\d{1,2})?)\s*(?:бат|baht|thb|บาท|฿)?/i
 
 // Date patterns
-const DATE_PATTERNS: [RegExp, () => string][] = [
+const DATE_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
   [/(сегодня|today|วันนี้)/i, () => toISO(new Date())],
   [/(вчера|yesterday|เมื่อวาน)/i, () => { const d = new Date(); d.setDate(d.getDate() - 1); return toISO(d) }],
   [/(позавчера)/i, () => { const d = new Date(); d.setDate(d.getDate() - 2); return toISO(d) }],
   // DD/MM or DD.MM
-  [/\b(\d{1,2})[./](\d{1,2})\b/, (m) => {
+  [/\b(\d{1,2})[./](\d{1,2})\b/, (m: RegExpMatchArray) => {
     const day = parseInt(m[1])
     const month = parseInt(m[2])
     const year = new Date().getFullYear()
@@ -68,9 +68,7 @@ export function parseQuickExpense(text: string): QuickExpenseResult {
   for (const [pattern, resolver] of DATE_PATTERNS) {
     const m = remaining.match(pattern)
     if (m) {
-      receipt_date = typeof resolver === 'function'
-        ? (resolver as (m: RegExpMatchArray) => string)(m)
-        : resolver()
+      receipt_date = resolver(m)
       remaining = remaining.replace(m[0], ' ')
       break
     }
