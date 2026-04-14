@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 export interface MenuDish {
   id: string
   name: string
+  description: string | null
   product_code: string
   price: number | null
   cost_per_unit: number | null
@@ -17,6 +18,7 @@ export interface MenuDish {
   category_id: string | null
   category_name: string | null
   category_code: string | null
+  display_order: number | null
   tags: MenuTag[]
 }
 
@@ -34,18 +36,27 @@ export interface MenuCategory {
   sort_order: number
 }
 
+export interface MenuSubcategory {
+  id: string
+  name: string
+  parent_id: string
+  sort_order: number
+}
+
 export interface UseMenuDishesResult {
   dishes: MenuDish[]
   categories: MenuCategory[]
+  subcategories: Map<string, MenuSubcategory[]>
   isLoading: boolean
   error: string | null
-  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
+  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
   refetch: () => void
 }
 
 export function useMenuDishes(): UseMenuDishesResult {
   const [dishes, setDishes] = useState<MenuDish[]>([])
   const [categories, setCategories] = useState<MenuCategory[]>([])
+  const [subcategories, setSubcategories] = useState<Map<string, MenuSubcategory[]>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -53,12 +64,12 @@ export function useMenuDishes(): UseMenuDishesResult {
     setIsLoading(true)
     setError(null)
 
-    const [dishResult, tagResult] = await Promise.all([
+    const [dishResult, tagResult, subcatResult] = await Promise.all([
       supabase
         .from('nomenclature')
         .select(`
-          id, name, product_code, price, cost_per_unit,
-          is_available, is_featured, image_url,
+          id, name, description, product_code, price, cost_per_unit,
+          is_available, is_featured, image_url, display_order,
           calories, protein, carbs, fat,
           category_id,
           product_categories!category_id(id, code, name, sort_order)
@@ -69,6 +80,11 @@ export function useMenuDishes(): UseMenuDishesResult {
       supabase
         .from('nomenclature_tags')
         .select('nomenclature_id, tags(slug, name, tag_group, color)'),
+      supabase
+        .from('product_categories')
+        .select('id, name, parent_id, sort_order')
+        .not('parent_id', 'is', null)
+        .order('sort_order', { ascending: true }),
     ])
 
     if (dishResult.error) {
@@ -88,6 +104,20 @@ export function useMenuDishes(): UseMenuDishesResult {
       tagMap.set(nid, arr)
     }
 
+    // Build subcategory map: L1 category id -> L2 children
+    const subcatMap = new Map<string, MenuSubcategory[]>()
+    for (const row of subcatResult.data ?? []) {
+      const parentId = row.parent_id as string
+      const arr = subcatMap.get(parentId) ?? []
+      arr.push({
+        id: row.id as string,
+        name: row.name as string,
+        parent_id: parentId,
+        sort_order: row.sort_order as number,
+      })
+      subcatMap.set(parentId, arr)
+    }
+
     // Collect unique categories
     const catMap = new Map<string, MenuCategory>()
 
@@ -101,6 +131,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       return {
         id: d.id,
         name: d.name,
+        description: d.description ?? null,
         product_code: d.product_code,
         price: d.price ? Number(d.price) : null,
         cost_per_unit: d.cost_per_unit ? Number(d.cost_per_unit) : null,
@@ -114,6 +145,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         category_id: d.category_id,
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
+        display_order: d.display_order ? Number(d.display_order) : null,
         tags: tagMap.get(d.id) ?? [],
       }
     })
@@ -122,6 +154,7 @@ export function useMenuDishes(): UseMenuDishesResult {
     setCategories(
       Array.from(catMap.values()).sort((a, b) => a.sort_order - b.sort_order),
     )
+    setSubcategories(subcatMap)
     setIsLoading(false)
   }, [])
 
@@ -132,10 +165,11 @@ export function useMenuDishes(): UseMenuDishesResult {
   const updateDish = useCallback(
     async (
       id: string,
-      patch: Partial<Pick<MenuDish, 'name' | 'price' | 'is_available' | 'is_featured'>>,
+      patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>,
     ): Promise<{ ok: boolean; error?: string }> => {
       const updates: Record<string, unknown> = {}
       if (patch.name !== undefined) updates.name = patch.name.trim()
+      if (patch.description !== undefined) updates.description = patch.description?.trim() ?? null
       if (patch.price !== undefined) updates.price = patch.price
       if (patch.is_available !== undefined) updates.is_available = patch.is_available
       if (patch.is_featured !== undefined) updates.is_featured = patch.is_featured
@@ -155,5 +189,5 @@ export function useMenuDishes(): UseMenuDishesResult {
     [fetchData],
   )
 
-  return { dishes, categories, isLoading, error, updateDish, refetch: fetchData }
+  return { dishes, categories, subcategories, isLoading, error, updateDish, refetch: fetchData }
 }
