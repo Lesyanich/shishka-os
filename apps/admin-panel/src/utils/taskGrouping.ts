@@ -71,8 +71,12 @@ export interface ProjectGroup {
   children: BusinessTask[]
 }
 
-/** Group tasks by parent_task_id. Returns parent groups + orphan tasks. */
-export function deriveProjectGroups(tasks: BusinessTask[]): {
+/**
+ * Group tasks by parent_task_id. Returns parent groups + orphan tasks.
+ * @param tasks — the tasks to display (filtered by segment)
+ * @param allTasks — optional full task list for parent lookup
+ */
+export function deriveProjectGroups(tasks: BusinessTask[], allTasks?: BusinessTask[]): {
   projects: ProjectGroup[]
   orphans: BusinessTask[]
 } {
@@ -80,15 +84,16 @@ export function deriveProjectGroups(tasks: BusinessTask[]): {
   const childrenMap = new Map<string, BusinessTask[]>()
   const orphans: BusinessTask[] = []
 
-  // First pass: identify umbrella parents
-  for (const task of tasks) {
+  const lookupSource = allTasks ?? tasks
+  const displaySet = new Set(tasks.map(t => t.id))
+  for (const task of lookupSource) {
     if (!task.parent_task_id && task.tags?.includes('umbrella')) {
       parentMap.set(task.id, task)
       if (!childrenMap.has(task.id)) childrenMap.set(task.id, [])
     }
   }
 
-  // Second pass: assign children and orphans
+  // Assign displayed tasks to their parents or orphans
   for (const task of tasks) {
     if (parentMap.has(task.id)) continue // skip parents themselves
     if (task.parent_task_id && parentMap.has(task.parent_task_id)) {
@@ -101,7 +106,9 @@ export function deriveProjectGroups(tasks: BusinessTask[]): {
       childrenMap.get(task.parent_task_id)!.push(task)
       // Create a synthetic parent if we haven't seen it
       if (!parentMap.has(task.parent_task_id)) {
-        parentMap.set(task.parent_task_id, {
+        // Try to find real parent in lookupSource for its title
+        const realParent = lookupSource.find(t => t.id === task.parent_task_id)
+        parentMap.set(task.parent_task_id, realParent ?? {
           id: task.parent_task_id,
           title: `Project ${task.parent_task_id.slice(0, 8)}`,
           description: null,
@@ -132,7 +139,10 @@ export function deriveProjectGroups(tasks: BusinessTask[]): {
 
   const projects: ProjectGroup[] = []
   for (const [parentId, parent] of parentMap) {
-    projects.push({ parent, children: childrenMap.get(parentId) ?? [] })
+    const children = childrenMap.get(parentId) ?? []
+    if (children.length > 0 || displaySet.has(parentId)) {
+      projects.push({ parent, children })
+    }
   }
 
   // Sort: projects with in_progress children first, then by child count

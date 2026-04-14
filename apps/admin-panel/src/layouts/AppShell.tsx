@@ -15,7 +15,9 @@ import {
   LayoutGrid,
   LogOut,
   Package,
+  Rewind,
   Rocket,
+  ScanLine,
   Table2,
   Timer,
   Trash2,
@@ -74,6 +76,8 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/cook', icon: Timer, label: 'Cook Station' },
       { path: '/waste', icon: Trash2, label: 'Waste' },
       { path: '/schedule', icon: CalendarClock, label: 'Schedule' },
+      { path: '/logistics', icon: ScanLine, label: 'Logistics' },
+      { path: '/orders', icon: Bell, label: 'Orders' },
     ],
   },
   {
@@ -81,6 +85,7 @@ const NAV_SECTIONS: NavSection[] = [
     minRole: 'cook',
     items: [
       { path: '/planner', icon: CalendarDays, label: 'Planner' },
+      { path: '/planner/batch', icon: Rewind, label: 'Batch Plan' },
       { path: '/production', icon: Factory, label: 'Production' },
       { path: '/targets', icon: Target, label: 'Targets' },
       { path: '/receive', icon: ClipboardCheck, label: 'Receiving' },
@@ -95,6 +100,13 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/finance/analytics', icon: BarChart3, label: 'Analytics' },
       { path: '/receipts', icon: Inbox, label: 'Receipt Inbox' },
       { path: '/api-costs', icon: DollarSign, label: 'API Costs' },
+    ],
+  },
+  {
+    title: 'Settings',
+    minRole: 'owner',
+    items: [
+      { path: '/settings', icon: Settings, label: 'Settings' },
     ],
   },
 ]

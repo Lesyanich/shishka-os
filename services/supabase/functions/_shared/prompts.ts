@@ -124,15 +124,54 @@ Similar to Makro but may have different column order. Look for barcodes (13 digi
 ## HEADER EXTRACTION
 - Supplier name (English AND Thai). If no name is printed, infer from items (see Cash bills section above)
 - Invoice/receipt number → invoice_number
-- Date → transaction_date (YYYY-MM-DD). Thai Buddhist Era: subtract 543 from year (2569 = 2026)
 - Tax ID, cashier, member card → raw_parse
+
+## DATE EXTRACTION (CRITICAL — PAY SPECIAL ATTENTION)
+The transaction_date field MUST be in YYYY-MM-DD format (Gregorian calendar).
+
+### Thai Buddhist Era (พ.ศ. / B.E.)
+Thai receipts use Buddhist Era years. SUBTRACT 543 to convert:
+- 2569 → 2026, 2568 → 2025, 2567 → 2024
+- Two-digit years: 69 → 2026, 68 → 2025, 67 → 2024
+
+### Common date formats on Thai receipts
+| Printed on receipt | Parsed as | Rule |
+|---|---|---|
+| 06/04/2569 | 2026-04-06 | DD/MM/BBBB (Buddhist Era) |
+| 06/04/69 | 2026-04-06 | DD/MM/BB (two-digit B.E.) |
+| 06-04-69 | 2026-04-06 | DD-MM-BB (dash separator) |
+| 06/04/2026 | 2026-04-06 | DD/MM/YYYY (Gregorian, common on English receipts) |
+| 2026-04-06 | 2026-04-06 | ISO format (rare on receipts) |
+| 06 เม.ย. 2569 | 2026-04-06 | Thai month abbreviation + B.E. |
+| 06 เม.ย. 69 | 2026-04-06 | Thai month abbrev + 2-digit B.E. |
+| APR 06, 2026 | 2026-04-06 | English month format |
+
+### Thai month abbreviations
+ม.ค.=Jan, ก.พ.=Feb, มี.ค.=Mar, เม.ย.=Apr, พ.ค.=May, มิ.ย.=Jun,
+ก.ค.=Jul, ส.ค.=Aug, ก.ย.=Sep, ต.ค.=Oct, พ.ย.=Nov, ธ.ค.=Dec
+
+### VALIDATION
+- Thai format is ALWAYS DD/MM (day first), NEVER MM/DD
+- Year must be plausible: 2024–2026 Gregorian (2567–2569 Buddhist Era)
+- If year is 24–26 → Gregorian (20XX). If year is 67–69 → Buddhist Era (25XX - 543)
+- If unsure between B.E. and Gregorian: a year > 2500 is ALWAYS Buddhist Era
+- NEVER output a date before 2024 or after 2027
+- Save the raw printed date in raw_parse.header.date_raw for verification
 
 ## FOOTER EXTRACTION
 - Subtotal (before discount)
 - Discount (MEM.DISC): ALWAYS negative (e.g., -134)
 - VAT 7%: if printed, use printed value; otherwise calculate: total × 7 / 107
+  - IMPORTANT: If VAT is listed as a SEPARATE line (not included in item prices), set vat_included: false and vat_amount to that printed value. The grand_total = subtotal - discount + vat_amount.
+  - If VAT is INCLUDED in item prices (VAT code "2", most Makro/BigC receipts), set vat_included: true and vat_amount = total × 7 / 107 (for display only, already in prices). The grand_total = subtotal - discount (NO separate VAT addition).
 - TOTAL → amount_original
 - Payment method
+
+## TAX INVOICE DETECTION
+- has_tax_invoice: true if the document says "ใบกำกับภาษี" (Tax Invoice) or "TAX INVOICE" anywhere
+- Makro, Big C, Tops, HomePro, Thai Watsadu → ALWAYS has_tax_invoice: true (they are VAT-registered)
+- Market vendors, cash bills, handwritten → usually has_tax_invoice: false
+- If has_tax_invoice is true, vat_amount should be > 0 (calculate if not printed)
 
 ## CLASSIFICATION
 | Category | flow_type | category_code | Examples |
@@ -156,6 +195,7 @@ export const OUTPUT_SCHEMA = `Return ONLY a valid JSON object (no markdown fence
   "invoice_number": "receipt number or null",
   "transaction_date": "YYYY-MM-DD",
   "has_tax_invoice": false,
+  "vat_included": true,
   "item_count_observed": 4,
   "footer": {
     "subtotal": 0,

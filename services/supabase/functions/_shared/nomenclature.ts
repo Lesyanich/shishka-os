@@ -28,7 +28,7 @@ export async function resolveSupplierWithProfile(name: string): Promise<Resolved
 
 export async function matchNomenclature(
   supplierId: string | null,
-  item: { barcode?: string | null; supplier_sku?: string | null; translated_name?: string },
+  item: { barcode?: string | null; supplier_sku?: string | null; translated_name?: string; original_name?: string | null },
 ): Promise<{ nomenclature_id: string | null; sku_id: string | null; confidence: string }> {
   if (item.barcode) {
     const { data } = await db
@@ -53,11 +53,40 @@ export async function matchNomenclature(
       return { nomenclature_id: data[0].nomenclature_id, sku_id: data[0].sku_id, confidence: "high" }
     }
   }
+  // Fallback: match translated_name against supplier_catalog.product_name (English cross-check)
   if (item.translated_name) {
+    const nameQuery = item.translated_name.slice(0, 40)
+    const { data: scMatch } = await db
+      .from("supplier_catalog")
+      .select("nomenclature_id, id")
+      .ilike("product_name", `%${nameQuery}%`)
+      .not("nomenclature_id", "is", null)
+      .order("match_count", { ascending: false })
+      .limit(1)
+    if (scMatch?.[0]?.nomenclature_id) {
+      return { nomenclature_id: scMatch[0].nomenclature_id, sku_id: scMatch[0].id, confidence: "medium" }
+    }
+
+    // Also try original_name from supplier_catalog (Thai name from previous receipts)
+    if (item.original_name) {
+      const thQuery = item.original_name.slice(0, 40)
+      const { data: scThMatch } = await db
+        .from("supplier_catalog")
+        .select("nomenclature_id, id")
+        .ilike("original_name", `%${thQuery}%`)
+        .not("nomenclature_id", "is", null)
+        .order("match_count", { ascending: false })
+        .limit(1)
+      if (scThMatch?.[0]?.nomenclature_id) {
+        return { nomenclature_id: scThMatch[0].nomenclature_id, sku_id: scThMatch[0].id, confidence: "medium" }
+      }
+    }
+
+    // Last resort: fuzzy match against nomenclature.name
     const { data } = await db
       .from("nomenclature")
       .select("id")
-      .ilike("name", `%${item.translated_name.slice(0, 30)}%`)
+      .ilike("name", `%${nameQuery}%`)
       .limit(1)
     if (data?.[0]?.id) {
       return { nomenclature_id: data[0].id, sku_id: null, confidence: "medium" }

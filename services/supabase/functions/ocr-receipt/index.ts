@@ -185,6 +185,7 @@ ${fullOcrText}
         barcode: item.barcode as string | null,
         supplier_sku: item.supplier_sku as string | null,
         translated_name: item.translated_name as string,
+        original_name: item.original_name as string | null,
       })
       item.nomenclature_id = match.nomenclature_id
       item.sku_id = match.sku_id
@@ -209,6 +210,7 @@ ${fullOcrText}
       vat_amount: footer.vat_amount || 0,
       delivery_fee: footer.delivery_fee || 0,
       has_tax_invoice: parsed.has_tax_invoice || false,
+      vat_included: parsed.vat_included !== false,
       currency: "THB",
       food_items,
       capex_items,

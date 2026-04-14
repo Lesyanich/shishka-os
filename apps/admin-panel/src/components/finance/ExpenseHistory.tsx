@@ -91,6 +91,7 @@ export function ExpenseHistory({
           r.comments,
           r.category_name,
           r.sub_category_name,
+          r.invoice_number,
         ]
           .filter(Boolean)
           .join(' ')

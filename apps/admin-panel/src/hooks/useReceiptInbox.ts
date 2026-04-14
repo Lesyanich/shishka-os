@@ -196,6 +196,11 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       return { ok: true }
     }
 
+    // Immediately reflect 'processing' in UI — don't wait for realtime
+    setRows((prev) =>
+      prev.map((r) => (r.id === inboxId ? { ...r, status: 'processing' as const } : r)),
+    )
+
     try {
       const { data, error: fnErr } = await supabase.functions.invoke(
         `ocr-receipt?inbox_id=${inboxId}&model=${model}`,
@@ -331,10 +336,12 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       const hasItems = (pp.food_items?.length || 0) + (pp.capex_items?.length || 0) + (pp.opex_items?.length || 0)
       if (!hasItems) { result.failed++; result.errors.push(`${id.slice(0, 8)}: no items`); continue }
 
-      // Build payload (same as InboxReviewPanel.handleApproveConfirm)
+      // Build payload (same as InboxReviewPanel.handleApproveClick)
       const photos = row.photo_urls || []
+      const invoiceNum = pp.invoice_number || `REC-${(pp.transaction_date || '').replace(/-/g, '')}-${id.slice(0, 6)}`
       const payload = {
         ...pp,
+        invoice_number: invoiceNum,
         receipt_supplier_url: pp.receipt_supplier_url || photos[0] || null,
         receipt_bank_url: pp.receipt_bank_url || (photos[1] && photos[1] !== photos[0] ? photos[1] : null),
         tax_invoice_url: pp.tax_invoice_url || (pp.has_tax_invoice && photos.length > 1 ? photos[1] : null),

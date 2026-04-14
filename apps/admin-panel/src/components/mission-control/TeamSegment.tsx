@@ -31,14 +31,14 @@ const PERSON_PILLS: PersonPill[] = [
 
 const DOMAIN_PILLS: DomainPill[] = [
   { id: 'all',         label: 'All' },
-  { id: 'kitchen',     label: 'Kitchen' },
-  { id: 'finance',     label: 'Finance' },
-  { id: 'procurement', label: 'Procurement' },
-  { id: 'ops',         label: 'Ops' },
-  { id: 'tech',        label: 'Tech' },
-  { id: 'marketing',   label: 'Marketing' },
-  { id: 'sales',       label: 'Sales' },
-  { id: 'strategy',    label: 'Strategy' },
+  { id: 'kitchen',     label: '🍳 Kitchen' },
+  { id: 'finance',     label: '💰 Finance' },
+  { id: 'procurement', label: '📦 Procurement' },
+  { id: 'ops',         label: '⚙️ Ops' },
+  { id: 'tech',        label: '💻 Tech' },
+  { id: 'marketing',   label: '📢 Marketing' },
+  { id: 'sales',       label: '💎 Sales' },
+  { id: 'strategy',    label: '🧭 Strategy' },
 ]
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
   const [personFilter, setPersonFilter] = useState<PersonFilter>('all')
   const [domainFilter, setDomainFilter] = useState<DomainFilter>('all')
   const [search, setSearch] = useState('')
-  const [groupBy, setGroupBy] = useState<GroupBy>('topic')
+  const [groupBy, setGroupBy] = useState<GroupBy>('project')
 
   const person = personFilter !== 'all' ? personFilter : null
 
@@ -258,7 +258,7 @@ export function TeamSegment({ tasks, onOpenDetail }: TeamSegmentProps) {
         {/* Task list */}
         {allHumanTasks.length > 0 ? (
           groupBy === 'project' ? (
-            <ProjectGroupView tasks={allHumanTasks} onOpenDetail={onOpenDetail} />
+            <ProjectGroupView tasks={allHumanTasks} allTasks={tasks} onOpenDetail={onOpenDetail} />
           ) : (
             <GroupedTaskList
               tasks={allHumanTasks}

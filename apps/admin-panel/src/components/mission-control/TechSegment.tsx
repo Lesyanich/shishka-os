@@ -143,7 +143,7 @@ export function TechSegment({ tasks, onOpenDetail }: TechSegmentProps) {
   const [agentFilter, setAgentFilter] = useState<AgentFilter>('all')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [search, setSearch] = useState('')
-  const [viewMode, setViewMode] = useState<ViewMode>('flat')
+  const [viewMode, setViewMode] = useState<ViewMode>('projects')
 
   // Only code/agent executor_type tasks
   const techTasks = tasks.filter(t => t.executor_type === 'code' || t.executor_type === 'agent')
@@ -274,54 +274,61 @@ export function TechSegment({ tasks, onOpenDetail }: TechSegmentProps) {
         </div>
       </div>
 
-      {/* Agent Queue zone */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <Cpu className="h-4 w-4 text-violet-400" />
-          <h3 className="text-sm font-semibold text-slate-200">Agent Queue</h3>
-          <span className="text-xs text-slate-500">Currently running &amp; blocked</span>
-          {activeTasks.length > 0 && (
-            <span className="ml-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-400">
-              {activeTasks.length}
-            </span>
+      {/* ── Project view: unified grouped layout ── */}
+      {viewMode === 'projects' ? (
+        <ProjectGroupView
+          tasks={filtered.filter(t => t.status !== 'done' && t.status !== 'cancelled')}
+          allTasks={tasks}
+          onOpenDetail={onOpenDetail}
+        />
+      ) : (
+        <>
+        {/* Agent Queue zone */}
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <Cpu className="h-4 w-4 text-violet-400" />
+            <h3 className="text-sm font-semibold text-slate-200">Agent Queue</h3>
+            <span className="text-xs text-slate-500">Currently running &amp; blocked</span>
+            {activeTasks.length > 0 && (
+              <span className="ml-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-400">
+                {activeTasks.length}
+              </span>
+            )}
+          </div>
+
+          {activeTasks.length === 0 ? (
+            <div className="flex items-center gap-2 rounded-xl border border-slate-800/40 bg-slate-900/30 px-4 py-5 text-xs text-slate-500">
+              <Zap className="h-4 w-4 text-slate-600" />
+              <span>No active agent tasks right now.</span>
+            </div>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700">
+              {activeTasks.map(task => (
+                <FocusCard key={task.id} task={task} onClick={onOpenDetail} />
+              ))}
+            </div>
           )}
-        </div>
+        </section>
 
-        {activeTasks.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl border border-slate-800/40 bg-slate-900/30 px-4 py-5 text-xs text-slate-500">
-            <Zap className="h-4 w-4 text-slate-600" />
-            <span>No active agent tasks right now.</span>
+        {/* Backlog zone */}
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <Plus className="h-4 w-4 text-emerald-400" />
+            <h3 className="text-sm font-semibold text-slate-200">Backlog</h3>
+            <span className="text-xs text-slate-500">Quick wins, tech debt &amp; epics</span>
+            {backlogTasks.length > 0 && (
+              <span className="ml-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                {backlogTasks.length}
+              </span>
+            )}
           </div>
-        ) : (
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700">
-            {activeTasks.map(task => (
-              <FocusCard key={task.id} task={task} onClick={onOpenDetail} />
-            ))}
-          </div>
-        )}
-      </section>
 
-      {/* Backlog zone */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <Plus className="h-4 w-4 text-emerald-400" />
-          <h3 className="text-sm font-semibold text-slate-200">Backlog</h3>
-          <span className="text-xs text-slate-500">Quick wins, tech debt &amp; epics</span>
-          {backlogTasks.length > 0 && (
-            <span className="ml-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
-              {backlogTasks.length}
-            </span>
-          )}
-        </div>
-
-        {backlogTasks.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl border border-slate-800/40 bg-slate-900/30 px-4 py-5 text-xs text-slate-500">
-            <Star className="h-4 w-4 text-slate-600" />
-            <span>Backlog is clear.</span>
-          </div>
-        ) : viewMode === 'projects' ? (
-          <ProjectGroupView tasks={filtered} onOpenDetail={onOpenDetail} />
-        ) : (
+          {backlogTasks.length === 0 ? (
+            <div className="flex items-center gap-2 rounded-xl border border-slate-800/40 bg-slate-900/30 px-4 py-5 text-xs text-slate-500">
+              <Star className="h-4 w-4 text-slate-600" />
+              <span>Backlog is clear.</span>
+            </div>
+          ) : (
           <div className="grid grid-cols-[1fr_1.6fr] gap-4">
             {/* Left: Quick Wins & Tech Debt */}
             <div className="flex flex-col gap-1">
@@ -352,7 +359,9 @@ export function TechSegment({ tasks, onOpenDetail }: TechSegmentProps) {
             </div>
           </div>
         )}
-      </section>
+        </section>
+        </>
+      )}
     </div>
   )
 }
