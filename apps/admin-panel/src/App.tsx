@@ -37,6 +37,7 @@ const MemPalaceBrowser = lazy(() => import('./pages/brain').then(m => ({ default
 const QualityPage = lazy(() => import('./pages/brain').then(m => ({ default: m.QualityPage })))
 const BrainKnowledgePage = lazy(() => import('./pages/brain/BrainKnowledgePage').then(m => ({ default: m.BrainKnowledgePage })))
 const ProductionTargets = lazy(() => import('./pages/ProductionTargets').then(m => ({ default: m.ProductionTargets })))
+const ApiCostPage = lazy(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
 
 function PageLoader() {
   return (
@@ -94,6 +95,7 @@ function App() {
                     <Route path="analytics" element={<FinanceAnalytics />} />
                   </Route>
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
+                  <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
                 </Route>
 
                 {/* ── Kitchen + Production — accessible to all authenticated ── */}
