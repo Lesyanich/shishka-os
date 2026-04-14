@@ -33,7 +33,7 @@ export function useCookTasks(cookId: string | null): UseCookTasksResult {
         equipment_id, actual_start, actual_end, actual_weight,
         gross_weight, theoretical_yield, target_nomenclature_id,
         target_quantity, assigned_to, schedule_run_id, parent_target_id,
-        target_nomenclature:nomenclature!production_tasks_target_nomenclature_id_fkey(name, product_code)
+        target_nomenclature:nomenclature!production_tasks_target_nomenclature_id_fkey(name, product_code, norm_waste_pct)
       `)
       .eq('assigned_to', cookId)
       .in('status', ['pending', 'in_progress'])

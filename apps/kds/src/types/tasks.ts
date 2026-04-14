@@ -17,5 +17,5 @@ export interface ProductionTask {
   assigned_to: string | null
   schedule_run_id: string | null
   parent_target_id: string | null
-  target_nomenclature: { name: string; product_code: string } | null
+  target_nomenclature: { name: string; product_code: string; norm_waste_pct: number | null } | null
 }
