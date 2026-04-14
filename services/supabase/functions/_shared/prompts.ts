@@ -83,14 +83,25 @@ This should be parsed as:
 ### Big C / Lotus / Tops
 Similar to Makro but may have different column order. Look for barcodes (13 digits) and English product names.
 
-### DIY / Hardware Stores (Thai Watsadu, HomePro, Baan & Beyond)
-- Receipt format: CODE | DESCRIPTION | QTY | UNIT PRICE | TOTAL
+### DIY / Hardware Stores (Thai Watsadu, HomePro, Baan & Beyond, Mr. D.I.Y.)
+- Receipt format: CODE | DESCRIPTION | QTY | UNIT PRICE | DISC | TOTAL
 - The CODE column contains 4-8 digit article/product codes → save as supplier_sku (NOT barcode)
 - If a separate 13-digit EAN barcode is printed → save as barcode
 - Items are typically: OpEx (cleaning supplies, tools, household items) or CapEx (equipment >2000 THB)
 - Product names may be in English abbreviations (e.g., "BK GARBAGE BAG 30X40INC", "GLASS STORAGE 600ML")
 - No Thai→English translation needed if description is already in English
 - CRITICAL: Even if barcodes are not in a standard EAN-13 format, ALWAYS extract any numeric code that appears next to or above each item (4-13 digits). Save as supplier_sku if <13 digits, barcode if 13 digits.
+
+### Mr. D.I.Y. (specific format)
+- Header: "RECEIPT/TAX INVOICE" from "Mr D.I.Y (Bangkok) Co., Ltd."
+- Column layout: CODE | DESCRIPTION | QTY | U.PRICE | DISC | AMT (THB)
+- CODE column has 4-7 digit article numbers (e.g., 8802483, 903624, 8579196, 9024914) → save as supplier_sku
+- There are NO EAN-13 barcodes on Mr. D.I.Y. receipts → barcode field should be null
+- EVERY item line starts with a numeric CODE — you MUST extract it as supplier_sku for every single item
+- Example: "8802483  GLASS CANISTER 960185# 700ML  3  33.00  0.00  99.00"
+  → supplier_sku: "8802483", name: "GLASS CANISTER 960185# 700ML", quantity: 3, unit_price: 33.00, total_price: 99.00
+- Invoice number from "Inv No:" field in header (e.g., "0000007885")
+- Ref RCP No (e.g., "BS54 T1 0000030508") is NOT the invoice number
 
 ### Index Living Mall
 - Receipt format: similar to DIY stores — article code + description + qty + price + total
