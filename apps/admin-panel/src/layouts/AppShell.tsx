@@ -1,78 +1,185 @@
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   BarChart3,
   CalendarClock,
   CalendarDays,
   ChefHat,
+  ChevronDown,
+  ClipboardCheck,
+  DollarSign,
   Factory,
   GitBranch,
   Inbox,
   LayoutDashboard,
+  LayoutGrid,
   LogOut,
-  PlusCircle,
-  Rewind,
-  ScanLine,
+  Package,
+  Rocket,
   Table2,
   Timer,
   Trash2,
   Truck,
-  Package,
-  Bell,
-  Brain,
-  ClipboardCheck,
-  Rocket,
   UtensilsCrossed,
-  DollarSign,
+  Brain,
   Settings,
   Target,
-  LayoutGrid,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { useRole, type AppRole } from '../contexts/RoleContext'
+import { useAppRole, type AppRole } from '../contexts/AppRoleContext'
 
-const ROLE_LABELS: Record<AppRole, string> = {
-  lesia: 'Lesia',
-  bas: 'Bas',
-  chef: 'Chef',
-}
+/* ─── Types ─── */
 
 interface NavItem {
   path: string
   icon: typeof LayoutDashboard
   label: string
-  enabled: boolean
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { path: '/', icon: LayoutDashboard, label: 'Control Center', enabled: true },
-  { path: '/mission', icon: Rocket, label: 'Mission Control', enabled: true },
-  { path: '/brain', icon: Brain, label: 'Brain', enabled: true },
-  { path: '/menu', icon: LayoutGrid, label: 'Menu', enabled: true },
-  { path: '/bom', icon: GitBranch, label: 'BOM Hub', enabled: true },
-  { path: '/kds', icon: ChefHat, label: 'Kitchen KDS', enabled: true },
-  { path: '/cook', icon: Timer, label: 'Cook Station', enabled: true },
-  { path: '/waste', icon: Trash2, label: 'Waste', enabled: true },
-  { path: '/logistics', icon: ScanLine, label: 'Logistics', enabled: true },
-  { path: '/procurement', icon: Truck, label: 'Procurement', enabled: true },
-  { path: '/sku', icon: Package, label: 'SKU Manager', enabled: true },
-  { path: '/orders', icon: Bell, label: 'Orders', enabled: true },
-  { path: '/planner', icon: CalendarDays, label: 'Planner', enabled: true },
-  { path: '/planner/batch', icon: Rewind, label: 'Batch Plan', enabled: true },
-  { path: '/production', icon: Factory, label: 'Production', enabled: true },
-  { path: '/targets', icon: Target, label: 'Targets', enabled: true },
-  { path: '/receive', icon: ClipboardCheck, label: 'Receiving', enabled: true },
-  { path: '/finance/ledger', icon: Table2, label: 'Ledger', enabled: true },
-  { path: '/finance/entry', icon: PlusCircle, label: 'New Entry', enabled: true },
-  { path: '/finance/analytics', icon: BarChart3, label: 'Analytics', enabled: true },
-  { path: '/receipts', icon: Inbox, label: 'Receipt Inbox', enabled: true },
-  { path: '/api-costs', icon: DollarSign, label: 'API Costs', enabled: true },
-  { path: '/schedule', icon: CalendarClock, label: 'Schedule', enabled: true },
-  { path: '/settings', icon: Settings, label: 'Settings', enabled: true },
+interface NavSection {
+  title: string
+  minRole: AppRole
+  items: NavItem[]
+  defaultOpen?: boolean
+}
+
+/* ─── Navigation structure ─── */
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: 'Operations',
+    minRole: 'owner',
+    defaultOpen: true,
+    items: [
+      { path: '/', icon: LayoutDashboard, label: 'Control Center' },
+      { path: '/mission', icon: Rocket, label: 'Mission Control' },
+      { path: '/brain', icon: Brain, label: 'Brain' },
+    ],
+  },
+  {
+    title: 'Menu & Products',
+    minRole: 'owner',
+    items: [
+      { path: '/menu', icon: LayoutGrid, label: 'Menu' },
+      { path: '/bom', icon: GitBranch, label: 'BOM Hub' },
+      { path: '/sku', icon: Package, label: 'SKU Manager' },
+    ],
+  },
+  {
+    title: 'Kitchen',
+    minRole: 'cook',
+    defaultOpen: true,
+    items: [
+      { path: '/kds', icon: ChefHat, label: 'Kitchen KDS' },
+      { path: '/cook', icon: Timer, label: 'Cook Station' },
+      { path: '/waste', icon: Trash2, label: 'Waste' },
+      { path: '/schedule', icon: CalendarClock, label: 'Schedule' },
+    ],
+  },
+  {
+    title: 'Production',
+    minRole: 'cook',
+    items: [
+      { path: '/planner', icon: CalendarDays, label: 'Planner' },
+      { path: '/production', icon: Factory, label: 'Production' },
+      { path: '/targets', icon: Target, label: 'Targets' },
+      { path: '/receive', icon: ClipboardCheck, label: 'Receiving' },
+      { path: '/procurement', icon: Truck, label: 'Procurement' },
+    ],
+  },
+  {
+    title: 'Finance',
+    minRole: 'owner',
+    items: [
+      { path: '/finance/ledger', icon: Table2, label: 'Ledger' },
+      { path: '/finance/analytics', icon: BarChart3, label: 'Analytics' },
+      { path: '/receipts', icon: Inbox, label: 'Receipt Inbox' },
+      { path: '/api-costs', icon: DollarSign, label: 'API Costs' },
+    ],
+  },
 ]
+
+/* ─── Role badge ─── */
+
+const ROLE_STYLE: Record<AppRole, string> = {
+  owner: 'bg-amber-500/15 text-amber-300',
+  cook: 'bg-sky-500/15 text-sky-300',
+}
+
+/* ─── Collapsible section ─── */
+
+function SidebarSection({
+  section,
+  isOpen,
+  onToggle,
+}: {
+  section: NavSection
+  isOpen: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="flex w-full items-center justify-between px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-400"
+      >
+        <span className="hidden lg:block">{section.title}</span>
+        <ChevronDown
+          className={[
+            'hidden h-3 w-3 transition-transform lg:block',
+            isOpen ? '' : '-rotate-90',
+          ].join(' ')}
+        />
+      </button>
+      {isOpen && (
+        <div className="flex flex-col gap-0.5">
+          {section.items.map(({ path, icon: Icon, label }) => (
+            <NavLink
+              key={path}
+              to={path}
+              end={path === '/'}
+              className={({ isActive }) =>
+                [
+                  'flex items-center gap-3 rounded-lg px-2 py-2 text-xs font-medium transition',
+                  isActive
+                    ? 'bg-emerald-500/15 text-emerald-300'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100',
+                ].join(' ')
+              }
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="hidden lg:block">{label}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── AppShell ─── */
 
 export function AppShell() {
   const { user, signOut } = useAuth()
-  const { role, setRole } = useRole()
+  const { role, staffName, isLoading: roleLoading } = useAppRole()
+
+  const visibleSections = NAV_SECTIONS.filter(
+    (s) => role === 'owner' || s.minRole === 'cook',
+  )
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(
+    () => {
+      const initial: Record<string, boolean> = {}
+      for (const s of NAV_SECTIONS) {
+        initial[s.title] = s.defaultOpen ?? true
+      }
+      return initial
+    },
+  )
+
+  const toggleSection = (title: string) => {
+    setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }))
+  }
 
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'short',
@@ -96,42 +203,56 @@ export function AppShell() {
           </div>
         </div>
 
+        {/* Staff identity */}
+        {!roleLoading && staffName && (
+          <div className="flex items-center gap-2 border-b border-slate-800 px-3 py-2.5">
+            <span className="hidden truncate text-xs font-medium text-slate-300 lg:block">
+              {staffName}
+            </span>
+            <span
+              className={[
+                'hidden rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase lg:inline-block',
+                ROLE_STYLE[role],
+              ].join(' ')}
+            >
+              {role}
+            </span>
+          </div>
+        )}
+
         {/* Navigation */}
-        <nav className="flex flex-1 flex-col gap-1 p-2">
-          {NAV_ITEMS.map(({ path, icon: Icon, label, enabled }) =>
-            enabled ? (
-              <NavLink
-                key={path}
-                to={path}
-                end={path === '/'}
-                className={({ isActive }) =>
-                  [
-                    'flex items-center gap-3 rounded-lg px-2 py-2 text-xs font-medium transition',
-                    isActive
-                      ? 'bg-emerald-500/15 text-emerald-300'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100',
-                  ].join(' ')
-                }
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="hidden lg:block">{label}</span>
-              </NavLink>
-            ) : (
-              <div
-                key={path}
-                title={`${label} — coming soon`}
-                className="flex cursor-not-allowed items-center gap-3 rounded-lg px-2 py-2 text-xs text-slate-700"
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="hidden lg:block">{label}</span>
-              </div>
-            ),
-          )}
+        <nav className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
+          {visibleSections.map((section) => (
+            <SidebarSection
+              key={section.title}
+              section={section}
+              isOpen={openSections[section.title] ?? true}
+              onToggle={() => toggleSection(section.title)}
+            />
+          ))}
+
+          {/* Settings — always visible, outside sections */}
+          <div className="mt-auto">
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                [
+                  'flex items-center gap-3 rounded-lg px-2 py-2 text-xs font-medium transition',
+                  isActive
+                    ? 'bg-emerald-500/15 text-emerald-300'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100',
+                ].join(' ')
+              }
+            >
+              <Settings className="h-4 w-4 shrink-0" />
+              <span className="hidden lg:block">Settings</span>
+            </NavLink>
+          </div>
         </nav>
 
         {/* Footer */}
         <div className="border-t border-slate-800 px-3 py-3">
-          <p className="hidden text-[10px] text-slate-700 lg:block">v0.6.0 · Phase 8</p>
+          <p className="hidden text-[10px] text-slate-700 lg:block">v0.7.0 · ERP</p>
         </div>
       </aside>
 
@@ -145,21 +266,12 @@ export function AppShell() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-xs text-slate-500">{today}</span>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as AppRole)}
-              className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-emerald-500/50 focus:outline-none"
-            >
-              {(Object.keys(ROLE_LABELS) as AppRole[]).map((r) => (
-                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-              ))}
-            </select>
             {user && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">{user.email}</span>
                 <button
                   onClick={signOut}
-                  title="Выйти"
+                  title="Sign out"
                   className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
                 >
                   <LogOut className="h-3.5 w-3.5" />

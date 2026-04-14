@@ -2,8 +2,9 @@ import { lazy, Suspense } from 'react'
 import * as Sentry from '@sentry/react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
-import { RoleProvider } from './contexts/RoleContext'
+import { AppRoleProvider } from './contexts/AppRoleContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { RoleGuard } from './components/RoleGuard'
 import { AppShell } from './layouts/AppShell'
 import { Loader2 } from 'lucide-react'
 
@@ -75,7 +76,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <RoleProvider>
+        <AppRoleProvider>
         <Sentry.ErrorBoundary fallback={FallbackError}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -87,38 +88,43 @@ function App() {
             <Route path="/live" element={<Suspense fallback={<PageLoader />}><KitchenLive /></Suspense>} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
-                <Route path="/" element={<ControlCenter />} />
-                <Route path="/bom" element={<Suspense fallback={<PageLoader />}><BOMHub /></Suspense>} />
+                {/* ── Owner-only routes ── */}
+                <Route element={<RoleGuard minRole="owner" />}>
+                  <Route path="/" element={<ControlCenter />} />
+                  <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
+                  <Route path="/brain" element={<Suspense fallback={<PageLoader />}><BrainPage /></Suspense>}>
+                    <Route index element={<Navigate to="knowledge" replace />} />
+                    <Route path="knowledge" element={<Suspense fallback={<PageLoader />}><BrainKnowledgePage /></Suspense>} />
+                    <Route path="cost" element={<Suspense fallback={<PageLoader />}><BrainCostPage /></Suspense>} />
+                    <Route path="mempalace" element={<Suspense fallback={<PageLoader />}><MemPalaceBrowser /></Suspense>} />
+                    <Route path="quality" element={<Suspense fallback={<PageLoader />}><QualityPage /></Suspense>} />
+                  </Route>
+                  <Route path="/menu" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />
+                  <Route path="/bom" element={<Suspense fallback={<PageLoader />}><BOMHub /></Suspense>} />
+                  <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
+                  <Route path="/logistics" element={<Suspense fallback={<PageLoader />}><LogisticsScanner /></Suspense>} />
+                  <Route path="/orders" element={<Suspense fallback={<PageLoader />}><OrderManager /></Suspense>} />
+                  <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
+                    <Route index element={<Navigate to="ledger" replace />} />
+                    <Route path="ledger" element={<FinanceLedger />} />
+                    <Route path="entry" element={<FinanceEntry />} />
+                    <Route path="analytics" element={<FinanceAnalytics />} />
+                  </Route>
+                  <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
+                  <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
+                </Route>
+
+                {/* ── Kitchen + Production — accessible to all authenticated ── */}
                 <Route path="/kds" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
                 <Route path="/cook" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
                 <Route path="/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
-                <Route path="/logistics" element={<Suspense fallback={<PageLoader />}><LogisticsScanner /></Suspense>} />
-                <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
-                <Route path="/menu" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />
-                <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
-                <Route path="/orders" element={<Suspense fallback={<PageLoader />}><OrderManager /></Suspense>} />
+                <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
                 <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
                 <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
-                <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
-                  <Route index element={<Navigate to="ledger" replace />} />
-                  <Route path="ledger" element={<FinanceLedger />} />
-                  <Route path="entry" element={<FinanceEntry />} />
-                  <Route path="analytics" element={<FinanceAnalytics />} />
-                </Route>
-                <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
-                <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
-                <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
                 <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
-                <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
-                <Route path="/brain" element={<Suspense fallback={<PageLoader />}><BrainPage /></Suspense>}>
-                  <Route index element={<Navigate to="knowledge" replace />} />
-                  <Route path="knowledge" element={<Suspense fallback={<PageLoader />}><BrainKnowledgePage /></Suspense>} />
-                  <Route path="cost" element={<Suspense fallback={<PageLoader />}><BrainCostPage /></Suspense>} />
-                  <Route path="mempalace" element={<Suspense fallback={<PageLoader />}><MemPalaceBrowser /></Suspense>} />
-                  <Route path="quality" element={<Suspense fallback={<PageLoader />}><QualityPage /></Suspense>} />
-                </Route>
-                <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
+                <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
+                <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
                 <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
               </Route>
             </Route>
@@ -126,7 +132,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Sentry.ErrorBoundary>
-        </RoleProvider>
+        </AppRoleProvider>
       </AuthProvider>
     </BrowserRouter>
   )
