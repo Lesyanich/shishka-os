@@ -1,11 +1,12 @@
-import { useOptimistic, useState, useCallback } from 'react'
+import { useOptimistic, useState, useCallback, useMemo } from 'react'
 import { Check, X, Star, StarOff } from 'lucide-react'
-import type { MenuDish } from '../../../hooks/useMenuDishes'
+import type { MenuDish, MenuSubcategory } from '../../../hooks/useMenuDishes'
 
 interface OwnerTableProps {
   dishes: MenuDish[]
   selectedCategory: string | null
-  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
+  subcategories: Map<string, MenuSubcategory[]>
+  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
 }
 
 function foodCostColor(pct: number): string {
@@ -19,13 +20,21 @@ function formatThb(v: number | null): string {
   return `\u0E3F${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
+function hasNutrition(dish: MenuDish): boolean {
+  return dish.calories != null || dish.protein != null || dish.carbs != null || dish.fat != null
+}
+
 interface EditState {
   id: string
   name: string
   price: string
 }
 
-export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTableProps) {
+type GroupItem =
+  | { type: 'l2-header'; subcategory: MenuSubcategory; dishCount: number }
+  | { type: 'dish'; dish: MenuDish }
+
+export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate }: OwnerTableProps) {
   const filtered = selectedCategory
     ? dishes.filter((d) => d.category_id === selectedCategory)
     : dishes
@@ -87,10 +96,45 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
     [onUpdate, setOptimistic],
   )
 
+  // Group dishes with L2 subcategory headers
+  const groupedDishes = useMemo((): GroupItem[] => {
+    const relevantL1Ids = selectedCategory
+      ? [selectedCategory]
+      : (Array.from(new Set(optimisticDishes.map((d) => d.category_id).filter(Boolean))) as string[])
+
+    const groups: GroupItem[] = []
+
+    for (const catId of relevantL1Ids) {
+      const l2s = subcategories.get(catId) ?? []
+      const catDishes = optimisticDishes.filter((d) => d.category_id === catId)
+
+      if (l2s.length === 0) {
+        for (const dish of catDishes) {
+          groups.push({ type: 'dish', dish })
+        }
+      } else {
+        for (const l2 of l2s) {
+          groups.push({ type: 'l2-header', subcategory: l2, dishCount: 0 })
+        }
+        for (const dish of catDishes) {
+          groups.push({ type: 'dish', dish })
+        }
+      }
+    }
+
+    // Add dishes without a category
+    const uncategorized = optimisticDishes.filter((d) => d.category_id == null)
+    for (const dish of uncategorized) {
+      groups.push({ type: 'dish', dish })
+    }
+
+    return groups
+  }, [optimisticDishes, subcategories, selectedCategory])
+
   if (optimisticDishes.length === 0) {
     return (
-      <div className="flex items-center justify-center py-20 text-sm text-slate-500">
-        No dishes in this category.
+      <div className="flex flex-col items-center justify-center py-20 text-sm text-slate-500">
+        <span>No dishes in this category.</span>
       </div>
     )
   }
@@ -101,6 +145,7 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
         <thead>
           <tr className="border-b border-slate-800 bg-slate-900/50 text-left text-[10px] uppercase tracking-wider text-slate-500">
             <th className="px-3 py-2.5">Name</th>
+            <th className="px-3 py-2.5">Description</th>
             <th className="px-3 py-2.5">Category</th>
             <th className="px-3 py-2.5 text-right">Price</th>
             <th className="px-3 py-2.5 text-right">Cost</th>
@@ -111,12 +156,26 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
           </tr>
         </thead>
         <tbody>
-          {optimisticDishes.map((dish) => {
+          {groupedDishes.map((item, idx) => {
+            if (item.type === 'l2-header') {
+              return (
+                <tr key={`l2-${item.subcategory.id}`} className="bg-slate-900/30">
+                  <td colSpan={9} className="px-3 py-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                      {item.subcategory.name}
+                    </span>
+                  </td>
+                </tr>
+              )
+            }
+
+            const dish = item.dish
             const isEditing = editing?.id === dish.id
-            const cost = dish.cost_per_unit ?? 0
+            const cost = dish.cost_per_unit
             const price = dish.price ?? 0
-            const foodCostPct = price > 0 ? (cost / price) * 100 : 0
-            const margin = price - cost
+            const hasCost = cost != null
+            const foodCostPct = hasCost && price > 0 ? (cost / price) * 100 : 0
+            const margin = hasCost ? price - cost : 0
 
             return (
               <tr
@@ -142,12 +201,32 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => startEdit(dish)}
-                      className="text-left font-medium text-slate-100"
-                    >
-                      {dish.name}
-                    </button>
+                    <span className="flex items-center">
+                      <button
+                        onClick={() => startEdit(dish)}
+                        className="text-left font-medium text-slate-100"
+                      >
+                        {dish.name}
+                      </button>
+                      {!hasNutrition(dish) && (
+                        <span className="ml-2 inline-flex rounded-full bg-slate-700 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
+                          No KBJU
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </td>
+
+                {/* Description */}
+                <td className="max-w-[200px] px-3 py-2 text-slate-400">
+                  {dish.description ? (
+                    <span title={dish.description} className="block truncate">
+                      {dish.description.length > 40
+                        ? dish.description.slice(0, 40) + '...'
+                        : dish.description}
+                    </span>
+                  ) : (
+                    <span className="text-slate-600">-</span>
                   )}
                 </td>
 
@@ -179,29 +258,35 @@ export function OwnerTable({ dishes, selectedCategory, onUpdate }: OwnerTablePro
                 </td>
 
                 {/* Cost */}
-                <td className="px-3 py-2 text-right text-slate-400">
-                  {formatThb(dish.cost_per_unit)}
+                <td className="px-3 py-2 text-right">
+                  {hasCost ? (
+                    <span className="text-slate-400">{formatThb(cost)}</span>
+                  ) : (
+                    <span className="inline-flex rounded-full bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                      No BOM
+                    </span>
+                  )}
                 </td>
 
                 {/* Food Cost % */}
                 <td className="px-3 py-2 text-right">
-                  {price > 0 ? (
+                  {hasCost && price > 0 ? (
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${foodCostColor(foodCostPct)}`}>
                       {foodCostPct.toFixed(1)}%
                     </span>
                   ) : (
-                    <span className="text-slate-600">-</span>
+                    <span className="text-slate-600">&mdash;</span>
                   )}
                 </td>
 
                 {/* Margin */}
                 <td className="px-3 py-2 text-right">
-                  {price > 0 ? (
+                  {hasCost && price > 0 ? (
                     <span className={margin > 0 ? 'text-emerald-400' : 'text-rose-400'}>
                       {formatThb(margin)}
                     </span>
                   ) : (
-                    <span className="text-slate-600">-</span>
+                    <span className="text-slate-600">&mdash;</span>
                   )}
                 </td>
 
