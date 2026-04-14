@@ -85,7 +85,7 @@ Similar to Makro but may have different column order. Look for barcodes (13 digi
 
 ### DIY / Hardware Stores (Thai Watsadu, HomePro, Baan & Beyond, Mr. D.I.Y.)
 - Receipt format: CODE | DESCRIPTION | QTY | UNIT PRICE | DISC | TOTAL
-- The CODE column contains 4-8 digit article/product codes → save as supplier_sku (NOT barcode)
+- The CODE column contains 4-8 digit article/product codes → save BOTH as supplier_sku AND barcode
 - If a separate 13-digit EAN barcode is printed → save as barcode
 - Items are typically: OpEx (cleaning supplies, tools, household items) or CapEx (equipment >2000 THB)
 - Product names may be in English abbreviations (e.g., "BK GARBAGE BAG 30X40INC", "GLASS STORAGE 600ML")
@@ -95,17 +95,16 @@ Similar to Makro but may have different column order. Look for barcodes (13 digi
 ### Mr. D.I.Y. (specific format)
 - Header: "RECEIPT/TAX INVOICE" from "Mr D.I.Y (Bangkok) Co., Ltd."
 - Column layout: CODE | DESCRIPTION | QTY | U.PRICE | DISC | AMT (THB)
-- CODE column has 4-7 digit article numbers (e.g., 8802483, 903624, 8579196, 9024914) → save as supplier_sku
-- There are NO EAN-13 barcodes on Mr. D.I.Y. receipts → barcode field should be null
-- EVERY item line starts with a numeric CODE — you MUST extract it as supplier_sku for every single item
+- CODE column has 4-7 digit article numbers (e.g., 8802483, 903624, 8579196, 9024914) → save BOTH as supplier_sku AND barcode
+- EVERY item line starts with a numeric CODE — you MUST extract it for every single item
 - Example: "8802483  GLASS CANISTER 960185# 700ML  3  33.00  0.00  99.00"
-  → supplier_sku: "8802483", name: "GLASS CANISTER 960185# 700ML", quantity: 3, unit_price: 33.00, total_price: 99.00
+  → supplier_sku: "8802483", barcode: "8802483", name: "GLASS CANISTER 960185# 700ML", quantity: 3, unit_price: 33.00, total_price: 99.00
 - Invoice number from "Inv No:" field in header (e.g., "0000007885")
 - Ref RCP No (e.g., "BS54 T1 0000030508") is NOT the invoice number
 
 ### Index Living Mall
 - Receipt format: similar to DIY stores — article code + description + qty + price + total
-- Article codes are 7-10 digit numbers → save as supplier_sku
+- Article codes are 7-10 digit numbers → save BOTH as supplier_sku AND barcode
 - Product names are usually in English (e.g., "DRAWER ORGANIZER", "LED DESK LAMP")
 - Items are typically CapEx (furniture, lighting, storage) or OpEx (small accessories)
 - ALWAYS extract the article/product code for each line item — do NOT skip codes
