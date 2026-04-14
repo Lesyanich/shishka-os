@@ -1,8 +1,30 @@
 import { useCallback, useRef, useState } from 'react'
-import { AlertCircle, ImagePlus, Loader2, Trash2, Upload, UploadCloud } from 'lucide-react'
+import { AlertCircle, ImagePlus, Loader2, Mic, MicOff, Trash2, Upload, UploadCloud, Send } from 'lucide-react'
 import type { OcrModel, BatchProcessResult, InboxInsert } from '../../hooks/useReceiptInbox'
 import { useAppRole } from '../../contexts/AppRoleContext'
 import { MAX_FILE_SIZE, ACCEPT, compressImage, uploadToStorage } from './upload-helpers'
+import { parseQuickExpense } from '../../utils/parseQuickExpense'
+
+/* ────────────────────────── Speech Recognition ────────────────────────── */
+
+type SpeechRecognitionInstance = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start: () => void
+  stop: () => void
+  onresult: ((event: { results: SpeechRecognitionResultList }) => void) | null
+  onerror: ((event: { error: string }) => void) | null
+  onend: (() => void) | null
+}
+
+function getSpeechRecognition(): SpeechRecognitionInstance | null {
+  const SR = window.SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition
+  if (!SR) return null
+  return new (SR as new () => SpeechRecognitionInstance)()
+}
+
+const hasSpeech = typeof window !== 'undefined' && !!(window.SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition)
 
 /* ────────────────────────── Constants ────────────────────────── */
 
@@ -58,6 +80,50 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
 
   const [model, setModel] = useState<OcrModel>(getStoredModel)
 
+  // ── Note / voice input ──
+  const [noteText, setNoteText] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const noteInputRef = useRef<HTMLInputElement>(null)
+
+  const toggleMic = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+    const recognition = getSpeechRecognition()
+    if (!recognition) return
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.lang = 'ru-RU'
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript ?? ''
+      setNoteText((prev) => (prev ? prev + ' ' + transcript : transcript).trim())
+      setIsListening(false)
+    }
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+  }, [isListening])
+
+  /** Build insert payload with optional note hints */
+  const buildInsert = useCallback((photoUrls: string[]): InboxInsert => {
+    const base: InboxInsert = { uploaded_by: uploadedBy, photo_urls: photoUrls }
+    const text = noteText.trim()
+    if (!text) return base
+    const parsed = parseQuickExpense(text)
+    return {
+      ...base,
+      supplier_hint: parsed.supplier_hint,
+      amount_hint: parsed.amount_hint,
+      receipt_date: parsed.receipt_date,
+      notes: text,
+    }
+  }, [noteText, uploadedBy])
+
   const addFiles = useCallback((incoming: FileList | File[]) => {
     const arr = Array.from(incoming).filter((f) => {
       if (!ACCEPT.includes(f.type)) {
@@ -106,6 +172,30 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
     [addFiles],
   )
 
+  /* ── Note-only submit (no photos) ── */
+  const handleNoteOnly = async () => {
+    const text = noteText.trim()
+    if (!text) return
+    setStep('uploading')
+    setToast(null)
+    const payload = buildInsert([])
+    const err = await onInsert(payload)
+    if (err) {
+      setStep('error')
+      setToast({ type: 'err', msg: err })
+    } else {
+      const parsed = parseQuickExpense(text)
+      const parts: string[] = []
+      if (parsed.supplier_hint) parts.push(parsed.supplier_hint)
+      if (parsed.amount_hint) parts.push(`฿${parsed.amount_hint.toLocaleString()}`)
+      parts.push(parsed.receipt_date)
+      setStep('done')
+      setToast({ type: 'ok', msg: `Added: ${parts.join(' · ')}` })
+      setNoteText('')
+      noteInputRef.current?.focus()
+    }
+  }
+
   /* ── Upload files to storage (shared logic) ── */
   const uploadFiles = async (): Promise<string[] | null> => {
     setStep('compressing')
@@ -148,10 +238,7 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
         let successCount = 0
         let lastError: string | null = null
         for (const url of photoUrls) {
-          const err = await onInsert({
-            uploaded_by: uploadedBy,
-            photo_urls: [url],
-          })
+          const err = await onInsert(buildInsert([url]))
           if (err) {
             lastError = err
           } else {
@@ -169,10 +256,7 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
         setToast({ type: 'ok', msg: `Uploaded ${successCount} receipt(s) — parse from the list` })
       } else {
         // All photos → one inbox row (single receipt, multiple pages)
-        const err = await onInsert({
-          uploaded_by: uploadedBy,
-          photo_urls: photoUrls,
-        })
+        const err = await onInsert(buildInsert(photoUrls))
         if (err) {
           setStep('error')
           setToast({ type: 'err', msg: err })
@@ -186,6 +270,7 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
       setProgress('')
       for (const f of files) if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
       setFiles([])
+      setNoteText('')
     } catch (err) {
       setStep('error')
       setToast({ type: 'err', msg: err instanceof Error ? err.message : 'Unknown error' })
@@ -232,10 +317,7 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
         setStep('analyzing')
         setProgress('Parsing receipt...')
 
-        const err = await onInsert({
-          uploaded_by: uploadedBy,
-          photo_urls: photoUrls,
-        })
+        const err = await onInsert(buildInsert(photoUrls))
         if (err) {
           setStep('error')
           setToast({ type: 'err', msg: err })
@@ -248,6 +330,7 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
       setProgress('')
       for (const f of files) if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
       setFiles([])
+      setNoteText('')
     } catch (err) {
       setStep('error')
       setToast({ type: 'err', msg: err instanceof Error ? err.message : 'Unknown error' })
@@ -337,6 +420,53 @@ export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) 
             </div>
           </div>
         )}
+
+        {/* ── Note / voice input ── */}
+        <div className="flex items-center gap-2">
+          <input
+            ref={noteInputRef}
+            type="text"
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (files.length > 0) handleProcess()
+                else if (noteText.trim()) handleNoteOnly()
+              }
+            }}
+            placeholder={files.length > 0 ? 'Add note: supplier, amount, date...' : 'макро 3500 · water 200 вчера · or drop photos above'}
+            className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-indigo-500 transition-colors"
+            disabled={isProcessing}
+          />
+          {hasSpeech && (
+            <button
+              type="button"
+              onClick={toggleMic}
+              disabled={isProcessing}
+              className={`rounded-md p-2 transition-colors ${
+                isListening
+                  ? 'bg-rose-500/20 text-rose-400 animate-pulse'
+                  : 'bg-slate-800 text-slate-500 hover:bg-slate-700 hover:text-slate-300'
+              } disabled:opacity-40`}
+              title={isListening ? 'Stop' : 'Voice input'}
+            >
+              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </button>
+          )}
+          {/* Note-only send (no photos) */}
+          {files.length === 0 && noteText.trim() && (
+            <button
+              type="button"
+              onClick={handleNoteOnly}
+              disabled={isProcessing}
+              className="rounded-md bg-indigo-600 p-2 text-white transition-colors hover:bg-indigo-500 disabled:opacity-40"
+              title="Send note only (no photos)"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
+        </div>
 
         {/* ── Controls ── */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">

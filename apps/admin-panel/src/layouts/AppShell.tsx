@@ -23,6 +23,7 @@ import {
   Trash2,
   Truck,
   UtensilsCrossed,
+  Bell,
   Brain,
   Settings,
   Target,
@@ -72,8 +73,8 @@ const NAV_SECTIONS: NavSection[] = [
     minRole: 'cook',
     defaultOpen: true,
     items: [
-      { path: '/kds', icon: ChefHat, label: 'Kitchen KDS' },
-      { path: '/cook', icon: Timer, label: 'Cook Station' },
+      { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS' },
+      { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station' },
       { path: '/waste', icon: Trash2, label: 'Waste' },
       { path: '/schedule', icon: CalendarClock, label: 'Schedule' },
       { path: '/logistics', icon: ScanLine, label: 'Logistics' },
