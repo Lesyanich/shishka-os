@@ -68,15 +68,15 @@ export function useMenuDishes(): UseMenuDishesResult {
       supabase
         .from('nomenclature')
         .select(`
-          id, name, description, product_code, price, cost_per_unit,
-          is_available, is_featured, image_url, display_order,
+          id, name, product_code, price, cost_per_unit,
+          is_available, is_featured, image_url,
           calories, protein, carbs, fat,
           category_id,
           product_categories!category_id(id, code, name, sort_order)
         `)
         .eq('type', 'dish')
         .like('product_code', 'SALE-%')
-        .order('display_order', { ascending: true }),
+        .order('name', { ascending: true }),
       supabase
         .from('nomenclature_tags')
         .select('nomenclature_id, tags(slug, name, tag_group, color)'),
@@ -131,7 +131,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       return {
         id: d.id,
         name: d.name,
-        description: d.description ?? null,
+        description: null,
         product_code: d.product_code,
         price: d.price ? Number(d.price) : null,
         cost_per_unit: d.cost_per_unit ? Number(d.cost_per_unit) : null,
@@ -145,7 +145,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         category_id: d.category_id,
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
-        display_order: d.display_order ? Number(d.display_order) : null,
+        display_order: null,
         tags: tagMap.get(d.id) ?? [],
       }
     })
@@ -169,7 +169,6 @@ export function useMenuDishes(): UseMenuDishesResult {
     ): Promise<{ ok: boolean; error?: string }> => {
       const updates: Record<string, unknown> = {}
       if (patch.name !== undefined) updates.name = patch.name.trim()
-      if (patch.description !== undefined) updates.description = patch.description?.trim() ?? null
       if (patch.price !== undefined) updates.price = patch.price
       if (patch.is_available !== undefined) updates.is_available = patch.is_available
       if (patch.is_featured !== undefined) updates.is_featured = patch.is_featured
