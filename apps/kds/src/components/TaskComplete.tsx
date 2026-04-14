@@ -32,7 +32,7 @@ export function TaskComplete({ task, onDone }: TaskCompleteProps) {
     return ((grossWeight - netVal) / grossWeight * 100).toFixed(1)
   }, [netVal, grossWeight])
 
-  const normWastePct = 10 // TODO: fetch from nomenclature.norm_waste_pct
+  const normWastePct = task.target_nomenclature?.norm_waste_pct ?? 10
   const hasVariance = wastePct != null && Math.abs(parseFloat(wastePct) - normWastePct) > 5
 
   const handleFinish = useCallback(async () => {
