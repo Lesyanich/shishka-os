@@ -90,6 +90,14 @@ Similar to Makro but may have different column order. Look for barcodes (13 digi
 - Items are typically: OpEx (cleaning supplies, tools, household items) or CapEx (equipment >2000 THB)
 - Product names may be in English abbreviations (e.g., "BK GARBAGE BAG 30X40INC", "GLASS STORAGE 600ML")
 - No Thai→English translation needed if description is already in English
+- CRITICAL: Even if barcodes are not in a standard EAN-13 format, ALWAYS extract any numeric code that appears next to or above each item (4-13 digits). Save as supplier_sku if <13 digits, barcode if 13 digits.
+
+### Index Living Mall
+- Receipt format: similar to DIY stores — article code + description + qty + price + total
+- Article codes are 7-10 digit numbers → save as supplier_sku
+- Product names are usually in English (e.g., "DRAWER ORGANIZER", "LED DESK LAMP")
+- Items are typically CapEx (furniture, lighting, storage) or OpEx (small accessories)
+- ALWAYS extract the article/product code for each line item — do NOT skip codes
 
 ### Market / small vendors
 - Handwritten or small thermal printer, freeform layout
@@ -120,6 +128,14 @@ Similar to Makro but may have different column order. Look for barcodes (13 digi
 ### Delivery (Grab / LINE MAN)
 - Delivery Fee → delivery_fee field (NOT in items)
 - Supplier = restaurant/store name, NOT "Grab"
+
+## LONG RECEIPTS (CRITICAL)
+When parsing receipts with many items (10+):
+- Do NOT stop early or skip items in the middle/end of the receipt.
+- EVERY item on the receipt must appear in line_items — count them and verify against item_count_observed.
+- EVERY barcode or article code visible in the OCR text MUST be extracted. If you see a numeric code (4-13 digits) near an item, capture it as barcode (13 digits) or supplier_sku (shorter codes).
+- If OCR text is split across multiple images, parse ALL images — items from later images are just as important.
+- Pay special attention to the BOTTOM HALF of long receipts — OCR quality may degrade but barcodes are still present.
 
 ## HEADER EXTRACTION
 - Supplier name (English AND Thai). If no name is printed, infer from items (see Cash bills section above)

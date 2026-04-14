@@ -83,13 +83,16 @@ export async function matchNomenclature(
     }
 
     // Last resort: fuzzy match against nomenclature.name
-    const { data } = await db
-      .from("nomenclature")
-      .select("id")
-      .ilike("name", `%${nameQuery}%`)
-      .limit(1)
-    if (data?.[0]?.id) {
-      return { nomenclature_id: data[0].id, sku_id: null, confidence: "medium" }
+    // Require minimum 8 chars to avoid false positives like "Gas" → "Hummus Garnish"
+    if (nameQuery.length >= 8) {
+      const { data } = await db
+        .from("nomenclature")
+        .select("id")
+        .ilike("name", `%${nameQuery}%`)
+        .limit(1)
+      if (data?.[0]?.id) {
+        return { nomenclature_id: data[0].id, sku_id: null, confidence: "low" }
+      }
     }
   }
   return { nomenclature_id: null, sku_id: null, confidence: "low" }

@@ -52,7 +52,7 @@ export interface UseReceiptInboxResult {
   isLoading: boolean
   error: string | null
   refetch: () => void
-  insert: (payload: InboxInsert) => Promise<string | null>
+  insert: (payload: InboxInsert) => Promise<{ id?: string; error?: string }>
   parseReceipt: (inboxId: string, model: OcrModel) => Promise<{ ok: boolean; error?: string }>
   batchProcess: (photoUrls: string[], uploadedBy: string, model: OcrModel) => Promise<BatchProcessResult>
   approve: (inboxId: string, payload: Record<string, unknown>) => Promise<{ ok: boolean; error?: string; expense_id?: string }>
@@ -173,14 +173,14 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     }
   }, [fetchData])
 
-  const insert = useCallback(async (payload: InboxInsert): Promise<string | null> => {
-    const { error: err } = await supabase.from('receipt_inbox').insert(payload)
+  const insert = useCallback(async (payload: InboxInsert): Promise<{ id?: string; error?: string }> => {
+    const { data, error: err } = await supabase.from('receipt_inbox').insert(payload).select('id').single()
     if (err) {
       console.error('[useReceiptInbox] insert error', err)
-      return err.message
+      return { error: err.message }
     }
     // Realtime INSERT subscription will add the row
-    return null
+    return { id: data.id as string }
   }, [])
 
   const parseReceipt = useCallback(async (inboxId: string, model: OcrModel): Promise<{ ok: boolean; error?: string }> => {

@@ -16,7 +16,7 @@ export function ReceiptInbox() {
       </div>
 
       {/* Uploader (with integrated voice/text notes) */}
-      <BatchUploader onBatchProcess={batchProcess} onInsert={insert} />
+      <BatchUploader onBatchProcess={batchProcess} onInsert={insert} onParse={parseReceipt} />
 
       {/* List */}
       <InboxList
