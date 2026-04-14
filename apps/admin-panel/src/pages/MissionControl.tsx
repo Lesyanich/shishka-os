@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Rocket, Plus, Loader2, X, Search, ArrowUpDown, AlertTriangle } from 'lucide-react'
 import { useBusinessTasks } from '../hooks/useBusinessTasks'
 import type { BusinessTask, TaskStatus, TaskPriority, NewBusinessTask } from '../hooks/useBusinessTasks'
-import { useRole } from '../contexts/RoleContext'
+import { useAppRole } from '../contexts/AppRoleContext'
 import { SegmentBar } from '../components/mission-control/SegmentBar'
 import type { Segment } from '../components/mission-control/SegmentBar'
 import { TeamSegment } from '../components/mission-control/TeamSegment'
@@ -22,8 +22,8 @@ const PRIORITY_ORDER: Record<TaskPriority, number> = { critical: 0, high: 1, med
 // ── Main Page ──
 
 export function MissionControl() {
-  const { role } = useRole()
-  const isCEO = role === 'lesia'
+  const { role } = useAppRole()
+  const isCEO = role === 'owner'
 
   const [activeTab, setActiveTab] = useState<TopTab>('planning')
   const [segment, setSegment] = useState<Segment>('team')
@@ -152,7 +152,7 @@ export function MissionControl() {
       {/* Role banner (non-CEO) */}
       {!isCEO && (
         <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2.5 text-sm text-blue-300">
-          👁 Viewing as <strong className="font-semibold">{role === 'bas' ? 'Bas' : 'Chef'}</strong> — showing only your tasks
+          Viewing as <strong className="font-semibold">Cook</strong> — showing only your tasks
         </div>
       )}
 

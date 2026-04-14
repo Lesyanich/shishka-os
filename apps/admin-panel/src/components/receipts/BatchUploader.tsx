@@ -1,15 +1,14 @@
 import { useCallback, useRef, useState } from 'react'
 import { AlertCircle, ImagePlus, Loader2, Trash2, Upload, UploadCloud } from 'lucide-react'
 import type { OcrModel, BatchProcessResult, InboxInsert } from '../../hooks/useReceiptInbox'
-import { useRole } from '../../contexts/RoleContext'
+import { useAppRole } from '../../contexts/AppRoleContext'
 import { MAX_FILE_SIZE, ACCEPT, compressImage, uploadToStorage } from './upload-helpers'
 
 /* ────────────────────────── Constants ────────────────────────── */
 
 const ROLE_TO_UPLOADER: Record<string, string> = {
-  lesia: 'Lesia',
-  bas: 'Bas',
-  chef: 'Admin',
+  owner: 'Admin',
+  cook: 'Cook',
 }
 
 const MODEL_OPTIONS: { value: OcrModel; label: string }[] = [
@@ -46,8 +45,8 @@ interface BatchUploaderProps {
 /* ────────────────────────── Component ────────────────────────── */
 
 export function BatchUploader({ onBatchProcess, onInsert }: BatchUploaderProps) {
-  const { role } = useRole()
-  const uploadedBy = ROLE_TO_UPLOADER[role] || 'Admin'
+  const { role, staffName } = useAppRole()
+  const uploadedBy = staffName || ROLE_TO_UPLOADER[role] || 'Admin'
 
   const [files, setFiles] = useState<DroppedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
