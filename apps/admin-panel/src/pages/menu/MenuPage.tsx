@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, Table2, LayoutGrid, Loader2 } from 'lucide-react'
+import { Eye, Table2, LayoutGrid, Loader2, ChefHat } from 'lucide-react'
 import { useMenuDishes } from '../../hooks/useMenuDishes'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
@@ -9,7 +9,7 @@ type ViewMode = 'owner' | 'customer'
 type OwnerLayout = 'table' | 'gallery'
 
 export function MenuPage() {
-  const { dishes, categories, isLoading, error, updateDish } = useMenuDishes()
+  const { dishes, categories, subcategories, isLoading, error, updateDish } = useMenuDishes()
   const [view, setView] = useState<ViewMode>('owner')
   const [ownerLayout, setOwnerLayout] = useState<OwnerLayout>('table')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -130,10 +130,19 @@ export function MenuPage() {
         <div className="rounded-lg border border-rose-800/50 bg-rose-950/30 p-4 text-sm text-rose-300">
           Failed to load menu: {error}
         </div>
+      ) : dishes.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-32 text-slate-500">
+          <ChefHat className="mb-3 h-10 w-10 text-slate-600" />
+          <p className="text-sm font-medium text-slate-400">No dishes yet</p>
+          <p className="mt-1 text-xs text-slate-600">
+            Add SALE-type dishes in the nomenclature to see them here.
+          </p>
+        </div>
       ) : view === 'owner' && ownerLayout === 'table' ? (
         <OwnerTable
           dishes={dishes}
           selectedCategory={selectedCategory}
+          subcategories={subcategories}
           onUpdate={updateDish}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
