@@ -1,5 +1,10 @@
 import { db } from "./supabase.ts"
 
+export interface ResolvedSupplier {
+  id: string | null
+  ocr_profile: Record<string, unknown> | null
+}
+
 export async function resolveSupplier(name: string): Promise<string | null> {
   if (!name) return null
   const { data } = await db
@@ -8,6 +13,17 @@ export async function resolveSupplier(name: string): Promise<string | null> {
     .ilike("name", `%${name}%`)
     .limit(1)
   return data?.[0]?.id ?? null
+}
+
+export async function resolveSupplierWithProfile(name: string): Promise<ResolvedSupplier> {
+  if (!name) return { id: null, ocr_profile: null }
+  const { data } = await db
+    .from("suppliers")
+    .select("id, ocr_profile")
+    .ilike("name", `%${name}%`)
+    .limit(1)
+  if (!data?.[0]) return { id: null, ocr_profile: null }
+  return { id: data[0].id, ocr_profile: data[0].ocr_profile ?? null }
 }
 
 export async function matchNomenclature(
