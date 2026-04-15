@@ -238,11 +238,14 @@ ${fullOcrText}
     const itemsSum = lineItems.reduce((s, it) => s + (Number(it.total_price) || 0), 0)
     const grandTotal = Number(footer.grand_total) || 0
     const discountTotal = Math.abs(Number(footer.discount_total) || 0)
-    const expectedTotal = itemsSum - discountTotal
-    const reconDiff = Math.abs(expectedTotal - grandTotal)
+    // Try both formulas: some receipts embed discount in item AMT (Mr. D.I.Y.),
+    // others report it separately in footer. Pick whichever matches better.
+    const diffWithDiscount = Math.abs((itemsSum - discountTotal) - grandTotal)
+    const diffWithoutDiscount = Math.abs(itemsSum - grandTotal)
+    const reconDiff = Math.min(diffWithDiscount, diffWithoutDiscount)
 
     if (reconDiff > 1 && grandTotal > 0) {
-      console.log(`[ocr-receipt] Reconciliation mismatch: items=${itemsSum} - disc=${discountTotal} = ${expectedTotal}, receipt=${grandTotal}, diff=${reconDiff}`)
+      console.log(`[ocr-receipt] Reconciliation mismatch: items=${itemsSum}, disc=${discountTotal}, receipt=${grandTotal}, diff=${reconDiff}`)
       payload._reconciliation = { status: "mismatch", items_sum: itemsSum, grand_total: grandTotal, diff: reconDiff }
       payload._warnings = [...(payload._warnings as string[]), `Items total (฿${itemsSum.toFixed(0)}) differs from receipt (฿${grandTotal.toFixed(0)}) by ฿${reconDiff.toFixed(0)}. Use Reconcile button to auto-fix.`]
     } else {
