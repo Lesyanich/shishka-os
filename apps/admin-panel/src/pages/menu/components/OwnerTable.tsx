@@ -1,6 +1,7 @@
-import { useOptimistic, useState, useCallback, useMemo } from 'react'
-import { Check, X, Star, StarOff } from 'lucide-react'
+import { Fragment, useOptimistic, useState, useCallback, useMemo } from 'react'
+import { Check, X, Star, StarOff, ChevronDown, ChevronRight } from 'lucide-react'
 import type { MenuDish, MenuSubcategory } from '../../../hooks/useMenuDishes'
+import { DishExpandedCard } from './DishExpandedCard'
 
 interface OwnerTableProps {
   dishes: MenuDish[]
@@ -46,6 +47,11 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate }
   )
 
   const [editing, setEditing] = useState<EditState | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const toggleExpand = useCallback((dishId: string) => {
+    setExpandedId((prev) => (prev === dishId ? null : dishId))
+  }, [])
 
   const startEdit = useCallback((dish: MenuDish) => {
     setEditing({
@@ -144,6 +150,7 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate }
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-slate-800 bg-slate-900/50 text-left text-[10px] uppercase tracking-wider text-slate-500">
+            <th className="px-2 py-2.5" style={{ width: 28 }}></th>
             <th className="px-3 py-2.5">Name</th>
             <th className="px-3 py-2.5">Description</th>
             <th className="px-3 py-2.5">Category</th>
@@ -156,11 +163,11 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate }
           </tr>
         </thead>
         <tbody>
-          {groupedDishes.map((item, idx) => {
+          {groupedDishes.map((item) => {
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-slate-900/30">
-                  <td colSpan={9} className="px-3 py-2">
+                  <td colSpan={10} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                       {item.subcategory.name}
                     </span>
@@ -177,11 +184,30 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate }
             const foodCostPct = hasCost && price > 0 ? (cost / price) * 100 : 0
             const margin = hasCost ? price - cost : 0
 
+            const isExpanded = expandedId === dish.id
+
             return (
+              <Fragment key={dish.id}>
               <tr
-                key={dish.id}
-                className="border-b border-slate-800/50 transition hover:bg-slate-800/30"
+                className={`border-b border-slate-800/50 transition ${
+                  isExpanded ? 'bg-slate-800/40' : 'hover:bg-slate-800/30'
+                }`}
               >
+                {/* Expand toggle */}
+                <td className="px-2 py-2">
+                  <button
+                    onClick={() => toggleExpand(dish.id)}
+                    className="rounded p-1 text-slate-500 transition hover:bg-slate-700 hover:text-slate-200"
+                    title={isExpanded ? 'Collapse' : 'Expand tech card'}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </td>
+
                 {/* Name */}
                 <td className="px-3 py-2">
                   {isEditing ? (
@@ -318,6 +344,14 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate }
                   </button>
                 </td>
               </tr>
+              {isExpanded && (
+                <tr className="bg-slate-950/60">
+                  <td colSpan={10} className="p-0">
+                    <DishExpandedCard dish={dish} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             )
           })}
         </tbody>
