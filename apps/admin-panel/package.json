@@ -12,10 +12,15 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.69",
+    "@ai-sdk/google": "^3.0.63",
+    "@ai-sdk/openai": "^3.0.53",
+    "@ai-sdk/react": "^3.0.163",
     "@anthropic-ai/sdk": "^0.89.0",
     "@sentry/react": "^10.43.0",
     "@supabase/supabase-js": "^2.98.0",
     "@tailwindcss/vite": "^4.2.1",
+    "ai": "^6.0.161",
     "lucide-react": "^0.577.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",

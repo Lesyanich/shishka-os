@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Eye, Table2, LayoutGrid, Loader2, ChefHat } from 'lucide-react'
+import { Eye, Table2, LayoutGrid, Loader2, ChefHat, Sparkles } from 'lucide-react'
 import { useMenuDishes } from '../../hooks/useMenuDishes'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
+import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
 
 type ViewMode = 'owner' | 'customer'
 type OwnerLayout = 'table' | 'gallery'
@@ -13,6 +14,7 @@ export function MenuPage() {
   const [view, setView] = useState<ViewMode>('owner')
   const [ownerLayout, setOwnerLayout] = useState<OwnerLayout>('table')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [chefOpen, setChefOpen] = useState(false)
 
   // Stats
   const totalDishes = dishes.length
@@ -36,6 +38,16 @@ export function MenuPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* AI Chef button */}
+          <button
+            onClick={() => setChefOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:border-emerald-600 hover:bg-emerald-500/20"
+            title="Open AI Chef"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            AI Chef
+          </button>
+
           {/* Owner layout toggle */}
           {view === 'owner' && (
             <div className="flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
@@ -157,6 +169,9 @@ export function MenuPage() {
           selectedCategory={selectedCategory}
         />
       )}
+
+      {/* AI Chef slide-out panel */}
+      <ChefChatPanel open={chefOpen} onClose={() => setChefOpen(false)} />
     </div>
   )
 }
