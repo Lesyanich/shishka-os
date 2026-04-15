@@ -1,22 +1,17 @@
 // POST /api/chef/chat — streaming chat with the AI Chef.
 //
-// v2 (P1.3.5 + P2):
+// v2.1 (fix for FUNCTION_INVOCATION_FAILED in prod):
+//   - Back to VercelRequest/VercelResponse (Node runtime — compatible with Vercel Functions)
+//   - pipeUIMessageStreamToResponse(res) — canonical pattern for Node servers
 //   - Multi-provider via Vercel AI SDK (Anthropic / OpenAI / Google)
-//   - Web API Request/Response handler (matches AI SDK idioms)
-//   - useChat on the frontend handles the UI stream protocol
-//   - Auth: Bearer JWT in Authorization header, verified against Supabase
-//   - Session persistence via onFinish (fires after stream ends, non-blocking response)
+//   - Auth: Bearer JWT in Authorization header
+//   - Session persistence via onFinish (fires after stream close, non-blocking)
 //
 // Architecture (CEO decisions 2026-04-15, MC 5a4f1e17):
 //   - Vercel Hobby tier, 300s maxDuration (configured in vercel.json)
-//   - Inline + post-response side effects (token logging, history upsert)
-//   - Single shishka-os Vercel project
-//
-// Still intentionally NOT here (P1.4):
-//   - Chef agent tools (read_bom, check_inventory, etc.)
-//   - MCP tool bridge
-//   - MemPalace context injection
+//   - Inline + post-response side effects
 
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { convertToModelMessages, streamText, type UIMessage } from 'ai'
 import {
   getLanguageModel,
@@ -53,19 +48,15 @@ interface ChatBody {
   context?: Record<string, unknown>
 }
 
-function corsHeaders(): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  }
+function setCors(res: VercelResponse): void {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
-function jsonError(status: number, error: string): Response {
-  return new Response(JSON.stringify({ error }), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders() },
-  })
+function jsonError(res: VercelResponse, status: number, error: string): void {
+  setCors(res)
+  res.status(status).json({ error })
 }
 
 async function verifyJwt(jwt: string): Promise<{ userId: string; email: string | null } | null> {
@@ -75,88 +66,103 @@ async function verifyJwt(jwt: string): Promise<{ userId: string; email: string |
   return { userId: data.user.id, email: data.user.email ?? null }
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  setCors(res)
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders() })
+    res.status(204).end()
+    return
   }
 
   if (req.method !== 'POST') {
-    return jsonError(405, 'Method not allowed. Use POST.')
+    jsonError(res, 405, 'Method not allowed. Use POST.')
+    return
   }
 
-  // ─── Auth ──────────────────────────────────────────────────
-  const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return jsonError(401, 'Unauthorized. Provide Authorization: Bearer <jwt>.')
-  }
-  const jwt = authHeader.slice('Bearer '.length).trim()
-  if (!jwt) return jsonError(401, 'Unauthorized. Empty JWT.')
-
-  const user = await verifyJwt(jwt)
-  if (!user) return jsonError(401, 'Unauthorized. Invalid JWT.')
-
-  // ─── Validate body ─────────────────────────────────────────
-  let body: ChatBody
   try {
-    body = (await req.json()) as ChatBody
-  } catch {
-    return jsonError(400, 'Body must be valid JSON.')
-  }
+    // ─── Auth ──────────────────────────────────────────────────
+    const rawAuth = req.headers.authorization ?? req.headers.Authorization
+    const authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      jsonError(res, 401, 'Unauthorized. Provide Authorization: Bearer <jwt>.')
+      return
+    }
+    const jwt = authHeader.slice('Bearer '.length).trim()
+    if (!jwt) {
+      jsonError(res, 401, 'Unauthorized. Empty JWT.')
+      return
+    }
 
-  if (!Array.isArray(body.messages) || body.messages.length === 0) {
-    return jsonError(400, 'Body must include non-empty messages array.')
-  }
+    const user = await verifyJwt(jwt)
+    if (!user) {
+      jsonError(res, 401, 'Unauthorized. Invalid JWT.')
+      return
+    }
 
-  // ─── Resolve model ─────────────────────────────────────────
-  const provider = body.provider ?? DEFAULT_MODEL.provider
-  const modelId = body.model ?? DEFAULT_MODEL.id
-  const knownModel = AVAILABLE_MODELS.find((m) => m.provider === provider && m.id === modelId)
-  if (!knownModel) {
-    return jsonError(400, `Unknown model: ${provider}/${modelId}.`)
-  }
+    // ─── Body ──────────────────────────────────────────────────
+    // Vercel auto-parses JSON for application/json content-type
+    const body = req.body as ChatBody | undefined
+    if (!body || !Array.isArray(body.messages) || body.messages.length === 0) {
+      jsonError(res, 400, 'Body must include non-empty messages array.')
+      return
+    }
 
-  let languageModel
-  try {
-    languageModel = getLanguageModel(provider, modelId)
+    // ─── Resolve model ─────────────────────────────────────────
+    const provider = body.provider ?? DEFAULT_MODEL.provider
+    const modelId = body.model ?? DEFAULT_MODEL.id
+    const knownModel = AVAILABLE_MODELS.find((m) => m.provider === provider && m.id === modelId)
+    if (!knownModel) {
+      jsonError(res, 400, `Unknown model: ${provider}/${modelId}.`)
+      return
+    }
+
+    let languageModel
+    try {
+      languageModel = getLanguageModel(provider, modelId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      jsonError(res, 503, `Provider not configured: ${msg}`)
+      return
+    }
+
+    // ─── Stream ────────────────────────────────────────────────
+    const modelMessages = await convertToModelMessages(body.messages)
+    const result = streamText({
+      model: languageModel,
+      system: SYSTEM_PROMPT_V1,
+      messages: modelMessages,
+      onFinish: async ({ text, usage }) => {
+        try {
+          await persistSession({
+            jwt,
+            userId: user.userId,
+            sessionId: body.session_id,
+            incoming: body.messages,
+            assistantText: text,
+            usage: {
+              input_tokens: usage.inputTokens ?? 0,
+              output_tokens: usage.outputTokens ?? 0,
+            },
+            provider,
+            model: modelId,
+            context: body.context,
+          })
+        } catch (e) {
+          console.error('[/api/chef/chat] persistSession failed', e)
+        }
+      },
+    })
+
+    // Canonical Node-server pattern from AI SDK docs
+    result.pipeUIMessageStreamToResponse(res)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    return jsonError(503, `Provider not configured: ${msg}`)
+    // Any uncaught error — log and return JSON. Don't crash the function.
+    console.error('[/api/chef/chat] handler crash', err)
+    if (!res.headersSent) {
+      const msg = err instanceof Error ? err.message : String(err)
+      jsonError(res, 500, `Internal error: ${msg}`)
+    }
   }
-
-  // ─── Stream ────────────────────────────────────────────────
-  const modelMessages = await convertToModelMessages(body.messages)
-  const result = streamText({
-    model: languageModel,
-    system: SYSTEM_PROMPT_V1,
-    messages: modelMessages,
-    onFinish: async ({ text, usage }) => {
-      // Runs after the stream closes. Errors here don't fail the response.
-      try {
-        await persistSession({
-          jwt,
-          userId: user.userId,
-          sessionId: body.session_id,
-          incoming: body.messages,
-          assistantText: text,
-          usage: {
-            input_tokens: usage.inputTokens ?? 0,
-            output_tokens: usage.outputTokens ?? 0,
-          },
-          provider,
-          model: modelId,
-          context: body.context,
-        })
-      } catch (e) {
-        console.error('[/api/chef/chat] persistSession failed', e)
-      }
-    },
-  })
-
-  const response = result.toUIMessageStreamResponse()
-  // Merge CORS headers into the streamed response
-  const mergedHeaders = new Headers(response.headers)
-  for (const [k, v] of Object.entries(corsHeaders())) mergedHeaders.set(k, v)
-  return new Response(response.body, { status: response.status, headers: mergedHeaders })
 }
 
 // ─── Session persistence ───────────────────────────────────
@@ -180,7 +186,6 @@ async function persistSession(args: PersistArgs): Promise<void> {
   const turnIn = args.usage.input_tokens
   const turnOut = args.usage.output_tokens
 
-  // Flatten UIMessage → plain {role, content} for storage
   const flattened = args.incoming.map((m) => ({
     role: m.role,
     content: uiMessageText(m),
@@ -230,7 +235,6 @@ async function persistSession(args: PersistArgs): Promise<void> {
   }
 }
 
-/** Extract plain text from a UIMessage's parts (v6 AI SDK message shape). */
 function uiMessageText(m: UIMessage): string {
   if (typeof (m as unknown as { content?: string }).content === 'string') {
     return (m as unknown as { content: string }).content
