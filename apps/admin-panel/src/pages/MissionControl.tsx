@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
-import { Rocket, Plus, Loader2, X, Search, ArrowUpDown, AlertTriangle } from 'lucide-react'
+import { Rocket, Plus, Loader2, X, Search, ArrowUpDown } from 'lucide-react'
 import { useBusinessTasks } from '../hooks/useBusinessTasks'
 import type { BusinessTask, TaskStatus, TaskPriority, NewBusinessTask } from '../hooks/useBusinessTasks'
+import { useDataHealth } from '../hooks/useDataHealth'
 import { useAppRole } from '../contexts/AppRoleContext'
 import { SegmentBar } from '../components/mission-control/SegmentBar'
 import type { Segment } from '../components/mission-control/SegmentBar'
@@ -11,6 +12,7 @@ import { KitchenSegment } from '../components/mission-control/KitchenSegment'
 import { QuickAddForm } from '../components/mission-control/QuickAddForm'
 import { KanbanBoard } from '../components/mission-control/KanbanBoard'
 import { TaskDetailPanel } from '../components/mission-control/TaskDetailPanel'
+import { DataHealthTab } from '../components/mission-control/DataHealthTab'
 
 // ── Constants ──
 
@@ -70,7 +72,15 @@ export function MissionControl() {
     kitchen: activeTasks.filter(t => t.domain === 'kitchen' && t.executor_type === 'human').length,
   }), [activeTasks])
 
-  const dataHealthCount = 20 // placeholder
+  // Data Health tab — live count of errors+warnings+actions (info metrics don't badge)
+  const { metrics: healthMetrics } = useDataHealth()
+  const dataHealthCount = useMemo(
+    () =>
+      healthMetrics
+        .filter(m => m.severity === 'error' || m.severity === 'warning' || m.severity === 'action')
+        .reduce((sum, m) => sum + m.val, 0),
+    [healthMetrics],
+  )
 
   const searchLower = searchQuery.toLowerCase()
   const kanbanTasks = useMemo(() => {
@@ -261,12 +271,7 @@ export function MissionControl() {
       )}
 
       {/* ── Data Health tab ── */}
-      {!isLoading && activeTab === 'data-health' && (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-          <AlertTriangle className="h-10 w-10 mb-3 text-slate-700" />
-          <p className="text-sm font-medium">Data Health — Coming in next iteration</p>
-        </div>
-      )}
+      {activeTab === 'data-health' && <DataHealthTab addTask={addTask} />}
 
       {/* Task Detail Panel */}
       {selectedTask && (
