@@ -92,3 +92,6 @@ services/mempalace/*-key.txt
 
 # MemPalace encrypted backups — binary blobs, recoverable from live data, not source
 _backups/mempalace/
+
+# Git worktrees for parallel manual sessions
+.worktrees/
