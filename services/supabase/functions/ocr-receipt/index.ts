@@ -232,10 +232,100 @@ ${fullOcrText}
       _ocr_text: fullOcrText,
     }
 
+    // ══════════════════════════════════════════
+    // STAGE 3: Auto-reconciliation
+    // If items_sum ≠ grand_total (diff > 1 THB), ask LLM to fix
+    // ══════════════════════════════════════════
+    const itemsSum = lineItems.reduce((s, it) => s + (Number(it.total_price) || 0), 0)
+    const grandTotal = Number(footer.grand_total) || 0
+    const discountTotal = Math.abs(Number(footer.discount_total) || 0)
+    const expectedTotal = itemsSum - discountTotal
+    const reconDiff = Math.abs(expectedTotal - grandTotal)
+    let reconRetryResult: ApiResult | null = null
+
+    if (reconDiff > 1 && grandTotal > 0) {
+      console.log(`[ocr-receipt] Stage 3: Reconciliation mismatch! items_sum=${itemsSum} - discount=${discountTotal} = ${expectedTotal}, receipt=${grandTotal}, diff=${reconDiff}`)
+      try {
+        const reconPrompt = `You previously parsed this receipt and extracted ${lineItems.length} items totaling ฿${itemsSum.toFixed(2)}.
+But the receipt total is ฿${grandTotal.toFixed(2)} (after discount ฿${discountTotal.toFixed(2)}).
+The difference is ฿${reconDiff.toFixed(2)}.
+
+This means you either:
+1. MISSED an item (most likely if diff > 10 THB)
+2. Got a wrong quantity or price for an item
+3. Missed a discount on an item (DISC column)
+
+Here is what you parsed:
+${JSON.stringify(lineItems.map((it, i) => ({ line: i + 1, sku: it.supplier_sku || it.barcode, name: (it.translated_name || it.original_name || '').toString().slice(0, 40), qty: it.quantity, price: it.unit_price, total: it.total_price })), null, 2)}
+
+Please re-examine the receipt carefully and return the COMPLETE corrected line_items array in the same JSON format as before. Fix the specific error — do not re-parse everything from scratch, just correct the mismatch.
+Return ONLY valid JSON: { "line_items": [...], "footer": { "subtotal": ..., "discount_total": ..., "vat_amount": ..., "grand_total": ... }, "_reconciliation": { "status": "...", "items_sum": ..., "fix_applied": "description of what was wrong" } }`
+
+        // Use same images or OCR text
+        reconRetryResult = await callLLM(modelKey, fullSystemPrompt, reconPrompt, visionImages || undefined)
+
+        console.log(`[ocr-receipt] Stage 3 done: ${reconRetryResult.tokensIn} in, ${reconRetryResult.tokensOut} out`)
+
+        let reconText = reconRetryResult.text.trim()
+        if (reconText.startsWith("```")) {
+          reconText = reconText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "")
+        }
+        const reconParsed = JSON.parse(reconText)
+        const reconItems = reconParsed.line_items as Record<string, unknown>[] | undefined
+        const reconFooter = reconParsed.footer as Record<string, number> | undefined
+
+        if (reconItems?.length) {
+          // Verify the fix actually improved things
+          const newSum = reconItems.reduce((s, it) => s + (Number(it.total_price) || 0), 0)
+          const newGrand = Number(reconFooter?.grand_total ?? grandTotal)
+          const newDiscount = Math.abs(Number(reconFooter?.discount_total ?? discountTotal))
+          const newDiff = Math.abs((newSum - newDiscount) - newGrand)
+
+          if (newDiff < reconDiff) {
+            console.log(`[ocr-receipt] Stage 3: Fix improved! diff ${reconDiff} → ${newDiff} (${lineItems.length} → ${reconItems.length} items)`)
+            // Re-run nomenclature matching on new/changed items
+            for (const item of reconItems) {
+              const match = await matchNomenclature(supplierId, {
+                barcode: item.barcode as string | null,
+                supplier_sku: item.supplier_sku as string | null,
+                translated_name: item.translated_name as string,
+                original_name: item.original_name as string | null,
+              })
+              item.nomenclature_id = match.nomenclature_id
+              item.sku_id = match.sku_id
+              if (!item.confidence || item.confidence === "low") item.confidence = match.confidence
+            }
+
+            // Replace items in payload
+            const reclassified = classifyItems(reconItems)
+            payload.food_items = reclassified.food_items
+            payload.capex_items = reclassified.capex_items
+            payload.opex_items = reclassified.opex_items
+            payload.line_items = reconItems
+            payload.item_count_observed = reconItems.length
+            if (reconFooter) {
+              payload.amount_original = reconFooter.grand_total || payload.amount_original
+              payload.discount_total = reconFooter.discount_total || payload.discount_total
+              payload.vat_amount = reconFooter.vat_amount || payload.vat_amount
+            }
+            payload._reconciliation = reconParsed._reconciliation || { status: "fixed", items_sum: newSum, fix_applied: "auto-reconciliation pass" }
+            payload._warnings = [...(payload._warnings as string[]), `Auto-reconciliation: diff reduced from ฿${reconDiff.toFixed(0)} to ฿${newDiff.toFixed(0)}`]
+          } else {
+            console.log(`[ocr-receipt] Stage 3: Fix did NOT improve (${reconDiff} → ${newDiff}), keeping original`)
+            payload._warnings = [...(payload._warnings as string[]), `Auto-reconciliation attempted but failed (diff ฿${reconDiff.toFixed(0)})`]
+          }
+        }
+      } catch (reconErr) {
+        console.warn(`[ocr-receipt] Stage 3 failed:`, reconErr)
+        payload._warnings = [...(payload._warnings as string[]), `Auto-reconciliation error: ${reconErr instanceof Error ? reconErr.message : 'unknown'}`]
+      }
+    }
+
     // ── Calculate cost ──
-    const gcvCost = row.photo_urls.length * 0.0015
+    const gcvCost = forceVision ? 0 : row.photo_urls.length * 0.0015
     const pricing = MODEL_PRICING[modelConfig.modelId] || { input: 0, output: 0 }
     const llmCost = result.tokensIn * pricing.input + result.tokensOut * pricing.output
+      + (reconRetryResult ? reconRetryResult.tokensIn * pricing.input + reconRetryResult.tokensOut * pricing.output : 0)
     const totalCost = gcvCost + llmCost
     const durationMs = Date.now() - startTime
 
@@ -246,9 +336,9 @@ ${fullOcrText}
         parsed_payload: payload,
         parsed_at: new Date().toISOString(),
         parse_cost_usd: totalCost,
-        parse_tokens_in: result.tokensIn,
-        parse_tokens_out: result.tokensOut,
-        model_used: modelConfig.modelId,
+        parse_tokens_in: result.tokensIn + (reconRetryResult?.tokensIn ?? 0),
+        parse_tokens_out: result.tokensOut + (reconRetryResult?.tokensOut ?? 0),
+        model_used: modelLabel,
         error_message: null,
       })
       .eq("id", inboxId)
