@@ -18,8 +18,8 @@ import {
   AVAILABLE_MODELS,
   DEFAULT_MODEL,
   type Provider,
-} from '../_lib/llm'
-import { supabaseForUser } from '../_lib/supabase'
+} from '../_lib/llm.js'
+import { supabaseForUser } from '../_lib/supabase.js'
 
 export const config = { runtime: 'nodejs', maxDuration: 300 }
 
