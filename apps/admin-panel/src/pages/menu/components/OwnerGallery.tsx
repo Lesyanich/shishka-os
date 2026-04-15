@@ -1,7 +1,8 @@
-import { useOptimistic, useCallback } from 'react'
-import { Star, StarOff, ImageOff, Eye, EyeOff } from 'lucide-react'
+import { useOptimistic, useCallback, useState } from 'react'
+import { Star, StarOff, ImageOff, Eye, EyeOff, X } from 'lucide-react'
 import type { MenuDish } from '../../../hooks/useMenuDishes'
 import { NutritionBadges } from './NutritionBadge'
+import { DishExpandedCard } from './DishExpandedCard'
 
 interface OwnerGalleryProps {
   dishes: MenuDish[]
@@ -41,6 +42,9 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate }: OwnerGaller
     [onUpdate, setOptimistic],
   )
 
+  const [openDishId, setOpenDishId] = useState<string | null>(null)
+  const openDish = optimisticDishes.find((d) => d.id === openDishId) ?? null
+
   if (optimisticDishes.length === 0) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-slate-500">
@@ -60,10 +64,15 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate }: OwnerGaller
         return (
           <div
             key={dish.id}
-            className={`group relative flex flex-col overflow-hidden rounded-xl border transition ${
+            onClick={(e) => {
+              // Don't open modal if clicking on toggles/buttons
+              if ((e.target as HTMLElement).closest('button')) return
+              setOpenDishId(dish.id)
+            }}
+            className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border transition ${
               dish.is_available
-                ? 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                : 'border-slate-800/50 bg-slate-950/40 opacity-60'
+                ? 'border-slate-800 bg-slate-900/60 hover:border-emerald-700/50'
+                : 'border-slate-800/50 bg-slate-950/40 opacity-60 hover:opacity-80'
             }`}
           >
             {/* Photo */}
@@ -163,6 +172,37 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate }: OwnerGaller
           </div>
         )
       })}
+
+      {/* Modal overlay for dish detail */}
+      {openDish && (
+        <div
+          onClick={() => setOpenDishId(null)}
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-8"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-100">{openDish.name}</h2>
+                <p className="text-[11px] text-slate-500">
+                  {openDish.product_code}
+                  {openDish.category_name && ` · ${openDish.category_name}`}
+                </p>
+              </div>
+              <button
+                onClick={() => setOpenDishId(null)}
+                className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <DishExpandedCard dish={openDish} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
