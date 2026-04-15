@@ -243,8 +243,11 @@ ${fullOcrText}
     const reconDiff = Math.abs(expectedTotal - grandTotal)
     let reconRetryResult: ApiResult | null = null
 
-    if (reconDiff > 1 && grandTotal > 0) {
-      console.log(`[ocr-receipt] Stage 3: Reconciliation mismatch! items_sum=${itemsSum} - discount=${discountTotal} = ${expectedTotal}, receipt=${grandTotal}, diff=${reconDiff}`)
+    const elapsedMs = Date.now() - startTime
+    const timeLeftMs = 140_000 - elapsedMs // Supabase Edge timeout ~150s, leave 10s buffer
+
+    if (reconDiff > 1 && grandTotal > 0 && timeLeftMs > 30_000) {
+      console.log(`[ocr-receipt] Stage 3: Reconciliation mismatch! items_sum=${itemsSum} - discount=${discountTotal} = ${expectedTotal}, receipt=${grandTotal}, diff=${reconDiff}, timeLeft=${Math.round(timeLeftMs/1000)}s`)
       try {
         const reconPrompt = `You previously parsed this receipt and extracted ${lineItems.length} items totaling ฿${itemsSum.toFixed(2)}.
 But the receipt total is ฿${grandTotal.toFixed(2)} (after discount ฿${discountTotal.toFixed(2)}).
@@ -261,8 +264,11 @@ ${JSON.stringify(lineItems.map((it, i) => ({ line: i + 1, sku: it.supplier_sku |
 Please re-examine the receipt carefully and return the COMPLETE corrected line_items array in the same JSON format as before. Fix the specific error — do not re-parse everything from scratch, just correct the mismatch.
 Return ONLY valid JSON: { "line_items": [...], "footer": { "subtotal": ..., "discount_total": ..., "vat_amount": ..., "grand_total": ... }, "_reconciliation": { "status": "...", "items_sum": ..., "fix_applied": "description of what was wrong" } }`
 
-        // Use same images or OCR text
-        reconRetryResult = await callLLM(modelKey, fullSystemPrompt, reconPrompt, visionImages || undefined)
+        // Text-only reconciliation (no images) — much faster, stays within timeout
+        const reconWithOcr = fullOcrText.length > 0
+          ? reconPrompt + `\n\nOriginal OCR text for reference:\n${fullOcrText}`
+          : reconPrompt
+        reconRetryResult = await callLLM(modelKey, fullSystemPrompt, reconWithOcr)
 
         console.log(`[ocr-receipt] Stage 3 done: ${reconRetryResult.tokensIn} in, ${reconRetryResult.tokensOut} out`)
 
@@ -319,6 +325,9 @@ Return ONLY valid JSON: { "line_items": [...], "footer": { "subtotal": ..., "dis
         console.warn(`[ocr-receipt] Stage 3 failed:`, reconErr)
         payload._warnings = [...(payload._warnings as string[]), `Auto-reconciliation error: ${reconErr instanceof Error ? reconErr.message : 'unknown'}`]
       }
+    } else if (reconDiff > 1 && grandTotal > 0) {
+      console.log(`[ocr-receipt] Stage 3: SKIPPED — not enough time (${Math.round(timeLeftMs/1000)}s left, need 30s)`)
+      payload._warnings = [...(payload._warnings as string[]), `Reconciliation skipped (timeout risk, ${Math.round(elapsedMs/1000)}s elapsed). Items diff: ฿${reconDiff.toFixed(0)}. Re-parse to retry.`]
     }
 
     // ── Calculate cost ──
