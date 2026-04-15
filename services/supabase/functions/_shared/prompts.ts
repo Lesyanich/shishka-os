@@ -97,8 +97,13 @@ Similar to Makro but may have different column order. Look for barcodes (13 digi
 - Column layout: CODE | DESCRIPTION | QTY | U.PRICE | DISC | AMT (THB)
 - CODE column has 4-7 digit article numbers (e.g., 8802483, 903624, 8579196, 9024914) → save BOTH as supplier_sku AND barcode
 - EVERY item line starts with a numeric CODE — you MUST extract it for every single item
-- Example: "8802483  GLASS CANISTER 960185# 700ML  3  33.00  0.00  99.00"
-  → supplier_sku: "8802483", barcode: "8802483", name: "GLASS CANISTER 960185# 700ML", quantity: 3, unit_price: 33.00, total_price: 99.00
+- CRITICAL — DISC column: Most items have DISC=0.00, but SOME items have a per-item discount.
+  When DISC > 0: AMT = (QTY × U.PRICE) − DISC. Use AMT as total_price, NOT QTY × U.PRICE.
+  Example WITHOUT discount: "8802483  GLASS CANISTER 960185# 700ML  3  33.00  0.00  99.00"
+  → qty: 3, unit_price: 33.00, total_price: 99.00 (DISC=0, so 3×33=99)
+  Example WITH discount: "8973462  SILICONE ICE MOULD FY-13#  1  77.00  22.00  55.00"
+  → qty: 1, unit_price: 77.00, total_price: 55.00 (DISC=22, so 77−22=55, NOT qty=3!)
+  DO NOT confuse the DISC value with quantity or price. The columns are always in order: QTY | U.PRICE | DISC | AMT.
 - Invoice number from "Inv No:" field in header (e.g., "0000007885")
 - Ref RCP No (e.g., "BS54 T1 0000030508") is NOT the invoice number
 
