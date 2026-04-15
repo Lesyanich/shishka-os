@@ -327,7 +327,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     setEditingRows((prev) => { const next = new Set(prev); next.delete(`food:${idx}`); return next })
   }
 
-  function updateCapex(idx: number, field: keyof CapexItem, value: string | number) {
+  function updateCapex(idx: number, field: keyof CapexItem, value: string | number | null) {
     setCapexItems((prev) => {
       const next = [...prev]
       const item = { ...next[idx], [field]: value }
@@ -349,7 +349,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     setEditingRows((prev) => { const next = new Set(prev); next.delete(`capex:${idx}`); return next })
   }
 
-  function updateOpex(idx: number, field: keyof OpexItem, value: string | number) {
+  function updateOpex(idx: number, field: keyof OpexItem, value: string | number | null) {
     setOpexItems((prev) => {
       const next = [...prev]
       const item = { ...next[idx], [field]: value }
@@ -943,7 +943,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                         {editing ? <input value={item.name} onChange={(e) => updateCapex(i, 'name', e.target.value)} className={inputCls} /> : <span className="text-slate-200">{item.name}</span>}
                       </td>
                       <td className="px-2 py-1.5">
-                        {editing ? <input value={item.barcode || ''} onChange={(e) => updateCapex(i, 'barcode', e.target.value || null)} className={`${inputCls} font-mono`} placeholder="barcode / sku" /> : <span className="font-mono text-[10px] text-slate-400">{item.barcode || (item as Record<string, unknown>).supplier_sku as string || '\u2014'}</span>}
+                        {editing ? <input value={item.barcode || ''} onChange={(e) => updateCapex(i, 'barcode', e.target.value || null)} className={`${inputCls} font-mono`} placeholder="barcode / sku" /> : <span className="font-mono text-[10px] text-slate-400">{item.barcode || (item as unknown as Record<string, unknown>).supplier_sku as string || '\u2014'}</span>}
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         {editing ? <input type="number" step="any" value={item.quantity} onChange={(e) => updateCapex(i, 'quantity', Number(e.target.value))} className={`${numInputCls} w-16`} /> : <span className="text-slate-300">{item.quantity}</span>}
@@ -1018,7 +1018,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                         {editing ? (
                           <input value={item.barcode || ''} onChange={(e) => updateOpex(i, 'barcode', e.target.value)} className={`${inputCls} font-mono text-[10px]`} placeholder="barcode" />
                         ) : (
-                          <span className="font-mono text-[10px] text-slate-500">{item.barcode || (item as Record<string, unknown>).supplier_sku as string || '\u2014'}</span>
+                          <span className="font-mono text-[10px] text-slate-500">{item.barcode || (item as unknown as Record<string, unknown>).supplier_sku as string || '\u2014'}</span>
                         )}
                       </td>
                       <td className="px-2 py-1.5 text-right">
