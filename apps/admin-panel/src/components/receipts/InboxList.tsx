@@ -34,6 +34,8 @@ const ROW_MODEL_OPTIONS: { value: OcrModel; label: string }[] = [
   { value: 'gemini-flash-lite', label: 'Flash Lite' },
   { value: 'gemini-3-flash', label: 'Gem3 Flash' },
   { value: 'gemini-pro', label: 'Gem Pro' },
+  { value: 'gemini-flash-vision', label: 'Flash Vision' },
+  { value: 'gemini-pro-vision', label: 'Pro Vision' },
   { value: 'gpt-4o', label: 'GPT-4o' },
   { value: 'claude-sonnet', label: 'Sonnet' },
   { value: 'claude-haiku', label: 'Haiku' },
@@ -116,7 +118,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
 
   const getSelectedModel = (): OcrModel => {
     const v = localStorage.getItem('receipt-ocr-model')
-    if (v === 'gemini-flash' || v === 'gemini-flash-lite' || v === 'gemini-3-flash' || v === 'gemini-pro' || v === 'claude-sonnet' || v === 'claude-haiku' || v === 'gpt-4o' || v === 'claude-sub') return v
+    if (v === 'gemini-flash' || v === 'gemini-flash-lite' || v === 'gemini-3-flash' || v === 'gemini-pro' || v === 'claude-sonnet' || v === 'claude-haiku' || v === 'gpt-4o' || v === 'claude-sub' || v === 'gemini-flash-vision' || v === 'gemini-pro-vision') return v
     return 'gemini-flash'
   }
 

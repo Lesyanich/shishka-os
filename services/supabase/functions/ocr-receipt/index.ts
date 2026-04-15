@@ -26,7 +26,11 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url)
     const inboxId = url.searchParams.get("inbox_id")?.trim()
-    const modelKey = url.searchParams.get("model")?.trim() || "gemini-flash"
+    const rawModelKey = url.searchParams.get("model")?.trim() || "gemini-flash"
+    // Vision mode: user can append "-vision" to any model key (e.g. "gemini-pro-vision")
+    // This skips GCV OCR and sends images directly to the LLM for better table parsing
+    const forceVision = rawModelKey.endsWith("-vision") || url.searchParams.get("force_vision") === "1"
+    const modelKey = rawModelKey.replace(/-vision$/, "")
 
     if (!inboxId) return json({ error: "inbox_id query parameter is required" }, 400)
 
@@ -48,45 +52,50 @@ Deno.serve(async (req: Request) => {
     if (!row.photo_urls?.length) return json({ error: "No photo_urls in inbox row" }, 400)
 
     // ── Mark as processing ──
+    const modelLabel = forceVision ? `${modelConfig.modelId}+vision` : modelConfig.modelId
     await db.from("receipt_inbox")
-      .update({ status: "processing", model_used: modelConfig.modelId })
+      .update({ status: "processing", model_used: modelLabel })
       .eq("id", inboxId)
 
     // ══════════════════════════════════════════
     // STAGE 1: Google Cloud Vision OCR
+    // (skipped entirely in forced vision mode — saves GCV cost)
     // ══════════════════════════════════════════
-    console.log(`[ocr-receipt] Stage 1: OCR on ${row.photo_urls.length} image(s)...`)
     const ocrTexts: string[] = []
 
-    for (const photoUrl of row.photo_urls) {
-      try {
-        const img = await downloadImageAsBase64(photoUrl)
-        const text = await extractTextViaGCV(img.data)
-        if (text) ocrTexts.push(text)
-        console.log(`[ocr-receipt] GCV extracted ${text.length} chars from ${photoUrl.slice(-30)}`)
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        console.error(`[ocr-receipt] GCV failed for ${photoUrl}: ${errMsg}`)
-        // Continue — vision fallback will handle images with no OCR text
+    if (forceVision) {
+      console.log(`[ocr-receipt] Stage 1: SKIPPED (forced vision mode)`)
+    } else {
+      console.log(`[ocr-receipt] Stage 1: OCR on ${row.photo_urls.length} image(s)...`)
+      for (const photoUrl of row.photo_urls) {
+        try {
+          const img = await downloadImageAsBase64(photoUrl)
+          const text = await extractTextViaGCV(img.data)
+          if (text) ocrTexts.push(text)
+          console.log(`[ocr-receipt] GCV extracted ${text.length} chars from ${photoUrl.slice(-30)}`)
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          console.error(`[ocr-receipt] GCV failed for ${photoUrl}: ${errMsg}`)
+        }
       }
-    }
 
-    if (ocrTexts.length === 0) {
-      // No OCR text at all — will fall through to vision fallback below
-      console.log(`[ocr-receipt] No OCR text extracted — will attempt vision fallback`)
+      if (ocrTexts.length === 0) {
+        console.log(`[ocr-receipt] No OCR text extracted — will attempt vision fallback`)
+      }
     }
 
     const fullOcrText = ocrTexts.join("\n\n--- PAGE BREAK ---\n\n")
     console.log(`[ocr-receipt] Stage 1 done: ${fullOcrText.length} total chars`)
 
     // ── Vision fallback for handwritten/low-OCR receipts ──
+    // Also forced when user selects a "-vision" model variant (better for tabular receipts like Mr. D.I.Y.)
     const MIN_OCR_CHARS = 50 // Below this threshold, OCR probably failed
     const totalOcrChars = ocrTexts.reduce((sum, t) => sum + t.length, 0)
-    const useVisionFallback = totalOcrChars < MIN_OCR_CHARS
+    const useVisionFallback = forceVision || totalOcrChars < MIN_OCR_CHARS
 
     let visionImages: ImageInput[] | undefined
     if (useVisionFallback) {
-      console.log(`[ocr-receipt] OCR too short (${totalOcrChars} chars) — falling back to vision mode`)
+      console.log(`[ocr-receipt] Vision mode: ${forceVision ? 'forced by user' : `OCR too short (${totalOcrChars} chars)`}`)
       visionImages = []
       for (const photoUrl of row.photo_urls) {
         try {
