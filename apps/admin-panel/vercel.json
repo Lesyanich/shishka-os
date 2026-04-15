@@ -2,5 +2,11 @@
   "installCommand": "npm install --force",
   "buildCommand": "rm -rf tsconfig.tsbuildinfo tsconfig.app.tsbuildinfo && npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/chef/chat.ts": { "maxDuration": 300 },
+    "api/chef/*.ts": { "maxDuration": 60 }
+  }
 }
