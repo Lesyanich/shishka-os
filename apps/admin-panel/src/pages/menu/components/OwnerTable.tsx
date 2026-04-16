@@ -1,4 +1,4 @@
-import { Fragment, useOptimistic, useState, useCallback, useMemo } from 'react'
+import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
 import { Check, X, Star, StarOff, ChevronDown, ChevronRight } from 'lucide-react'
 import type { MenuDish, MenuSubcategory } from '../../../hooks/useMenuDishes'
 import { DishExpandedCard } from './DishExpandedCard'
@@ -8,6 +8,8 @@ interface OwnerTableProps {
   selectedCategory: string | null
   subcategories: Map<string, MenuSubcategory[]>
   onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
+  /** Imperative trigger: when this id changes, auto-expand that row and scroll to it. */
+  autoExpandId?: string | null
 }
 
 function foodCostColor(pct: number): string {
@@ -35,7 +37,7 @@ type GroupItem =
   | { type: 'l2-header'; subcategory: MenuSubcategory; dishCount: number }
   | { type: 'dish'; dish: MenuDish }
 
-export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate }: OwnerTableProps) {
+export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, autoExpandId }: OwnerTableProps) {
   const filtered = selectedCategory
     ? dishes.filter((d) => d.category_id === selectedCategory)
     : dishes
@@ -48,6 +50,21 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate }
 
   const [editing, setEditing] = useState<EditState | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  // Imperative auto-expand: when parent sets autoExpandId to a new value,
+  // expand that row and scroll it into view. Fires once per id change.
+  const lastAutoExpandId = useRef<string | null>(null)
+  useEffect(() => {
+    if (autoExpandId && autoExpandId !== lastAutoExpandId.current) {
+      lastAutoExpandId.current = autoExpandId
+      setExpandedId(autoExpandId)
+      // Defer scroll to after the row renders
+      setTimeout(() => {
+        const el = document.querySelector<HTMLElement>(`[data-dish-row="${autoExpandId}"]`)
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [autoExpandId])
 
   const toggleExpand = useCallback((dishId: string) => {
     setExpandedId((prev) => (prev === dishId ? null : dishId))
@@ -189,6 +206,7 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate }
             return (
               <Fragment key={dish.id}>
               <tr
+                data-dish-row={dish.id}
                 className={`border-b border-slate-800/50 transition ${
                   isExpanded ? 'bg-slate-800/40' : 'hover:bg-slate-800/30'
                 }`}
