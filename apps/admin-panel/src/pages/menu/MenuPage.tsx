@@ -1,20 +1,32 @@
 import { useState } from 'react'
-import { Eye, Table2, LayoutGrid, Loader2, ChefHat, Sparkles } from 'lucide-react'
+import { Eye, Table2, LayoutGrid, Loader2, ChefHat, Sparkles, Plus } from 'lucide-react'
 import { useMenuDishes } from '../../hooks/useMenuDishes'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
+import { NewDishModal } from './components/NewDishModal'
 import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
 
 type ViewMode = 'owner' | 'customer'
 type OwnerLayout = 'table' | 'gallery'
 
 export function MenuPage() {
-  const { dishes, categories, subcategories, isLoading, error, updateDish } = useMenuDishes()
+  const { dishes, categories, subcategories, isLoading, error, updateDish, refetch } = useMenuDishes()
   const [view, setView] = useState<ViewMode>('owner')
   const [ownerLayout, setOwnerLayout] = useState<OwnerLayout>('table')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [chefOpen, setChefOpen] = useState(false)
+  const [newDishOpen, setNewDishOpen] = useState(false)
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
+
+  const handleDishCreated = async (dishId: string) => {
+    setJustCreatedId(dishId)
+    await refetch()
+    // Snap back to owner/table so the new row + chevron is visible
+    setView('owner')
+    setOwnerLayout('table')
+    setSelectedCategory(null)
+  }
 
   // Stats
   const totalDishes = dishes.length
@@ -38,6 +50,16 @@ export function MenuPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* New Dish button */}
+          <button
+            onClick={() => setNewDishOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-700"
+            title="Create new dish"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New dish
+          </button>
+
           {/* AI Chef button */}
           <button
             onClick={() => setChefOpen(true)}
@@ -156,6 +178,7 @@ export function MenuPage() {
           selectedCategory={selectedCategory}
           subcategories={subcategories}
           onUpdate={updateDish}
+          autoExpandId={justCreatedId}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
         <OwnerGallery
@@ -169,6 +192,13 @@ export function MenuPage() {
           selectedCategory={selectedCategory}
         />
       )}
+
+      {/* New Dish modal */}
+      <NewDishModal
+        open={newDishOpen}
+        onClose={() => setNewDishOpen(false)}
+        onCreated={handleDishCreated}
+      />
 
       {/* AI Chef slide-out panel */}
       <ChefChatPanel open={chefOpen} onClose={() => setChefOpen(false)} />

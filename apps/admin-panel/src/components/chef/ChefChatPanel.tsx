@@ -21,18 +21,23 @@ export function ChefChatPanel({ open, onClose, context }: ChefChatPanelProps) {
   // ─── Auth token ref (kept fresh via Supabase session listener) ───
   const jwtRef = useRef<string | null>(null)
   const [authReady, setAuthReady] = useState(false)
+  const [hasSession, setHasSession] = useState(false) // observable version of jwtRef for UI
 
   useEffect(() => {
     let mounted = true
 
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return
-      jwtRef.current = data.session?.access_token ?? null
+      const tok = data.session?.access_token ?? null
+      jwtRef.current = tok
+      setHasSession(tok !== null)
       setAuthReady(true)
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      jwtRef.current = session?.access_token ?? null
+      const tok = session?.access_token ?? null
+      jwtRef.current = tok
+      setHasSession(tok !== null)
     })
 
     return () => {
@@ -167,6 +172,13 @@ export function ChefChatPanel({ open, onClose, context }: ChefChatPanelProps) {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Authenticating...
             </div>
+          ) : !hasSession ? (
+            <div className="rounded-lg border border-amber-800/50 bg-amber-950/30 px-4 py-6 text-center">
+              <p className="text-sm font-medium text-amber-200">Please log in to use AI Chef</p>
+              <p className="mt-1 text-[11px] text-amber-400/80">
+                No Supabase session detected. Sign in (top-right) then reopen this panel.
+              </p>
+            </div>
           ) : messages.length === 0 ? (
             <EmptyState model={model} />
           ) : (
@@ -204,16 +216,22 @@ export function ChefChatPanel({ open, onClose, context }: ChefChatPanelProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={authReady ? 'Ask the chef...' : 'Authenticating...'}
-              disabled={!authReady || isBusy}
+              placeholder={
+                !authReady
+                  ? 'Authenticating...'
+                  : !hasSession
+                    ? 'Log in first to use AI Chef'
+                    : 'Ask the chef...'
+              }
+              disabled={!authReady || !hasSession || isBusy}
               rows={2}
               className="flex-1 resize-none rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isBusy || !authReady}
+              disabled={!input.trim() || isBusy || !authReady || !hasSession}
               className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-              title="Send (Enter)"
+              title={!hasSession ? 'Please log in first' : 'Send (Enter)'}
             >
               {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
             </button>
