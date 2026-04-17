@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Calculator,
+  ChevronDown,
+  ChevronRight,
   Edit3,
   Loader2,
   Plus,
@@ -37,6 +39,22 @@ type NomItem = {
   allergens: string[] | null
   // Economics
   markup_pct: number
+  // Category (migration 045/046)
+  category_id: string | null
+  category_name: string | null
+  category_code: string | null
+  // Portion (migration 138)
+  portion_size: number | null
+  portion_unit: string | null
+}
+
+type CategoryNode = {
+  id: string
+  code: string
+  name: string
+  parent_id: string | null
+  level: number
+  sort_order: number
 }
 
 type Ingredient = {
@@ -117,6 +135,28 @@ function MarginBadge({ price, cost }: { price: number | null; cost: number }) {
       {margin.toFixed(0)}%
     </span>
   )
+}
+
+// ─── Cost/Price per 100g/ml ─────────────────────────────────
+
+function per100Label(item: NomItem): string | null {
+  // For RAW: use cost_per_unit + base_unit
+  if (item.product_code.startsWith('RAW-')) {
+    if (item.cost_per_unit <= 0) return null
+    const bu = item.base_unit
+    if (bu === 'kg') return `฿${(item.cost_per_unit / 10).toFixed(0)}/100g`
+    if (bu === 'g') return `฿${(item.cost_per_unit * 100).toFixed(0)}/100g`
+    if (bu === 'L') return `฿${(item.cost_per_unit / 10).toFixed(0)}/100ml`
+    if (bu === 'ml') return `฿${(item.cost_per_unit * 100).toFixed(0)}/100ml`
+    return null // pcs — can't convert
+  }
+  // For PF/SALE/MOD: use price + portion_size/unit
+  const val = item.price ?? item.cost_per_unit
+  if (!val || val <= 0) return null
+  if (!item.portion_size || item.portion_size <= 0 || !item.portion_unit) return null
+  if (item.portion_unit === 'pcs') return null
+  const per100 = (val / item.portion_size) * 100
+  return `฿${per100.toFixed(0)}/100${item.portion_unit}`
 }
 
 // ─── Modal Component (3 sections) ────────────────────────────
@@ -793,6 +833,9 @@ export function RecipeBuilder() {
 
   const [newIngredientId, setNewIngredientId] = useState<string>('')
 
+  // Categories for grouping
+  const [allCategories, setAllCategories] = useState<CategoryNode[]>([])
+
   // Right panel tab
   type RightTab = 'bom' | 'process'
   const [rightTab, setRightTab] = useState<RightTab>('bom')
@@ -812,7 +855,19 @@ export function RecipeBuilder() {
     [dishes, selectedDishId],
   )
 
-  // Fetch items for left panel (with storefront fields)
+  // Fetch all categories once on mount (for grouping)
+  useEffect(() => {
+    ;(async () => {
+      const { data } = await supabase
+        .from('product_categories')
+        .select('id, code, name, parent_id, level, sort_order')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+      setAllCategories((data ?? []) as CategoryNode[])
+    })()
+  }, [])
+
+  // Fetch items for left panel (with storefront fields + category)
   const fetchDishes = useCallback(async () => {
     setIsLoadingDishes(true)
 
@@ -822,11 +877,12 @@ export function RecipeBuilder() {
     const { data, error } = await supabase
       .from('nomenclature')
       .select(
-        'id, product_code, name, base_unit, type, cost_per_unit, notes, price, image_url, slug, is_available, display_order, is_featured, calories, protein, carbs, fat, allergens, markup_pct',
+        `id, product_code, name, base_unit, type, cost_per_unit, notes, price, image_url, slug, is_available, display_order, is_featured, calories, protein, carbs, fat, allergens, markup_pct, category_id, portion_size, portion_unit,
+        product_categories!category_id(id, code, name)`,
       )
       .ilike('product_code', `${prefix}-%`)
       .eq('is_deleted', false)
-      .order('product_code', { ascending: true })
+      .order('name', { ascending: true })
 
     if (error) {
       console.error('[RecipeBuilder] Failed to load items', {
@@ -835,16 +891,24 @@ export function RecipeBuilder() {
       })
     } else {
       setDishes(
-        (data ?? []).map((d) => ({
-          ...d,
-          cost_per_unit: Number(d.cost_per_unit ?? 0),
-          markup_pct: Number(d.markup_pct ?? 0),
-          price: d.price ? Number(d.price) : null,
-          calories: d.calories ? Number(d.calories) : null,
-          protein: d.protein ? Number(d.protein) : null,
-          carbs: d.carbs ? Number(d.carbs) : null,
-          fat: d.fat ? Number(d.fat) : null,
-        })) as NomItem[],
+        (data ?? []).map((d) => {
+          const cat = d.product_categories as unknown as { id: string; code: string; name: string } | null
+          return {
+            ...d,
+            cost_per_unit: Number(d.cost_per_unit ?? 0),
+            markup_pct: Number(d.markup_pct ?? 0),
+            price: d.price ? Number(d.price) : null,
+            calories: d.calories ? Number(d.calories) : null,
+            protein: d.protein ? Number(d.protein) : null,
+            carbs: d.carbs ? Number(d.carbs) : null,
+            fat: d.fat ? Number(d.fat) : null,
+            category_id: d.category_id ?? null,
+            category_name: cat?.name ?? null,
+            category_code: cat?.code ?? null,
+            portion_size: d.portion_size != null ? Number(d.portion_size) : null,
+            portion_unit: d.portion_unit ?? null,
+          }
+        }) as NomItem[],
       )
     }
 
@@ -1014,6 +1078,63 @@ export function RecipeBuilder() {
         dish.name.toLowerCase().includes(term),
     )
   }, [dishes, dishesFilter])
+
+  // Group filtered dishes by L2 category (parent of their L3 category)
+  type CategoryGroup = { id: string; name: string; code: string; sortOrder: number; items: NomItem[] }
+
+  const groupedByCategory = useMemo((): CategoryGroup[] => {
+    // Build lookup: category id → node
+    const catById = new Map<string, CategoryNode>()
+    for (const c of allCategories) catById.set(c.id, c)
+
+    // Resolve L2 parent for a given category_id
+    const resolveL2 = (catId: string): CategoryNode | null => {
+      const cat = catById.get(catId)
+      if (!cat) return null
+      if (cat.level === 2) return cat
+      if (cat.level === 3 && cat.parent_id) return catById.get(cat.parent_id) ?? null
+      if (cat.level === 1) return cat // L1 items shown under L1 header
+      return null
+    }
+
+    const buckets = new Map<string, CategoryGroup>()
+    const uncategorized: NomItem[] = []
+
+    for (const dish of filteredDishes) {
+      if (!dish.category_id) {
+        uncategorized.push(dish)
+        continue
+      }
+      const l2 = resolveL2(dish.category_id)
+      if (!l2) {
+        uncategorized.push(dish)
+        continue
+      }
+      let bucket = buckets.get(l2.id)
+      if (!bucket) {
+        bucket = { id: l2.id, name: l2.name, code: l2.code, sortOrder: l2.sort_order, items: [] }
+        buckets.set(l2.id, bucket)
+      }
+      bucket.items.push(dish)
+    }
+
+    const groups = Array.from(buckets.values()).sort((a, b) => a.sortOrder - b.sortOrder)
+    if (uncategorized.length > 0) {
+      groups.push({ id: '__uncategorized', name: 'Uncategorized', code: '', sortOrder: 9999, items: uncategorized })
+    }
+    return groups
+  }, [filteredDishes, allCategories])
+
+  // Track collapsed category groups
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const toggleGroup = useCallback((groupId: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
+  }, [])
 
   const handleQuantityChange = (id: string, value: string) => {
     const numeric = Number(value)
@@ -1210,68 +1331,113 @@ export function RecipeBuilder() {
                 </button>
               </div>
             ) : (
-              <ul className="space-y-1">
-                {filteredDishes.map((dish) => {
-                  const isSelected = dish.id === selectedDishId
+              <div className="space-y-1">
+                {groupedByCategory.map((group) => {
+                  const isCollapsed = collapsedGroups.has(group.id)
                   return (
-                    <li key={dish.id}>
+                    <div key={group.id}>
+                      {/* Category group header */}
                       <button
                         type="button"
-                        onClick={() => setSelectedDishId(dish.id)}
-                        className={[
-                          'flex w-full flex-col items-start rounded-lg border px-3 py-2 text-left text-xs transition',
-                          isSelected
-                            ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-50'
-                            : 'border-transparent bg-slate-900/60 text-slate-100 hover:border-slate-700 hover:bg-slate-900',
-                        ].join(' ')}
+                        onClick={() => toggleGroup(group.id)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-slate-800/40"
                       >
-                        <div className="flex w-full items-center justify-between gap-2">
-                          <span className="truncate text-[12px] font-medium">
-                            {dish.name}
-                          </span>
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            {(activeFilter === 'sales' || activeFilter === 'pf') && (
-                              <span
-                                className={`h-2 w-2 shrink-0 rounded-full ${
-                                  (processStepCounts[dish.id] ?? 0) > 0
-                                    ? 'bg-emerald-500'
-                                    : 'bg-rose-500'
-                                }`}
-                                title={
-                                  (processStepCounts[dish.id] ?? 0) > 0
-                                    ? `${processStepCounts[dish.id]} process steps`
-                                    : 'No process steps'
-                                }
-                              />
-                            )}
-                            {dish.cost_per_unit > 0 && (
-                              <span className="text-[10px] text-amber-400">
-                                {dish.cost_per_unit.toFixed(0)} THB
-                              </span>
-                            )}
-                            <MarginBadge
-                              price={dish.price}
-                              cost={dish.cost_per_unit}
-                            />
-                          </div>
-                        </div>
-                        <span className="mt-0.5 flex items-center gap-2 text-[10px] text-slate-500">
-                          <span className="font-mono uppercase tracking-wide text-slate-600">
-                            {dish.product_code}
-                          </span>
-                          <span>·</span>
-                          <span>{dish.base_unit ?? '--'}</span>
+                        {isCollapsed ? (
+                          <ChevronRight className="h-3 w-3 text-slate-500" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3 text-slate-500" />
+                        )}
+                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                          group.id === '__uncategorized' ? 'text-amber-400' : 'text-slate-400'
+                        }`}>
+                          {group.name}
+                        </span>
+                        <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-500">
+                          {group.items.length}
                         </span>
                       </button>
-                    </li>
+
+                      {/* Items within group */}
+                      {!isCollapsed && (
+                        <ul className="space-y-0.5 pb-1">
+                          {group.items.map((dish) => {
+                            const isSelected = dish.id === selectedDishId
+                            const p100 = per100Label(dish)
+                            return (
+                              <li key={dish.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedDishId(dish.id)}
+                                  className={[
+                                    'flex w-full flex-col items-start rounded-lg border px-3 py-2 text-left text-xs transition',
+                                    isSelected
+                                      ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-50'
+                                      : 'border-transparent bg-slate-900/60 text-slate-100 hover:border-slate-700 hover:bg-slate-900',
+                                  ].join(' ')}
+                                >
+                                  <div className="flex w-full items-center justify-between gap-2">
+                                    <span className="truncate text-[12px] font-medium">
+                                      {dish.name}
+                                    </span>
+                                    <div className="flex shrink-0 items-center gap-1.5">
+                                      {(activeFilter === 'sales' || activeFilter === 'pf') && (
+                                        <span
+                                          className={`h-2 w-2 shrink-0 rounded-full ${
+                                            (processStepCounts[dish.id] ?? 0) > 0
+                                              ? 'bg-emerald-500'
+                                              : 'bg-rose-500'
+                                          }`}
+                                          title={
+                                            (processStepCounts[dish.id] ?? 0) > 0
+                                              ? `${processStepCounts[dish.id]} process steps`
+                                              : 'No process steps'
+                                          }
+                                        />
+                                      )}
+                                      {dish.cost_per_unit > 0 && (
+                                        <span className="text-[10px] text-amber-400">
+                                          {dish.cost_per_unit.toFixed(0)} THB
+                                        </span>
+                                      )}
+                                      <MarginBadge
+                                        price={dish.price}
+                                        cost={dish.cost_per_unit}
+                                      />
+                                    </div>
+                                  </div>
+                                  <span className="mt-0.5 flex items-center gap-2 text-[10px] text-slate-500">
+                                    <span className="font-mono uppercase tracking-wide text-slate-600">
+                                      {dish.product_code}
+                                    </span>
+                                    <span>·</span>
+                                    <span>{dish.base_unit ?? '--'}</span>
+                                    {p100 && (
+                                      <>
+                                        <span>·</span>
+                                        <span className="text-sky-400">{p100}</span>
+                                      </>
+                                    )}
+                                  </span>
+                                </button>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   )
                 })}
-              </ul>
+              </div>
             )}
           </div>
 
           <div className="border-t border-slate-800 px-4 py-2 text-[10px] text-slate-500">
-            {filteredDishes.length} items
+            {filteredDishes.length} items · {groupedByCategory.length} groups
+            {groupedByCategory.find((g) => g.id === '__uncategorized') && (
+              <span className="ml-1 text-amber-400">
+                · {groupedByCategory.find((g) => g.id === '__uncategorized')!.items.length} uncategorized
+              </span>
+            )}
           </div>
         </section>
 
