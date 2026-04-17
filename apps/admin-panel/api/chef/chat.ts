@@ -1,44 +1,30 @@
 // POST /api/chef/chat — streaming chat with the AI Chef.
 //
-// v2.1 (fix for FUNCTION_INVOCATION_FAILED in prod):
-//   - Back to VercelRequest/VercelResponse (Node runtime — compatible with Vercel Functions)
-//   - pipeUIMessageStreamToResponse(res) — canonical pattern for Node servers
-//   - Multi-provider via Vercel AI SDK (Anthropic / OpenAI / Google)
-//   - Auth: Bearer JWT in Authorization header
-//   - Session persistence via onFinish (fires after stream close, non-blocking)
+// v3 (P1.4 — read tools):
+//   - 7 read-only tools for menu/BOM/cost queries
+//   - Tools-aware system prompt (chefPrompt.ts)
+//   - Multi-step tool-use loop with stepCount safety limit
+//   - Multi-provider via Vercel AI SDK
+//   - Auth: Bearer JWT → tools query DB as that user (RLS)
+//   - Session persistence via onFinish
 //
 // Architecture (CEO decisions 2026-04-15, MC 5a4f1e17):
-//   - Vercel Hobby tier, 300s maxDuration (configured in vercel.json)
+//   - Vercel Hobby tier, 300s maxDuration
 //   - Inline + post-response side effects
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { convertToModelMessages, streamText, type UIMessage } from 'ai'
+import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 'ai'
 import {
   getLanguageModel,
   AVAILABLE_MODELS,
   DEFAULT_MODEL,
   type Provider,
 } from '../_lib/llm.js'
+import { CHEF_SYSTEM_PROMPT } from '../_lib/chefPrompt.js'
 import { supabaseForUser } from '../_lib/supabase.js'
+import { createChefTools } from './_tools.js'
 
 export const config = { runtime: 'nodejs', maxDuration: 300 }
-
-const SYSTEM_PROMPT_V1 = `You are the AI Executive Chef for Shishka Healthy Kitchen, a healthy food restaurant in Thailand.
-
-You assist the owner (Lesia) with:
-- Menu composition (dishes, BOM, pricing)
-- Recipe development and process steps
-- Cost analysis and food cost optimization
-- Ingredient substitutions and sourcing decisions
-
-Rules:
-- Reply in the user's language (Russian, English, or Thai).
-- Be concise. The owner is busy. Skip filler.
-- When the user asks you to make a change, describe what you'd do and ask for confirmation. Do NOT claim to have made changes — you cannot write to the database yet (write tools land in the next phase).
-- Use Thai Baht (฿) for prices.
-- For ingredient names, prefer the canonical form used in Shishka's nomenclature (e.g. "RAW-SALT_SEA_FINE").
-
-You currently have NO database access. If the user asks you to look something up, say "I cannot read the database yet — that lands in the next phase. For now I can answer from general knowledge or whatever you paste into chat."`
 
 interface ChatBody {
   messages: UIMessage[]
@@ -125,12 +111,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    // ─── Stream ────────────────────────────────────────────────
+    // ─── Stream with tools ──────────────────────────────────────
     const modelMessages = await convertToModelMessages(body.messages)
+    const tools = createChefTools(jwt)
     const result = streamText({
       model: languageModel,
-      system: SYSTEM_PROMPT_V1,
+      system: CHEF_SYSTEM_PROMPT,
       messages: modelMessages,
+      tools,
+      stopWhen: stepCountIs(10), // safety: max 10 tool-call rounds per turn
       onFinish: async ({ text, usage }) => {
         try {
           await persistSession({

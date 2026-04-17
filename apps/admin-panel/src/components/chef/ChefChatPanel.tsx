@@ -251,25 +251,73 @@ export function ChefChatPanel({ open, onClose, context }: ChefChatPanelProps) {
 interface UIMessageLike {
   id: string
   role: 'user' | 'assistant' | 'system'
-  parts?: Array<{ type: string; text?: string }>
+  parts?: Array<{ type: string; text?: string; toolName?: string; result?: unknown; state?: string }>
   content?: string
 }
 
 function MessageBubble({ message }: { message: UIMessageLike }) {
-  const text = extractText(message)
   const isUser = message.role === 'user'
+  const parts = message.parts ?? []
+  const hasToolParts = parts.some((p) => p.type === 'tool-invocation')
 
-  return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[85%] rounded-lg px-3 py-2 text-xs ${
-          isUser
-            ? 'bg-emerald-600/20 text-slate-100 border border-emerald-700/30'
-            : 'bg-slate-800/60 text-slate-100 border border-slate-700/50'
-        }`}
-      >
-        <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
+  // For user messages or simple text-only assistant messages, render text bubble
+  if (isUser || !hasToolParts) {
+    const text = extractText(message)
+    return (
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <div
+          className={`max-w-[85%] rounded-lg px-3 py-2 text-xs ${
+            isUser
+              ? 'bg-emerald-600/20 text-slate-100 border border-emerald-700/30'
+              : 'bg-slate-800/60 text-slate-100 border border-slate-700/50'
+          }`}
+        >
+          <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
+        </div>
       </div>
+    )
+  }
+
+  // Assistant message with tool calls — render each part
+  return (
+    <div className="space-y-2">
+      {parts.map((part, i) => {
+        if (part.type === 'text' && part.text) {
+          return (
+            <div key={i} className="flex justify-start">
+              <div className="max-w-[85%] rounded-lg border border-slate-700/50 bg-slate-800/60 px-3 py-2 text-xs text-slate-100">
+                <div className="whitespace-pre-wrap leading-relaxed">{part.text}</div>
+              </div>
+            </div>
+          )
+        }
+
+        if (part.type === 'tool-invocation') {
+          const toolName = part.toolName ?? 'tool'
+          const state = part.state ?? 'result'
+          const isRunning = state === 'call' || state === 'partial-call'
+
+          return (
+            <div key={i} className="flex justify-start">
+              <div className="max-w-[85%] rounded-lg border border-sky-800/30 bg-sky-950/30 px-3 py-1.5 text-[11px]">
+                <div className="flex items-center gap-1.5 text-sky-300">
+                  {isRunning ? (
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-sky-400" />
+                  ) : (
+                    <span className="text-[10px]">✓</span>
+                  )}
+                  <span className="font-mono font-medium">{toolName}</span>
+                  <span className="text-sky-500">
+                    {isRunning ? 'querying...' : 'done'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        return null
+      })}
     </div>
   )
 }
@@ -289,10 +337,10 @@ function extractText(m: UIMessageLike): string {
 
 function EmptyState({ model }: { model: ModelOption }) {
   const suggestions = [
-    'What should I consider when pricing a new dish?',
-    'Suggest a healthy lunch combo for our menu',
-    'How to reduce food cost on poke bowls?',
-    'What are good flavor pairings for beetroot?',
+    'Какие блюда у нас сейчас в меню?',
+    'У каких блюд нет состава (BOM)?',
+    'Какая маржа у наших блюд?',
+    'Что входит в состав борща?',
   ]
 
   return (
@@ -300,7 +348,7 @@ function EmptyState({ model }: { model: ModelOption }) {
       <ChefHat className="h-10 w-10 text-slate-600 mb-3" />
       <p className="text-sm font-medium text-slate-300">Chef is ready</p>
       <p className="mt-1 text-[11px] text-slate-500">
-        Using {model.label}. I can't read your DB yet — that's next week.
+        Using {model.label}. I can read your menu, BOM, and cost data.
       </p>
       <div className="mt-5 w-full space-y-1.5 px-2">
         <div className="text-[9px] font-bold uppercase tracking-wider text-slate-600 text-left">
