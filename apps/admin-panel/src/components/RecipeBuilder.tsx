@@ -1364,36 +1364,23 @@ export function RecipeBuilder() {
               </div>
 
               {/* Add ingredient row */}
-              <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-3 text-xs">
+              <div className="flex items-end gap-2 border-b border-slate-800 px-4 py-3 text-xs">
                 <div className="flex-1">
                   <label className="mb-1 block text-[11px] text-slate-400">
                     Add Ingredient (PF- / MOD- / RAW-)
                   </label>
-                  <select
-                    className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-100 outline-none"
-                    value={newIngredientId}
-                    onChange={(e) => setNewIngredientId(e.target.value)}
-                    disabled={isLoadingIngredients}
-                  >
-                    <option value="">Select ingredient by code...</option>
-                    {availableIngredients.map((ingredient) => (
-                      <option key={ingredient.id} value={ingredient.id}>
-                        {ingredient.product_code} -- {ingredient.name}
-                        {ingredient.base_unit
-                          ? ` [${ingredient.base_unit}]`
-                          : ''}
-                        {ingredient.cost_per_unit > 0
-                          ? ` (${ingredient.cost_per_unit} THB)`
-                          : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <IngredientSearchPicker
+                    ingredients={availableIngredients}
+                    selectedId={newIngredientId}
+                    onSelect={setNewIngredientId}
+                    isLoading={isLoadingIngredients}
+                  />
                 </div>
                 <button
                   type="button"
                   onClick={handleAddIngredient}
                   disabled={!newIngredientId}
-                  className="mt-5 inline-flex h-8 items-center justify-center rounded-md border border-emerald-500/60 bg-emerald-500/10 px-3 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/20 disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-emerald-500/60 bg-emerald-500/10 px-3 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/20 disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
                 >
                   <Plus className="mr-1 h-3 w-3" />
                   Add
@@ -1525,5 +1512,185 @@ export function RecipeBuilder() {
         />
       )}
     </>
+  )
+}
+
+// ─── Ingredient Search Picker ─────────────────────────────────
+// Searchable combobox for picking a RAW / PF / MOD ingredient by human name.
+// Shows code as muted suffix so engineers can still audit, but the primary
+// display is the name. Grouped by type (RAW → PF → MOD).
+
+type IngredientGroupKey = 'RAW' | 'PF' | 'MOD'
+
+function ingredientGroupKey(i: Ingredient): IngredientGroupKey {
+  if (i.type === 'semi' || i.product_code.startsWith('PF-')) return 'PF'
+  if (i.type === 'modifier' || i.product_code.startsWith('MOD-')) return 'MOD'
+  return 'RAW'
+}
+
+const GROUP_BADGE: Record<IngredientGroupKey, string> = {
+  RAW: 'bg-slate-700 text-slate-300',
+  PF: 'bg-violet-500/15 text-violet-300',
+  MOD: 'bg-amber-500/15 text-amber-300',
+}
+
+const GROUP_ORDER: IngredientGroupKey[] = ['RAW', 'PF', 'MOD']
+
+interface IngredientSearchPickerProps {
+  ingredients: Ingredient[]
+  selectedId: string
+  onSelect: (id: string) => void
+  isLoading: boolean
+}
+
+function IngredientSearchPicker({
+  ingredients,
+  selectedId,
+  onSelect,
+  isLoading,
+}: IngredientSearchPickerProps) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+
+  const selected = useMemo(
+    () => ingredients.find((i) => i.id === selectedId) ?? null,
+    [ingredients, selectedId],
+  )
+
+  const grouped = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const filtered = q
+      ? ingredients.filter(
+          (i) =>
+            i.name.toLowerCase().includes(q) ||
+            i.product_code.toLowerCase().includes(q),
+        )
+      : ingredients
+
+    const buckets: Record<IngredientGroupKey, Ingredient[]> = {
+      RAW: [],
+      PF: [],
+      MOD: [],
+    }
+    for (const i of filtered) buckets[ingredientGroupKey(i)].push(i)
+    for (const k of GROUP_ORDER) {
+      buckets[k].sort((a, b) => a.name.localeCompare(b.name))
+    }
+    return buckets
+  }, [ingredients, query])
+
+  const totalMatches =
+    grouped.RAW.length + grouped.PF.length + grouped.MOD.length
+
+  const handlePick = (id: string) => {
+    onSelect(id)
+    setQuery('')
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative">
+      {selected && !open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex h-8 w-full items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 text-left text-[11px] text-slate-100 hover:border-slate-600"
+          disabled={isLoading}
+        >
+          <span
+            className={`rounded px-1 py-0.5 text-[9px] font-bold ${GROUP_BADGE[ingredientGroupKey(selected)]}`}
+          >
+            {ingredientGroupKey(selected)}
+          </span>
+          <span className="flex-1 truncate">{selected.name}</span>
+          <span className="text-[10px] text-slate-500">
+            {selected.base_unit ?? ''}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelect('')
+            }}
+            className="rounded p-0.5 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+            aria-label="Clear selection"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </button>
+      ) : (
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setOpen(true)
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            placeholder={
+              isLoading
+                ? 'Loading ingredients…'
+                : 'Search by name or code…'
+            }
+            disabled={isLoading}
+            className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 pl-7 pr-2 text-[11px] text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500"
+          />
+        </div>
+      )}
+
+      {open && !isLoading && (
+        <div className="absolute left-0 right-0 top-9 z-10 max-h-64 overflow-y-auto rounded-md border border-slate-700 bg-slate-900 shadow-xl">
+          {totalMatches === 0 ? (
+            <div className="px-3 py-4 text-center text-[11px] text-slate-500">
+              No matches
+            </div>
+          ) : (
+            GROUP_ORDER.map((g) => {
+              const items = grouped[g]
+              if (items.length === 0) return null
+              return (
+                <div key={g}>
+                  <div className="sticky top-0 border-b border-slate-800 bg-slate-950/90 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+                    {g} · {items.length}
+                  </div>
+                  {items.map((i) => (
+                    <button
+                      key={i.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handlePick(i.id)}
+                      className="flex w-full items-center gap-2 border-b border-slate-800/60 px-2 py-1.5 text-left text-[11px] transition last:border-b-0 hover:bg-slate-800"
+                    >
+                      <span
+                        className={`rounded px-1 py-0.5 text-[9px] font-bold ${GROUP_BADGE[g]}`}
+                      >
+                        {g}
+                      </span>
+                      <span className="flex-1 truncate text-slate-100">
+                        {i.name}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        {i.base_unit ?? ''}
+                      </span>
+                      <span className="text-[10px] tabular-nums text-slate-500">
+                        {i.cost_per_unit > 0
+                          ? `฿${i.cost_per_unit}`
+                          : ''}
+                      </span>
+                      <span className="font-mono text-[9px] text-slate-600">
+                        {i.product_code}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
+    </div>
   )
 }
