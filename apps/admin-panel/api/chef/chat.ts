@@ -23,6 +23,7 @@ import {
 import { CHEF_SYSTEM_PROMPT } from '../_lib/chefPrompt.js'
 import { supabaseForUser } from '../_lib/supabase.js'
 import { createChefTools } from './_tools.js'
+import { createChefWriteTools } from './_writeTools.js'
 
 export const config = { runtime: 'nodejs', maxDuration: 300 }
 
@@ -113,7 +114,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     // ─── Stream with tools ──────────────────────────────────────
     const modelMessages = await convertToModelMessages(body.messages)
-    const tools = createChefTools(jwt)
+    const readTools = createChefTools(jwt)
+    const writeTools = createChefWriteTools(jwt)
+    const tools = { ...readTools, ...writeTools }
     const result = streamText({
       model: languageModel,
       system: CHEF_SYSTEM_PROMPT,
