@@ -69,3 +69,39 @@ export function getLanguageModel(provider: Provider, modelId: string): LanguageM
 
 /** Unused-export suppressors (keep factories around for per-request overrides later). */
 export const _providers = { anthropic: createAnthropic, openai: createOpenAI }
+
+// ─── Pricing (USD per token) ────────────────────────────────
+// Source: provider pricing pages. Keep the map keyed by the same modelId we
+// pass to the SDK. Unlisted models fall back to zero cost (still logged, so
+// we see usage even if price isn't wired up yet — easier to audit later).
+interface ModelPrice {
+  input: number  // USD per input token
+  output: number // USD per output token
+}
+
+export const MODEL_PRICING: Record<string, ModelPrice> = {
+  // Anthropic
+  'claude-opus-4-6':    { input: 15 / 1_000_000, output: 75 / 1_000_000 },
+  'claude-sonnet-4-6':  { input:  3 / 1_000_000, output: 15 / 1_000_000 },
+  'claude-haiku-4-5':   { input: 0.8 / 1_000_000, output: 4 / 1_000_000 },
+  // OpenAI
+  'gpt-4o':             { input: 2.5 / 1_000_000, output: 10 / 1_000_000 },
+  'gpt-4o-mini':        { input: 0.15 / 1_000_000, output: 0.6 / 1_000_000 },
+  // Google — base tier pricing (Gemini 1.5 Pro has a second tier above 128k context)
+  'gemini-2.0-flash-exp': { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 },
+  'gemini-1.5-pro':       { input: 1.25 / 1_000_000, output: 5.00 / 1_000_000 },
+}
+
+/**
+ * Compute USD cost for a single chat turn. Returns 0 if the model isn't in
+ * MODEL_PRICING — the row is still logged so we can see usage.
+ */
+export function computeCostUsd(
+  modelId: string,
+  tokens_in: number,
+  tokens_out: number,
+): number {
+  const p = MODEL_PRICING[modelId]
+  if (!p) return 0
+  return tokens_in * p.input + tokens_out * p.output
+}

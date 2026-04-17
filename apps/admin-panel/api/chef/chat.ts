@@ -22,6 +22,7 @@ import {
 } from '../_lib/llm.js'
 import { CHEF_SYSTEM_PROMPT } from '../_lib/chefPrompt.js'
 import { supabaseForUser } from '../_lib/supabase.js'
+import { logApiCost } from '../_lib/apiCostLog.js'
 import { createChefTools } from './_tools.js'
 import { createChefWriteTools } from './_writeTools.js'
 
@@ -124,6 +125,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       tools,
       stopWhen: stepCountIs(10), // safety: max 10 tool-call rounds per turn
       onFinish: async ({ text, usage }) => {
+        const tokens_in = usage.inputTokens ?? 0
+        const tokens_out = usage.outputTokens ?? 0
+
         try {
           await persistSession({
             jwt,
@@ -131,10 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             sessionId: body.session_id,
             incoming: body.messages,
             assistantText: text,
-            usage: {
-              input_tokens: usage.inputTokens ?? 0,
-              output_tokens: usage.outputTokens ?? 0,
-            },
+            usage: { input_tokens: tokens_in, output_tokens: tokens_out },
             provider,
             model: modelId,
             context: body.context,
@@ -142,6 +143,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         } catch (e) {
           console.error('[/api/chef/chat] persistSession failed', e)
         }
+
+        // Always log API cost, even if persistSession fails — these are
+        // independent concerns and /api-costs is the accounting source.
+        await logApiCost({
+          service: provider,
+          model: modelId,
+          feature: 'chef-chat',
+          tokens_in,
+          tokens_out,
+          reference_id: body.session_id ?? null,
+          reference_type: body.session_id ? 'chef_session' : null,
+          metadata: { user_id: user.userId },
+        })
       },
     })
 
