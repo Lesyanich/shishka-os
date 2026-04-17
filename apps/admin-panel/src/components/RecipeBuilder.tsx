@@ -1225,11 +1225,11 @@ export function RecipeBuilder() {
                             : 'border-transparent bg-slate-900/60 text-slate-100 hover:border-slate-700 hover:bg-slate-900',
                         ].join(' ')}
                       >
-                        <div className="flex w-full items-center justify-between">
-                          <span className="font-mono text-[11px] uppercase tracking-wide">
-                            {dish.product_code}
+                        <div className="flex w-full items-center justify-between gap-2">
+                          <span className="truncate text-[12px] font-medium">
+                            {dish.name}
                           </span>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex shrink-0 items-center gap-1.5">
                             {(activeFilter === 'sales' || activeFilter === 'pf') && (
                               <span
                                 className={`h-2 w-2 shrink-0 rounded-full ${
@@ -1255,11 +1255,12 @@ export function RecipeBuilder() {
                             />
                           </div>
                         </div>
-                        <span className="mt-0.5 text-[11px] text-slate-400">
-                          {dish.name}
-                        </span>
-                        <span className="mt-0.5 text-[10px] text-slate-500">
-                          {dish.base_unit ?? '--'}
+                        <span className="mt-0.5 flex items-center gap-2 text-[10px] text-slate-500">
+                          <span className="font-mono uppercase tracking-wide text-slate-600">
+                            {dish.product_code}
+                          </span>
+                          <span>·</span>
+                          <span>{dish.base_unit ?? '--'}</span>
                         </span>
                       </button>
                     </li>
