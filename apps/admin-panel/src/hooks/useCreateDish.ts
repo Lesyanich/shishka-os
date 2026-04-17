@@ -37,6 +37,8 @@ export interface CategoryOption {
   sort_order: number
 }
 
+export type PortionUnit = 'g' | 'ml' | 'pcs'
+
 export interface CreateDishInput {
   name: string
   product_code: string
@@ -44,6 +46,8 @@ export interface CreateDishInput {
   price: number | null
   is_available: boolean
   is_featured: boolean
+  portion_size: number | null
+  portion_unit: PortionUnit | null
 }
 
 export interface UseCreateDishResult {
@@ -159,6 +163,10 @@ export function useCreateDish(): UseCreateDishResult {
         category_id: input.category_id,
         is_available: input.is_available,
         is_featured: input.is_featured,
+      }
+      if (input.portion_size !== null && input.portion_unit !== null) {
+        payload.portion_size = input.portion_size
+        payload.portion_unit = input.portion_unit
       }
       if (input.price !== null && input.price > 0) {
         payload.price = input.price

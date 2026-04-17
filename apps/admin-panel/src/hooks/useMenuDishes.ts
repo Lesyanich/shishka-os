@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+export type PortionUnit = 'g' | 'ml' | 'pcs'
+
 export interface MenuDish {
   id: string
   name: string
@@ -15,6 +17,8 @@ export interface MenuDish {
   protein: number | null
   carbs: number | null
   fat: number | null
+  portion_size: number | null
+  portion_unit: PortionUnit | null
   category_id: string | null
   category_name: string | null
   category_code: string | null
@@ -49,7 +53,7 @@ export interface UseMenuDishesResult {
   subcategories: Map<string, MenuSubcategory[]>
   isLoading: boolean
   error: string | null
-  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
+  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'>>) => Promise<{ ok: boolean; error?: string }>
   refetch: () => void
 }
 
@@ -71,6 +75,7 @@ export function useMenuDishes(): UseMenuDishesResult {
           id, name, product_code, price, cost_per_unit,
           is_available, is_featured, image_url,
           calories, protein, carbs, fat,
+          portion_size, portion_unit,
           category_id,
           product_categories!category_id(id, code, name, sort_order)
         `)
@@ -142,6 +147,8 @@ export function useMenuDishes(): UseMenuDishesResult {
         protein: d.protein ? Number(d.protein) : null,
         carbs: d.carbs ? Number(d.carbs) : null,
         fat: d.fat ? Number(d.fat) : null,
+        portion_size: d.portion_size != null ? Number(d.portion_size) : null,
+        portion_unit: (d.portion_unit as PortionUnit | null) ?? null,
         category_id: d.category_id,
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
@@ -165,13 +172,15 @@ export function useMenuDishes(): UseMenuDishesResult {
   const updateDish = useCallback(
     async (
       id: string,
-      patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>,
+      patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'>>,
     ): Promise<{ ok: boolean; error?: string }> => {
       const updates: Record<string, unknown> = {}
       if (patch.name !== undefined) updates.name = patch.name.trim()
       if (patch.price !== undefined) updates.price = patch.price
       if (patch.is_available !== undefined) updates.is_available = patch.is_available
       if (patch.is_featured !== undefined) updates.is_featured = patch.is_featured
+      if (patch.portion_size !== undefined) updates.portion_size = patch.portion_size
+      if (patch.portion_unit !== undefined) updates.portion_unit = patch.portion_unit
 
       const { error: updateErr } = await supabase
         .from('nomenclature')

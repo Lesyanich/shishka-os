@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Check, ChefHat, Loader2, X } from 'lucide-react'
-import { useCreateDish, productCodeFromName } from '../../../hooks/useCreateDish'
+import { useCreateDish, productCodeFromName, type PortionUnit } from '../../../hooks/useCreateDish'
 
 interface NewDishModalProps {
   open: boolean
@@ -26,6 +26,8 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null)
   const [price, setPrice] = useState('')
+  const [portionSize, setPortionSize] = useState('')
+  const [portionUnit, setPortionUnit] = useState<PortionUnit>('g')
   const [isAvailable, setIsAvailable] = useState(true)
   const [isFeatured, setIsFeatured] = useState(false)
 
@@ -47,6 +49,8 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
       setCategoryId(null)
       setSubcategoryId(null)
       setPrice('')
+      setPortionSize('')
+      setPortionUnit('g')
       setIsAvailable(true)
       setIsFeatured(false)
       setLocalError(null)
@@ -78,12 +82,20 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
       return
     }
 
+    const portionNum = portionSize.trim() ? Number(portionSize) : null
+    if (portionNum !== null && (Number.isNaN(portionNum) || portionNum <= 0)) {
+      setLocalError('Portion size must be a positive number')
+      return
+    }
+
     const result = await createDish({
       name: name.trim(),
       product_code: productCode.trim().toUpperCase(),
       // Prefer L2 if chosen, else L1
       category_id: subcategoryId ?? categoryId,
       price: priceNum,
+      portion_size: portionNum,
+      portion_unit: portionNum !== null ? portionUnit : null,
       is_available: isAvailable,
       is_featured: isFeatured,
     })
@@ -221,23 +233,53 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
             </div>
           </div>
 
-          {/* Price */}
-          <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Price, ฿
-              <span className="ml-2 text-[9px] font-normal text-slate-600">
-                optional — can fill in later
-              </span>
-            </label>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              min={0}
-              step="1"
-              placeholder="290"
-              className="w-32 rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
-            />
+          {/* Price + portion */}
+          <div className="grid grid-cols-[8rem_1fr] gap-3">
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Price, ฿
+                <span className="ml-2 text-[9px] font-normal text-slate-600">
+                  optional
+                </span>
+              </label>
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                min={0}
+                step="1"
+                placeholder="290"
+                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Portion size
+                <span className="ml-2 text-[9px] font-normal text-slate-600">
+                  enables price per 100{portionUnit === 'pcs' ? '' : portionUnit}
+                </span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={portionSize}
+                  onChange={(e) => setPortionSize(e.target.value)}
+                  min={0}
+                  step="1"
+                  placeholder="250"
+                  className="w-24 rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+                />
+                <select
+                  value={portionUnit}
+                  onChange={(e) => setPortionUnit(e.target.value as PortionUnit)}
+                  className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="g">g</option>
+                  <option value="ml">ml</option>
+                  <option value="pcs">pcs</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* Toggles */}
