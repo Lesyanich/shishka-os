@@ -119,36 +119,53 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
     [onUpdate, setOptimistic],
   )
 
-  // Group dishes with L2 subcategory headers
+  // Group dishes with L2 subcategory headers.
+  // A dish's category_id may point to either an L1 category OR an L2 subcategory
+  // (the join returns whatever row matches). Render an L2 header only when at
+  // least one dish actually references that L2 — prevents empty dividers.
   const groupedDishes = useMemo((): GroupItem[] => {
     const relevantL1Ids = selectedCategory
       ? [selectedCategory]
       : (Array.from(new Set(optimisticDishes.map((d) => d.category_id).filter(Boolean))) as string[])
 
     const groups: GroupItem[] = []
+    const claimed = new Set<string>()
 
     for (const catId of relevantL1Ids) {
       const l2s = subcategories.get(catId) ?? []
-      const catDishes = optimisticDishes.filter((d) => d.category_id === catId)
+      const directDishes = optimisticDishes.filter((d) => d.category_id === catId)
 
       if (l2s.length === 0) {
-        for (const dish of catDishes) {
+        for (const dish of directDishes) {
           groups.push({ type: 'dish', dish })
+          claimed.add(dish.id)
         }
-      } else {
-        for (const l2 of l2s) {
-          groups.push({ type: 'l2-header', subcategory: l2, dishCount: 0 })
-        }
-        for (const dish of catDishes) {
+        continue
+      }
+
+      // Dishes directly under the L1 (no L2 match) render first without a header
+      for (const dish of directDishes) {
+        groups.push({ type: 'dish', dish })
+        claimed.add(dish.id)
+      }
+
+      // Then each non-empty L2: header + its dishes
+      for (const l2 of l2s) {
+        const l2Dishes = optimisticDishes.filter((d) => d.category_id === l2.id)
+        if (l2Dishes.length === 0) continue
+        groups.push({ type: 'l2-header', subcategory: l2, dishCount: l2Dishes.length })
+        for (const dish of l2Dishes) {
           groups.push({ type: 'dish', dish })
+          claimed.add(dish.id)
         }
       }
     }
 
-    // Add dishes without a category
-    const uncategorized = optimisticDishes.filter((d) => d.category_id == null)
-    for (const dish of uncategorized) {
-      groups.push({ type: 'dish', dish })
+    // Add dishes without a category OR not claimed above
+    for (const dish of optimisticDishes) {
+      if (!claimed.has(dish.id) && dish.category_id == null) {
+        groups.push({ type: 'dish', dish })
+      }
     }
 
     return groups
