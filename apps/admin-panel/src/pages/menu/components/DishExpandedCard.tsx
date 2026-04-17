@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { ChefHat, ChevronDown, ChevronRight, Flame, FileText, Soup } from 'lucide-react'
+import { Camera, ChefHat, ChevronDown, ChevronRight, Flame, FileText, Soup } from 'lucide-react'
 import type { MenuDish } from '../../../hooks/useMenuDishes'
 import { useDishDetail } from '../../../hooks/useDishDetail'
+import { useNomenclatureImages } from '../../../hooks/useNomenclatureImages'
 import { BomTreeEditor } from './BomTreeEditor'
 import { NutritionBadges } from './NutritionBadge'
+import { ImageGallery } from '../../../components/gallery/ImageGallery'
 import { ProcessTab } from '../../../components/bom/ProcessTab'
 
 interface DishExpandedCardProps {
   dish: MenuDish
 }
 
-type Section = 'bom' | 'assembly' | 'production' | 'nutrition'
+type Section = 'bom' | 'assembly' | 'production' | 'nutrition' | 'photos'
 
 function formatThb(v: number | null): string {
   if (v == null) return '-'
@@ -19,6 +21,7 @@ function formatThb(v: number | null): string {
 
 export function DishExpandedCard({ dish }: DishExpandedCardProps) {
   const detail = useDishDetail(dish.id)
+  const gallery = useNomenclatureImages(dish.id)
   const [openSections, setOpenSections] = useState<Set<Section>>(
     new Set(['bom', 'assembly']),
   )
@@ -224,6 +227,25 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
             />
           </div>
         )}
+      </Section>
+
+      {/* Section: Photos */}
+      <Section
+        title="Photos"
+        icon={<Camera className="h-3.5 w-3.5" />}
+        count={gallery.images.length}
+        isOpen={openSections.has('photos')}
+        onToggle={() => toggle('photos')}
+      >
+        <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3">
+          <ImageGallery
+            images={gallery.images}
+            isLoading={gallery.isLoading}
+            onUpload={gallery.upload}
+            onRemove={gallery.remove}
+            onSetPrimary={gallery.setPrimary}
+          />
+        </div>
       </Section>
     </div>
   )
