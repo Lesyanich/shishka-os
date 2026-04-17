@@ -1,13 +1,13 @@
 import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
 import { Check, X, Star, StarOff, ChevronDown, ChevronRight } from 'lucide-react'
-import type { MenuDish, MenuSubcategory } from '../../../hooks/useMenuDishes'
+import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useMenuDishes'
 import { DishExpandedCard } from './DishExpandedCard'
 
 interface OwnerTableProps {
   dishes: MenuDish[]
   selectedCategory: string | null
   subcategories: Map<string, MenuSubcategory[]>
-  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
+  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'>>) => Promise<{ ok: boolean; error?: string }>
   /** Imperative trigger: when this id changes, auto-expand that row and scroll to it. */
   autoExpandId?: string | null
 }
@@ -27,10 +27,27 @@ function hasNutrition(dish: MenuDish): boolean {
   return dish.calories != null || dish.protein != null || dish.carbs != null || dish.fat != null
 }
 
+function formatPortion(dish: MenuDish): string {
+  if (dish.portion_size == null || dish.portion_unit == null) return '-'
+  return `${dish.portion_size}${dish.portion_unit}`
+}
+
+function pricePer100(price: number | null, portionSize: number | null, portionUnit: PortionUnit | null): number | null {
+  if (price == null || portionSize == null || portionSize <= 0) return null
+  if (portionUnit === 'pcs') return null
+  return (price / portionSize) * 100
+}
+
 interface EditState {
   id: string
   name: string
   price: string
+}
+
+interface PortionEditState {
+  id: string
+  size: string
+  unit: PortionUnit
 }
 
 type GroupItem =
@@ -49,6 +66,7 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
   )
 
   const [editing, setEditing] = useState<EditState | null>(null)
+  const [portionEditing, setPortionEditing] = useState<PortionEditState | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   // Imperative auto-expand: when parent sets autoExpandId to a new value,
@@ -117,6 +135,44 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
       await onUpdate(dish.id, { [field]: newVal })
     },
     [onUpdate, setOptimistic],
+  )
+
+  const startPortionEdit = useCallback((dish: MenuDish) => {
+    setPortionEditing({
+      id: dish.id,
+      size: dish.portion_size?.toString() ?? '',
+      unit: dish.portion_unit ?? 'g',
+    })
+  }, [])
+
+  const cancelPortionEdit = useCallback(() => {
+    setPortionEditing(null)
+  }, [])
+
+  const savePortionEdit = useCallback(async () => {
+    if (!portionEditing) return
+    const original = filtered.find((d) => d.id === portionEditing.id)
+    if (!original) return
+
+    const newSize = portionEditing.size ? Number(portionEditing.size) : null
+    const newUnit = newSize != null ? portionEditing.unit : null
+
+    if (newSize === original.portion_size && newUnit === original.portion_unit) {
+      setPortionEditing(null)
+      return
+    }
+
+    setOptimistic({ id: portionEditing.id, patch: { portion_size: newSize, portion_unit: newUnit } })
+    setPortionEditing(null)
+    await onUpdate(portionEditing.id, { portion_size: newSize, portion_unit: newUnit })
+  }, [portionEditing, filtered, onUpdate, setOptimistic])
+
+  const handlePortionKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') savePortionEdit()
+      if (e.key === 'Escape') cancelPortionEdit()
+    },
+    [savePortionEdit, cancelPortionEdit],
   )
 
   // Group dishes with L2 subcategory headers.
@@ -188,7 +244,9 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
             <th className="px-3 py-2.5">Name</th>
             <th className="px-3 py-2.5">Description</th>
             <th className="px-3 py-2.5">Category</th>
+            <th className="px-3 py-2.5 text-right">Portion</th>
             <th className="px-3 py-2.5 text-right">Price</th>
+            <th className="px-3 py-2.5 text-right">&#x0E3F;/100g</th>
             <th className="px-3 py-2.5 text-right">Cost</th>
             <th className="px-3 py-2.5 text-right">Food Cost %</th>
             <th className="px-3 py-2.5 text-right">Margin</th>
@@ -201,7 +259,7 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-slate-900/30">
-                  <td colSpan={10} className="px-3 py-2">
+                  <td colSpan={12} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                       {item.subcategory.name}
                     </span>
@@ -302,6 +360,46 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
                   )}
                 </td>
 
+                {/* Portion */}
+                <td className="px-3 py-2 text-right">
+                  {portionEditing?.id === dish.id ? (
+                    <div className="flex items-center justify-end gap-1">
+                      <input
+                        value={portionEditing.size}
+                        onChange={(e) => setPortionEditing({ ...portionEditing, size: e.target.value })}
+                        onKeyDown={handlePortionKeyDown}
+                        className="w-16 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-right text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                        type="number"
+                        min={0}
+                        autoFocus
+                      />
+                      <select
+                        value={portionEditing.unit}
+                        onChange={(e) => setPortionEditing({ ...portionEditing, unit: e.target.value as PortionUnit })}
+                        className="rounded border border-slate-600 bg-slate-800 px-1 py-1 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                      >
+                        <option value="g">g</option>
+                        <option value="ml">ml</option>
+                        <option value="pcs">pcs</option>
+                      </select>
+                      <button onClick={savePortionEdit} className="rounded bg-emerald-600 p-0.5 text-white hover:bg-emerald-500">
+                        <Check className="h-3 w-3" />
+                      </button>
+                      <button onClick={cancelPortionEdit} className="rounded bg-slate-700 p-0.5 text-slate-300 hover:bg-slate-600">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => startPortionEdit(dish)}
+                      className={`text-right ${dish.portion_size != null ? 'text-slate-300' : 'text-slate-600'}`}
+                      title="Edit portion size"
+                    >
+                      {formatPortion(dish)}
+                    </button>
+                  )}
+                </td>
+
                 {/* Price */}
                 <td className="px-3 py-2 text-right">
                   {isEditing ? (
@@ -316,6 +414,18 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
                   ) : (
                     <span className="font-medium text-slate-100">{formatThb(dish.price)}</span>
                   )}
+                </td>
+
+                {/* ฿/100g */}
+                <td className="px-3 py-2 text-right">
+                  {(() => {
+                    const per100 = pricePer100(dish.price, dish.portion_size, dish.portion_unit)
+                    return per100 != null ? (
+                      <span className="text-slate-400">{formatThb(Math.round(per100))}</span>
+                    ) : (
+                      <span className="text-slate-600">&mdash;</span>
+                    )
+                  })()}
                 </td>
 
                 {/* Cost */}
@@ -381,7 +491,7 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
               </tr>
               {isExpanded && (
                 <tr className="bg-slate-950/60">
-                  <td colSpan={10} className="p-0">
+                  <td colSpan={12} className="p-0">
                     <DishExpandedCard dish={dish} />
                   </td>
                 </tr>

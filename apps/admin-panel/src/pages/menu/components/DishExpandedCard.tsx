@@ -88,6 +88,28 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
             {margin !== null ? formatThb(margin) : '—'}
           </div>
         </div>
+        {dish.portion_size != null && dish.portion_unit != null && (
+          <>
+            <div className="h-8 w-px bg-slate-800" />
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">Portion</div>
+              <div className="text-base font-bold text-slate-100 tabular-nums">
+                {dish.portion_size}{dish.portion_unit}
+              </div>
+            </div>
+            {dish.portion_unit !== 'pcs' && price > 0 && (
+              <>
+                <div className="h-8 w-px bg-slate-800" />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">&#x0E3F;/100{dish.portion_unit}</div>
+                  <div className="text-base font-bold text-slate-100 tabular-nums">
+                    {formatThb(Math.round((price / dish.portion_size) * 100))}
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        )}
         {dish.product_code && (
           <>
             <div className="h-8 w-px bg-slate-800" />
