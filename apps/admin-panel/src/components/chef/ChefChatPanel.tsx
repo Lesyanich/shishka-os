@@ -130,7 +130,10 @@ export function ChefChatPanel({ open, onClose, context }: ChefChatPanelProps) {
       />
 
       {/* Panel */}
-      <aside className="fixed right-0 top-0 z-50 flex h-screen w-full max-w-lg flex-col border-l border-slate-800 bg-slate-950 shadow-2xl">
+      <aside
+        onTouchStart={(e) => e.stopPropagation()}
+        className="fixed right-0 top-0 z-50 flex h-dvh w-full max-w-lg flex-col border-l border-slate-800 bg-slate-950 shadow-2xl"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
           <div className="flex items-center gap-2">
@@ -209,7 +212,7 @@ export function ChefChatPanel({ open, onClose, context }: ChefChatPanelProps) {
         </div>
 
         {/* Input */}
-        <div className="border-t border-slate-800 p-3">
+        <div className="border-t border-slate-800 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="flex items-end gap-2">
             <textarea
               ref={textareaRef}
