@@ -45,12 +45,12 @@ export async function fetchRecentApiCosts(limit = 50): Promise<ApiCostRow[]> {
   return (data ?? []) as ApiCostRow[]
 }
 
-export async function fetchTotalSpend30d(): Promise<{ total: number; receipt: number; brain: number }> {
+export async function fetchTotalSpend30d(): Promise<{ total: number; byFeature: Record<string, number> }> {
   const since = new Date()
   since.setDate(since.getDate() - 30)
   const sinceIso = since.toISOString()
 
-  // api_cost_log (receipts + any future features)
+  // api_cost_log (all features)
   const { data: apiData, error: apiErr } = await supabase
     .from('api_cost_log')
     .select('cost_usd, feature')
@@ -58,7 +58,7 @@ export async function fetchTotalSpend30d(): Promise<{ total: number; receipt: nu
 
   if (apiErr) throw new Error(apiErr.message)
 
-  // brain_query_log (existing brain costs)
+  // brain_query_log (legacy brain costs in separate table)
   const { data: brainData, error: brainErr } = await supabase
     .from('brain_query_log')
     .select('cost_usd')
@@ -66,21 +66,21 @@ export async function fetchTotalSpend30d(): Promise<{ total: number; receipt: nu
 
   if (brainErr) throw new Error(brainErr.message)
 
-  const receiptCost = (apiData ?? [])
-    .filter((r) => r.feature === 'receipt-ocr')
-    .reduce((sum, r) => sum + Number(r.cost_usd), 0)
+  const byFeature: Record<string, number> = {}
+
+  for (const row of apiData ?? []) {
+    const f = row.feature || 'other'
+    byFeature[f] = (byFeature[f] ?? 0) + Number(row.cost_usd)
+  }
 
   const brainCost = (brainData ?? []).reduce((sum, r) => sum + Number(r.cost_usd), 0)
-
-  const otherApiCost = (apiData ?? [])
-    .filter((r) => r.feature !== 'receipt-ocr')
-    .reduce((sum, r) => sum + Number(r.cost_usd), 0)
-
-  return {
-    total: receiptCost + brainCost + otherApiCost,
-    receipt: receiptCost,
-    brain: brainCost,
+  if (brainCost > 0) {
+    byFeature['brain-query'] = (byFeature['brain-query'] ?? 0) + brainCost
   }
+
+  const total = Object.values(byFeature).reduce((a, b) => a + b, 0)
+
+  return { total, byFeature }
 }
 
 export async function fetchDailyCosts(days = 30): Promise<DailyCost[]> {

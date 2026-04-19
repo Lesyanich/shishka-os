@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Brain, DollarSign, Hash, Loader2, Receipt } from 'lucide-react'
+import { Brain, ChefHat, DollarSign, Hash, Loader2, Receipt, Sparkles } from 'lucide-react'
 import {
   fetchDailyCosts,
   fetchModelBreakdown,
@@ -25,24 +25,38 @@ function Card({ icon, label, value, sub }: { icon: React.ReactNode; label: strin
   )
 }
 
-/* ────────────────────────── Feature label helper ────────────────────────── */
+/* ────────────────────────── Feature registry ────────────────────────── */
+
+interface FeatureMeta {
+  label: string
+  color: string         // Tailwind bg class for bars/dots
+  icon: React.ReactNode
+}
+
+const FEATURE_REGISTRY: Record<string, FeatureMeta> = {
+  'chef-chat':    { label: 'Chef AI',      color: 'bg-orange-500',  icon: <ChefHat className="h-3 w-3" /> },
+  'receipt-ocr':  { label: 'Receipt OCR',  color: 'bg-emerald-500', icon: <Receipt className="h-3 w-3" /> },
+  'brain-query':  { label: 'Brain Query',  color: 'bg-purple-500',  icon: <Brain className="h-3 w-3" /> },
+}
+
+const DEFAULT_META: FeatureMeta = { label: 'Other', color: 'bg-slate-500', icon: <Sparkles className="h-3 w-3" /> }
+
+function featureMeta(f: string): FeatureMeta {
+  return FEATURE_REGISTRY[f] ?? { ...DEFAULT_META, label: f }
+}
 
 function featureLabel(f: string) {
-  if (f === 'receipt-ocr') return 'Receipt OCR'
-  if (f === 'brain-query') return 'Brain Query'
-  return f
+  return featureMeta(f).label
 }
 
 function featureColor(f: string) {
-  if (f === 'receipt-ocr') return 'bg-emerald-500'
-  if (f === 'brain-query') return 'bg-purple-500'
-  return 'bg-slate-500'
+  return featureMeta(f).color
 }
 
 /* ────────────────────────── Page ────────────────────────── */
 
 export function ApiCostPage() {
-  const [totals, setTotals] = useState<{ total: number; receipt: number; brain: number }>({ total: 0, receipt: 0, brain: 0 })
+  const [totals, setTotals] = useState<{ total: number; byFeature: Record<string, number> }>({ total: 0, byFeature: {} })
   const [dailyCosts, setDailyCosts] = useState<DailyCost[]>([])
   const [models, setModels] = useState<ModelBreakdown[]>([])
   const [recent, setRecent] = useState<ApiCostRow[]>([])
@@ -99,6 +113,12 @@ export function ApiCostPage() {
     0.01,
   )
 
+  // Collect all unique features across daily data + totals for legend/cards
+  const allFeatures = Array.from(new Set([
+    ...Object.keys(totals.byFeature),
+    ...Object.values(dailyTotals).flatMap((feats) => Object.keys(feats)),
+  ]))
+
   const totalCount = recent.length + models.reduce((s, m) => s + m.count, 0)
 
   return (
@@ -115,16 +135,19 @@ export function ApiCostPage() {
           label="30 дней"
           value={`$${totals.total.toFixed(2)}`}
         />
-        <Card
-          icon={<Receipt className="h-3 w-3" />}
-          label="Чеки"
-          value={`$${totals.receipt.toFixed(2)}`}
-        />
-        <Card
-          icon={<Brain className="h-3 w-3" />}
-          label="Brain"
-          value={`$${totals.brain.toFixed(2)}`}
-        />
+        {Object.entries(totals.byFeature)
+          .sort(([, a], [, b]) => b - a)
+          .map(([feature, cost]) => {
+            const meta = featureMeta(feature)
+            return (
+              <Card
+                key={feature}
+                icon={meta.icon}
+                label={meta.label}
+                value={`$${cost.toFixed(2)}`}
+              />
+            )
+          })}
         <Card
           icon={<Hash className="h-3 w-3" />}
           label="Вызовов"
@@ -167,9 +190,16 @@ export function ApiCostPage() {
               })}
           </div>
         )}
-        <div className="mt-2 flex items-center gap-4 text-[9px] text-slate-500">
-          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded bg-emerald-500" /> Receipt OCR</span>
-          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded bg-purple-500" /> Brain</span>
+        <div className="mt-2 flex flex-wrap items-center gap-4 text-[9px] text-slate-500">
+          {allFeatures.map((f) => {
+            const meta = featureMeta(f)
+            return (
+              <span key={f} className="flex items-center gap-1">
+                <span className={`inline-block h-2 w-2 rounded ${meta.color}`} />
+                {meta.label}
+              </span>
+            )
+          })}
         </div>
       </section>
 
