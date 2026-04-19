@@ -19,9 +19,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
   { provider: 'anthropic', id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', tier: 'fast', context_window_k: 200, notes: 'Cheapest; fast' },
   { provider: 'openai', id: 'gpt-4o', label: 'GPT-4o', tier: 'balanced', context_window_k: 128 },
   { provider: 'openai', id: 'gpt-4o-mini', label: 'GPT-4o mini', tier: 'fast', context_window_k: 128 },
+  { provider: 'google', id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', tier: 'quality', context_window_k: 2000, notes: 'Deep reasoning' },
   { provider: 'google', id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', tier: 'fast', context_window_k: 1000, notes: 'Cheapest; fast turns' },
-  { provider: 'google', id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', tier: 'fast', context_window_k: 1000 },
-  { provider: 'google', id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', tier: 'quality', context_window_k: 2000 },
 ]
 
 export const DEFAULT_MODEL: ModelOption = AVAILABLE_MODELS[1] // Claude Sonnet 4.6
