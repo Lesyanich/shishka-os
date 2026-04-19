@@ -33,7 +33,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
   { provider: 'openai', id: 'gpt-4o', label: 'GPT-4o', tier: 'balanced', context_window_k: 128 },
   { provider: 'openai', id: 'gpt-4o-mini', label: 'GPT-4o mini', tier: 'fast', context_window_k: 128 },
   // Google — uses GOOGLE_API_KEY (same as OCR pipeline, not GOOGLE_GENERATIVE_AI_API_KEY)
-  { provider: 'google', id: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash', tier: 'fast', context_window_k: 1000 },
+  { provider: 'google', id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', tier: 'fast', context_window_k: 1000, notes: 'Cheapest; fast turns' },
+  { provider: 'google', id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', tier: 'fast', context_window_k: 1000 },
   { provider: 'google', id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', tier: 'quality', context_window_k: 2000 },
 ]
 
@@ -88,8 +89,9 @@ export const MODEL_PRICING: Record<string, ModelPrice> = {
   'gpt-4o':             { input: 2.5 / 1_000_000, output: 10 / 1_000_000 },
   'gpt-4o-mini':        { input: 0.15 / 1_000_000, output: 0.6 / 1_000_000 },
   // Google — base tier pricing (Gemini 1.5 Pro has a second tier above 128k context)
-  'gemini-2.0-flash-exp': { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 },
-  'gemini-1.5-pro':       { input: 1.25 / 1_000_000, output: 5.00 / 1_000_000 },
+  'gemini-2.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
+  'gemini-2.0-flash': { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 },
+  'gemini-1.5-pro':   { input: 1.25 / 1_000_000, output: 5.00 / 1_000_000 },
 }
 
 /**
