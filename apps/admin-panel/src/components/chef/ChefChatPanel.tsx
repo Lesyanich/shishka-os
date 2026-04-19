@@ -227,21 +227,21 @@ export function ChefChatPanel({ open, onClose, context }: ChefChatPanelProps) {
                     : 'Ask the chef...'
               }
               disabled={!authReady || !hasSession || isBusy}
-              rows={2}
-              className="flex-1 resize-none rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+              rows={1}
+              className="flex-1 resize-none rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50 sm:text-xs"
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || isBusy || !authReady || !hasSession}
-              className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9"
               title={!hasSession ? 'Please log in first' : 'Send (Enter)'}
             >
-              {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
           </div>
-          <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-600">
-            <span>Enter to send · Shift+Enter for newline</span>
-            <span>Chef can't write to DB yet — ask or confirm before changes land</span>
+          <div className="mt-1.5 text-[10px] text-slate-600">
+            <span className="hidden sm:inline">Enter to send · Shift+Enter for newline · </span>
+            <span>Chef is read-only — confirm before changes</span>
           </div>
         </div>
       </aside>
