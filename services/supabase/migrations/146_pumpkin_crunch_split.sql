@@ -82,11 +82,10 @@ UPDATE bom_structures bs
    AND bs.slot IS NULL;
 
 -- ── Self-register in migration_log ──
-INSERT INTO public.migration_log (filename, applied_by, reviewed_by, description)
+INSERT INTO public.migration_log (filename, applied_by, notes)
 VALUES (
   '146_pumpkin_crunch_split.sql',
   'claude-code',
-  'lesia',
   'Split PF-CRUNCH_PUMPKIN (single-seed Finish crunch) from MOD-ANCIENT_CRUNCH (full seed mix). Wires it into SALE-PUMPKIN_SOUP BOM with slot=finish + backfills coconut base slot=base.'
 ) ON CONFLICT (filename) DO NOTHING;
 
