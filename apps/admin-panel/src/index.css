@@ -9,7 +9,9 @@
   /* Brand */
   --color-royal-green: #2D3F1C;
   --color-royal-red: #9B1C21;
+  --color-forest: #2D3F1C;       /* alias for royal-green (emphasis) */
   --color-forest-soft: #5B7A3D;
+  --color-brick: #9B1C21;        /* alias for royal-red (primary accent) */
   --color-brick-soft: #C74A4F;
   --color-amber-watch: #B88830;
 
@@ -20,6 +22,8 @@
 
   /* Text */
   --color-cream: #F0EAD6;
+  --color-muted: rgba(240, 234, 214, 0.6);   /* cream @ 60% — secondary copy */
+  --color-faint: rgba(240, 234, 214, 0.35);  /* cream @ 35% — meta/counts */
 
   /* Nutrition badges (editorial, muted) */
   --color-nutri-cal: #B88830;   /* amber */
@@ -41,22 +45,20 @@
 }
 
 :root {
-  font-family: "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    ui-sans-serif, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #020617;
-  color: #e5e7eb;
+  background-color: var(--color-surface-1);
+  color: var(--color-cream);
 }
 
 #root {
@@ -79,11 +81,6 @@ body {
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(99, 102, 241, 0.15); }
-  50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
 }
 
 @keyframes fade-in-up {
@@ -118,18 +115,14 @@ body {
   overflow: hidden;
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2.5s ease-in-out infinite;
-}
-
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(99, 102, 241, 0.08) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(155, 28, 33, 0.08) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 3s linear infinite;
 }
 
 .animate-border-flow {
-  background: linear-gradient(270deg, #6366f1, #8b5cf6, #a78bfa, #6366f1);
+  background: linear-gradient(270deg, #9B1C21, #C74A4F, #2D3F1C, #5B7A3D, #9B1C21);
   background-size: 400% 400%;
   animation: border-flow 6s ease infinite;
 }
@@ -154,7 +147,7 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #818cf8, transparent);
+  background: linear-gradient(90deg, transparent, #C74A4F, transparent);
   animation: scan-line 1.8s ease-in-out infinite;
   pointer-events: none;
 }

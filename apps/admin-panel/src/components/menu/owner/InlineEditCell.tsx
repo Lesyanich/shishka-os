@@ -156,7 +156,7 @@ export function InlineEditCell<T extends string | number | null>({
       aria-label={ariaLabel}
       className={`inline-block ${alignCls} ${hover} ${flashCls} ${className ?? ''}`}
     >
-      {displayed ?? <span className="text-slate-600">{placeholder}</span>}
+      {displayed ?? <span className="text-faint">{placeholder}</span>}
     </button>
   )
 }

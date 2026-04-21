@@ -93,18 +93,51 @@ export function MenuPage() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-slate-100">Menu</h1>
-          <p className="text-xs text-slate-500">
-            {totalDishes} dishes &middot; {availableCount} available &middot; {featuredCount} featured &middot; avg food cost {avgFoodCost.toFixed(1)}%
-          </p>
+        <div className="flex items-center gap-3">
+          {/* Brand mark */}
+          <div
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border bg-royal-green text-cream"
+            style={{
+              borderColor: 'var(--color-forest-soft)',
+              fontFamily: 'var(--font-display-sc)',
+              fontWeight: 700,
+              fontSize: '14px',
+              lineHeight: 1,
+            }}
+            aria-hidden
+          >
+            Ш
+          </div>
+          <span
+            className="text-cream"
+            style={{
+              fontFamily: 'var(--font-display-sc)',
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              fontSize: '13px',
+            }}
+          >
+            SHISHKA
+          </span>
+          <span className="text-faint" aria-hidden>/</span>
+          <div>
+            <h1
+              className="text-2xl text-cream"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 500 }}
+            >
+              Menu
+            </h1>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-muted">
+              {totalDishes} dishes &middot; {availableCount} available &middot; {featuredCount} featured &middot; avg fc {avgFoodCost.toFixed(1)}%
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
           {/* New Dish button */}
           <button
             onClick={() => setNewDishOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-700"
+            className="flex items-center gap-1.5 rounded-lg border border-brick bg-brick px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brick-soft hover:border-brick-soft"
             title="Create new dish"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -114,7 +147,7 @@ export function MenuPage() {
           {/* AI Chef button */}
           <button
             onClick={() => setChefOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:border-emerald-600 hover:bg-emerald-500/20"
+            className="flex items-center gap-1.5 rounded-lg border border-cream/15 bg-transparent px-3 py-1.5 text-xs font-medium text-cream transition hover:border-cream/30 hover:bg-surface-3"
             title="Open AI Chef"
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -123,13 +156,13 @@ export function MenuPage() {
 
           {/* Owner layout toggle */}
           {view === 'owner' && (
-            <div className="flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
+            <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
               <button
                 onClick={() => setOwnerLayout('table')}
                 className={`flex items-center rounded-md p-1.5 transition ${
                   ownerLayout === 'table'
-                    ? 'bg-slate-700 text-slate-100'
-                    : 'text-slate-500 hover:text-slate-300'
+                    ? 'bg-surface-3 text-cream'
+                    : 'text-muted hover:text-cream'
                 }`}
                 title="Table view"
               >
@@ -139,8 +172,8 @@ export function MenuPage() {
                 onClick={() => setOwnerLayout('gallery')}
                 className={`flex items-center rounded-md p-1.5 transition ${
                   ownerLayout === 'gallery'
-                    ? 'bg-slate-700 text-slate-100'
-                    : 'text-slate-500 hover:text-slate-300'
+                    ? 'bg-surface-3 text-cream'
+                    : 'text-muted hover:text-cream'
                 }`}
                 title="Gallery view"
               >
@@ -150,13 +183,13 @@ export function MenuPage() {
           )}
 
           {/* View toggle */}
-          <div className="flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
+          <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
             <button
               onClick={() => setView('owner')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 view === 'owner'
-                  ? 'bg-slate-700 text-slate-100'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-surface-3 text-cream'
+                  : 'text-muted hover:text-cream'
               }`}
             >
               Owner
@@ -165,8 +198,8 @@ export function MenuPage() {
               onClick={() => setView('customer')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 view === 'customer'
-                  ? 'bg-slate-700 text-slate-100'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-surface-3 text-cream'
+                  : 'text-muted hover:text-cream'
               }`}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -202,19 +235,19 @@ export function MenuPage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-32 text-xs text-slate-500">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin text-emerald-500" />
+        <div className="flex items-center justify-center py-32 text-xs text-muted">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin text-forest-soft" />
           Loading menu...
         </div>
       ) : error ? (
-        <div className="rounded-lg border border-rose-800/50 bg-rose-950/30 p-4 text-sm text-rose-300">
+        <div className="rounded-lg border border-brick/40 bg-brick/10 p-4 text-sm text-brick-soft">
           Failed to load menu: {error}
         </div>
       ) : dishes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-slate-500">
-          <ChefHat className="mb-3 h-10 w-10 text-slate-600" />
-          <p className="text-sm font-medium text-slate-400">No dishes yet</p>
-          <p className="mt-1 text-xs text-slate-600">
+        <div className="flex flex-col items-center justify-center py-32 text-muted">
+          <ChefHat className="mb-3 h-10 w-10 text-faint" />
+          <p className="text-sm font-medium text-cream">No dishes yet</p>
+          <p className="mt-1 text-xs text-faint">
             Add SALE-type dishes in the nomenclature to see them here.
           </p>
         </div>

@@ -50,77 +50,78 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
   const foodCostPct = liveCost > 0 && price > 0 ? (liveCost / price) * 100 : null
   const margin = liveCost > 0 && price > 0 ? price - liveCost : null
 
+  const labelCls =
+    'text-[10px] uppercase tracking-[0.12em] text-muted'
+  const labelStyle = { fontFamily: 'var(--font-display-sc)', fontWeight: 700 } as const
+  const valueCls = 'text-[22px] text-cream tabular-nums'
+  const valueStyle = { fontFamily: 'var(--font-display)', fontWeight: 500 } as const
+  const foodCostToneCls =
+    foodCostPct === null
+      ? 'text-faint'
+      : foodCostPct < 30
+        ? 'text-fc-good'
+        : foodCostPct <= 45
+          ? 'text-fc-warn'
+          : 'text-fc-bad'
+  const marginToneCls =
+    margin === null ? 'text-faint' : margin > 0 ? 'text-forest-soft' : 'text-brick-soft'
+
   return (
-    <div className="border-t border-emerald-900/30 bg-slate-950/60 p-5">
+    <div className="border-t border-surface-3 bg-surface-1 p-5">
+      {/* Dish name */}
+      <h2
+        className="mb-3 italic text-2xl text-cream"
+        style={{ fontFamily: 'var(--font-display)', fontWeight: 500 }}
+      >
+        {dish.name}
+      </h2>
+
       {/* Hero strip */}
-      <div className="mb-4 flex flex-wrap items-center gap-4 rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Price</div>
-          <div className="text-base font-bold text-slate-100 tabular-nums">{formatThb(price)}</div>
+      <div className="mb-4 grid auto-cols-max grid-flow-col items-stretch divide-x divide-surface-3 rounded-lg border border-surface-3 bg-surface-2">
+        <div className="px-4 py-3">
+          <div className={labelCls} style={labelStyle}>Price</div>
+          <div className={valueCls} style={valueStyle}>{formatThb(price)}</div>
         </div>
-        <div className="h-8 w-px bg-slate-800" />
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Cost (live BOM)</div>
-          <div className="text-base font-bold text-slate-100 tabular-nums">{formatThb(liveCost)}</div>
+        <div className="px-4 py-3">
+          <div className={labelCls} style={labelStyle}>Cost (live BOM)</div>
+          <div className={valueCls} style={valueStyle}>{formatThb(liveCost)}</div>
         </div>
-        <div className="h-8 w-px bg-slate-800" />
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Food cost</div>
-          <div
-            className={`text-base font-bold tabular-nums ${
-              foodCostPct === null
-                ? 'text-slate-500'
-                : foodCostPct < 30
-                  ? 'text-emerald-400'
-                  : foodCostPct <= 45
-                    ? 'text-amber-400'
-                    : 'text-rose-400'
-            }`}
-          >
+        <div className="px-4 py-3">
+          <div className={labelCls} style={labelStyle}>Food cost</div>
+          <div className={`${valueCls} ${foodCostToneCls}`} style={valueStyle}>
             {foodCostPct !== null ? `${foodCostPct.toFixed(1)}%` : '—'}
           </div>
         </div>
-        <div className="h-8 w-px bg-slate-800" />
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Margin</div>
-          <div
-            className={`text-base font-bold tabular-nums ${
-              margin === null ? 'text-slate-500' : margin > 0 ? 'text-emerald-400' : 'text-rose-400'
-            }`}
-          >
+        <div className="px-4 py-3">
+          <div className={labelCls} style={labelStyle}>Margin</div>
+          <div className={`${valueCls} ${marginToneCls}`} style={valueStyle}>
             {margin !== null ? formatThb(margin) : '—'}
           </div>
         </div>
         {dish.portion_size != null && dish.portion_unit != null && (
           <>
-            <div className="h-8 w-px bg-slate-800" />
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500">Portion</div>
-              <div className="text-base font-bold text-slate-100 tabular-nums">
-                {dish.portion_size}{dish.portion_unit}
+            <div className="px-4 py-3">
+              <div className={labelCls} style={labelStyle}>Portion</div>
+              <div className={valueCls} style={valueStyle}>
+                {dish.portion_size}
+                <span className="ml-0.5 font-mono text-base text-muted">{dish.portion_unit}</span>
               </div>
             </div>
             {dish.portion_unit !== 'pcs' && price > 0 && (
-              <>
-                <div className="h-8 w-px bg-slate-800" />
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">&#x0E3F;/100{dish.portion_unit}</div>
-                  <div className="text-base font-bold text-slate-100 tabular-nums">
-                    {formatThb(Math.round((price / dish.portion_size) * 100))}
-                  </div>
+              <div className="px-4 py-3">
+                <div className={labelCls} style={labelStyle}>&#x0E3F;/100{dish.portion_unit}</div>
+                <div className={valueCls} style={valueStyle}>
+                  {formatThb(Math.round((price / dish.portion_size) * 100))}
                 </div>
-              </>
+              </div>
             )}
           </>
         )}
         {dish.product_code && (
-          <>
-            <div className="h-8 w-px bg-slate-800" />
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500">Code</div>
-              <div className="text-xs font-mono text-slate-400">{dish.product_code}</div>
-            </div>
-          </>
+          <div className="px-4 py-3">
+            <div className={labelCls} style={labelStyle}>Code</div>
+            <div className="font-mono text-xs text-muted">{dish.product_code}</div>
+          </div>
         )}
       </div>
 
@@ -151,7 +152,7 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
         isOpen={openSections.has('assembly')}
         onToggle={() => toggle('assembly')}
       >
-        <div className="flex max-h-96 flex-col overflow-hidden rounded-lg border border-slate-800">
+        <div className="flex max-h-96 flex-col overflow-hidden rounded-lg border border-surface-3">
           <ProcessTab nomenclatureId={dish.id} />
         </div>
       </Section>
@@ -165,7 +166,7 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
         onToggle={() => toggle('production')}
       >
         {detail.pfChildren.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/30 px-4 py-6 text-center text-xs text-slate-500">
+          <div className="rounded-lg border border-dashed border-surface-3 bg-surface-2/40 px-4 py-6 text-center text-xs text-muted">
             No PF ingredients — this dish is assembled directly from RAW.
           </div>
         ) : (
@@ -173,29 +174,29 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
             {detail.pfChildren.map((pf) => {
               const isOpen = expandedPfIds.has(pf.id)
               return (
-                <div key={pf.id} className="rounded-lg border border-slate-800 bg-slate-900/40">
+                <div key={pf.id} className="rounded-lg border border-surface-3 bg-surface-2/60">
                   <button
                     onClick={() => togglePf(pf.id)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left transition hover:bg-slate-800/40"
+                    className="flex w-full items-center justify-between px-3 py-2 text-left transition hover:bg-surface-3/60"
                   >
                     <div className="flex items-center gap-2">
                       {isOpen ? (
-                        <ChevronDown className="h-3 w-3 text-slate-400" />
+                        <ChevronDown className="h-3 w-3 text-muted" />
                       ) : (
-                        <ChevronRight className="h-3 w-3 text-slate-400" />
+                        <ChevronRight className="h-3 w-3 text-muted" />
                       )}
-                      <span className="inline-flex rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-300">
+                      <span className="inline-flex rounded bg-amber-watch/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-watch">
                         PF
                       </span>
-                      <span className="text-xs font-medium text-slate-100">{pf.name}</span>
-                      <span className="text-[10px] text-slate-500">{pf.product_code}</span>
+                      <span className="text-xs font-medium text-cream">{pf.name}</span>
+                      <span className="font-mono text-[10px] text-faint">{pf.product_code}</span>
                     </div>
-                    <span className="text-[10px] text-slate-500">
+                    <span className="text-[10px] text-muted">
                       {isOpen ? 'Hide process' : 'Show process'}
                     </span>
                   </button>
                   {isOpen && (
-                    <div className="flex max-h-80 flex-col overflow-hidden border-t border-slate-800">
+                    <div className="flex max-h-80 flex-col overflow-hidden border-t border-surface-3">
                       <ProcessTab nomenclatureId={pf.id} />
                     </div>
                   )}
@@ -214,11 +215,11 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
         onToggle={() => toggle('nutrition')}
       >
         {dish.calories == null && dish.protein == null && dish.carbs == null && dish.fat == null ? (
-          <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/30 px-4 py-6 text-center text-xs text-slate-500">
+          <div className="rounded-lg border border-dashed border-surface-3 bg-surface-2/40 px-4 py-6 text-center text-xs text-muted">
             No nutrition data. Edit the dish in Nomenclature or ask AI Chef to compute from BOM.
           </div>
         ) : (
-          <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3">
+          <div className="rounded-lg border border-surface-3 bg-surface-2/60 px-4 py-3">
             <NutritionBadges
               calories={dish.calories}
               protein={dish.protein}
@@ -237,7 +238,7 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
         isOpen={openSections.has('photos')}
         onToggle={() => toggle('photos')}
       >
-        <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3">
+        <div className="rounded-lg border border-surface-3 bg-surface-2/60 px-4 py-3">
           <ImageGallery
             images={gallery.images}
             isLoading={gallery.isLoading}
@@ -267,19 +268,22 @@ function Section({ title, icon, count, isOpen, onToggle, children }: SectionProp
     <div className="mb-3 last:mb-0">
       <button
         onClick={onToggle}
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-slate-800/40"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-surface-3/60"
       >
         {isOpen ? (
-          <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+          <ChevronDown className="h-3.5 w-3.5 text-muted" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
+          <ChevronRight className="h-3.5 w-3.5 text-muted" />
         )}
-        {icon && <span className="text-slate-400">{icon}</span>}
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+        {icon && <span className="text-muted">{icon}</span>}
+        <span
+          className="text-[11px] uppercase tracking-[0.12em] text-cream"
+          style={{ fontFamily: 'var(--font-display-sc)', fontWeight: 700 }}
+        >
           {title}
         </span>
         {count !== undefined && (
-          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+          <span className="rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted">
             {count}
           </span>
         )}

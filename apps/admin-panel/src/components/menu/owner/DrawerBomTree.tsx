@@ -25,7 +25,7 @@ function slotBadgeTone(slot: string | null): string {
     case 'dressing':
       return 'bg-[var(--color-royal-red)]/15 text-[color:var(--color-brick-soft)]'
     case 'protein':
-      return 'bg-sky-900/30 text-sky-300'
+      return 'bg-nutri-pro/25 text-nutri-pro'
     default:
       return ''
   }
@@ -54,7 +54,7 @@ function TreeRow({ node, isLast, prefix }: TreeRowProps) {
       >
         <span className="flex min-w-0 items-center gap-1 truncate">
           <span
-            className="shrink-0 font-mono text-[10px] text-slate-600"
+            className="shrink-0 font-mono text-[10px] text-faint"
             aria-hidden
           >
             {prefix}
@@ -107,13 +107,13 @@ export function DrawerBomTree({ root, isLoading, error }: DrawerBomTreeProps) {
       >
         BOM tree
       </h3>
-      {isLoading && <div className="text-xs text-slate-500">Loading recipe…</div>}
-      {error && <div className="text-xs text-rose-400">{error}</div>}
+      {isLoading && <div className="text-xs text-muted">Loading recipe…</div>}
+      {error && <div className="text-xs text-brick-soft">{error}</div>}
       {root && root.children.length === 0 && !isLoading && (
-        <div className="text-xs text-[color:var(--color-cream)]/40">No recipe defined.</div>
+        <div className="text-xs text-faint">No recipe defined.</div>
       )}
       {root && root.children.length > 0 && (
-        <div className="rounded-lg border border-slate-800/60 bg-[var(--color-surface-2)] px-3 py-2">
+        <div className="rounded-lg border border-surface-3 bg-surface-2 px-3 py-2">
           <TreeRow node={root} isLast prefix="" />
         </div>
       )}

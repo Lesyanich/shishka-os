@@ -98,7 +98,7 @@ export function CategorySection({
       {/* Sticky tab strip */}
       <nav
         aria-label="Menu categories"
-        className="sticky z-10 -mx-2 flex gap-1 overflow-x-auto border-b border-slate-800/70 bg-[var(--color-surface-1)]/90 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-[var(--color-surface-1)]/70"
+        className="sticky z-10 -mx-2 flex gap-5 overflow-x-auto border-b border-surface-3 bg-surface-1/90 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-surface-1/70"
         style={{ top: stickyTopPx }}
       >
         {visibleCategories.map((cat) => {
@@ -109,15 +109,15 @@ export function CategorySection({
               type="button"
               onClick={() => scrollTo(cat.id)}
               aria-current={isActive ? 'true' : undefined}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.14em] transition ${
+              className={`shrink-0 border-b-2 -mb-px px-1 py-1.5 text-base transition ${
                 isActive
-                  ? 'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-1 ring-inset ring-[var(--color-forest-soft)]/40'
-                  : 'text-[color:var(--color-cream)]/60 hover:bg-[var(--color-surface-3)] hover:text-[color:var(--color-cream)]/85'
+                  ? 'border-brick text-cream'
+                  : 'border-transparent text-muted hover:text-cream'
               }`}
-              style={{ fontFamily: 'var(--font-display-sc)' }}
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 500 }}
             >
               {cat.name}
-              <span className="ml-2 font-mono text-[10px] tabular-nums opacity-60">
+              <span className="ml-2 font-mono text-[10px] tabular-nums text-faint">
                 {byCategory.map.get(cat.id)?.length ?? 0}
               </span>
             </button>

@@ -61,15 +61,15 @@ export function DrawerTagEditor({
         <button
           type="button"
           onClick={() => setPicker((p) => !p)}
-          className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-[var(--color-surface-2)] px-2 py-0.5 text-[10px] font-medium text-[color:var(--color-cream)]/70 transition hover:border-slate-500 hover:text-[color:var(--color-cream)]"
+          className="inline-flex items-center gap-1 rounded-full border border-surface-3 bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted transition hover:border-cream/30 hover:text-cream"
         >
           <Plus className="h-3 w-3" />
           {picker ? 'Done' : 'Add'}
         </button>
       </div>
 
-      {isLoading && <div className="text-xs text-slate-500">Loading tags…</div>}
-      {error && <div className="text-xs text-rose-400">{error}</div>}
+      {isLoading && <div className="text-xs text-muted">Loading tags…</div>}
+      {error && <div className="text-xs text-brick-soft">{error}</div>}
 
       {/* Applied */}
       {tags.length > 0 ? (
@@ -77,7 +77,7 @@ export function DrawerTagEditor({
           {tags.map((t) => (
             <span
               key={t.id}
-              className="inline-flex items-center gap-1 rounded-full bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-slate-300"
+              className="inline-flex items-center gap-1 rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-muted"
               style={tagChipStyle(t)}
             >
               <span className="opacity-60 font-mono text-[9px]">{t.tagGroup}:</span>
@@ -103,25 +103,25 @@ export function DrawerTagEditor({
 
       {/* Picker */}
       {picker && (
-        <div className="mt-2 rounded-lg border border-slate-800 bg-[var(--color-surface-2)] p-2">
-          <div className="mb-2 flex items-center gap-1.5 rounded border border-slate-700 bg-[var(--color-surface-1)] px-2">
-            <Search className="h-3 w-3 text-slate-500" />
+        <div className="mt-2 rounded-lg border border-surface-3 bg-surface-2 p-2">
+          <div className="mb-2 flex items-center gap-1.5 rounded border border-surface-3 bg-surface-1 px-2">
+            <Search className="h-3 w-3 text-muted" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search tags…"
-              className="flex-1 bg-transparent py-1 text-xs text-[color:var(--color-cream)] placeholder:text-slate-500 focus:outline-none"
+              className="flex-1 bg-transparent py-1 text-xs text-cream placeholder:text-muted focus:outline-none"
             />
           </div>
           <div className="max-h-56 space-y-2 overflow-y-auto">
             {groupedFiltered.length === 0 && (
-              <div className="text-xs text-slate-500">No matches.</div>
+              <div className="text-xs text-muted">No matches.</div>
             )}
             {groupedFiltered.map(([group, items]) => (
               <div key={group}>
                 <div
-                  className="mb-1 text-[9px] uppercase tracking-wider text-[color:var(--color-cream)]/40"
-                  style={{ fontFamily: 'var(--font-display-sc)' }}
+                  className="mb-1 text-[9px] uppercase tracking-wider text-muted"
+                  style={{ fontFamily: 'var(--font-display-sc)', fontWeight: 700 }}
                 >
                   {group}
                 </div>
@@ -131,7 +131,7 @@ export function DrawerTagEditor({
                       key={t.id}
                       type="button"
                       onClick={() => void onAdd(t.id)}
-                      className="rounded-full bg-slate-700/60 px-2 py-0.5 text-[10px] text-slate-300 transition hover:bg-slate-600"
+                      className="rounded-full bg-surface-3/80 px-2 py-0.5 text-[10px] text-muted transition hover:bg-surface-3"
                       style={tagChipStyle(t)}
                     >
                       + {t.name}

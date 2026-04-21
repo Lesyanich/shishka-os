@@ -33,16 +33,16 @@ export function PriceLabel({
   const alignCls = align === 'right' ? 'items-end text-right' : 'items-start text-left'
   const wrapCls =
     tone === 'overlay'
-      ? 'rounded-lg bg-slate-950/80 px-2.5 py-1 backdrop-blur'
+      ? 'rounded-lg bg-surface-1/80 px-2.5 py-1 backdrop-blur'
       : ''
   return (
     <span className={`inline-flex flex-col ${alignCls} ${wrapCls}`}>
-      <span className="font-mono text-xs font-bold tabular-nums text-emerald-300">
+      <span className="font-mono text-xs font-bold tabular-nums text-cream">
         {BAHT}
         {price.toLocaleString()}
       </span>
       {per100 && (
-        <span className="font-mono text-[9px] font-medium tabular-nums text-slate-400">
+        <span className="font-mono text-[9px] font-medium tabular-nums text-muted">
           {per100}
         </span>
       )}

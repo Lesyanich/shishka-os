@@ -6,11 +6,11 @@ const NUTRITION_CONFIG: Record<
   NutrientKey,
   { label: string; bg: string; text: string }
 > = {
-  calories: { label: 'kcal',      bg: 'bg-amber-900/40',  text: 'text-amber-300'  },
-  protein:  { label: 'g protein', bg: 'bg-slate-800/60',  text: 'text-slate-200'  },
-  carbs:    { label: 'g carbs',   bg: 'bg-violet-900/40', text: 'text-violet-300' },
-  fat:      { label: 'g fat',     bg: 'bg-rose-900/40',   text: 'text-rose-300'   },
-  fiber:    { label: 'g fiber',   bg: 'bg-emerald-900/40', text: 'text-emerald-300' },
+  calories: { label: 'kcal',      bg: 'bg-nutri-cal/20',  text: 'text-nutri-cal'  },
+  protein:  { label: 'g protein', bg: 'bg-nutri-pro/20',  text: 'text-nutri-pro'  },
+  carbs:    { label: 'g carbs',   bg: 'bg-nutri-car/20',  text: 'text-nutri-car'  },
+  fat:      { label: 'g fat',     bg: 'bg-nutri-fat/20',  text: 'text-nutri-fat'  },
+  fiber:    { label: 'g fiber',   bg: 'bg-nutri-fib/20',  text: 'text-nutri-fib'  },
 }
 
 interface NutritionBadgeProps {

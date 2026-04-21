@@ -89,15 +89,15 @@ export function DetailDrawer({
         role="dialog"
         aria-label={`${item.name} detail`}
         aria-modal="false"
-        className="fixed right-0 top-0 z-50 flex h-full w-full max-w-[400px] flex-col border-l border-slate-800 bg-[var(--color-surface-1)] text-[color:var(--color-cream)] shadow-2xl"
+        className="fixed right-0 top-0 z-50 flex h-full w-full max-w-[400px] flex-col border-l border-surface-3 bg-surface-1 text-cream shadow-2xl"
         style={{
           animation: 'drawer-slide-in 240ms cubic-bezier(0.32, 0.72, 0, 1) both',
         }}
       >
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-800/80 px-5 py-3">
+        <header className="flex shrink-0 items-center justify-between border-b border-surface-3 px-5 py-3">
           <span
-            className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-cream)]/60"
-            style={{ fontFamily: 'var(--font-display-sc)' }}
+            className="text-[11px] uppercase tracking-[0.18em] text-muted"
+            style={{ fontFamily: 'var(--font-display-sc)', fontWeight: 700 }}
           >
             Detail
           </span>
@@ -106,7 +106,7 @@ export function DetailDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close detail drawer"
-            className="rounded-full p-1 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brick-soft)]/60"
+            className="rounded-full p-1 text-muted transition hover:bg-surface-3 hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-brick-soft/60"
           >
             <X className="h-4 w-4" />
           </button>

@@ -55,8 +55,8 @@ export function DrawerScorecard({ scorecard, isLoading, error }: DrawerScorecard
         )}
       </div>
 
-      {isLoading && <div className="text-xs text-slate-500">Scoring…</div>}
-      {error && <div className="text-xs text-rose-400">Score unavailable: {error}</div>}
+      {isLoading && <div className="text-xs text-muted">Scoring…</div>}
+      {error && <div className="text-xs text-brick-soft">Score unavailable: {error}</div>}
 
       {scorecard && (
         <>
@@ -95,7 +95,7 @@ export function DrawerScorecard({ scorecard, isLoading, error }: DrawerScorecard
                       {score}/2
                     </span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-surface-3">
                     <div
                       className={`h-full rounded-full transition-[width] duration-500 ${bar.tone}`}
                       style={{ width: bar.width }}

@@ -34,19 +34,22 @@ export function CategoryTabs({
   if (categories.length === 0) return null
 
   const baseCls =
-    'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition'
-  const activeCls = 'bg-emerald-500/15 text-emerald-300'
-  const idleCls = 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-  const countCls = 'ml-1.5 font-mono text-[10px] tabular-nums opacity-60'
+    'shrink-0 px-3 py-1.5 text-base font-medium transition border-b-2 -mb-px'
+  const activeCls = 'border-brick text-cream'
+  const idleCls = 'border-transparent text-muted hover:text-cream'
+  const countCls = 'ml-1.5 font-mono text-[10px] tabular-nums text-faint'
 
   const allCount = readCount(counts, null)
 
+  const fontStyle = { fontFamily: 'var(--font-display)', fontWeight: 500 }
+
   return (
-    <div className="flex gap-1 overflow-x-auto pb-1">
+    <div className="flex gap-5 overflow-x-auto border-b border-surface-3">
       <button
         type="button"
         onClick={() => onSelect(null)}
         className={`${baseCls} ${selectedId === null ? activeCls : idleCls}`}
+        style={fontStyle}
       >
         {allLabel}
         {allCount != null && <span className={countCls}>{allCount}</span>}
@@ -59,6 +62,7 @@ export function CategoryTabs({
             type="button"
             onClick={() => onSelect(cat.id)}
             className={`${baseCls} ${selectedId === cat.id ? activeCls : idleCls}`}
+            style={fontStyle}
           >
             {cat.name}
             {n != null && <span className={countCls}>{n}</span>}

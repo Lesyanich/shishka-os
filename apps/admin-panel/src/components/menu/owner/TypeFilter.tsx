@@ -25,22 +25,22 @@ const TONE: Record<
 > = {
   all: {
     active: 'bg-[var(--color-cream)]/10 text-[color:var(--color-cream)] ring-1 ring-inset ring-[var(--color-cream)]/30',
-    idle: 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100',
+    idle: 'text-muted hover:bg-surface-3/60 hover:text-cream',
     accent: 'bg-[var(--color-cream)]/70',
   },
   SALE: {
     active: 'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-1 ring-inset ring-[var(--color-forest-soft)]/50',
-    idle: 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100',
+    idle: 'text-muted hover:bg-surface-3/60 hover:text-cream',
     accent: 'bg-[var(--color-forest-soft)]',
   },
   PF: {
     active: 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-1 ring-inset ring-[var(--color-amber-watch)]/50',
-    idle: 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100',
+    idle: 'text-muted hover:bg-surface-3/60 hover:text-cream',
     accent: 'bg-[var(--color-amber-watch)]',
   },
   MOD: {
     active: 'bg-[var(--color-royal-red)]/20 text-[color:var(--color-brick-soft)] ring-1 ring-inset ring-[var(--color-brick-soft)]/50',
-    idle: 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100',
+    idle: 'text-muted hover:bg-surface-3/60 hover:text-cream',
     accent: 'bg-[var(--color-brick-soft)]',
   },
 }
@@ -50,7 +50,7 @@ export function TypeFilter({ value, onChange, counts }: TypeFilterProps) {
     <div
       role="tablist"
       aria-label="Product type filter"
-      className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-[var(--color-surface-1)] p-1"
+      className="inline-flex items-center gap-1 rounded-full border border-surface-3 bg-surface-1 p-1"
     >
       {ORDER.map((key) => {
         const isActive = value === key

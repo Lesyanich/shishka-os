@@ -17,7 +17,7 @@ export function HeroHeader({
 }: HeroHeaderProps) {
   return (
     <header
-      className="relative overflow-hidden rounded-2xl border border-slate-800 bg-[var(--color-surface-2)]"
+      className="relative overflow-hidden rounded-2xl border border-surface-3 bg-surface-2"
       role="banner"
     >
       {heroImageUrl ? (

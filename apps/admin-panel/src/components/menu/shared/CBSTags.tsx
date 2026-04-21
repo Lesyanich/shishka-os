@@ -18,7 +18,7 @@ export function CBSTags({ tags, max, size = 'sm' }: CBSTagsProps) {
       {shown.map((tag) => (
         <span
           key={tag.slug}
-          className={`rounded-full font-medium ${sizeCls} bg-slate-700 text-slate-300`}
+          className={`rounded-full font-medium ${sizeCls} bg-surface-3 text-muted`}
           style={
             tag.color
               ? { backgroundColor: `${tag.color}20`, color: tag.color }
@@ -30,7 +30,7 @@ export function CBSTags({ tags, max, size = 'sm' }: CBSTagsProps) {
       ))}
       {overflow > 0 && (
         <span
-          className={`rounded-full font-medium text-slate-400 ${sizeCls} bg-slate-800`}
+          className={`rounded-full font-medium text-muted ${sizeCls} bg-surface-2`}
         >
           +{overflow}
         </span>

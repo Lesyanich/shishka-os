@@ -26,9 +26,9 @@ function formatPortion(size: number | null, unit: PortionUnit | null): string | 
 }
 
 function scoreTone(score: number): string {
-  if (score >= 85) return 'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-[var(--color-forest-soft)]/50'
-  if (score >= 70) return 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-[var(--color-amber-watch)]/50'
-  return 'bg-[var(--color-royal-red)]/20 text-[color:var(--color-brick-soft)] ring-[var(--color-brick-soft)]/50'
+  if (score >= 85) return 'text-forest-soft'
+  if (score >= 70) return 'text-amber-watch'
+  return 'text-brick-soft'
 }
 
 export function DishCard({
@@ -53,12 +53,12 @@ export function DishCard({
   return (
     <Wrapper
       {...wrapperProps}
-      className={`group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-[var(--color-surface-2)] text-left transition hover:border-slate-700 hover:bg-[var(--color-surface-3)] ${interactive ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60' : ''}`}
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-surface-3 bg-surface-2 text-left transition hover:border-surface-3/80 hover:bg-surface-3 ${interactive ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brick-soft/60' : ''}`}
     >
       <DishPhotoSlot imageUrl={dish.imageUrl} dishName={dish.name} aspect="photo" />
 
       {dish.isFeatured && (
-        <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+        <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-amber-watch/25 px-2 py-0.5 text-[10px] font-medium text-amber-watch">
           <Star className="h-3 w-3" />
           Featured
         </span>
@@ -72,10 +72,10 @@ export function DishCard({
         />
         {qualityScore != null && (
           <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums ring-1 ring-inset ${scoreTone(qualityScore)}`}
+            className={`inline-flex items-center font-mono text-[11px] font-semibold tabular-nums ${scoreTone(qualityScore)}`}
             title={`Quality score ${qualityScore}/100`}
           >
-            {Math.round(qualityScore)}
+            {(qualityScore / 10).toFixed(1)} / 10
           </span>
         )}
       </div>
@@ -83,21 +83,21 @@ export function DishCard({
       <div className="flex flex-1 flex-col gap-2 p-3">
         {categoryLabel && (
           <span
-            className="text-[10px] uppercase tracking-[0.14em] text-[color:var(--color-cream)]/50"
-            style={{ fontFamily: 'var(--font-display-sc)' }}
+            className="text-[10px] uppercase tracking-[0.14em] text-brick-soft"
+            style={{ fontFamily: 'var(--font-display-sc)', fontWeight: 700 }}
           >
-            {categoryLabel}
+            &mdash; {categoryLabel} &mdash;
           </span>
         )}
         <div className="flex items-baseline justify-between gap-2">
           <h3
-            className="leading-tight text-[color:var(--color-cream)]"
-            style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 500 }}
+            className="leading-tight text-cream"
+            style={{ fontFamily: 'var(--font-display)', fontSize: '21px', fontWeight: 500 }}
           >
             {dish.name}
           </h3>
           {portion && (
-            <span className="shrink-0 font-mono text-[10px] font-medium tabular-nums text-slate-400">
+            <span className="shrink-0 font-mono text-[10px] font-medium tabular-nums text-muted">
               {portion}
             </span>
           )}
@@ -105,7 +105,7 @@ export function DishCard({
 
         {description && (
           <p
-            className="text-xs leading-snug text-[color:var(--color-cream)]/70 line-clamp-3"
+            className="text-[12.5px] leading-relaxed text-muted line-clamp-3"
             style={{ fontFamily: 'var(--font-sans)' }}
           >
             {description}
