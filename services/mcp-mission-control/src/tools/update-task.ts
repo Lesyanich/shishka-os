@@ -12,6 +12,7 @@ interface UpdateTaskArgs {
   context_files?: string[];
   parent_task_id?: string | null;
   related_ids?: Record<string, string | number | boolean>;
+  assigned_to?: string;
 }
 
 export async function updateTask(args: UpdateTaskArgs) {
@@ -65,6 +66,7 @@ export async function updateTask(args: UpdateTaskArgs) {
   if (args.tags !== undefined) update.tags = args.tags;
   if (args.context_files !== undefined) update.context_files = args.context_files;
   if (args.parent_task_id !== undefined) update.parent_task_id = args.parent_task_id;
+  if (args.assigned_to !== undefined) update.assigned_to = args.assigned_to;
 
   // related_ids: merge with existing (JSONB bag semantics — add/replace keys,
   // do NOT wipe unrelated keys). Pass {} to explicitly clear.
