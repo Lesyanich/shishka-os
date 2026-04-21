@@ -8,6 +8,15 @@ import { DishPhotoSlot } from './DishPhotoSlot'
 interface DishCardProps {
   dish: DishSummary
   onClick?: (id: string) => void
+  /** 'full' admin, 'reduced' customer (cal + dominant macro). Default 'full'. */
+  nutritionMode?: 'full' | 'reduced'
+  /** Small text above the name — typically category. Customer variant. */
+  categoryLabel?: string
+  /** Optional quality score (0–100); renders as a compact pill next to the
+   * price. Wired when the Dish Quality Scorecard sub-task lands. */
+  qualityScore?: number | null
+  /** Description line shown under the name (customer variant). */
+  description?: string | null
 }
 
 function formatPortion(size: number | null, unit: PortionUnit | null): string | null {
@@ -16,7 +25,20 @@ function formatPortion(size: number | null, unit: PortionUnit | null): string | 
   return `${size}${unit}`
 }
 
-export function DishCard({ dish, onClick }: DishCardProps) {
+function scoreTone(score: number): string {
+  if (score >= 85) return 'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-[var(--color-forest-soft)]/50'
+  if (score >= 70) return 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-[var(--color-amber-watch)]/50'
+  return 'bg-[var(--color-royal-red)]/20 text-[color:var(--color-brick-soft)] ring-[var(--color-brick-soft)]/50'
+}
+
+export function DishCard({
+  dish,
+  onClick,
+  nutritionMode = 'full',
+  categoryLabel,
+  qualityScore,
+  description,
+}: DishCardProps) {
   const portion = formatPortion(dish.portionSize, dish.portionUnit)
   const interactive = onClick != null
 
@@ -41,20 +63,36 @@ export function DishCard({ dish, onClick }: DishCardProps) {
           Featured
         </span>
       )}
-      <div className="pointer-events-none absolute right-2 top-2">
+      <div className="pointer-events-none absolute right-2 top-2 flex items-end gap-2">
         <PriceLabel
           price={dish.price}
           portionSize={dish.portionSize}
           portionUnit={dish.portionUnit}
           tone="overlay"
         />
+        {qualityScore != null && (
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums ring-1 ring-inset ${scoreTone(qualityScore)}`}
+            title={`Quality score ${qualityScore}/100`}
+          >
+            {Math.round(qualityScore)}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-3">
+        {categoryLabel && (
+          <span
+            className="text-[10px] uppercase tracking-[0.14em] text-[color:var(--color-cream)]/50"
+            style={{ fontFamily: 'var(--font-display-sc)' }}
+          >
+            {categoryLabel}
+          </span>
+        )}
         <div className="flex items-baseline justify-between gap-2">
           <h3
             className="leading-tight text-[color:var(--color-cream)]"
-            style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 600 }}
+            style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 500 }}
           >
             {dish.name}
           </h3>
@@ -65,7 +103,16 @@ export function DishCard({ dish, onClick }: DishCardProps) {
           )}
         </div>
 
-        <NutritionBadges nutrition={dish.nutrition} />
+        {description && (
+          <p
+            className="text-xs leading-snug text-[color:var(--color-cream)]/70 line-clamp-3"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          >
+            {description}
+          </p>
+        )}
+
+        <NutritionBadges nutrition={dish.nutrition} mode={nutritionMode} />
 
         {dish.tags.length > 0 && (
           <div className="mt-auto pt-1">

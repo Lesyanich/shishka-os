@@ -31,16 +31,38 @@ export function NutritionBadge({ type, value }: NutritionBadgeProps) {
 
 interface NutritionBadgesProps {
   nutrition: NutritionSummary
+  /** 'full' (default) — all non-zero macros + calories.
+   * 'reduced' — calories + dominant macro only (customer-site variant). */
+  mode?: 'full' | 'reduced'
 }
 
-export function NutritionBadges({ nutrition }: NutritionBadgesProps) {
+function dominantMacro(
+  nutrition: NutritionSummary,
+): { type: NutrientKey; value: number } | null {
+  const candidates: { type: NutrientKey; value: number }[] = []
+  const { protein, carbs, fat } = nutrition
+  if (protein != null && protein > 0) candidates.push({ type: 'protein', value: protein })
+  if (carbs != null && carbs > 0)     candidates.push({ type: 'carbs',   value: carbs   })
+  if (fat != null && fat > 0)         candidates.push({ type: 'fat',     value: fat     })
+  if (candidates.length === 0) return null
+  return candidates.reduce((best, cur) => (cur.value > best.value ? cur : best))
+}
+
+export function NutritionBadges({ nutrition, mode = 'full' }: NutritionBadgesProps) {
   const items: { type: NutrientKey; value: number }[] = []
   const { calories, protein, carbs, fat, fiber } = nutrition
-  if (calories != null && calories > 0) items.push({ type: 'calories', value: calories })
-  if (protein != null && protein > 0)   items.push({ type: 'protein',  value: protein  })
-  if (carbs != null && carbs > 0)       items.push({ type: 'carbs',    value: carbs    })
-  if (fat != null && fat > 0)           items.push({ type: 'fat',      value: fat      })
-  if (fiber != null && fiber > 0)       items.push({ type: 'fiber',    value: fiber    })
+
+  if (mode === 'reduced') {
+    if (calories != null && calories > 0) items.push({ type: 'calories', value: calories })
+    const dom = dominantMacro(nutrition)
+    if (dom) items.push(dom)
+  } else {
+    if (calories != null && calories > 0) items.push({ type: 'calories', value: calories })
+    if (protein != null && protein > 0)   items.push({ type: 'protein',  value: protein  })
+    if (carbs != null && carbs > 0)       items.push({ type: 'carbs',    value: carbs    })
+    if (fat != null && fat > 0)           items.push({ type: 'fat',      value: fat      })
+    if (fiber != null && fiber > 0)       items.push({ type: 'fiber',    value: fiber    })
+  }
 
   if (items.length === 0) return null
 

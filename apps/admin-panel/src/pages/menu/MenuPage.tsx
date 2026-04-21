@@ -238,6 +238,7 @@ export function MenuPage() {
       ) : (
         <CustomerPreview
           dishes={dishes}
+          categories={categories}
           selectedCategory={selectedCategory}
         />
       )}
