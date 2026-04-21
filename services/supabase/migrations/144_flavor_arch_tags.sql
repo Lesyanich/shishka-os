@@ -38,11 +38,10 @@ INSERT INTO tags (slug, name, name_th, tag_group, color, sort_order) VALUES
 ON CONFLICT (slug) DO NOTHING;
 
 -- ── Self-register in migration_log ──
-INSERT INTO public.migration_log (filename, applied_by, reviewed_by, description)
+INSERT INTO public.migration_log (filename, applied_by, notes)
 VALUES (
   '144_flavor_arch_tags.sql',
   'claude-code',
-  'lesia',
   'Flavor Architecture Level 1: new tag_group=texture + 6 role slugs (crunchy/crispy/silky/creamy/chewy/juicy) for dish-level texture audit.'
 ) ON CONFLICT (filename) DO NOTHING;
 

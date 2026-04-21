@@ -33,11 +33,10 @@ CREATE INDEX IF NOT EXISTS idx_bom_structures_slot
   WHERE slot IS NOT NULL;
 
 -- ── Self-register in migration_log ──
-INSERT INTO public.migration_log (filename, applied_by, reviewed_by, description)
+INSERT INTO public.migration_log (filename, applied_by, notes)
 VALUES (
   '145_bom_composition_slots.sql',
   'claude-code',
-  'lesia',
   'bom_structures.slot column (nullable, CHECK base/protein/finish/accent/dressing) for per-BOM-row composition role. Enables Detail Drawer scorecard + Lego Modularity audit.'
 ) ON CONFLICT (filename) DO NOTHING;
 
