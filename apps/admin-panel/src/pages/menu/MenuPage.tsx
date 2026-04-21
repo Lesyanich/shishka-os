@@ -8,6 +8,7 @@ import { CustomerPreview } from './components/CustomerPreview'
 import { NewDishModal } from './components/NewDishModal'
 import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
 import { TypeFilter, type TypeFilterValue } from '../../components/menu/owner/TypeFilter'
+import { DetailDrawer } from '../../components/menu/owner/DetailDrawer'
 import { CategoryTabs } from '../../components/menu/shared'
 
 type ViewMode = 'owner' | 'customer'
@@ -33,6 +34,7 @@ export function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [chefOpen, setChefOpen] = useState(false)
   const [newDishOpen, setNewDishOpen] = useState(false)
+  const [drawerItemId, setDrawerItemId] = useState<string | null>(null)
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
 
   // Items scoped to current type filter (used for category counts + OwnerTable).
@@ -227,6 +229,7 @@ export function MenuPage() {
           onUpdate={inlineUpdate.commit}
           isFailed={inlineUpdate.isFailed}
           errorFor={inlineUpdate.errorFor}
+          onOpenDrawer={setDrawerItemId}
           autoExpandId={justCreatedId}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
@@ -252,6 +255,16 @@ export function MenuPage() {
 
       {/* AI Chef slide-out panel */}
       <ChefChatPanel open={chefOpen} onClose={() => setChefOpen(false)} />
+
+      {/* Detail drawer — slide-in right panel */}
+      <DetailDrawer
+        item={items.find((i) => i.id === drawerItemId) ?? null}
+        onClose={() => setDrawerItemId(null)}
+        onToggleAvailable={async (id, next) => {
+          await inlineUpdate.commit(id, { is_available: next })
+        }}
+        returnFocusToId={drawerItemId}
+      />
     </div>
   )
 }
