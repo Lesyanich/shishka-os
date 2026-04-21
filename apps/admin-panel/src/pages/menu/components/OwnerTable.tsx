@@ -4,6 +4,7 @@ import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useM
 import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
 import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 import { useExpandedRows } from '../../../hooks/useExpandedRows'
+import { InlineEditCell } from '../../../components/menu/owner/InlineEditCell'
 import { DishExpandedCard } from './DishExpandedCard'
 
 interface OwnerTableProps {
@@ -14,6 +15,10 @@ interface OwnerTableProps {
   childrenByParent: Map<string, MenuBomChild[]>
   dualTypeIds: Set<string>
   onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'>>) => Promise<{ ok: boolean; error?: string }>
+  /** Parent-provided: true when a recent inline commit failed for this id. */
+  isFailed?: (id: string) => boolean
+  /** Parent-provided: last error message (used as row-level tooltip). */
+  errorFor?: (id: string) => string | undefined
   /** Imperative trigger: when this id changes, auto-expand that row and scroll to it. */
   autoExpandId?: string | null
 }
@@ -86,12 +91,6 @@ function pricePer100(price: number | null, portionSize: number | null, portionUn
   return (price / portionSize) * 100
 }
 
-interface EditState {
-  id: string
-  name: string
-  price: string
-}
-
 interface PortionEditState {
   id: string
   size: string
@@ -110,6 +109,8 @@ export function OwnerTable({
   childrenByParent,
   dualTypeIds,
   onUpdate,
+  isFailed,
+  errorFor,
   autoExpandId,
 }: OwnerTableProps) {
   const filtered = selectedCategory
@@ -122,7 +123,6 @@ export function OwnerTable({
       state.map((d) => (d.id === update.id ? { ...d, ...update.patch } : d)),
   )
 
-  const [editing, setEditing] = useState<EditState | null>(null)
   const [portionEditing, setPortionEditing] = useState<PortionEditState | null>(null)
   // Tech-card expand (single row) — kept for backward compat until the
   // Detail Drawer sub-task replaces it.
@@ -148,53 +148,30 @@ export function OwnerTable({
     setExpandedId((prev) => (prev === dishId ? null : dishId))
   }, [])
 
-  const startEdit = useCallback((dish: MenuDish) => {
-    setEditing({
-      id: dish.id,
-      name: dish.name,
-      price: dish.price?.toString() ?? '',
-    })
-  }, [])
-
-  const cancelEdit = useCallback(() => {
-    setEditing(null)
-  }, [])
-
-  const saveEdit = useCallback(async () => {
-    if (!editing) return
-    const patch: Partial<Pick<MenuDish, 'name' | 'price'>> = {}
-    const original = filtered.find((d) => d.id === editing.id)
-    if (!original) return
-
-    if (editing.name !== original.name) patch.name = editing.name
-    const newPrice = editing.price ? Number(editing.price) : null
-    if (newPrice !== original.price) patch.price = newPrice
-
-    if (Object.keys(patch).length === 0) {
-      setEditing(null)
-      return
-    }
-
-    setOptimistic({ id: editing.id, patch })
-    setEditing(null)
-    await onUpdate(editing.id, patch)
-  }, [editing, filtered, onUpdate, setOptimistic])
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') saveEdit()
-      if (e.key === 'Escape') cancelEdit()
+  /** Optimistic patch + remote update. Revert is automatic: on failure
+   * the upstream refetch in useMenuData rewrites `items`, which flushes
+   * the optimistic overlay. Row-level flash comes from `isFailed`. */
+  const commitPatch = useCallback(
+    async (
+      id: string,
+      patch: Partial<
+        Pick<
+          MenuDish,
+          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'
+        >
+      >,
+    ) => {
+      setOptimistic({ id, patch })
+      await onUpdate(id, patch)
     },
-    [saveEdit, cancelEdit],
+    [onUpdate, setOptimistic],
   )
 
   const toggleField = useCallback(
     async (dish: MenuDish, field: 'is_available' | 'is_featured') => {
-      const newVal = !dish[field]
-      setOptimistic({ id: dish.id, patch: { [field]: newVal } })
-      await onUpdate(dish.id, { [field]: newVal })
+      await commitPatch(dish.id, { [field]: !dish[field] })
     },
-    [onUpdate, setOptimistic],
+    [commitPatch],
   )
 
   const startPortionEdit = useCallback((dish: MenuDish) => {
@@ -335,7 +312,6 @@ export function OwnerTable({
             }
 
             const dish = item.dish
-            const isEditing = editing?.id === dish.id
             const cost = dish.cost_per_unit
             const price = dish.price ?? 0
             const hasCost = cost != null
@@ -346,14 +322,17 @@ export function OwnerTable({
             const bomChildren = childrenByParent.get(dish.id) ?? []
             const isDrilled = pfExpanded.isExpanded(dish.id)
             const isDual = dualTypeIds.has(dish.id)
+            const rowFailed = isFailed?.(dish.id) ?? false
+            const rowError = errorFor?.(dish.id)
 
             return (
               <Fragment key={dish.id}>
               <tr
                 data-dish-row={dish.id}
+                title={rowError}
                 className={`border-b border-slate-800/50 transition ${
                   isExpanded ? 'bg-slate-800/40' : 'hover:bg-slate-800/30'
-                }`}
+                } ${rowFailed ? 'animate-[inline-flash_1200ms_ease-out]' : ''}`}
               >
                 {/* Expand toggle (tech card) */}
                 <td className="px-2 py-2">
@@ -395,37 +374,25 @@ export function OwnerTable({
 
                 {/* Name */}
                 <td className="px-3 py-2">
-                  {isEditing ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        value={editing.name}
-                        onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                        onKeyDown={handleKeyDown}
-                        className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
-                        autoFocus
-                      />
-                      <button onClick={saveEdit} className="rounded bg-emerald-600 p-0.5 text-white hover:bg-emerald-500">
-                        <Check className="h-3 w-3" />
-                      </button>
-                      <button onClick={cancelEdit} className="rounded bg-slate-700 p-0.5 text-slate-300 hover:bg-slate-600">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="flex items-center">
-                      <button
-                        onClick={() => startEdit(dish)}
-                        className="text-left font-medium text-slate-100"
-                      >
-                        {dish.name}
-                      </button>
-                      {!hasNutrition(dish) && (
-                        <span className="ml-2 inline-flex rounded-full bg-slate-700 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
-                          No KBJU
-                        </span>
-                      )}
-                    </span>
-                  )}
+                  <span className="flex items-center gap-2">
+                    <InlineEditCell<string | null>
+                      value={dish.name}
+                      onCommit={(next) => {
+                        if (next != null && next !== dish.name) {
+                          void commitPatch(dish.id, { name: next })
+                        }
+                      }}
+                      variant="text"
+                      ariaLabel={`Edit name for ${dish.name}`}
+                      className="font-medium text-[color:var(--color-cream)]"
+                      isFailed={rowFailed}
+                    />
+                    {!hasNutrition(dish) && (
+                      <span className="inline-flex rounded-full bg-slate-700 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
+                        No KBJU
+                      </span>
+                    )}
+                  </span>
                 </td>
 
                 {/* Type badge */}
@@ -499,18 +466,22 @@ export function OwnerTable({
 
                 {/* Price */}
                 <td className="px-3 py-2 text-right">
-                  {isEditing ? (
-                    <input
-                      value={editing.price}
-                      onChange={(e) => setEditing({ ...editing, price: e.target.value })}
-                      onKeyDown={handleKeyDown}
-                      className="w-20 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-right text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
-                      type="number"
-                      min={0}
-                    />
-                  ) : (
-                    <span className="font-medium text-slate-100">{formatThb(dish.price)}</span>
-                  )}
+                  <InlineEditCell<number | null>
+                    value={dish.price}
+                    onCommit={(next) => {
+                      if (next !== dish.price) {
+                        void commitPatch(dish.id, { price: next })
+                      }
+                    }}
+                    variant="number"
+                    min={0}
+                    step={1}
+                    align="right"
+                    ariaLabel={`Edit price for ${dish.name}`}
+                    className="font-mono font-medium tabular-nums text-[color:var(--color-cream)]"
+                    format={(v) => (v == null ? '-' : formatThb(v))}
+                    isFailed={rowFailed}
+                  />
                 </td>
 
                 {/* ฿/100g */}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Eye, Table2, LayoutGrid, Loader2, ChefHat, Sparkles, Plus } from 'lucide-react'
 import { useMenuData } from '../../hooks/useMenuData'
+import { useInlineUpdate } from '../../hooks/useInlineUpdate'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
@@ -25,6 +26,7 @@ export function MenuPage() {
     updateItem,
     refetch,
   } = useMenuData()
+  const inlineUpdate = useInlineUpdate(updateItem)
   const [view, setView] = useState<ViewMode>('owner')
   const [ownerLayout, setOwnerLayout] = useState<OwnerLayout>('table')
   const [typeFilter, setTypeFilter] = useState<TypeFilterValue>('SALE')
@@ -222,7 +224,9 @@ export function MenuPage() {
           subcategories={subcategories}
           childrenByParent={childrenByParent}
           dualTypeIds={dualTypeIds}
-          onUpdate={updateItem}
+          onUpdate={inlineUpdate.commit}
+          isFailed={inlineUpdate.isFailed}
+          errorFor={inlineUpdate.errorFor}
           autoExpandId={justCreatedId}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
