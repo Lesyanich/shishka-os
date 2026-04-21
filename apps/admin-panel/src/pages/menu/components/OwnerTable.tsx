@@ -1,15 +1,71 @@
 import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
-import { Check, X, Star, StarOff, ChevronDown, ChevronRight } from 'lucide-react'
+import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch } from 'lucide-react'
 import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useMenuDishes'
+import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
+import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
+import { useExpandedRows } from '../../../hooks/useExpandedRows'
+import { useRowKeyboardNav } from '../../../hooks/useRowKeyboardNav'
+import { InlineEditCell } from '../../../components/menu/owner/InlineEditCell'
 import { DishExpandedCard } from './DishExpandedCard'
 
 interface OwnerTableProps {
-  dishes: MenuDish[]
+  items: MenuItem[]
+  typeFilter: TypeFilterValue
   selectedCategory: string | null
   subcategories: Map<string, MenuSubcategory[]>
+  childrenByParent: Map<string, MenuBomChild[]>
+  dualTypeIds: Set<string>
   onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'>>) => Promise<{ ok: boolean; error?: string }>
+  /** Parent-provided: true when a recent inline commit failed for this id. */
+  isFailed?: (id: string) => boolean
+  /** Parent-provided: last error message (used as row-level tooltip). */
+  errorFor?: (id: string) => string | undefined
+  /** 'o' — open detail drawer for focused row. Stub until drawer sub-task lands. */
+  onOpenDrawer?: (id: string) => void
   /** Imperative trigger: when this id changes, auto-expand that row and scroll to it. */
   autoExpandId?: string | null
+}
+
+const KIND_BADGE: Record<NomenclatureKind, { label: string; cls: string }> = {
+  SALE: {
+    label: 'SALE',
+    cls: 'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-1 ring-inset ring-[var(--color-forest-soft)]/40',
+  },
+  PF: {
+    label: 'PF',
+    cls: 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-1 ring-inset ring-[var(--color-amber-watch)]/40',
+  },
+  MOD: {
+    label: 'MOD',
+    cls: 'bg-[var(--color-royal-red)]/20 text-[color:var(--color-brick-soft)] ring-1 ring-inset ring-[var(--color-brick-soft)]/40',
+  },
+}
+
+function KindBadge({ kind, dual }: { kind: NomenclatureKind; dual: boolean }) {
+  if (dual) {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-cream)] ring-1 ring-inset ring-white/20"
+        style={{
+          fontFamily: 'var(--font-display-sc)',
+          backgroundImage:
+            'linear-gradient(90deg, var(--color-royal-green) 0%, var(--color-royal-green) 49%, var(--color-amber-watch) 51%, var(--color-amber-watch) 100%)',
+        }}
+        title="Dual-type: sold as SALE and used as PF ingredient"
+      >
+        PF·SALE
+      </span>
+    )
+  }
+  const { label, cls } = KIND_BADGE[kind]
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}
+      style={{ fontFamily: 'var(--font-display-sc)' }}
+    >
+      {label}
+    </span>
+  )
 }
 
 function foodCostColor(pct: number): string {
@@ -38,12 +94,6 @@ function pricePer100(price: number | null, portionSize: number | null, portionUn
   return (price / portionSize) * 100
 }
 
-interface EditState {
-  id: string
-  name: string
-  price: string
-}
-
 interface PortionEditState {
   id: string
   size: string
@@ -52,22 +102,37 @@ interface PortionEditState {
 
 type GroupItem =
   | { type: 'l2-header'; subcategory: MenuSubcategory; dishCount: number }
-  | { type: 'dish'; dish: MenuDish }
+  | { type: 'dish'; dish: MenuItem }
 
-export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, autoExpandId }: OwnerTableProps) {
+export function OwnerTable({
+  items,
+  typeFilter,
+  selectedCategory,
+  subcategories,
+  childrenByParent,
+  dualTypeIds,
+  onUpdate,
+  isFailed,
+  errorFor,
+  onOpenDrawer,
+  autoExpandId,
+}: OwnerTableProps) {
   const filtered = selectedCategory
-    ? dishes.filter((d) => d.category_id === selectedCategory)
-    : dishes
+    ? items.filter((d) => d.category_id === selectedCategory)
+    : items
 
   const [optimisticDishes, setOptimistic] = useOptimistic(
     filtered,
-    (state: MenuDish[], update: { id: string; patch: Partial<MenuDish> }) =>
+    (state: MenuItem[], update: { id: string; patch: Partial<MenuItem> }) =>
       state.map((d) => (d.id === update.id ? { ...d, ...update.patch } : d)),
   )
 
-  const [editing, setEditing] = useState<EditState | null>(null)
   const [portionEditing, setPortionEditing] = useState<PortionEditState | null>(null)
+  // Tech-card expand (single row) — kept for backward compat until the
+  // Detail Drawer sub-task replaces it.
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  // PF drill-down (multi-row). Independent from tech-card expand.
+  const pfExpanded = useExpandedRows()
 
   // Imperative auto-expand: when parent sets autoExpandId to a new value,
   // expand that row and scroll it into view. Fires once per id change.
@@ -76,7 +141,6 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
     if (autoExpandId && autoExpandId !== lastAutoExpandId.current) {
       lastAutoExpandId.current = autoExpandId
       setExpandedId(autoExpandId)
-      // Defer scroll to after the row renders
       setTimeout(() => {
         const el = document.querySelector<HTMLElement>(`[data-dish-row="${autoExpandId}"]`)
         el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -88,53 +152,30 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
     setExpandedId((prev) => (prev === dishId ? null : dishId))
   }, [])
 
-  const startEdit = useCallback((dish: MenuDish) => {
-    setEditing({
-      id: dish.id,
-      name: dish.name,
-      price: dish.price?.toString() ?? '',
-    })
-  }, [])
-
-  const cancelEdit = useCallback(() => {
-    setEditing(null)
-  }, [])
-
-  const saveEdit = useCallback(async () => {
-    if (!editing) return
-    const patch: Partial<Pick<MenuDish, 'name' | 'price'>> = {}
-    const original = filtered.find((d) => d.id === editing.id)
-    if (!original) return
-
-    if (editing.name !== original.name) patch.name = editing.name
-    const newPrice = editing.price ? Number(editing.price) : null
-    if (newPrice !== original.price) patch.price = newPrice
-
-    if (Object.keys(patch).length === 0) {
-      setEditing(null)
-      return
-    }
-
-    setOptimistic({ id: editing.id, patch })
-    setEditing(null)
-    await onUpdate(editing.id, patch)
-  }, [editing, filtered, onUpdate, setOptimistic])
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') saveEdit()
-      if (e.key === 'Escape') cancelEdit()
+  /** Optimistic patch + remote update. Revert is automatic: on failure
+   * the upstream refetch in useMenuData rewrites `items`, which flushes
+   * the optimistic overlay. Row-level flash comes from `isFailed`. */
+  const commitPatch = useCallback(
+    async (
+      id: string,
+      patch: Partial<
+        Pick<
+          MenuDish,
+          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'
+        >
+      >,
+    ) => {
+      setOptimistic({ id, patch })
+      await onUpdate(id, patch)
     },
-    [saveEdit, cancelEdit],
+    [onUpdate, setOptimistic],
   )
 
   const toggleField = useCallback(
     async (dish: MenuDish, field: 'is_available' | 'is_featured') => {
-      const newVal = !dish[field]
-      setOptimistic({ id: dish.id, patch: { [field]: newVal } })
-      await onUpdate(dish.id, { [field]: newVal })
+      await commitPatch(dish.id, { [field]: !dish[field] })
     },
-    [onUpdate, setOptimistic],
+    [commitPatch],
   )
 
   const startPortionEdit = useCallback((dish: MenuDish) => {
@@ -227,31 +268,99 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
     return groups
   }, [optimisticDishes, subcategories, selectedCategory])
 
+  // Ordered list of row ids (skip L2 headers — they're not navigable).
+  const orderedRowIds = useMemo(
+    () => groupedDishes.filter((g) => g.type === 'dish').map((g) => g.dish.id),
+    [groupedDishes],
+  )
+
+  const kbd = useRowKeyboardNav({
+    ids: orderedRowIds,
+    // Enter: toggle tech-card expand. For SALE with PF children, also toggle
+    // drill-down so the keyboard-first flow exposes the tree in one keystroke.
+    onEnter: (id) => {
+      toggleExpand(id)
+      const hasKids = (childrenByParent.get(id) ?? []).length > 0
+      const item = items.find((i) => i.id === id)
+      if (hasKids && item?.kind === 'SALE') pfExpanded.toggle(id)
+    },
+    onOpen: (id) => onOpenDrawer?.(id),
+    // 'e' → synthesize a click on the focused row's name button (static
+    // InlineEditCell display), which switches it into edit mode and
+    // auto-focuses the input. Fallback: first editable cell.
+    onEdit: (id) => {
+      const row = containerElementRef.current?.querySelector<HTMLElement>(
+        `[data-dish-row="${id}"]`,
+      )
+      if (!row) return
+      const target =
+        row.querySelector<HTMLButtonElement>('[data-inline-cell="name"] button') ??
+        row.querySelector<HTMLButtonElement>('[data-inline-cell] button')
+      target?.click()
+    },
+    onEscape: () => {
+      // When a drawer or inline-edit is open, they cancel first (their own
+      // onKeyDown handles Escape). This fires only when nothing else claims
+      // it — we just clear the focus ring.
+    },
+  })
+
+  // Keep a separate DOM ref so onEdit can scope queries to our table scroll
+  // container. The hook's own ref is used for focus + keydown attach.
+  const containerElementRef = useRef<HTMLDivElement | null>(null)
+
+  // Scroll focused row into view on change
+  useEffect(() => {
+    if (!kbd.focusedId) return
+    const el = containerElementRef.current?.querySelector<HTMLElement>(
+      `[data-dish-row="${kbd.focusedId}"]`,
+    )
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [kbd.focusedId])
+
   if (optimisticDishes.length === 0) {
+    const emptyCopy =
+      typeFilter === 'all'
+        ? 'No items in this category.'
+        : `No ${typeFilter} items in this category.`
     return (
       <div className="flex flex-col items-center justify-center py-20 text-sm text-slate-500">
-        <span>No dishes in this category.</span>
+        <span>{emptyCopy}</span>
       </div>
     )
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-800">
-      <table className="w-full text-xs">
+    <div
+      {...kbd.containerProps}
+      ref={(el) => {
+        kbd.containerProps.ref.current = el
+        containerElementRef.current = el
+      }}
+      aria-label="Menu items"
+      aria-rowcount={orderedRowIds.length}
+      className="overflow-x-auto rounded-lg border border-slate-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-brick-soft)]/40"
+    >
+      <table className="w-full text-xs" role="presentation">
         <thead>
-          <tr className="border-b border-slate-800 bg-slate-900/50 text-left text-[10px] uppercase tracking-wider text-slate-500">
-            <th className="px-2 py-2.5" style={{ width: 28 }}></th>
-            <th className="px-3 py-2.5">Name</th>
-            <th className="px-3 py-2.5">Description</th>
-            <th className="px-3 py-2.5">Category</th>
-            <th className="px-3 py-2.5 text-right">Portion</th>
-            <th className="px-3 py-2.5 text-right">Price</th>
-            <th className="px-3 py-2.5 text-right">&#x0E3F;/100g</th>
-            <th className="px-3 py-2.5 text-right">Cost</th>
-            <th className="px-3 py-2.5 text-right">Food Cost %</th>
-            <th className="px-3 py-2.5 text-right">Margin</th>
-            <th className="px-3 py-2.5 text-center">Available</th>
-            <th className="px-3 py-2.5 text-center">Featured</th>
+          <tr
+            role="row"
+            className="border-b border-slate-800 bg-slate-900/50 text-left text-[10px] uppercase tracking-wider text-slate-500"
+          >
+            <th role="columnheader" className="px-2 py-2.5" style={{ width: 28 }}></th>
+            <th role="columnheader" className="px-2 py-2.5" style={{ width: 28 }}></th>
+            <th role="columnheader" className="px-3 py-2.5">Name</th>
+            <th role="columnheader" className="px-3 py-2.5">Type</th>
+            <th role="columnheader" className="px-3 py-2.5">Description</th>
+            <th role="columnheader" className="px-3 py-2.5">Category</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Portion</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Price</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">&#x0E3F;/100g</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Cost</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Food Cost %</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Margin</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Available</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Featured</th>
           </tr>
         </thead>
         <tbody>
@@ -259,7 +368,7 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-slate-900/30">
-                  <td colSpan={12} className="px-3 py-2">
+                  <td colSpan={14} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                       {item.subcategory.name}
                     </span>
@@ -269,7 +378,6 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
             }
 
             const dish = item.dish
-            const isEditing = editing?.id === dish.id
             const cost = dish.cost_per_unit
             const price = dish.price ?? 0
             const hasCost = cost != null
@@ -277,16 +385,36 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
             const margin = hasCost ? price - cost : 0
 
             const isExpanded = expandedId === dish.id
+            const bomChildren = childrenByParent.get(dish.id) ?? []
+            const isDrilled = pfExpanded.isExpanded(dish.id)
+            const isDual = dualTypeIds.has(dish.id)
+            const rowFailed = isFailed?.(dish.id) ?? false
+            const rowError = errorFor?.(dish.id)
+            const rowIndex = orderedRowIds.indexOf(dish.id) + 1 // ARIA is 1-based
+            const isFocused = kbd.focusedId === dish.id
+            const hasChildren = bomChildren.length > 0
 
             return (
               <Fragment key={dish.id}>
               <tr
+                id={`row-${dish.id}`}
+                role="row"
+                aria-rowindex={rowIndex}
+                aria-selected={isFocused || undefined}
+                aria-expanded={hasChildren ? isDrilled : undefined}
                 data-dish-row={dish.id}
+                data-focused={isFocused || undefined}
+                title={rowError}
+                onClick={() => kbd.setFocused(dish.id)}
                 className={`border-b border-slate-800/50 transition ${
                   isExpanded ? 'bg-slate-800/40' : 'hover:bg-slate-800/30'
-                }`}
+                } ${
+                  isFocused
+                    ? 'ring-2 ring-inset ring-[var(--color-brick-soft)]/70 bg-[var(--color-royal-red)]/5'
+                    : ''
+                } ${rowFailed ? 'animate-[inline-flash_1200ms_ease-out]' : ''}`}
               >
-                {/* Expand toggle */}
+                {/* Expand toggle (tech card) */}
                 <td className="px-2 py-2">
                   <button
                     onClick={() => toggleExpand(dish.id)}
@@ -301,39 +429,55 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
                   </button>
                 </td>
 
-                {/* Name */}
-                <td className="px-3 py-2">
-                  {isEditing ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        value={editing.name}
-                        onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                        onKeyDown={handleKeyDown}
-                        className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
-                        autoFocus
-                      />
-                      <button onClick={saveEdit} className="rounded bg-emerald-600 p-0.5 text-white hover:bg-emerald-500">
-                        <Check className="h-3 w-3" />
-                      </button>
-                      <button onClick={cancelEdit} className="rounded bg-slate-700 p-0.5 text-slate-300 hover:bg-slate-600">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
+                {/* BOM drill-down toggle — only for items that reference children */}
+                <td className="px-2 py-2">
+                  {bomChildren.length > 0 ? (
+                    <button
+                      onClick={() => pfExpanded.toggle(dish.id)}
+                      className={`rounded p-1 transition ${
+                        isDrilled
+                          ? 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)]'
+                          : 'text-slate-500 hover:bg-slate-700 hover:text-slate-200'
+                      }`}
+                      title={
+                        isDrilled
+                          ? `Hide ${bomChildren.length} BOM children`
+                          : `Show ${bomChildren.length} BOM children`
+                      }
+                    >
+                      <GitBranch className="h-3.5 w-3.5" />
+                    </button>
                   ) : (
-                    <span className="flex items-center">
-                      <button
-                        onClick={() => startEdit(dish)}
-                        className="text-left font-medium text-slate-100"
-                      >
-                        {dish.name}
-                      </button>
-                      {!hasNutrition(dish) && (
-                        <span className="ml-2 inline-flex rounded-full bg-slate-700 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
-                          No KBJU
-                        </span>
-                      )}
-                    </span>
+                    <span className="inline-block h-5 w-5" aria-hidden />
                   )}
+                </td>
+
+                {/* Name */}
+                <td className="px-3 py-2" data-inline-cell="name">
+                  <span className="flex items-center gap-2">
+                    <InlineEditCell<string | null>
+                      value={dish.name}
+                      onCommit={(next) => {
+                        if (next != null && next !== dish.name) {
+                          void commitPatch(dish.id, { name: next })
+                        }
+                      }}
+                      variant="text"
+                      ariaLabel={`Edit name for ${dish.name}`}
+                      className="font-medium text-[color:var(--color-cream)]"
+                      isFailed={rowFailed}
+                    />
+                    {!hasNutrition(dish) && (
+                      <span className="inline-flex rounded-full bg-slate-700 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
+                        No KBJU
+                      </span>
+                    )}
+                  </span>
+                </td>
+
+                {/* Type badge */}
+                <td className="px-3 py-2">
+                  <KindBadge kind={dish.kind} dual={isDual} />
                 </td>
 
                 {/* Description */}
@@ -401,19 +545,23 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
                 </td>
 
                 {/* Price */}
-                <td className="px-3 py-2 text-right">
-                  {isEditing ? (
-                    <input
-                      value={editing.price}
-                      onChange={(e) => setEditing({ ...editing, price: e.target.value })}
-                      onKeyDown={handleKeyDown}
-                      className="w-20 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-right text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
-                      type="number"
-                      min={0}
-                    />
-                  ) : (
-                    <span className="font-medium text-slate-100">{formatThb(dish.price)}</span>
-                  )}
+                <td className="px-3 py-2 text-right" data-inline-cell="price">
+                  <InlineEditCell<number | null>
+                    value={dish.price}
+                    onCommit={(next) => {
+                      if (next !== dish.price) {
+                        void commitPatch(dish.id, { price: next })
+                      }
+                    }}
+                    variant="number"
+                    min={0}
+                    step={1}
+                    align="right"
+                    ariaLabel={`Edit price for ${dish.name}`}
+                    className="font-mono font-medium tabular-nums text-[color:var(--color-cream)]"
+                    format={(v) => (v == null ? '-' : formatThb(v))}
+                    isFailed={rowFailed}
+                  />
                 </td>
 
                 {/* ฿/100g */}
@@ -489,9 +637,16 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
                   </button>
                 </td>
               </tr>
+              {isDrilled && bomChildren.length > 0 && (
+                <BomChildRows
+                  parentId={dish.id}
+                  parentName={dish.name}
+                  children={bomChildren}
+                />
+              )}
               {isExpanded && (
                 <tr className="bg-slate-950/60">
-                  <td colSpan={12} className="p-0">
+                  <td colSpan={14} className="p-0">
                     <DishExpandedCard dish={dish} />
                   </td>
                 </tr>
@@ -502,5 +657,98 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
         </tbody>
       </table>
     </div>
+  )
+}
+
+interface BomChildRowsProps {
+  parentId: string
+  parentName: string
+  children: MenuBomChild[]
+}
+
+/** Renders BOM children as indented table rows beneath the parent dish.
+ * Tree-character prefix (└─) + Alegreya body font for an editorial,
+ * dimmed look that clearly reads as "inside this recipe". Rows are
+ * presentational-only in the foundation; future sub-tasks (inline edit,
+ * detail drawer) will add interactivity. */
+function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
+  return (
+    <>
+      {children.map((c, idx) => {
+        const isLast = idx === children.length - 1
+        const prefix = isLast ? '└─' : '├─'
+        const child = c.child
+        const kind = child?.kind ?? null
+        const unit = child?.base_unit ?? ''
+        const costContribution =
+          child?.cost_per_unit != null
+            ? c.quantityPerUnit *
+              child.cost_per_unit *
+              (1 + (c.yieldLossPct ?? 0) / 100)
+            : null
+        return (
+          <tr
+            key={`${parentId}-child-${c.id}`}
+            className="bg-slate-950/40 text-[color:var(--color-cream)]/60"
+            data-bom-child-of={parentId}
+          >
+            <td className="px-2 py-1.5" />
+            <td className="px-2 py-1.5" />
+            <td className="px-3 py-1.5">
+              <span className="flex items-center gap-2">
+                <span
+                  className="font-mono text-[10px] text-slate-600"
+                  aria-hidden
+                  title={`Child of ${parentName}`}
+                >
+                  {prefix}
+                </span>
+                <span
+                  className="italic"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  {child?.name ?? <span className="text-rose-400">missing</span>}
+                </span>
+              </span>
+            </td>
+            <td className="px-3 py-1.5">
+              {kind && (
+                <span
+                  className="inline-flex rounded-full px-1.5 py-0.5 text-[9px] uppercase tracking-wider opacity-70"
+                  style={{ fontFamily: 'var(--font-display-sc)' }}
+                >
+                  {kind}
+                </span>
+              )}
+            </td>
+            <td className="px-3 py-1.5 text-slate-600" colSpan={2}>
+              <span className="font-mono text-[10px] tabular-nums">
+                {c.quantityPerUnit.toFixed(2)}
+                {unit ? ` ${unit}` : ''}
+                {c.yieldLossPct != null && c.yieldLossPct > 0 && (
+                  <span className="ml-2 text-rose-400/60">
+                    +{c.yieldLossPct}% loss
+                  </span>
+                )}
+              </span>
+            </td>
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5 text-right">
+              {costContribution != null && (
+                <span className="font-mono text-[10px] tabular-nums text-slate-500">
+                  {'\u0E3F'}
+                  {costContribution.toFixed(1)}
+                </span>
+              )}
+            </td>
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
+          </tr>
+        )
+      })}
+    </>
   )
 }

@@ -1,23 +1,72 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Eye, Table2, LayoutGrid, Loader2, ChefHat, Sparkles, Plus } from 'lucide-react'
-import { useMenuDishes } from '../../hooks/useMenuDishes'
+import { useMenuData } from '../../hooks/useMenuData'
+import { useInlineUpdate } from '../../hooks/useInlineUpdate'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
 import { NewDishModal } from './components/NewDishModal'
 import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
+import { TypeFilter, type TypeFilterValue } from '../../components/menu/owner/TypeFilter'
+import { CategoryTabs } from '../../components/menu/shared'
 
 type ViewMode = 'owner' | 'customer'
 type OwnerLayout = 'table' | 'gallery'
 
 export function MenuPage() {
-  const { dishes, categories, subcategories, isLoading, error, updateDish, refetch } = useMenuDishes()
+  const {
+    items,
+    dishes,
+    categories,
+    subcategories,
+    childrenByParent,
+    dualTypeIds,
+    isLoading,
+    error,
+    updateItem,
+    refetch,
+  } = useMenuData()
+  const inlineUpdate = useInlineUpdate(updateItem)
   const [view, setView] = useState<ViewMode>('owner')
   const [ownerLayout, setOwnerLayout] = useState<OwnerLayout>('table')
+  const [typeFilter, setTypeFilter] = useState<TypeFilterValue>('SALE')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [chefOpen, setChefOpen] = useState(false)
   const [newDishOpen, setNewDishOpen] = useState(false)
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
+
+  // Items scoped to current type filter (used for category counts + OwnerTable).
+  // Dual-type items appear in BOTH filter buckets per product-design spec.
+  const typeFilteredItems = useMemo(() => {
+    if (typeFilter === 'all') return items
+    return items.filter((i) => i.kind === typeFilter || (i.isDualType && typeFilter === 'PF'))
+  }, [items, typeFilter])
+
+  // Counts per category (null key = "All") within the active type filter
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string | null, number>()
+    counts.set(null, typeFilteredItems.length)
+    for (const item of typeFilteredItems) {
+      if (!item.category_id) continue
+      counts.set(item.category_id, (counts.get(item.category_id) ?? 0) + 1)
+    }
+    return counts
+  }, [typeFilteredItems])
+
+  // Counts per type filter bucket (drives pill counters)
+  const typeCounts = useMemo(() => {
+    let all = 0
+    let sale = 0
+    let pf = 0
+    let mod = 0
+    for (const item of items) {
+      all += 1
+      if (item.kind === 'SALE') sale += 1
+      if (item.kind === 'PF' || item.isDualType) pf += 1
+      if (item.kind === 'MOD') mod += 1
+    }
+    return { all, SALE: sale, PF: pf, MOD: mod }
+  }, [items])
 
   const handleDishCreated = async (dishId: string) => {
     setJustCreatedId(dishId)
@@ -125,33 +174,28 @@ export function MenuPage() {
         </div>
       </div>
 
-      {/* Category tabs */}
-      {categories.length > 0 && (
-        <div className="flex gap-1 overflow-x-auto pb-1">
-          <button
-            onClick={() => setSelectedCategory(null)}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
-              selectedCategory === null
-                ? 'bg-emerald-500/15 text-emerald-300'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-            }`}
-          >
-            All
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
-                selectedCategory === cat.id
-                  ? 'bg-emerald-500/15 text-emerald-300'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
+      {/* Type filter + Category tabs */}
+      {view === 'owner' && (
+        <div className="flex flex-wrap items-center gap-3">
+          <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
+          {categories.length > 0 && (
+            <div className="flex-1 min-w-0">
+              <CategoryTabs
+                categories={categories}
+                selectedId={selectedCategory}
+                onSelect={setSelectedCategory}
+                counts={categoryCounts}
+              />
+            </div>
+          )}
         </div>
+      )}
+      {view === 'customer' && categories.length > 0 && (
+        <CategoryTabs
+          categories={categories}
+          selectedId={selectedCategory}
+          onSelect={setSelectedCategory}
+        />
       )}
 
       {/* Content */}
@@ -174,21 +218,27 @@ export function MenuPage() {
         </div>
       ) : view === 'owner' && ownerLayout === 'table' ? (
         <OwnerTable
-          dishes={dishes}
+          items={typeFilteredItems}
+          typeFilter={typeFilter}
           selectedCategory={selectedCategory}
           subcategories={subcategories}
-          onUpdate={updateDish}
+          childrenByParent={childrenByParent}
+          dualTypeIds={dualTypeIds}
+          onUpdate={inlineUpdate.commit}
+          isFailed={inlineUpdate.isFailed}
+          errorFor={inlineUpdate.errorFor}
           autoExpandId={justCreatedId}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
         <OwnerGallery
           dishes={dishes}
           selectedCategory={selectedCategory}
-          onUpdate={updateDish}
+          onUpdate={updateItem}
         />
       ) : (
         <CustomerPreview
           dishes={dishes}
+          categories={categories}
           selectedCategory={selectedCategory}
         />
       )}
