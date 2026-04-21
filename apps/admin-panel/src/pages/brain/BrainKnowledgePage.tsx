@@ -21,7 +21,13 @@ import {
   StickyNote,
   GitGraph,
   Trash2,
+  MessagesSquare,
 } from 'lucide-react'
+import {
+  searchDrawers,
+  MemPalaceError,
+  type MemPalaceSearchHit,
+} from '../../api/mempalace'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -211,6 +217,41 @@ export function BrainKnowledgePage() {
   const [noteText, setNoteText] = useState('')
   const [notes, setNotes] = useState<BrainNote[]>(loadNotes)
   const searchRef = useRef<HTMLInputElement>(null)
+
+  // MemPalace semantic search state
+  const [memHits, setMemHits] = useState<MemPalaceSearchHit[] | null>(null)
+  const [memLoading, setMemLoading] = useState(false)
+  const [memError, setMemError] = useState<'offline' | 'error' | null>(null)
+  const memSeq = useRef(0)
+
+  // Debounced MemPalace semantic search (parallel to regex file search)
+  useEffect(() => {
+    if (search.length < 3) {
+      setMemHits(null)
+      setMemError(null)
+      setMemLoading(false)
+      return
+    }
+    const mySeq = ++memSeq.current
+    setMemLoading(true)
+    setMemError(null)
+    const timer = setTimeout(() => {
+      searchDrawers({ query: search, limit: 6 })
+        .then((res) => {
+          if (mySeq !== memSeq.current) return
+          setMemHits(res.results)
+          setMemLoading(false)
+        })
+        .catch((err: unknown) => {
+          if (mySeq !== memSeq.current) return
+          // HTTP error vs network failure (serve.py not running)
+          setMemError(err instanceof MemPalaceError ? 'error' : 'offline')
+          setMemHits(null)
+          setMemLoading(false)
+        })
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [search])
 
   // Load graph.json
   useEffect(() => {
@@ -409,6 +450,69 @@ export function BrainKnowledgePage() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── Из разговоров (MemPalace semantic) ─── */}
+      {search.length >= 3 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+          <h4 className="mb-2 flex items-center gap-2 text-xs font-medium text-indigo-400">
+            <MessagesSquare className="h-3.5 w-3.5" />
+            Из разговоров
+            <span className="text-[10px] font-normal text-slate-600">
+              MemPalace · semantic
+            </span>
+            {memLoading && (
+              <span className="text-[10px] font-normal text-slate-600">ищу...</span>
+            )}
+          </h4>
+          {memError === 'offline' ? (
+            <div className="text-xs text-slate-500">
+              <p className="mb-1.5">
+                MemPalace не запущен — семантический поиск по диалогам недоступен.
+              </p>
+              <code className="block overflow-x-auto rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-400">
+                cd services/mempalace &amp;&amp; .venv/bin/python serve.py
+              </code>
+            </div>
+          ) : memError === 'error' ? (
+            <p className="text-xs text-slate-500">
+              Ошибка запроса к MemPalace. Проверь <code className="text-slate-400">localhost:9622/health</code>.
+            </p>
+          ) : memHits && memHits.length > 0 ? (
+            <div className="space-y-1.5">
+              {memHits.map((h, i) => (
+                <div
+                  key={`${h.source_file}-${i}`}
+                  className="rounded-lg border border-slate-800/50 bg-slate-800/30 px-3 py-2"
+                >
+                  <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+                    <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-indigo-300">
+                      {h.wing}
+                    </span>
+                    <span className="rounded bg-slate-700 px-1.5 py-0.5 text-slate-400">
+                      {h.room}
+                    </span>
+                    <span className="text-slate-600">
+                      {(h.similarity * 100).toFixed(0)}% match
+                    </span>
+                  </div>
+                  <p className="line-clamp-2 text-xs text-slate-300">{h.text}</p>
+                  <p className="mt-1 truncate text-[10px] text-slate-600">
+                    {h.source_file}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : memHits && memHits.length === 0 ? (
+            <p className="text-xs text-slate-600">
+              Ничего не найдено в памяти разговоров.
+            </p>
+          ) : !memLoading ? (
+            <p className="text-xs text-slate-600">
+              Ищу по сохранённым диалогам агентов...
+            </p>
+          ) : null}
         </div>
       )}
 
