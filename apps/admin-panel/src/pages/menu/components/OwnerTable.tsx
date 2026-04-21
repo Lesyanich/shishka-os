@@ -4,6 +4,7 @@ import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useM
 import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
 import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 import { useExpandedRows } from '../../../hooks/useExpandedRows'
+import { useRowKeyboardNav } from '../../../hooks/useRowKeyboardNav'
 import { InlineEditCell } from '../../../components/menu/owner/InlineEditCell'
 import { DishExpandedCard } from './DishExpandedCard'
 
@@ -19,6 +20,8 @@ interface OwnerTableProps {
   isFailed?: (id: string) => boolean
   /** Parent-provided: last error message (used as row-level tooltip). */
   errorFor?: (id: string) => string | undefined
+  /** 'o' — open detail drawer for focused row. Stub until drawer sub-task lands. */
+  onOpenDrawer?: (id: string) => void
   /** Imperative trigger: when this id changes, auto-expand that row and scroll to it. */
   autoExpandId?: string | null
 }
@@ -111,6 +114,7 @@ export function OwnerTable({
   onUpdate,
   isFailed,
   errorFor,
+  onOpenDrawer,
   autoExpandId,
 }: OwnerTableProps) {
   const filtered = selectedCategory
@@ -264,6 +268,56 @@ export function OwnerTable({
     return groups
   }, [optimisticDishes, subcategories, selectedCategory])
 
+  // Ordered list of row ids (skip L2 headers — they're not navigable).
+  const orderedRowIds = useMemo(
+    () => groupedDishes.filter((g) => g.type === 'dish').map((g) => g.dish.id),
+    [groupedDishes],
+  )
+
+  const kbd = useRowKeyboardNav({
+    ids: orderedRowIds,
+    // Enter: toggle tech-card expand. For SALE with PF children, also toggle
+    // drill-down so the keyboard-first flow exposes the tree in one keystroke.
+    onEnter: (id) => {
+      toggleExpand(id)
+      const hasKids = (childrenByParent.get(id) ?? []).length > 0
+      const item = items.find((i) => i.id === id)
+      if (hasKids && item?.kind === 'SALE') pfExpanded.toggle(id)
+    },
+    onOpen: (id) => onOpenDrawer?.(id),
+    // 'e' → synthesize a click on the focused row's name button (static
+    // InlineEditCell display), which switches it into edit mode and
+    // auto-focuses the input. Fallback: first editable cell.
+    onEdit: (id) => {
+      const row = containerElementRef.current?.querySelector<HTMLElement>(
+        `[data-dish-row="${id}"]`,
+      )
+      if (!row) return
+      const target =
+        row.querySelector<HTMLButtonElement>('[data-inline-cell="name"] button') ??
+        row.querySelector<HTMLButtonElement>('[data-inline-cell] button')
+      target?.click()
+    },
+    onEscape: () => {
+      // When a drawer or inline-edit is open, they cancel first (their own
+      // onKeyDown handles Escape). This fires only when nothing else claims
+      // it — we just clear the focus ring.
+    },
+  })
+
+  // Keep a separate DOM ref so onEdit can scope queries to our table scroll
+  // container. The hook's own ref is used for focus + keydown attach.
+  const containerElementRef = useRef<HTMLDivElement | null>(null)
+
+  // Scroll focused row into view on change
+  useEffect(() => {
+    if (!kbd.focusedId) return
+    const el = containerElementRef.current?.querySelector<HTMLElement>(
+      `[data-dish-row="${kbd.focusedId}"]`,
+    )
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [kbd.focusedId])
+
   if (optimisticDishes.length === 0) {
     const emptyCopy =
       typeFilter === 'all'
@@ -277,24 +331,36 @@ export function OwnerTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-800">
-      <table className="w-full text-xs">
+    <div
+      {...kbd.containerProps}
+      ref={(el) => {
+        kbd.containerProps.ref.current = el
+        containerElementRef.current = el
+      }}
+      aria-label="Menu items"
+      aria-rowcount={orderedRowIds.length}
+      className="overflow-x-auto rounded-lg border border-slate-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-brick-soft)]/40"
+    >
+      <table className="w-full text-xs" role="presentation">
         <thead>
-          <tr className="border-b border-slate-800 bg-slate-900/50 text-left text-[10px] uppercase tracking-wider text-slate-500">
-            <th className="px-2 py-2.5" style={{ width: 28 }}></th>
-            <th className="px-2 py-2.5" style={{ width: 28 }}></th>
-            <th className="px-3 py-2.5">Name</th>
-            <th className="px-3 py-2.5">Type</th>
-            <th className="px-3 py-2.5">Description</th>
-            <th className="px-3 py-2.5">Category</th>
-            <th className="px-3 py-2.5 text-right">Portion</th>
-            <th className="px-3 py-2.5 text-right">Price</th>
-            <th className="px-3 py-2.5 text-right">&#x0E3F;/100g</th>
-            <th className="px-3 py-2.5 text-right">Cost</th>
-            <th className="px-3 py-2.5 text-right">Food Cost %</th>
-            <th className="px-3 py-2.5 text-right">Margin</th>
-            <th className="px-3 py-2.5 text-center">Available</th>
-            <th className="px-3 py-2.5 text-center">Featured</th>
+          <tr
+            role="row"
+            className="border-b border-slate-800 bg-slate-900/50 text-left text-[10px] uppercase tracking-wider text-slate-500"
+          >
+            <th role="columnheader" className="px-2 py-2.5" style={{ width: 28 }}></th>
+            <th role="columnheader" className="px-2 py-2.5" style={{ width: 28 }}></th>
+            <th role="columnheader" className="px-3 py-2.5">Name</th>
+            <th role="columnheader" className="px-3 py-2.5">Type</th>
+            <th role="columnheader" className="px-3 py-2.5">Description</th>
+            <th role="columnheader" className="px-3 py-2.5">Category</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Portion</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Price</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">&#x0E3F;/100g</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Cost</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Food Cost %</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Margin</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Available</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Featured</th>
           </tr>
         </thead>
         <tbody>
@@ -324,14 +390,28 @@ export function OwnerTable({
             const isDual = dualTypeIds.has(dish.id)
             const rowFailed = isFailed?.(dish.id) ?? false
             const rowError = errorFor?.(dish.id)
+            const rowIndex = orderedRowIds.indexOf(dish.id) + 1 // ARIA is 1-based
+            const isFocused = kbd.focusedId === dish.id
+            const hasChildren = bomChildren.length > 0
 
             return (
               <Fragment key={dish.id}>
               <tr
+                id={`row-${dish.id}`}
+                role="row"
+                aria-rowindex={rowIndex}
+                aria-selected={isFocused || undefined}
+                aria-expanded={hasChildren ? isDrilled : undefined}
                 data-dish-row={dish.id}
+                data-focused={isFocused || undefined}
                 title={rowError}
+                onClick={() => kbd.setFocused(dish.id)}
                 className={`border-b border-slate-800/50 transition ${
                   isExpanded ? 'bg-slate-800/40' : 'hover:bg-slate-800/30'
+                } ${
+                  isFocused
+                    ? 'ring-2 ring-inset ring-[var(--color-brick-soft)]/70 bg-[var(--color-royal-red)]/5'
+                    : ''
                 } ${rowFailed ? 'animate-[inline-flash_1200ms_ease-out]' : ''}`}
               >
                 {/* Expand toggle (tech card) */}
@@ -373,7 +453,7 @@ export function OwnerTable({
                 </td>
 
                 {/* Name */}
-                <td className="px-3 py-2">
+                <td className="px-3 py-2" data-inline-cell="name">
                   <span className="flex items-center gap-2">
                     <InlineEditCell<string | null>
                       value={dish.name}
@@ -465,7 +545,7 @@ export function OwnerTable({
                 </td>
 
                 {/* Price */}
-                <td className="px-3 py-2 text-right">
+                <td className="px-3 py-2 text-right" data-inline-cell="price">
                   <InlineEditCell<number | null>
                     value={dish.price}
                     onCommit={(next) => {
