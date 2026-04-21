@@ -1,5 +1,45 @@
 @import "tailwindcss";
 
+/* ═══════════ Menu Page Design Tokens (Expand+Drawer PM mode) ═══════════
+ * Palette extracted from Shishka logo (.ai). Typography pairs Alegreya
+ * (editorial serif) with Geist (utilitarian sans) and JetBrains Mono
+ * (numerics). Food-cost thresholds drive badge color in the owner table.
+ * Reusable on future customer site — see src/components/menu/shared/. */
+@theme {
+  /* Brand */
+  --color-royal-green: #2D3F1C;
+  --color-royal-red: #9B1C21;
+  --color-forest-soft: #5B7A3D;
+  --color-brick-soft: #C74A4F;
+  --color-amber-watch: #B88830;
+
+  /* Dark surfaces (menu page) */
+  --color-surface-1: #0B0F0A;
+  --color-surface-2: #12170F;
+  --color-surface-3: #1A2114;
+
+  /* Text */
+  --color-cream: #F0EAD6;
+
+  /* Nutrition badges (editorial, muted) */
+  --color-nutri-cal: #B88830;   /* amber */
+  --color-nutri-pro: #6B7280;   /* slate */
+  --color-nutri-car: #8B5A9E;   /* plum */
+  --color-nutri-fat: #B45A3C;   /* rust */
+  --color-nutri-fib: #5B7A3D;   /* forest */
+
+  /* Food-cost thresholds (also consumed as JS constants) */
+  --color-fc-good: #5B7A3D;     /* < 30% */
+  --color-fc-warn: #B88830;     /* 30–45% */
+  --color-fc-bad:  #9B1C21;     /* > 45% */
+
+  /* Typography */
+  --font-display: "Alegreya", ui-serif, Georgia, serif;
+  --font-display-sc: "Alegreya SC", ui-serif, Georgia, serif;
+  --font-sans: "Geist", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
 :root {
   font-family: "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
     ui-sans-serif, "Segoe UI", sans-serif;
