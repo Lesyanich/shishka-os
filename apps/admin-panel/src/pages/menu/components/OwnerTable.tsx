@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
-import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch } from 'lucide-react'
+import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch, PanelRightOpen } from 'lucide-react'
 import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useMenuDishes'
 import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
 import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
@@ -648,6 +648,20 @@ export function OwnerTable({
                 <tr className="bg-slate-950/60">
                   <td colSpan={14} className="p-0">
                     <DishExpandedCard dish={dish} />
+                    {onOpenDrawer && (
+                      <div className="flex justify-end border-t border-slate-800/50 bg-slate-950/40 px-4 py-2">
+                        <button
+                          type="button"
+                          onClick={() => onOpenDrawer(dish.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/50 bg-transparent px-3 py-1.5 text-[11px] font-medium text-[color:var(--color-cream)]/70 transition hover:border-[var(--color-forest-soft)]/50 hover:bg-[var(--color-royal-green)]/10 hover:text-[color:var(--color-forest-soft)]"
+                          title="Open detail drawer (or press o)"
+                        >
+                          <PanelRightOpen className="h-3.5 w-3.5" />
+                          Open detail
+                          <span className="opacity-60">→</span>
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               )}
