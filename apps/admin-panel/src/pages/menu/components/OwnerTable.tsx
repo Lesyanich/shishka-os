@@ -1,15 +1,63 @@
 import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
-import { Check, X, Star, StarOff, ChevronDown, ChevronRight } from 'lucide-react'
+import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch } from 'lucide-react'
 import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useMenuDishes'
+import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
+import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
+import { useExpandedRows } from '../../../hooks/useExpandedRows'
 import { DishExpandedCard } from './DishExpandedCard'
 
 interface OwnerTableProps {
-  dishes: MenuDish[]
+  items: MenuItem[]
+  typeFilter: TypeFilterValue
   selectedCategory: string | null
   subcategories: Map<string, MenuSubcategory[]>
+  childrenByParent: Map<string, MenuBomChild[]>
+  dualTypeIds: Set<string>
   onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'>>) => Promise<{ ok: boolean; error?: string }>
   /** Imperative trigger: when this id changes, auto-expand that row and scroll to it. */
   autoExpandId?: string | null
+}
+
+const KIND_BADGE: Record<NomenclatureKind, { label: string; cls: string }> = {
+  SALE: {
+    label: 'SALE',
+    cls: 'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-1 ring-inset ring-[var(--color-forest-soft)]/40',
+  },
+  PF: {
+    label: 'PF',
+    cls: 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-1 ring-inset ring-[var(--color-amber-watch)]/40',
+  },
+  MOD: {
+    label: 'MOD',
+    cls: 'bg-[var(--color-royal-red)]/20 text-[color:var(--color-brick-soft)] ring-1 ring-inset ring-[var(--color-brick-soft)]/40',
+  },
+}
+
+function KindBadge({ kind, dual }: { kind: NomenclatureKind; dual: boolean }) {
+  if (dual) {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-cream)] ring-1 ring-inset ring-white/20"
+        style={{
+          fontFamily: 'var(--font-display-sc)',
+          backgroundImage:
+            'linear-gradient(90deg, var(--color-royal-green) 0%, var(--color-royal-green) 49%, var(--color-amber-watch) 51%, var(--color-amber-watch) 100%)',
+        }}
+        title="Dual-type: sold as SALE and used as PF ingredient"
+      >
+        PF·SALE
+      </span>
+    )
+  }
+  const { label, cls } = KIND_BADGE[kind]
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}
+      style={{ fontFamily: 'var(--font-display-sc)' }}
+    >
+      {label}
+    </span>
+  )
 }
 
 function foodCostColor(pct: number): string {
@@ -52,22 +100,35 @@ interface PortionEditState {
 
 type GroupItem =
   | { type: 'l2-header'; subcategory: MenuSubcategory; dishCount: number }
-  | { type: 'dish'; dish: MenuDish }
+  | { type: 'dish'; dish: MenuItem }
 
-export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, autoExpandId }: OwnerTableProps) {
+export function OwnerTable({
+  items,
+  typeFilter,
+  selectedCategory,
+  subcategories,
+  childrenByParent,
+  dualTypeIds,
+  onUpdate,
+  autoExpandId,
+}: OwnerTableProps) {
   const filtered = selectedCategory
-    ? dishes.filter((d) => d.category_id === selectedCategory)
-    : dishes
+    ? items.filter((d) => d.category_id === selectedCategory)
+    : items
 
   const [optimisticDishes, setOptimistic] = useOptimistic(
     filtered,
-    (state: MenuDish[], update: { id: string; patch: Partial<MenuDish> }) =>
+    (state: MenuItem[], update: { id: string; patch: Partial<MenuItem> }) =>
       state.map((d) => (d.id === update.id ? { ...d, ...update.patch } : d)),
   )
 
   const [editing, setEditing] = useState<EditState | null>(null)
   const [portionEditing, setPortionEditing] = useState<PortionEditState | null>(null)
+  // Tech-card expand (single row) — kept for backward compat until the
+  // Detail Drawer sub-task replaces it.
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  // PF drill-down (multi-row). Independent from tech-card expand.
+  const pfExpanded = useExpandedRows()
 
   // Imperative auto-expand: when parent sets autoExpandId to a new value,
   // expand that row and scroll it into view. Fires once per id change.
@@ -76,7 +137,6 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
     if (autoExpandId && autoExpandId !== lastAutoExpandId.current) {
       lastAutoExpandId.current = autoExpandId
       setExpandedId(autoExpandId)
-      // Defer scroll to after the row renders
       setTimeout(() => {
         const el = document.querySelector<HTMLElement>(`[data-dish-row="${autoExpandId}"]`)
         el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -228,9 +288,13 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
   }, [optimisticDishes, subcategories, selectedCategory])
 
   if (optimisticDishes.length === 0) {
+    const emptyCopy =
+      typeFilter === 'all'
+        ? 'No items in this category.'
+        : `No ${typeFilter} items in this category.`
     return (
       <div className="flex flex-col items-center justify-center py-20 text-sm text-slate-500">
-        <span>No dishes in this category.</span>
+        <span>{emptyCopy}</span>
       </div>
     )
   }
@@ -241,7 +305,9 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
         <thead>
           <tr className="border-b border-slate-800 bg-slate-900/50 text-left text-[10px] uppercase tracking-wider text-slate-500">
             <th className="px-2 py-2.5" style={{ width: 28 }}></th>
+            <th className="px-2 py-2.5" style={{ width: 28 }}></th>
             <th className="px-3 py-2.5">Name</th>
+            <th className="px-3 py-2.5">Type</th>
             <th className="px-3 py-2.5">Description</th>
             <th className="px-3 py-2.5">Category</th>
             <th className="px-3 py-2.5 text-right">Portion</th>
@@ -259,7 +325,7 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-slate-900/30">
-                  <td colSpan={12} className="px-3 py-2">
+                  <td colSpan={14} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                       {item.subcategory.name}
                     </span>
@@ -277,6 +343,9 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
             const margin = hasCost ? price - cost : 0
 
             const isExpanded = expandedId === dish.id
+            const bomChildren = childrenByParent.get(dish.id) ?? []
+            const isDrilled = pfExpanded.isExpanded(dish.id)
+            const isDual = dualTypeIds.has(dish.id)
 
             return (
               <Fragment key={dish.id}>
@@ -286,7 +355,7 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
                   isExpanded ? 'bg-slate-800/40' : 'hover:bg-slate-800/30'
                 }`}
               >
-                {/* Expand toggle */}
+                {/* Expand toggle (tech card) */}
                 <td className="px-2 py-2">
                   <button
                     onClick={() => toggleExpand(dish.id)}
@@ -299,6 +368,29 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
                       <ChevronRight className="h-3.5 w-3.5" />
                     )}
                   </button>
+                </td>
+
+                {/* BOM drill-down toggle — only for items that reference children */}
+                <td className="px-2 py-2">
+                  {bomChildren.length > 0 ? (
+                    <button
+                      onClick={() => pfExpanded.toggle(dish.id)}
+                      className={`rounded p-1 transition ${
+                        isDrilled
+                          ? 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)]'
+                          : 'text-slate-500 hover:bg-slate-700 hover:text-slate-200'
+                      }`}
+                      title={
+                        isDrilled
+                          ? `Hide ${bomChildren.length} BOM children`
+                          : `Show ${bomChildren.length} BOM children`
+                      }
+                    >
+                      <GitBranch className="h-3.5 w-3.5" />
+                    </button>
+                  ) : (
+                    <span className="inline-block h-5 w-5" aria-hidden />
+                  )}
                 </td>
 
                 {/* Name */}
@@ -334,6 +426,11 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
                       )}
                     </span>
                   )}
+                </td>
+
+                {/* Type badge */}
+                <td className="px-3 py-2">
+                  <KindBadge kind={dish.kind} dual={isDual} />
                 </td>
 
                 {/* Description */}
@@ -489,9 +586,16 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
                   </button>
                 </td>
               </tr>
+              {isDrilled && bomChildren.length > 0 && (
+                <BomChildRows
+                  parentId={dish.id}
+                  parentName={dish.name}
+                  children={bomChildren}
+                />
+              )}
               {isExpanded && (
                 <tr className="bg-slate-950/60">
-                  <td colSpan={12} className="p-0">
+                  <td colSpan={14} className="p-0">
                     <DishExpandedCard dish={dish} />
                   </td>
                 </tr>
@@ -502,5 +606,98 @@ export function OwnerTable({ dishes, selectedCategory, subcategories, onUpdate, 
         </tbody>
       </table>
     </div>
+  )
+}
+
+interface BomChildRowsProps {
+  parentId: string
+  parentName: string
+  children: MenuBomChild[]
+}
+
+/** Renders BOM children as indented table rows beneath the parent dish.
+ * Tree-character prefix (└─) + Alegreya body font for an editorial,
+ * dimmed look that clearly reads as "inside this recipe". Rows are
+ * presentational-only in the foundation; future sub-tasks (inline edit,
+ * detail drawer) will add interactivity. */
+function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
+  return (
+    <>
+      {children.map((c, idx) => {
+        const isLast = idx === children.length - 1
+        const prefix = isLast ? '└─' : '├─'
+        const child = c.child
+        const kind = child?.kind ?? null
+        const unit = child?.base_unit ?? ''
+        const costContribution =
+          child?.cost_per_unit != null
+            ? c.quantityPerUnit *
+              child.cost_per_unit *
+              (1 + (c.yieldLossPct ?? 0) / 100)
+            : null
+        return (
+          <tr
+            key={`${parentId}-child-${c.id}`}
+            className="bg-slate-950/40 text-[color:var(--color-cream)]/60"
+            data-bom-child-of={parentId}
+          >
+            <td className="px-2 py-1.5" />
+            <td className="px-2 py-1.5" />
+            <td className="px-3 py-1.5">
+              <span className="flex items-center gap-2">
+                <span
+                  className="font-mono text-[10px] text-slate-600"
+                  aria-hidden
+                  title={`Child of ${parentName}`}
+                >
+                  {prefix}
+                </span>
+                <span
+                  className="italic"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  {child?.name ?? <span className="text-rose-400">missing</span>}
+                </span>
+              </span>
+            </td>
+            <td className="px-3 py-1.5">
+              {kind && (
+                <span
+                  className="inline-flex rounded-full px-1.5 py-0.5 text-[9px] uppercase tracking-wider opacity-70"
+                  style={{ fontFamily: 'var(--font-display-sc)' }}
+                >
+                  {kind}
+                </span>
+              )}
+            </td>
+            <td className="px-3 py-1.5 text-slate-600" colSpan={2}>
+              <span className="font-mono text-[10px] tabular-nums">
+                {c.quantityPerUnit.toFixed(2)}
+                {unit ? ` ${unit}` : ''}
+                {c.yieldLossPct != null && c.yieldLossPct > 0 && (
+                  <span className="ml-2 text-rose-400/60">
+                    +{c.yieldLossPct}% loss
+                  </span>
+                )}
+              </span>
+            </td>
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5 text-right">
+              {costContribution != null && (
+                <span className="font-mono text-[10px] tabular-nums text-slate-500">
+                  {'\u0E3F'}
+                  {costContribution.toFixed(1)}
+                </span>
+              )}
+            </td>
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
+          </tr>
+        )
+      })}
+    </>
   )
 }
