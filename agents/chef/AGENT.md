@@ -243,6 +243,39 @@ Chef Agent подключает **два** MCP-сервера:
         related_ids: {bible_file: "...", bible_section: "..."}
 ```
 
+### WF-9: Kitchen Test Protocol
+
+```
+When CEO shares a test plan, results, or conclusions:
+
+1. SAVE TO MEMPALACE (immediately, during conversation)
+   ├─ mempalace_add_drawer(wing="wing_kitchen", room="tests", content=<verbatim structured test data>)
+   │   Format:
+   │   TEST: [name]
+   │   Date: [YYYY-MM-DD]
+   │   Product: [nomenclature code if exists]
+   │   Batch: [size, portions]
+   │   Goal: [what we're testing]
+   │   Parameters: [ingredients, ratios, temperatures, times]
+   │   Result: [what happened — texture, taste, appearance]
+   │   Conclusion: [what we learned]
+   │   Next: [what to try next, if any]
+   │
+   └─ mempalace_kg_add × N (structured facts for graph queries)
+      Examples:
+      - (subject="GF_MANAKISH_TEST_A", predicate="tested_on", object="2026-04-21")
+      - (subject="GF_MANAKISH_TEST_A", predicate="uses_flour", object="corn + tapioca")
+      - (subject="GF_MANAKISH_TEST_A", predicate="result", object="flexible, good crisp edges")
+      - (subject="GF_MANAKISH_TEST_A", predicate="next_iteration", object="Test B: rice flour variant")
+
+2. UPDATE kitchen-journal.md (durability backup)
+   ├─ Append structured test record under today's date
+   └─ This ensures git history preserves test data even if MemPalace is reset
+
+3. DO NOT create Supabase products for tests
+   Tests are R&D knowledge, not nomenclature. Only create products (WF-1/WF-3) when a test is approved and moving to production.
+```
+
 ## Rules
 
 ### Immutable (из P0 + Lego)
@@ -326,8 +359,8 @@ Shishka Brain v2 has three orthogonal layers. Route queries by question shape, n
 | "What does CEO prefer/hate about fermentation?" | L1 Conversations | MemPalace (`wing_kitchen`) |
 | "Why did we pivot from coconut cream to tahini?" | L1 Conversations | MemPalace (`wing_kitchen`) |
 | "Which ingredient substitutions worked?" | L1 Conversations | MemPalace (`wing_kitchen`) |
-| "What's our kitchen philosophy on clean label?" | L2 Project Knowledge | LightRAG `:9621` (mode `mix`) |
-| "What equipment do we have for fermentation?" | L2 Project Knowledge | `docs/bible/equipment.md` + LightRAG |
+| "What's our kitchen philosophy?" | L2 Project Knowledge | Read `docs/bible/kitchen-philosophy.md` directly (Graphify MCP coming soon) |
+| "What equipment do we have for fermentation?" | L2 Project Knowledge | Read `docs/bible/equipment.md` directly |
 | "Where is function X?" / "What calls Y?" | L3 Code Structure | Graphify (when live) |
 | "What kitchen tasks are open?" | Action ledger | MC `shishka-mission-control` |
 
@@ -335,7 +368,7 @@ Shishka Brain v2 has three orthogonal layers. Route queries by question shape, n
 
 **Session start:** MemPalace wake-up for `wing_kitchen` loads recent menu decisions, ingredient test results, yield experiments, CEO taste preferences. See Context Loading step 5.
 
-**LightRAG query (L2):** HTTP POST to `http://localhost:9621/query` with body `{"query": "...", "mode": "mix"}`. Use for cross-document reasoning over bible + domain docs. Fallback: read static files directly (`docs/bible/*`, `agents/chef/domain/culinary-knowledge.md`).
+**L2 Project Knowledge:** Read static files directly (`docs/bible/*`, `agents/chef/domain/culinary-knowledge.md`). Graphify MCP integration coming in a follow-up task.
 
 **Chef examples:** "did we try beetroot with tahini before?", "what yield did we get from PF-BAKED_PUMPKIN last test?", "why did Lesia reject the first hummus recipe?", "what's our CBS framework?", "which RAW items are seasonal on Samui?".
 
@@ -344,14 +377,18 @@ Shishka Brain v2 has three orthogonal layers. Route queries by question shape, n
 - **Tier 1 (MC):** BOM creation results, cost alerts, Bible proposals, new product UUIDs, margin drift warnings
 - **Tier 2 (MemPalace `wing_kitchen`):** R&D reasoning, flavor test observations, CEO preference nuance, Noticed / Unsaid / Watch-next
 
-## Session End
+## Session End (MANDATORY — do NOT skip)
 
-Write one MemPalace drawer in `wing_kitchen` capturing:
-- **Noticed:** flavor observations, yield surprises, ingredient availability changes
-- **Unsaid:** ideas you considered but didn't propose yet
-- **Watch next session:** pending BOM items, ingredients needing price data, tests to run
+Before ending any session:
 
-Use `mempalace_diary_write` for session diary, `mempalace_add_drawer` for standalone knowledge (e.g., "beetroot + tahini + lemon works as a dressing base at 3:1:1 ratio").
+1. **Save every test discussed** → WF-9 (if not already saved during conversation)
+2. **Save decisions and preferences** → mempalace_add_drawer(wing="wing_kitchen", room="decisions", content=...)
+3. **Update kitchen-journal.md** → append today's work
+4. **Write session diary** → mempalace_diary_write(agent_name="chef", entry=<AAAK summary>)
+
+If CEO says "bye/пока/спасибо" — do steps 1-4 BEFORE responding with goodbye.
+
+Use `mempalace_add_drawer` for standalone knowledge (e.g., "beetroot + tahini + lemon works as a dressing base at 3:1:1 ratio").
 
 ## Autonomous Mode (future: scheduled runs)
 

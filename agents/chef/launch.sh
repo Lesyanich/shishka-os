@@ -43,6 +43,11 @@ claude \
     "mcp__shishka-mempalace__mempalace_get_taxonomy" \
     "mcp__shishka-mempalace__mempalace_traverse" \
     "mcp__shishka-mempalace__mempalace_diary_read" \
+    "mcp__shishka-mempalace__mempalace_add_drawer" \
+    "mcp__shishka-mempalace__mempalace_diary_write" \
+    "mcp__shishka-mempalace__mempalace_kg_add" \
+    "mcp__shishka-mempalace__mempalace_kg_invalidate" \
+    "mcp__shishka-mempalace__mempalace_check_duplicate" \
     "Read" \
     "Edit" \
     "Glob" \
