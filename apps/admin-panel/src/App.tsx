@@ -86,7 +86,7 @@ function App() {
                     <Route path="mempalace" element={<Suspense fallback={<PageLoader />}><MemPalaceBrowser /></Suspense>} />
                     <Route path="quality" element={<Suspense fallback={<PageLoader />}><QualityPage /></Suspense>} />
                   </Route>
-                  <Route path="/menu" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />
+                  <Route path="/menu/*" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />
                   <Route path="/bom" element={<Suspense fallback={<PageLoader />}><BOMHub /></Suspense>} />
                   <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
                   <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>

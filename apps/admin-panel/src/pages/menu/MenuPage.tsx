@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, Table2, LayoutGrid, Loader2, ChefHat, Sparkles, Plus } from 'lucide-react'
 import { useMenuData } from '../../hooks/useMenuData'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
@@ -14,6 +15,20 @@ import { CategoryTabs } from '../../components/menu/shared'
 type ViewMode = 'owner' | 'customer'
 type OwnerLayout = 'table' | 'gallery'
 
+const VIEW_MODES: readonly ViewMode[] = ['owner', 'customer']
+const OWNER_LAYOUTS: readonly OwnerLayout[] = ['table', 'gallery']
+const TYPE_FILTERS: readonly TypeFilterValue[] = ['all', 'SALE', 'PF', 'MOD']
+
+function pickParam<T extends string>(
+  params: URLSearchParams,
+  key: string,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  const v = params.get(key)
+  return (allowed as readonly string[]).includes(v ?? '') ? (v as T) : fallback
+}
+
 export function MenuPage() {
   const {
     items,
@@ -28,13 +43,79 @@ export function MenuPage() {
     refetch,
   } = useMenuData()
   const inlineUpdate = useInlineUpdate(updateItem)
-  const [view, setView] = useState<ViewMode>('owner')
-  const [ownerLayout, setOwnerLayout] = useState<OwnerLayout>('table')
-  const [typeFilter, setTypeFilter] = useState<TypeFilterValue>('SALE')
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // Derived state from URL query — shareable, refresh-safe.
+  const view = pickParam<ViewMode>(searchParams, 'view', VIEW_MODES, 'owner')
+  const ownerLayout = pickParam<OwnerLayout>(searchParams, 'layout', OWNER_LAYOUTS, 'table')
+  const typeFilter = pickParam<TypeFilterValue>(searchParams, 'type', TYPE_FILTERS, 'SALE')
+  const selectedCategory = searchParams.get('cat')
+
+  // URL-driven drawer: /menu/dish/:productCode opens DetailDrawer on that dish.
+  const drawerProductCode = useMemo(() => {
+    const m = location.pathname.match(/^\/menu\/dish\/([^/]+)/)
+    return m ? decodeURIComponent(m[1]) : null
+  }, [location.pathname])
+  const drawerItem = useMemo(
+    () => (drawerProductCode ? items.find((i) => i.product_code === drawerProductCode) ?? null : null),
+    [items, drawerProductCode],
+  )
+
+  // Setter that merges into existing query (omitting defaults for cleaner URLs).
+  const updateParam = useCallback(
+    (patch: Record<string, string | null>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null || v === '') next.delete(k)
+            else next.set(k, v)
+          }
+          return next
+        },
+        { replace: false },
+      )
+    },
+    [setSearchParams],
+  )
+
+  const setView = useCallback(
+    (v: ViewMode) => updateParam({ view: v === 'owner' ? null : v }),
+    [updateParam],
+  )
+  const setOwnerLayout = useCallback(
+    (l: OwnerLayout) => updateParam({ layout: l === 'table' ? null : l }),
+    [updateParam],
+  )
+  const setTypeFilter = useCallback(
+    (t: TypeFilterValue) => updateParam({ type: t === 'SALE' ? null : t }),
+    [updateParam],
+  )
+  const setSelectedCategory = useCallback(
+    (cat: string | null) => updateParam({ cat }),
+    [updateParam],
+  )
+
+  const openDrawer = useCallback(
+    (id: string) => {
+      const item = items.find((i) => i.id === id)
+      if (!item) return
+      navigate({
+        pathname: `/menu/dish/${encodeURIComponent(item.product_code)}`,
+        search: location.search,
+      })
+    },
+    [items, navigate, location.search],
+  )
+  const closeDrawer = useCallback(
+    () => navigate({ pathname: '/menu', search: location.search }),
+    [navigate, location.search],
+  )
+
   const [chefOpen, setChefOpen] = useState(false)
   const [newDishOpen, setNewDishOpen] = useState(false)
-  const [drawerItemId, setDrawerItemId] = useState<string | null>(null)
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
 
   // Items scoped to current type filter (used for category counts + OwnerTable).
@@ -229,7 +310,7 @@ export function MenuPage() {
           onUpdate={inlineUpdate.commit}
           isFailed={inlineUpdate.isFailed}
           errorFor={inlineUpdate.errorFor}
-          onOpenDrawer={setDrawerItemId}
+          onOpenDrawer={openDrawer}
           autoExpandId={justCreatedId}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
@@ -258,12 +339,12 @@ export function MenuPage() {
 
       {/* Detail drawer — slide-in right panel */}
       <DetailDrawer
-        item={items.find((i) => i.id === drawerItemId) ?? null}
-        onClose={() => setDrawerItemId(null)}
+        item={drawerItem}
+        onClose={closeDrawer}
         onToggleAvailable={async (id, next) => {
           await inlineUpdate.commit(id, { is_available: next })
         }}
-        returnFocusToId={drawerItemId}
+        returnFocusToId={drawerItem?.id ?? null}
       />
     </div>
   )
