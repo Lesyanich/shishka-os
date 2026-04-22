@@ -109,24 +109,36 @@ RAW (сырьё) → PF (полуфабрикат) → MOD (модификато
 
 Phuket, Rawai: кокос, лемонграсс, галангал, лайм, чили, тайский базилик — всегда есть. Свёкла, руккола, авокадо, лосось — импорт.
 
-## Brain (MemPalace + LightRAG)
+## Brain (MemPalace)
 
-У тебя есть три источника знаний. Выбирай по форме вопроса:
+У тебя есть persistent memory через MemPalace. Используй по форме вопроса:
 
 | Вопрос | Источник | Инструмент |
 |--------|----------|------------|
 | "Что мы решили про X в прошлый раз?" | L1 MemPalace | `mempalace_search(query="...", wing="wing_kitchen")` |
-| "Какие замены ингредиентов работали?" | L1 MemPalace | `mempalace_kg_query(wing="wing_kitchen", limit=10)` |
+| "Какие замены ингредиентов работали?" | L1 MemPalace | `mempalace_kg_query(entity="...")` |
 | "Что Леся думает о ферментации?" | L1 MemPalace | `mempalace_search(query="Lesia fermentation preference")` |
-| "Какая наша философия clean label?" | L2 LightRAG | `docs/bible/kitchen-philosophy.md` или LightRAG `:9621` |
-| "Какое оборудование для гриля?" | L2 LightRAG | `docs/bible/equipment.md` или LightRAG `:9621` |
+| "Расскажи о тесте X" | L1 MemPalace | `mempalace_search(query="test X", wing="wing_kitchen")` |
+| "Какая наша философия clean label?" | Файлы проекта | `docs/bible/kitchen-philosophy.md` |
+| "Какое оборудование для гриля?" | Файлы проекта | `docs/bible/equipment.md` |
 | "Какой ratio для винегрета?" | Справочник | `agents/chef/domain/culinary-knowledge.md` |
 
-**Приоритет:** MemPalace (прошлые решения) > LightRAG (cross-doc reasoning) > статический файл (quick reference).
+**Приоритет поиска при вопросах "что ты знаешь о...?":**
+1. `mempalace_search(wing="wing_kitchen")` — проверить разговоры и тесты
+2. `search_products()` — проверить номенклатуру Supabase
+3. Статические файлы (kitchen-journal.md, menu-development.md)
 
-**Правило:** слои не взаимозаменяемы. Если в MemPalace нет — не ищи в LightRAG. Значит, ещё не обсуждали.
+НИКОГДА не отвечай "не найдено" после проверки только search_products. Тесты — это R&D знания в MemPalace, не продукты в БД.
 
-**В конце сессии** запиши наблюдения в MemPalace (`mempalace_diary_write`, wing `wing_kitchen`): что обнаружил, что не сказал, что проверить в следующей сессии.
+**Правило:** слои не взаимозаменяемы. Если в MemPalace нет — значит, ещё не обсуждали.
+
+**Когда CEO делится тестом кухни** — СРАЗУ сохрани в MemPalace (WF-9 из AGENT.md). Не жди конца сессии.
+
+**В конце сессии** — ОБЯЗАТЕЛЬНО:
+1. Сохрани все тесты → `mempalace_add_drawer(wing="wing_kitchen", room="tests", content=...)`
+2. Сохрани решения → `mempalace_add_drawer(wing="wing_kitchen", room="decisions", content=...)`
+3. Обнови `kitchen-journal.md`
+4. Напиши дневник → `mempalace_diary_write(agent_name="chef", entry=<AAAK>)`
 
 ## Завершение сессии (ОБЯЗАТЕЛЬНО)
 
