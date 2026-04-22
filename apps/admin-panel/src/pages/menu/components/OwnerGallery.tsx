@@ -12,15 +12,15 @@ interface OwnerGalleryProps {
 }
 
 function foodCostColor(pct: number): string {
-  if (pct < 30) return 'text-emerald-400'
-  if (pct <= 45) return 'text-amber-400'
-  return 'text-rose-400'
+  if (pct < 30) return 'text-forest-soft'
+  if (pct <= 45) return 'text-amber-watch'
+  return 'text-brick-soft'
 }
 
 function foodCostBg(pct: number): string {
-  if (pct < 30) return 'bg-emerald-500/10 border-emerald-500/20'
-  if (pct <= 45) return 'bg-amber-500/10 border-amber-500/20'
-  return 'bg-rose-500/10 border-rose-500/20'
+  if (pct < 30) return 'bg-royal-green/25 border-forest-soft/20'
+  if (pct <= 45) return 'bg-amber-watch/15 border-amber-watch/25'
+  return 'bg-brick-soft/15 border-brick-soft/30'
 }
 
 export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer }: OwnerGalleryProps) {
@@ -45,7 +45,7 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer 
 
   if (optimisticDishes.length === 0) {
     return (
-      <div className="flex items-center justify-center py-20 text-sm text-slate-500">
+      <div className="flex items-center justify-center py-20 text-sm text-cream/50">
         No dishes in this category.
       </div>
     )
@@ -69,17 +69,17 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer 
             }}
             className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border transition ${
               dish.is_available
-                ? 'border-slate-800 bg-slate-900/60 hover:border-emerald-700/50'
-                : 'border-slate-800/50 bg-slate-950/40 opacity-60 hover:opacity-80'
+                ? 'border-surface-3 bg-surface-1/60 hover:border-forest-soft/40'
+                : 'border-surface-3/50 bg-surface-1/40 opacity-60 hover:opacity-80'
             }`}
           >
             {/* Photo */}
-            <div className="relative h-32 w-full bg-slate-800/50">
+            <div className="relative h-32 w-full bg-surface-2/50">
               {dish.image_url ? (
                 <img src={dish.image_url} alt={dish.name} className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
-                  <ImageOff className="h-6 w-6 text-slate-700" />
+                  <ImageOff className="h-6 w-6 text-cream/30" />
                 </div>
               )}
 
@@ -96,8 +96,8 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer 
                   onClick={() => toggleField(dish, 'is_featured')}
                   className={`rounded-md p-1 backdrop-blur transition ${
                     dish.is_featured
-                      ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
-                      : 'bg-slate-950/50 text-slate-500 hover:text-slate-300'
+                      ? 'bg-amber-watch/25 text-amber-watch hover:bg-amber-watch/35'
+                      : 'bg-surface-1/50 text-cream/50 hover:text-cream/80'
                   }`}
                   title={dish.is_featured ? 'Remove featured' : 'Mark featured'}
                 >
@@ -107,8 +107,8 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer 
                   onClick={() => toggleField(dish, 'is_available')}
                   className={`rounded-md p-1 backdrop-blur transition ${
                     dish.is_available
-                      ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
-                      : 'bg-slate-950/50 text-slate-500 hover:text-slate-300'
+                      ? 'bg-royal-green/30 text-forest-soft hover:bg-forest-soft/30'
+                      : 'bg-surface-1/50 text-cream/50 hover:text-cream/80'
                   }`}
                   title={dish.is_available ? 'Hide from menu' : 'Show on menu'}
                 >
@@ -121,24 +121,24 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer 
             <div className="flex flex-1 flex-col gap-2 p-3">
               {/* Name + category */}
               <div>
-                <h3 className="text-xs font-semibold text-slate-100 leading-tight">{dish.name}</h3>
+                <h3 className="text-xs font-semibold text-cream leading-tight">{dish.name}</h3>
                 {dish.category_name && (
-                  <span className="text-[10px] text-slate-500">{dish.category_name}</span>
+                  <span className="text-[10px] text-cream/50">{dish.category_name}</span>
                 )}
               </div>
 
               {/* Financial row */}
               <div className="flex items-baseline justify-between gap-2">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-sm font-bold tabular-nums text-slate-100">
+                  <span className="text-sm font-bold tabular-nums text-cream">
                     {price > 0 ? `\u0E3F${price.toLocaleString()}` : '-'}
                   </span>
-                  <span className="text-[10px] tabular-nums text-slate-500">
+                  <span className="text-[10px] tabular-nums text-cream/50">
                     cost {cost > 0 ? `\u0E3F${cost.toLocaleString()}` : '-'}
                   </span>
                 </div>
                 {price > 0 && (
-                  <span className={`text-xs font-semibold tabular-nums ${margin > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <span className={`text-xs font-semibold tabular-nums ${margin > 0 ? 'text-forest-soft' : 'text-brick-soft'}`}>
                     +{'\u0E3F'}{margin.toLocaleString()}
                   </span>
                 )}
@@ -158,7 +158,7 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer 
                   {dish.tags.map((tag) => (
                     <span
                       key={tag.slug}
-                      className="rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-slate-700/50 text-slate-400"
+                      className="rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-surface-3/50 text-cream/60"
                       style={tag.color ? { backgroundColor: `${tag.color}15`, color: tag.color } : undefined}
                     >
                       {tag.name}

@@ -175,8 +175,8 @@ export function MenuPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-slate-100">Menu</h1>
-          <p className="text-xs text-slate-500">
+          <h1 className="text-lg font-bold text-cream">Menu</h1>
+          <p className="text-xs text-cream/50">
             {totalDishes} dishes &middot; {availableCount} available &middot; {featuredCount} featured &middot; avg food cost {avgFoodCost.toFixed(1)}%
           </p>
         </div>
@@ -185,7 +185,7 @@ export function MenuPage() {
           {/* New Dish button */}
           <button
             onClick={() => setNewDishOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-700"
+            className="flex items-center gap-1.5 rounded-lg border border-surface-3 bg-surface-2 px-3 py-1.5 text-xs font-medium text-cream transition hover:border-surface-3 hover:bg-surface-3"
             title="Create new dish"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -195,7 +195,7 @@ export function MenuPage() {
           {/* AI Chef button */}
           <button
             onClick={() => setChefOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:border-emerald-600 hover:bg-emerald-500/20"
+            className="flex items-center gap-1.5 rounded-lg border border-forest-soft/40 bg-royal-green/25 px-3 py-1.5 text-xs font-medium text-forest-soft transition hover:border-forest-soft hover:bg-royal-green/30"
             title="Open AI Chef"
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -204,13 +204,13 @@ export function MenuPage() {
 
           {/* Owner layout toggle */}
           {view === 'owner' && (
-            <div className="flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
+            <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
               <button
                 onClick={() => setOwnerLayout('table')}
                 className={`flex items-center rounded-md p-1.5 transition ${
                   ownerLayout === 'table'
-                    ? 'bg-slate-700 text-slate-100'
-                    : 'text-slate-500 hover:text-slate-300'
+                    ? 'bg-surface-3 text-cream'
+                    : 'text-cream/50 hover:text-cream/80'
                 }`}
                 title="Table view"
               >
@@ -220,8 +220,8 @@ export function MenuPage() {
                 onClick={() => setOwnerLayout('gallery')}
                 className={`flex items-center rounded-md p-1.5 transition ${
                   ownerLayout === 'gallery'
-                    ? 'bg-slate-700 text-slate-100'
-                    : 'text-slate-500 hover:text-slate-300'
+                    ? 'bg-surface-3 text-cream'
+                    : 'text-cream/50 hover:text-cream/80'
                 }`}
                 title="Gallery view"
               >
@@ -231,13 +231,13 @@ export function MenuPage() {
           )}
 
           {/* View toggle */}
-          <div className="flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
+          <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
             <button
               onClick={() => setView('owner')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 view === 'owner'
-                  ? 'bg-slate-700 text-slate-100'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-surface-3 text-cream'
+                  : 'text-cream/60 hover:text-cream'
               }`}
             >
               Owner
@@ -246,8 +246,8 @@ export function MenuPage() {
               onClick={() => setView('customer')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 view === 'customer'
-                  ? 'bg-slate-700 text-slate-100'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-surface-3 text-cream'
+                  : 'text-cream/60 hover:text-cream'
               }`}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -283,19 +283,19 @@ export function MenuPage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-32 text-xs text-slate-500">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin text-emerald-500" />
+        <div className="flex items-center justify-center py-32 text-xs text-cream/50">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin text-forest-soft" />
           Loading menu...
         </div>
       ) : error ? (
-        <div className="rounded-lg border border-rose-800/50 bg-rose-950/30 p-4 text-sm text-rose-300">
+        <div className="rounded-lg border border-brick-soft/40 bg-brick-soft/15 p-4 text-sm text-brick-soft">
           Failed to load menu: {error}
         </div>
       ) : dishes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-slate-500">
-          <ChefHat className="mb-3 h-10 w-10 text-slate-600" />
-          <p className="text-sm font-medium text-slate-400">No dishes yet</p>
-          <p className="mt-1 text-xs text-slate-600">
+        <div className="flex flex-col items-center justify-center py-32 text-cream/50">
+          <ChefHat className="mb-3 h-10 w-10 text-cream/40" />
+          <p className="text-sm font-medium text-cream/60">No dishes yet</p>
+          <p className="mt-1 text-xs text-cream/40">
             Add SALE-type dishes in the nomenclature to see them here.
           </p>
         </div>
