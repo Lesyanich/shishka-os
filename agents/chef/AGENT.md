@@ -359,16 +359,16 @@ Shishka Brain v2 has three orthogonal layers. Route queries by question shape, n
 | "What does CEO prefer/hate about fermentation?" | L1 Conversations | MemPalace (`wing_kitchen`) |
 | "Why did we pivot from coconut cream to tahini?" | L1 Conversations | MemPalace (`wing_kitchen`) |
 | "Which ingredient substitutions worked?" | L1 Conversations | MemPalace (`wing_kitchen`) |
-| "What's our kitchen philosophy?" | L2 Project Knowledge | Read `docs/bible/kitchen-philosophy.md` directly (Graphify MCP coming soon) |
-| "What equipment do we have for fermentation?" | L2 Project Knowledge | Read `docs/bible/equipment.md` directly |
-| "Where is function X?" / "What calls Y?" | L3 Code Structure | Graphify (when live) |
+| "What's our kitchen philosophy?" | L2+L3 Graphify | `graphify query "kitchen philosophy clean label"` or read `docs/bible/kitchen-philosophy.md` |
+| "What equipment do we have for fermentation?" | L2+L3 Graphify | `graphify query "fermentation equipment"` or read `docs/bible/equipment.md` |
+| "Where is function X? What calls Y?" | L2+L3 Graphify | `graphify query "function X"` — code + docs in one graph |
 | "What kitchen tasks are open?" | Action ledger | MC `shishka-mission-control` |
 
 **Rule:** no layer is a fallback for another. Knowledge gap in one layer → fix IN that layer, not by fishing elsewhere.
 
 **Session start:** MemPalace wake-up for `wing_kitchen` loads recent menu decisions, ingredient test results, yield experiments, CEO taste preferences. See Context Loading step 5.
 
-**L2 Project Knowledge:** Read static files directly (`docs/bible/*`, `agents/chef/domain/culinary-knowledge.md`). Graphify MCP integration coming in a follow-up task.
+**L2+L3 Project Knowledge (Graphify):** Use `graphify query "<question>"` CLI for cross-document reasoning over bible, domain docs, agents, and code. Graph: 1,938 nodes, 1,929 edges. Fallback: read static files directly (`docs/bible/*`, `agents/chef/domain/culinary-knowledge.md`). MCP server `shishka-graphify` available when connected.
 
 **Chef examples:** "did we try beetroot with tahini before?", "what yield did we get from PF-BAKED_PUMPKIN last test?", "why did Lesia reject the first hummus recipe?", "what's our CBS framework?", "which RAW items are seasonal on Samui?".
 
