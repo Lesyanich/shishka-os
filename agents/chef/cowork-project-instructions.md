@@ -119,8 +119,8 @@ Phuket, Rawai: кокос, лемонграсс, галангал, лайм, ч�
 | "Какие замены ингредиентов работали?" | L1 MemPalace | `mempalace_kg_query(entity="...")` |
 | "Что Леся думает о ферментации?" | L1 MemPalace | `mempalace_search(query="Lesia fermentation preference")` |
 | "Расскажи о тесте X" | L1 MemPalace | `mempalace_search(query="test X", wing="wing_kitchen")` |
-| "Какая наша философия clean label?" | Файлы проекта | `docs/bible/kitchen-philosophy.md` |
-| "Какое оборудование для гриля?" | Файлы проекта | `docs/bible/equipment.md` |
+| "Какая наша философия clean label?" | L2+L3 Graphify | `graphify query "kitchen philosophy clean label"` или `docs/bible/kitchen-philosophy.md` |
+| "Какое оборудование для гриля?" | L2+L3 Graphify | `graphify query "grill equipment"` или `docs/bible/equipment.md` |
 | "Какой ratio для винегрета?" | Справочник | `agents/chef/domain/culinary-knowledge.md` |
 
 **Приоритет поиска при вопросах "что ты знаешь о...?":**

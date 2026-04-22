@@ -170,8 +170,8 @@ Shishka Brain v2 layering — route by question shape.
 |---|---|---|
 | "How did we handle X last handoff?" | L1 Conversations | MemPalace (`wing_tech`) |
 | "What MC RPC bug bit us here before?" | L1 Conversations | MemPalace (`wing_tech`) |
-| "What's RULE-HANDOFF-PACKET?" | L2 Project Knowledge | `docs/constitution/agent-rules.md` + LightRAG |
-| "Where is function X? What calls Y?" | L3 Code Structure | Graphify (when live) |
+| "What's RULE-HANDOFF-PACKET?" | L2+L3 Graphify | `graphify query "RULE-HANDOFF-PACKET"` or read `docs/constitution/agent-rules.md` |
+| "Where is function X? What calls Y?" | L2+L3 Graphify | `graphify query "function X"` — code + docs in one graph (1,938 nodes) |
 | "What tasks are open?" | Action ledger | MC `shishka-mission-control` |
 
 **Session start:** MemPalace wake-up for `wing_tech` loads recent handoff patterns, eng-rules corrections, PR/merge gotchas, CI debt.
