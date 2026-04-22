@@ -116,22 +116,22 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-surface-1/80 p-4 backdrop-blur-sm sm:p-8"
     >
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl"
+        className="relative w-full max-w-lg overflow-hidden rounded-xl border border-surface-3 bg-surface-1 shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
+        <div className="flex items-center justify-between border-b border-surface-3 px-5 py-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15">
-              <ChefHat className="h-4 w-4 text-emerald-400" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-royal-green/25">
+              <ChefHat className="h-4 w-4 text-forest-soft" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-100">New dish</h2>
-              <p className="text-[10px] text-slate-500">
+              <h2 className="text-sm font-bold text-cream">New dish</h2>
+              <p className="text-[10px] text-cream/50">
                 Creates a SALE-item. Add ingredients later by expanding the row.
               </p>
             </div>
@@ -139,7 +139,7 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
+            className="rounded-md p-1.5 text-cream/60 transition hover:bg-surface-2 hover:text-cream"
             title="Close (Esc)"
           >
             <X className="h-4 w-4" />
@@ -150,23 +150,23 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
         <div className="space-y-4 px-5 py-4">
           {/* Name */}
           <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Name <span className="text-rose-400">*</span>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-cream/50">
+              Name <span className="text-brick-soft">*</span>
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
               placeholder="Borsch Bio-Active"
-              className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-cream placeholder:text-cream/30 focus:border-forest-soft focus:outline-none"
             />
           </div>
 
           {/* Product code (auto-generated, editable) */}
           <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Product code <span className="text-rose-400">*</span>
-              <span className="ml-2 text-[9px] font-normal text-slate-600">
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-cream/50">
+              Product code <span className="text-brick-soft">*</span>
+              <span className="ml-2 text-[9px] font-normal text-cream/40">
                 auto from name, editable
               </span>
             </label>
@@ -177,21 +177,21 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
                 setCodeManuallyEdited(true)
               }}
               placeholder="SALE-BORSCH_BIO_ACTIVE"
-              className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded border border-surface-3 bg-surface-2 px-3 py-2 font-mono text-xs text-cream placeholder:text-cream/30 focus:border-forest-soft focus:outline-none"
             />
           </div>
 
           {/* Category L1 + L2 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Category <span className="text-rose-400">*</span>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-cream/50">
+                Category <span className="text-brick-soft">*</span>
               </label>
               <select
                 value={categoryId ?? ''}
                 onChange={(e) => setCategoryId(e.target.value || null)}
                 disabled={isLoadingCategories}
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+                className="w-full rounded border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-cream focus:border-forest-soft focus:outline-none disabled:opacity-50"
               >
                 <option value="">
                   {isLoadingCategories ? 'Loading…' : '— select —'}
@@ -205,9 +205,9 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
             </div>
 
             <div>
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-cream/50">
                 Subcategory
-                <span className="ml-2 text-[9px] font-normal text-slate-600">
+                <span className="ml-2 text-[9px] font-normal text-cream/40">
                   optional
                 </span>
               </label>
@@ -215,7 +215,7 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
                 value={subcategoryId ?? ''}
                 onChange={(e) => setSubcategoryId(e.target.value || null)}
                 disabled={!categoryId || l2Options.length === 0}
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+                className="w-full rounded border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-cream focus:border-forest-soft focus:outline-none disabled:opacity-50"
               >
                 <option value="">
                   {!categoryId
@@ -236,9 +236,9 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
           {/* Price + portion */}
           <div className="grid grid-cols-[8rem_1fr] gap-3">
             <div>
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-cream/50">
                 Price, ฿
-                <span className="ml-2 text-[9px] font-normal text-slate-600">
+                <span className="ml-2 text-[9px] font-normal text-cream/40">
                   optional
                 </span>
               </label>
@@ -249,13 +249,13 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
                 min={0}
                 step="1"
                 placeholder="290"
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+                className="w-full rounded border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-cream placeholder:text-cream/30 focus:border-forest-soft focus:outline-none"
               />
             </div>
             <div>
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-cream/50">
                 Portion size
-                <span className="ml-2 text-[9px] font-normal text-slate-600">
+                <span className="ml-2 text-[9px] font-normal text-cream/40">
                   enables price per 100{portionUnit === 'pcs' ? '' : portionUnit}
                 </span>
               </label>
@@ -267,12 +267,12 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
                   min={0}
                   step="1"
                   placeholder="250"
-                  className="w-24 rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+                  className="w-24 rounded border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-cream placeholder:text-cream/30 focus:border-forest-soft focus:outline-none"
                 />
                 <select
                   value={portionUnit}
                   onChange={(e) => setPortionUnit(e.target.value as PortionUnit)}
-                  className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none"
+                  className="rounded border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-cream focus:border-forest-soft focus:outline-none"
                 >
                   <option value="g">g</option>
                   <option value="ml">ml</option>
@@ -284,21 +284,21 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
 
           {/* Toggles */}
           <div className="flex items-center gap-5">
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-cream/80">
               <input
                 type="checkbox"
                 checked={isAvailable}
                 onChange={(e) => setIsAvailable(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500"
+                className="h-4 w-4 rounded border-surface-3 bg-surface-2 text-forest-soft focus:ring-forest-soft"
               />
               Available on menu
             </label>
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-cream/80">
               <input
                 type="checkbox"
                 checked={isFeatured}
                 onChange={(e) => setIsFeatured(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500"
+                className="h-4 w-4 rounded border-surface-3 bg-surface-2 text-amber-watch focus:ring-amber-watch"
               />
               Featured
             </label>
@@ -306,26 +306,26 @@ export function NewDishModal({ open, onClose, onCreated }: NewDishModalProps) {
 
           {/* Error */}
           {displayError && (
-            <div className="rounded-lg border border-rose-800/50 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">
+            <div className="rounded-lg border border-brick-soft/40 bg-brick-soft/15 px-3 py-2 text-xs text-brick-soft">
               {displayError}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-slate-800 px-5 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-surface-3 px-5 py-3">
           <button
             type="button"
             onClick={onClose}
             disabled={isCreating}
-            className="rounded-md border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+            className="rounded-md border border-surface-3 px-3 py-1.5 text-xs text-cream/80 transition hover:bg-surface-2 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!canSubmit}
-            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md bg-royal-green px-4 py-1.5 text-xs font-medium text-white transition hover:bg-forest-soft disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isCreating ? (
               <>

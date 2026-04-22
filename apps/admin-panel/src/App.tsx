@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import * as Sentry from '@sentry/react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { AppRoleProvider } from './contexts/AppRoleContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -48,6 +48,15 @@ function PageLoader() {
   )
 }
 
+// Alias for shareable nomenclature URLs. Covers SALE/PF/MOD (menu drawer
+// handles those). RAW items will land on a drawer with empty BOM/nutrition
+// until a dedicated edit surface exists — tracked separately.
+function NomenclatureRedirect() {
+  const { productCode } = useParams<{ productCode: string }>()
+  if (!productCode) return <Navigate to="/menu" replace />
+  return <Navigate to={`/menu/dish/${encodeURIComponent(productCode)}`} replace />
+}
+
 function FallbackError() {
   return (
     <div className="flex h-screen items-center justify-center bg-zinc-950 text-white">
@@ -86,7 +95,9 @@ function App() {
                     <Route path="mempalace" element={<Suspense fallback={<PageLoader />}><MemPalaceBrowser /></Suspense>} />
                     <Route path="quality" element={<Suspense fallback={<PageLoader />}><QualityPage /></Suspense>} />
                   </Route>
-                  <Route path="/menu" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />
+                  <Route path="/menu/*" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />
+                  <Route path="/nomenclature/:productCode" element={<NomenclatureRedirect />} />
+                  <Route path="/nomenclature" element={<Navigate to="/menu" replace />} />
                   <Route path="/bom" element={<Suspense fallback={<PageLoader />}><BOMHub /></Suspense>} />
                   <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
                   <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>

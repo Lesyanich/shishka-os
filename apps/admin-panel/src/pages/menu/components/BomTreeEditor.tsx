@@ -23,12 +23,12 @@ function formatThb(v: number): string {
 
 function typeBadge(type: string, productCode: string): { label: string; color: string } {
   if (type === 'semi' || productCode.startsWith('PF-')) {
-    return { label: 'PF', color: 'bg-violet-500/15 text-violet-300' }
+    return { label: 'PF', color: 'bg-nutri-car/20 text-nutri-car' }
   }
   if (type === 'modifier' || productCode.startsWith('MOD-')) {
-    return { label: 'MOD', color: 'bg-amber-500/15 text-amber-300' }
+    return { label: 'MOD', color: 'bg-amber-watch/20 text-amber-watch' }
   }
-  return { label: 'RAW', color: 'bg-slate-700 text-slate-300' }
+  return { label: 'RAW', color: 'bg-surface-3 text-cream/80' }
 }
 
 export function BomTreeEditor({
@@ -90,7 +90,7 @@ export function BomTreeEditor({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12 text-xs text-slate-500">
+      <div className="flex items-center justify-center py-12 text-xs text-cream/50">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         Loading BOM...
       </div>
@@ -99,7 +99,7 @@ export function BomTreeEditor({
 
   if (error) {
     return (
-      <div className="rounded-lg border border-rose-800/50 bg-rose-950/30 p-3 text-xs text-rose-300">
+      <div className="rounded-lg border border-brick-soft/40 bg-brick-soft/15 p-3 text-xs text-brick-soft">
         Failed to load BOM: {error}
       </div>
     )
@@ -108,21 +108,21 @@ export function BomTreeEditor({
   return (
     <div className="space-y-2">
       {bom.length === 0 && !isAdding ? (
-        <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/40 px-4 py-6 text-center">
-          <p className="text-xs text-slate-500">No ingredients yet</p>
+        <div className="rounded-lg border border-dashed border-surface-3 bg-surface-1/40 px-4 py-6 text-center">
+          <p className="text-xs text-cream/50">No ingredients yet</p>
           <button
             onClick={() => setIsAdding(true)}
-            className="mt-2 inline-flex items-center gap-1 rounded-md border border-emerald-700/50 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/20"
+            className="mt-2 inline-flex items-center gap-1 rounded-md border border-forest-soft/40 bg-royal-green/25 px-3 py-1 text-xs font-medium text-forest-soft transition hover:bg-royal-green/30"
           >
             <Plus className="h-3 w-3" />
             Add first ingredient
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-800">
+        <div className="overflow-hidden rounded-lg border border-surface-3">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-900/50 text-left text-[10px] uppercase tracking-wider text-slate-500">
+              <tr className="border-b border-surface-3 bg-surface-1/50 text-left text-[10px] uppercase tracking-wider text-cream/50">
                 <th className="px-3 py-2">Type</th>
                 <th className="px-3 py-2">Ingredient</th>
                 <th className="px-3 py-2 text-right">Quantity</th>
@@ -136,10 +136,10 @@ export function BomTreeEditor({
               {bom.map((row) => {
                 const ing = row.ingredient
                 const isEditing = editingId === row.id
-                const badge = ing ? typeBadge(ing.type, ing.product_code) : { label: '?', color: 'bg-slate-700 text-slate-400' }
+                const badge = ing ? typeBadge(ing.type, ing.product_code) : { label: '?', color: 'bg-surface-3 text-cream/60' }
 
                 return (
-                  <tr key={row.id} className="border-b border-slate-800/50 last:border-b-0 hover:bg-slate-800/20">
+                  <tr key={row.id} className="border-b border-surface-3/50 last:border-b-0 hover:bg-surface-2/20">
                     <td className="px-3 py-2">
                       <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold ${badge.color}`}>
                         {badge.label}
@@ -148,11 +148,11 @@ export function BomTreeEditor({
                     <td className="px-3 py-2">
                       {ing ? (
                         <div className="flex flex-col">
-                          <span className="font-medium text-slate-100">{ing.name}</span>
-                          <span className="text-[10px] text-slate-500">{ing.product_code}</span>
+                          <span className="font-medium text-cream">{ing.name}</span>
+                          <span className="text-[10px] text-cream/50">{ing.product_code}</span>
                         </div>
                       ) : (
-                        <span className="text-rose-400">Missing ingredient</span>
+                        <span className="text-brick-soft">Missing ingredient</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -168,22 +168,22 @@ export function BomTreeEditor({
                               if (e.key === 'Enter') saveEdit()
                               if (e.key === 'Escape') cancelEdit()
                             }}
-                            className="w-20 rounded border border-slate-600 bg-slate-800 px-2 py-0.5 text-right text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                            className="w-20 rounded border border-surface-3 bg-surface-2 px-2 py-0.5 text-right text-xs text-cream focus:border-forest-soft focus:outline-none"
                             autoFocus
                           />
-                          <span className="text-[10px] text-slate-500">{ing?.base_unit ?? ''}</span>
+                          <span className="text-[10px] text-cream/50">{ing?.base_unit ?? ''}</span>
                         </div>
                       ) : (
-                        <span className="tabular-nums text-slate-200">
+                        <span className="tabular-nums text-cream">
                           {row.quantity_per_unit}
-                          <span className="ml-1 text-[10px] text-slate-500">{ing?.base_unit ?? ''}</span>
+                          <span className="ml-1 text-[10px] text-cream/50">{ing?.base_unit ?? ''}</span>
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right text-slate-400 tabular-nums">
+                    <td className="px-3 py-2 text-right text-cream/60 tabular-nums">
                       {ing ? formatThb(ing.cost_per_unit) : '-'}
                     </td>
-                    <td className="px-3 py-2 text-right font-medium text-slate-200 tabular-nums">
+                    <td className="px-3 py-2 text-right font-medium text-cream tabular-nums">
                       {formatThb(row.cost_contribution)}
                     </td>
                     <td className="px-3 py-2">
@@ -196,10 +196,10 @@ export function BomTreeEditor({
                             if (e.key === 'Escape') cancelEdit()
                           }}
                           placeholder="Optional notes"
-                          className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-0.5 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                          className="w-full rounded border border-surface-3 bg-surface-2 px-2 py-0.5 text-xs text-cream focus:border-forest-soft focus:outline-none"
                         />
                       ) : (
-                        <span className="text-[11px] text-slate-500">{row.notes ?? ''}</span>
+                        <span className="text-[11px] text-cream/50">{row.notes ?? ''}</span>
                       )}
                     </td>
                     <td className="px-3 py-2">
@@ -208,14 +208,14 @@ export function BomTreeEditor({
                           <>
                             <button
                               onClick={saveEdit}
-                              className="rounded bg-emerald-600 p-1 text-white hover:bg-emerald-500"
+                              className="rounded bg-royal-green p-1 text-white hover:bg-forest-soft"
                               title="Save"
                             >
                               <Check className="h-3 w-3" />
                             </button>
                             <button
                               onClick={cancelEdit}
-                              className="rounded bg-slate-700 p-1 text-slate-300 hover:bg-slate-600"
+                              className="rounded bg-surface-3 p-1 text-cream/80 hover:bg-surface-3"
                               title="Cancel"
                             >
                               <X className="h-3 w-3" />
@@ -225,7 +225,7 @@ export function BomTreeEditor({
                           <>
                             <button
                               onClick={() => startEdit(row)}
-                              className="rounded p-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                              className="rounded p-1 text-cream/60 hover:bg-surface-3 hover:text-cream"
                               title="Edit"
                             >
                               <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -234,7 +234,7 @@ export function BomTreeEditor({
                             </button>
                             <button
                               onClick={() => handleRemove(row)}
-                              className="rounded p-1 text-slate-400 hover:bg-rose-900/40 hover:text-rose-300"
+                              className="rounded p-1 text-cream/60 hover:bg-brick-soft/30 hover:text-brick-soft"
                               title="Remove"
                             >
                               <Trash2 className="h-3 w-3" />
@@ -249,11 +249,11 @@ export function BomTreeEditor({
             </tbody>
             {bom.length > 0 && (
               <tfoot>
-                <tr className="border-t border-slate-700 bg-slate-900/60">
-                  <td colSpan={4} className="px-3 py-2 text-right text-[10px] uppercase tracking-wider text-slate-500">
+                <tr className="border-t border-surface-3 bg-surface-1/60">
+                  <td colSpan={4} className="px-3 py-2 text-right text-[10px] uppercase tracking-wider text-cream/50">
                     Total BOM cost per unit
                   </td>
-                  <td className="px-3 py-2 text-right text-sm font-bold text-emerald-300 tabular-nums">
+                  <td className="px-3 py-2 text-right text-sm font-bold text-forest-soft tabular-nums">
                     {formatThb(totalBomCost)}
                   </td>
                   <td colSpan={2}></td>
@@ -274,7 +274,7 @@ export function BomTreeEditor({
       ) : bom.length > 0 ? (
         <button
           onClick={() => setIsAdding(true)}
-          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs text-slate-400 transition hover:border-emerald-700 hover:bg-emerald-500/5 hover:text-emerald-300"
+          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-surface-3 bg-surface-1/30 px-3 py-1.5 text-xs text-cream/60 transition hover:border-forest-soft hover:bg-forest-soft/5 hover:text-forest-soft"
         >
           <Plus className="h-3 w-3" />
           Add ingredient
@@ -351,33 +351,33 @@ function IngredientPicker({ excludeIds, onCancel, onAdd }: IngredientPickerProps
   }
 
   return (
-    <div className="rounded-lg border border-emerald-800/40 bg-slate-900/60 p-3">
+    <div className="rounded-lg border border-forest-soft/40 bg-surface-1/60 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-200">Add ingredient</span>
-        <button onClick={onCancel} className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300">
+        <span className="text-xs font-medium text-cream">Add ingredient</span>
+        <button onClick={onCancel} className="rounded p-1 text-cream/50 hover:bg-surface-2 hover:text-cream/80">
           <X className="h-3 w-3" />
         </button>
       </div>
 
       <div className="relative mb-2">
-        <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-500" />
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-cream/50" />
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search RAW / PF / MOD..."
-          className="w-full rounded border border-slate-700 bg-slate-800 py-1.5 pl-7 pr-2 text-xs text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+          className="w-full rounded border border-surface-3 bg-surface-2 py-1.5 pl-7 pr-2 text-xs text-cream placeholder:text-cream/40 focus:border-forest-soft focus:outline-none"
         />
       </div>
 
-      <div className="mb-2 max-h-48 overflow-y-auto rounded border border-slate-800">
+      <div className="mb-2 max-h-48 overflow-y-auto rounded border border-surface-3">
         {isSearching ? (
-          <div className="flex items-center justify-center py-4 text-[11px] text-slate-500">
+          <div className="flex items-center justify-center py-4 text-[11px] text-cream/50">
             <Loader2 className="mr-1 h-3 w-3 animate-spin" />
             Searching...
           </div>
         ) : results.length === 0 ? (
-          <div className="py-4 text-center text-[11px] text-slate-500">No matches</div>
+          <div className="py-4 text-center text-[11px] text-cream/50">No matches</div>
         ) : (
           results.map((r) => {
             const badge = typeBadge(r.type, r.product_code)
@@ -385,18 +385,18 @@ function IngredientPicker({ excludeIds, onCancel, onAdd }: IngredientPickerProps
               <button
                 key={r.id}
                 onClick={() => setSelectedId(r.id)}
-                className={`flex w-full items-center gap-2 border-b border-slate-800/60 px-2 py-1.5 text-left text-xs transition last:border-b-0 ${
+                className={`flex w-full items-center gap-2 border-b border-surface-3/60 px-2 py-1.5 text-left text-xs transition last:border-b-0 ${
                   selectedId === r.id
-                    ? 'bg-emerald-500/10 text-emerald-100'
-                    : 'text-slate-300 hover:bg-slate-800'
+                    ? 'bg-royal-green/25 text-cream'
+                    : 'text-cream/80 hover:bg-surface-2'
                 }`}
               >
                 <span className={`rounded px-1 py-0.5 text-[9px] font-bold ${badge.color}`}>
                   {badge.label}
                 </span>
                 <span className="flex-1 truncate">{r.name}</span>
-                <span className="text-[10px] text-slate-500">{r.product_code}</span>
-                <span className="text-[10px] text-slate-400 tabular-nums">
+                <span className="text-[10px] text-cream/50">{r.product_code}</span>
+                <span className="text-[10px] text-cream/60 tabular-nums">
                   {formatThb(r.cost_per_unit)}/{r.base_unit ?? ''}
                 </span>
               </button>
@@ -407,7 +407,7 @@ function IngredientPicker({ excludeIds, onCancel, onAdd }: IngredientPickerProps
 
       {selected && (
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-cream/60">
             Quantity ({selected.base_unit ?? 'unit'})
           </span>
           <input
@@ -420,13 +420,13 @@ function IngredientPicker({ excludeIds, onCancel, onAdd }: IngredientPickerProps
               if (e.key === 'Enter' && quantity) handleSave()
               if (e.key === 'Escape') onCancel()
             }}
-            className="w-24 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-right text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+            className="w-24 rounded border border-surface-3 bg-surface-2 px-2 py-1 text-right text-xs text-cream focus:border-forest-soft focus:outline-none"
             autoFocus
           />
           <button
             onClick={handleSave}
             disabled={!quantity || isSaving}
-            className="inline-flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded bg-royal-green px-3 py-1 text-xs font-medium text-white transition hover:bg-forest-soft disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
             Add

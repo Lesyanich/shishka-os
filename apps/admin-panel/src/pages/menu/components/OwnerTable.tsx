@@ -69,9 +69,9 @@ function KindBadge({ kind, dual }: { kind: NomenclatureKind; dual: boolean }) {
 }
 
 function foodCostColor(pct: number): string {
-  if (pct < 30) return 'text-emerald-400 bg-emerald-500/10'
-  if (pct <= 45) return 'text-amber-400 bg-amber-500/10'
-  return 'text-rose-400 bg-rose-500/10'
+  if (pct < 30) return 'text-forest-soft bg-royal-green/25'
+  if (pct <= 45) return 'text-amber-watch bg-amber-watch/15'
+  return 'text-brick-soft bg-brick-soft/15'
 }
 
 function formatThb(v: number | null): string {
@@ -324,7 +324,7 @@ export function OwnerTable({
         ? 'No items in this category.'
         : `No ${typeFilter} items in this category.`
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-sm text-slate-500">
+      <div className="flex flex-col items-center justify-center py-20 text-sm text-cream/50">
         <span>{emptyCopy}</span>
       </div>
     )
@@ -339,13 +339,13 @@ export function OwnerTable({
       }}
       aria-label="Menu items"
       aria-rowcount={orderedRowIds.length}
-      className="overflow-x-auto rounded-lg border border-slate-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-brick-soft)]/40"
+      className="overflow-x-auto rounded-lg border border-surface-3 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-brick-soft)]/40"
     >
       <table className="w-full text-xs" role="presentation">
         <thead>
           <tr
             role="row"
-            className="border-b border-slate-800 bg-slate-900/50 text-left text-[10px] uppercase tracking-wider text-slate-500"
+            className="border-b border-surface-3 bg-surface-1/50 text-left text-[10px] uppercase tracking-wider text-cream/50"
           >
             <th role="columnheader" className="px-2 py-2.5" style={{ width: 28 }}></th>
             <th role="columnheader" className="px-2 py-2.5" style={{ width: 28 }}></th>
@@ -367,9 +367,9 @@ export function OwnerTable({
           {groupedDishes.map((item) => {
             if (item.type === 'l2-header') {
               return (
-                <tr key={`l2-${item.subcategory.id}`} className="bg-slate-900/30">
+                <tr key={`l2-${item.subcategory.id}`} className="bg-surface-1/30">
                   <td colSpan={14} className="px-3 py-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-cream/50">
                       {item.subcategory.name}
                     </span>
                   </td>
@@ -406,8 +406,8 @@ export function OwnerTable({
                 data-focused={isFocused || undefined}
                 title={rowError}
                 onClick={() => kbd.setFocused(dish.id)}
-                className={`border-b border-slate-800/50 transition ${
-                  isExpanded ? 'bg-slate-800/40' : 'hover:bg-slate-800/30'
+                className={`border-b border-surface-3/50 transition ${
+                  isExpanded ? 'bg-surface-2/40' : 'hover:bg-surface-2/30'
                 } ${
                   isFocused
                     ? 'ring-2 ring-inset ring-[var(--color-brick-soft)]/70 bg-[var(--color-royal-red)]/5'
@@ -418,7 +418,7 @@ export function OwnerTable({
                 <td className="px-2 py-2">
                   <button
                     onClick={() => toggleExpand(dish.id)}
-                    className="rounded p-1 text-slate-500 transition hover:bg-slate-700 hover:text-slate-200"
+                    className="rounded p-1 text-cream/50 transition hover:bg-surface-3 hover:text-cream"
                     title={isExpanded ? 'Collapse' : 'Expand tech card'}
                   >
                     {isExpanded ? (
@@ -437,7 +437,7 @@ export function OwnerTable({
                       className={`rounded p-1 transition ${
                         isDrilled
                           ? 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)]'
-                          : 'text-slate-500 hover:bg-slate-700 hover:text-slate-200'
+                          : 'text-cream/50 hover:bg-surface-3 hover:text-cream'
                       }`}
                       title={
                         isDrilled
@@ -468,7 +468,7 @@ export function OwnerTable({
                       isFailed={rowFailed}
                     />
                     {!hasNutrition(dish) && (
-                      <span className="inline-flex rounded-full bg-slate-700 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
+                      <span className="inline-flex rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-medium text-cream/60">
                         No KBJU
                       </span>
                     )}
@@ -481,7 +481,7 @@ export function OwnerTable({
                 </td>
 
                 {/* Description */}
-                <td className="max-w-[200px] px-3 py-2 text-slate-400">
+                <td className="max-w-[200px] px-3 py-2 text-cream/60">
                   {dish.description ? (
                     <span title={dish.description} className="block truncate">
                       {dish.description.length > 40
@@ -489,18 +489,18 @@ export function OwnerTable({
                         : dish.description}
                     </span>
                   ) : (
-                    <span className="text-slate-600">-</span>
+                    <span className="text-cream/40">-</span>
                   )}
                 </td>
 
                 {/* Category */}
                 <td className="px-3 py-2">
                   {dish.category_name ? (
-                    <span className="inline-flex rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] font-medium text-slate-300">
+                    <span className="inline-flex rounded-full bg-surface-3/50 px-2 py-0.5 text-[10px] font-medium text-cream/80">
                       {dish.category_name}
                     </span>
                   ) : (
-                    <span className="text-slate-600">-</span>
+                    <span className="text-cream/40">-</span>
                   )}
                 </td>
 
@@ -512,7 +512,7 @@ export function OwnerTable({
                         value={portionEditing.size}
                         onChange={(e) => setPortionEditing({ ...portionEditing, size: e.target.value })}
                         onKeyDown={handlePortionKeyDown}
-                        className="w-16 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-right text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                        className="w-16 rounded border border-surface-3 bg-surface-2 px-2 py-1 text-right text-xs text-cream focus:border-forest-soft focus:outline-none"
                         type="number"
                         min={0}
                         autoFocus
@@ -520,23 +520,23 @@ export function OwnerTable({
                       <select
                         value={portionEditing.unit}
                         onChange={(e) => setPortionEditing({ ...portionEditing, unit: e.target.value as PortionUnit })}
-                        className="rounded border border-slate-600 bg-slate-800 px-1 py-1 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                        className="rounded border border-surface-3 bg-surface-2 px-1 py-1 text-xs text-cream focus:border-forest-soft focus:outline-none"
                       >
                         <option value="g">g</option>
                         <option value="ml">ml</option>
                         <option value="pcs">pcs</option>
                       </select>
-                      <button onClick={savePortionEdit} className="rounded bg-emerald-600 p-0.5 text-white hover:bg-emerald-500">
+                      <button onClick={savePortionEdit} className="rounded bg-royal-green p-0.5 text-white hover:bg-forest-soft">
                         <Check className="h-3 w-3" />
                       </button>
-                      <button onClick={cancelPortionEdit} className="rounded bg-slate-700 p-0.5 text-slate-300 hover:bg-slate-600">
+                      <button onClick={cancelPortionEdit} className="rounded bg-surface-3 p-0.5 text-cream/80 hover:bg-surface-3">
                         <X className="h-3 w-3" />
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => startPortionEdit(dish)}
-                      className={`text-right ${dish.portion_size != null ? 'text-slate-300' : 'text-slate-600'}`}
+                      className={`text-right ${dish.portion_size != null ? 'text-cream/80' : 'text-cream/40'}`}
                       title="Edit portion size"
                     >
                       {formatPortion(dish)}
@@ -569,9 +569,9 @@ export function OwnerTable({
                   {(() => {
                     const per100 = pricePer100(dish.price, dish.portion_size, dish.portion_unit)
                     return per100 != null ? (
-                      <span className="text-slate-400">{formatThb(Math.round(per100))}</span>
+                      <span className="text-cream/60">{formatThb(Math.round(per100))}</span>
                     ) : (
-                      <span className="text-slate-600">&mdash;</span>
+                      <span className="text-cream/40">&mdash;</span>
                     )
                   })()}
                 </td>
@@ -579,9 +579,9 @@ export function OwnerTable({
                 {/* Cost */}
                 <td className="px-3 py-2 text-right">
                   {hasCost ? (
-                    <span className="text-slate-400">{formatThb(cost)}</span>
+                    <span className="text-cream/60">{formatThb(cost)}</span>
                   ) : (
-                    <span className="inline-flex rounded-full bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                    <span className="inline-flex rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-cream/60">
                       No BOM
                     </span>
                   )}
@@ -594,18 +594,18 @@ export function OwnerTable({
                       {foodCostPct.toFixed(1)}%
                     </span>
                   ) : (
-                    <span className="text-slate-600">&mdash;</span>
+                    <span className="text-cream/40">&mdash;</span>
                   )}
                 </td>
 
                 {/* Margin */}
                 <td className="px-3 py-2 text-right">
                   {hasCost && price > 0 ? (
-                    <span className={margin > 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                    <span className={margin > 0 ? 'text-forest-soft' : 'text-brick-soft'}>
                       {formatThb(margin)}
                     </span>
                   ) : (
-                    <span className="text-slate-600">&mdash;</span>
+                    <span className="text-cream/40">&mdash;</span>
                   )}
                 </td>
 
@@ -614,7 +614,7 @@ export function OwnerTable({
                   <button
                     onClick={() => toggleField(dish, 'is_available')}
                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
-                      dish.is_available ? 'bg-emerald-600' : 'bg-slate-700'
+                      dish.is_available ? 'bg-royal-green' : 'bg-surface-3'
                     }`}
                   >
                     <span
@@ -630,7 +630,7 @@ export function OwnerTable({
                   <button
                     onClick={() => toggleField(dish, 'is_featured')}
                     className={`transition ${
-                      dish.is_featured ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-slate-400'
+                      dish.is_featured ? 'text-amber-watch hover:text-amber-watch' : 'text-cream/40 hover:text-cream/60'
                     }`}
                   >
                     {dish.is_featured ? <Star className="h-4 w-4" /> : <StarOff className="h-4 w-4" />}
@@ -645,15 +645,15 @@ export function OwnerTable({
                 />
               )}
               {isExpanded && (
-                <tr className="bg-slate-950/60">
+                <tr className="bg-surface-1/60">
                   <td colSpan={14} className="p-0">
                     <DishExpandedCard dish={dish} />
                     {onOpenDrawer && (
-                      <div className="flex justify-end border-t border-slate-800/50 bg-slate-950/40 px-4 py-2">
+                      <div className="flex justify-end border-t border-surface-3/50 bg-surface-1/40 px-4 py-2">
                         <button
                           type="button"
                           onClick={() => onOpenDrawer(dish.id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/50 bg-transparent px-3 py-1.5 text-[11px] font-medium text-[color:var(--color-cream)]/70 transition hover:border-[var(--color-forest-soft)]/50 hover:bg-[var(--color-royal-green)]/10 hover:text-[color:var(--color-forest-soft)]"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-surface-3/50 bg-transparent px-3 py-1.5 text-[11px] font-medium text-[color:var(--color-cream)]/70 transition hover:border-[var(--color-forest-soft)]/50 hover:bg-[var(--color-royal-green)]/10 hover:text-[color:var(--color-forest-soft)]"
                           title="Open detail drawer (or press o)"
                         >
                           <PanelRightOpen className="h-3.5 w-3.5" />
@@ -703,7 +703,7 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
         return (
           <tr
             key={`${parentId}-child-${c.id}`}
-            className="bg-slate-950/40 text-[color:var(--color-cream)]/60"
+            className="bg-surface-1/40 text-[color:var(--color-cream)]/60"
             data-bom-child-of={parentId}
           >
             <td className="px-2 py-1.5" />
@@ -711,7 +711,7 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
             <td className="px-3 py-1.5">
               <span className="flex items-center gap-2">
                 <span
-                  className="font-mono text-[10px] text-slate-600"
+                  className="font-mono text-[10px] text-cream/40"
                   aria-hidden
                   title={`Child of ${parentName}`}
                 >
@@ -721,7 +721,7 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
                   className="italic"
                   style={{ fontFamily: 'var(--font-display)' }}
                 >
-                  {child?.name ?? <span className="text-rose-400">missing</span>}
+                  {child?.name ?? <span className="text-brick-soft">missing</span>}
                 </span>
               </span>
             </td>
@@ -735,12 +735,12 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
                 </span>
               )}
             </td>
-            <td className="px-3 py-1.5 text-slate-600" colSpan={2}>
+            <td className="px-3 py-1.5 text-cream/40" colSpan={2}>
               <span className="font-mono text-[10px] tabular-nums">
                 {c.quantityPerUnit.toFixed(2)}
                 {unit ? ` ${unit}` : ''}
                 {c.yieldLossPct != null && c.yieldLossPct > 0 && (
-                  <span className="ml-2 text-rose-400/60">
+                  <span className="ml-2 text-brick-soft/60">
                     +{c.yieldLossPct}% loss
                   </span>
                 )}
@@ -750,7 +750,7 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5 text-right">
               {costContribution != null && (
-                <span className="font-mono text-[10px] tabular-nums text-slate-500">
+                <span className="font-mono text-[10px] tabular-nums text-cream/50">
                   {'\u0E3F'}
                   {costContribution.toFixed(1)}
                 </span>
