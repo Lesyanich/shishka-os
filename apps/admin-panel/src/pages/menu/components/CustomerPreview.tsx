@@ -15,6 +15,9 @@ interface CustomerPreviewProps {
   selectedCategory: string | null
   /** Quality score lookup — wires when the scorecard sub-task lands. */
   qualityScoreFor?: (dishId: string) => number | null | undefined
+  /** Click a dish → open DetailDrawer (owner-only). Public site leaves this
+   * undefined so cards are non-interactive. */
+  onOpenDish?: (dishId: string) => void
 }
 
 /** Adapter layer: translates admin-panel `MenuDish` rows into the pure
@@ -27,6 +30,7 @@ export function CustomerPreview({
   categories,
   selectedCategory,
   qualityScoreFor,
+  onOpenDish,
 }: CustomerPreviewProps) {
   const visible = useMemo(
     () => dishes.filter((d) => d.is_available),
@@ -107,6 +111,7 @@ export function CustomerPreview({
         categoryOf={(id) => categoryOfId.get(id) ?? null}
         descriptionFor={(id) => descriptionOfId.get(id) ?? null}
         qualityScoreFor={qualityScoreFor}
+        onSelect={onOpenDish}
         stickyTopPx={64}
       />
     </div>

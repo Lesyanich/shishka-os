@@ -1,13 +1,14 @@
-import { useOptimistic, useCallback, useState } from 'react'
-import { Star, StarOff, ImageOff, Eye, EyeOff, X } from 'lucide-react'
+import { useOptimistic, useCallback } from 'react'
+import { Star, StarOff, ImageOff, Eye, EyeOff } from 'lucide-react'
 import type { MenuDish } from '../../../hooks/useMenuDishes'
 import { NutritionBadges } from './NutritionBadge'
-import { DishExpandedCard } from './DishExpandedCard'
 
 interface OwnerGalleryProps {
   dishes: MenuDish[]
   selectedCategory: string | null
   onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'price' | 'is_available' | 'is_featured'>>) => Promise<{ ok: boolean; error?: string }>
+  /** Click a card (outside toggles) → open DetailDrawer via URL. */
+  onOpenDrawer?: (dishId: string) => void
 }
 
 function foodCostColor(pct: number): string {
@@ -22,7 +23,7 @@ function foodCostBg(pct: number): string {
   return 'bg-rose-500/10 border-rose-500/20'
 }
 
-export function OwnerGallery({ dishes, selectedCategory, onUpdate }: OwnerGalleryProps) {
+export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer }: OwnerGalleryProps) {
   const filtered = selectedCategory
     ? dishes.filter((d) => d.category_id === selectedCategory)
     : dishes
@@ -41,9 +42,6 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate }: OwnerGaller
     },
     [onUpdate, setOptimistic],
   )
-
-  const [openDishId, setOpenDishId] = useState<string | null>(null)
-  const openDish = optimisticDishes.find((d) => d.id === openDishId) ?? null
 
   if (optimisticDishes.length === 0) {
     return (
@@ -65,9 +63,9 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate }: OwnerGaller
           <div
             key={dish.id}
             onClick={(e) => {
-              // Don't open modal if clicking on toggles/buttons
+              // Don't open drawer if clicking on toggles/buttons
               if ((e.target as HTMLElement).closest('button')) return
-              setOpenDishId(dish.id)
+              onOpenDrawer?.(dish.id)
             }}
             className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border transition ${
               dish.is_available
@@ -172,37 +170,6 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate }: OwnerGaller
           </div>
         )
       })}
-
-      {/* Modal overlay for dish detail */}
-      {openDish && (
-        <div
-          onClick={() => setOpenDishId(null)}
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-8"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl"
-          >
-            <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
-              <div>
-                <h2 className="text-base font-bold text-slate-100">{openDish.name}</h2>
-                <p className="text-[11px] text-slate-500">
-                  {openDish.product_code}
-                  {openDish.category_name && ` · ${openDish.category_name}`}
-                </p>
-              </div>
-              <button
-                onClick={() => setOpenDishId(null)}
-                className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
-                title="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <DishExpandedCard dish={openDish} />
-          </div>
-        </div>
-      )}
     </div>
   )
 }

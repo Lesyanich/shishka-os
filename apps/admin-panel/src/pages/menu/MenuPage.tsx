@@ -318,12 +318,14 @@ export function MenuPage() {
           dishes={dishes}
           selectedCategory={selectedCategory}
           onUpdate={updateItem}
+          onOpenDrawer={openDrawer}
         />
       ) : (
         <CustomerPreview
           dishes={dishes}
           categories={categories}
           selectedCategory={selectedCategory}
+          onOpenDish={openDrawer}
         />
       )}
 
