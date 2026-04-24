@@ -1,4 +1,5 @@
 import { db } from "./supabase.ts"
+import { parseGS1WeightBarcode, matchGS1WeightItem } from "./gs1.ts"
 
 export interface ResolvedSupplier {
   id: string | null
@@ -58,6 +59,17 @@ export async function matchNomenclature(
   supplierId: string | null,
   item: { barcode?: string | null; supplier_sku?: string | null; translated_name?: string; original_name?: string | null },
 ): Promise<{ nomenclature_id: string | null; sku_id: string | null; confidence: string }> {
+  // Level 0: GS1 variable-weight barcode (prefix "2", >13 digits)
+  if (item.barcode) {
+    const gs1 = parseGS1WeightBarcode(item.barcode)
+    if (gs1) {
+      const gs1Match = await matchGS1WeightItem(gs1.base)
+      if (gs1Match.nomenclature_id) {
+        return { nomenclature_id: gs1Match.nomenclature_id, sku_id: gs1Match.sku_id, confidence: "high" }
+      }
+    }
+  }
+
   if (item.barcode) {
     // Level 1a: supplier_catalog by barcode
     const { data } = await db
