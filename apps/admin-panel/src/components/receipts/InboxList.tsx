@@ -444,7 +444,7 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                       {/* Actions */}
                       <td className="px-1 py-2.5">
                         <div className="flex items-center justify-center gap-1">
-                          {!r.expense_id && r.model_used !== 'claude-subscription' && (
+                          {!r.expense_id && r.status !== 'processed' && r.model_used !== 'claude-subscription' && (
                             <>
                               <select
                                 value={rowModels[r.id] || 'gemini-flash'}
