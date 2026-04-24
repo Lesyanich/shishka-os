@@ -746,11 +746,18 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             </div>
           </div>
 
+          {/* Reconciliation formula */}
+          {!totalMismatch && (discountAmount > 0 || (!vatIncluded && vatAmount > 0)) && (
+            <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-[10px] text-slate-400">
+              <Check className="h-3 w-3 flex-shrink-0 text-emerald-500" />
+              {'\u0E3F'}{fmt(calculatedTotal)}{!discountEmbedded && discountAmount > 0 ? ` \u2212 ${fmt(discountAmount)}` : ''}{!vatIncluded && vatAmount ? ` + ${fmt(vatAmount)}` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)}
+            </div>
+          )}
           {/* Mismatch warning */}
           {totalMismatch && (
             <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
               <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              Items ({'\u0E3F'}{fmt(calculatedTotal)}){discountEmbedded ? ` [discount ฿${fmt(discountAmount)} already in prices]` : ` − discount (฿${fmt(discountAmount)})`}{!vatIncluded && vatAmount ? ` + VAT (฿${fmt(vatAmount)})` : ''}{vatIncluded && vatAmount ? ` [VAT ฿${fmt(vatAmount)} incl.]` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} ≠ receipt ({'\u0E3F'}{fmt(receiptTotal)}).
+              Items ({'\u0E3F'}{fmt(calculatedTotal)}){discountEmbedded ? ` [discount \u0E3F${fmt(discountAmount)} already in prices]` : ` \u2212 discount (\u0E3F${fmt(discountAmount)})`}{!vatIncluded && vatAmount ? ` + VAT (\u0E3F${fmt(vatAmount)})` : ''}{vatIncluded && vatAmount ? ` [VAT \u0E3F${fmt(vatAmount)} incl.]` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} \u2260 receipt ({'\u0E3F'}{fmt(receiptTotal)}).
               Diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))}
             </div>
           )}
