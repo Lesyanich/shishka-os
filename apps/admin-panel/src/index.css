@@ -8,18 +8,34 @@
 @theme {
   /* Brand */
   --color-royal-green: #2D3F1C;
+  --color-royal-green-deep: #1A2411;
   --color-royal-red: #9B1C21;
   --color-forest-soft: #5B7A3D;
   --color-brick-soft: #C74A4F;
+  --color-brick-bright: #E27A7F;
   --color-amber-watch: #B88830;
+  --color-amber-glow: #D6A03B;
 
   /* Dark surfaces (menu page) */
   --color-surface-1: #0B0F0A;
   --color-surface-2: #12170F;
   --color-surface-3: #1A2114;
 
+  /* Warmer-dark surfaces (roadmap + future global) — CEO-approved 2026-04-24 */
+  --color-s-0: #0A0D08;
+  --color-s-1: #10150D;
+  --color-s-2: #171E12;
+  --color-s-3: #1F2818;
+  --color-line: rgba(240, 234, 214, 0.09);
+  --color-line-strong: rgba(240, 234, 214, 0.18);
+
   /* Text */
   --color-cream: #F0EAD6;
+  --color-cream-dim: #D8D0B8;
+
+  /* Motion */
+  --ease-out-brand: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-emph-brand: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* Nutrition badges (editorial, muted) */
   --color-nutri-cal: #B88830;   /* amber */

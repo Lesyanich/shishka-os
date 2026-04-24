@@ -1,167 +1,180 @@
-import { useMemo, useState } from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useOpeningRoadmap } from '../hooks/useOpeningRoadmap'
 import { OPENING_PHASES } from '../components/roadmap/roadmap-config'
-import { RoadmapHeader } from '../components/roadmap/RoadmapHeader'
-import { PhaseCard } from '../components/roadmap/PhaseCard'
-import { RoadmapTaskRow } from '../components/roadmap/RoadmapTaskRow'
+import { RoadmapTopbar } from '../components/roadmap/RoadmapTopbar'
+import { CalendarRibbon } from '../components/roadmap/CalendarRibbon'
+import { BeforeRecipeLock } from '../components/roadmap/BeforeRecipeLock'
+import { BlockersCard } from '../components/roadmap/BlockersCard'
+import { PhaseChapter } from '../components/roadmap/PhaseChapter'
+import {
+  computeCurrentPhaseId,
+  defaultExpanded,
+} from './OpeningRoadmap.helpers'
+import './opening-roadmap.css'
+
+// Re-export so existing test imports keep working.
+export { computeCurrentPhaseId, defaultExpanded } from './OpeningRoadmap.helpers'
+
+const TODAY_OPTIONS: Intl.DateTimeFormatOptions = {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+}
+
+const MARGINALIA: Record<number, string> = {
+  0: "Three dishes still open: shakshuka portioning, za'atar dough hydration, chicken bowl sauce. Once these freeze, no new experiments until Q3.",
+  5: 'Target date: Fri 05 Jun 2026. 45-cover limit first weekend. Feedback forms on every receipt.',
+}
 
 export function OpeningRoadmap() {
   const {
     phases,
-    unassignedTasks,
-    overallProgress,
-    totalBlockers,
+    overallProgress: _overallProgress,
+    blockers,
+    mustDo,
     isLoading,
     error,
     refetch,
   } = useOpeningRoadmap()
+  void _overallProgress // retained on hook API for future use; not rendered here
 
-  // Auto-expand: first non-done phase is the "current" one
-  const currentPhaseId = useMemo(() => {
-    for (const p of phases) {
-      if (p.status !== 'done') return p.config.id
-    }
-    return phases[phases.length - 1]?.config.id ?? 0
-  }, [phases])
+  const currentPhaseId = useMemo(() => computeCurrentPhaseId(phases), [phases])
 
-  // Track which phases are expanded — current phase starts expanded
-  const [expandedSet, setExpandedSet] = useState<Set<number>>(() => new Set())
+  // Per-user override: once a phase is toggled, the explicit state wins until reload.
+  const [explicit, setExplicit] = useState<Record<number, boolean>>({})
 
-  // Derived: a phase is expanded if it's in the set OR if it's the current
-  // phase and the user hasn't explicitly toggled it
-  const [userToggled, setUserToggled] = useState<Set<number>>(() => new Set())
-
-  function isExpanded(phaseId: number): boolean {
-    if (userToggled.has(phaseId)) return expandedSet.has(phaseId)
-    // Default: expand current, collapse done, expand others
-    if (phaseId === currentPhaseId) return true
-    const phase = phases.find((p) => p.config.id === phaseId)
-    return phase?.status !== 'done'
+  function isExpanded(phaseId: number, phaseStatus: string): boolean {
+    if (phaseId in explicit) return explicit[phaseId]
+    return defaultExpanded({ phaseId, phaseStatus, currentPhaseId })
   }
 
-  function togglePhase(phaseId: number) {
-    setUserToggled((prev) => new Set(prev).add(phaseId))
-    setExpandedSet((prev) => {
-      const next = new Set(prev)
-      if (isExpanded(phaseId)) {
-        next.delete(phaseId)
-      } else {
-        next.add(phaseId)
-      }
-      return next
-    })
+  function togglePhase(phaseId: number, phaseStatus: string) {
+    setExplicit((prev) => ({
+      ...prev,
+      [phaseId]: !isExpanded(phaseId, phaseStatus),
+    }))
   }
 
-  // Lock Day from Phase 0 config
-  const lockDay = OPENING_PHASES.find((p) => p.lockDay)?.lockDay
-
-  /* ─── Loading state ─── */
-  if (isLoading && phases.every((p) => p.tasks.length === 0)) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32">
-        <div className="relative">
-          <div className="absolute inset-0 animate-ping rounded-full bg-emerald-500/20" />
-          <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-zinc-800">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
-          </div>
-        </div>
-        <p className="mt-4 text-xs text-zinc-500">Loading roadmap...</p>
-      </div>
-    )
-  }
-
-  /* ─── Error state ─── */
-  if (error && phases.every((p) => p.tasks.length === 0)) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-950/40 ring-1 ring-red-800/40">
-          <AlertTriangle className="h-6 w-6 text-red-400" />
-        </div>
-        <p className="mt-4 text-sm font-medium text-red-300">Failed to load roadmap</p>
-        <p className="mt-1 text-xs text-zinc-500">{error}</p>
-        <button
-          onClick={refetch}
-          className="mt-4 rounded-lg bg-zinc-800 px-4 py-2 text-xs text-zinc-300 transition-colors hover:bg-zinc-700"
-        >
-          Try again
-        </button>
-      </div>
-    )
-  }
-
-  /* ─── Task summary line ─── */
-  const totalTasks = phases.reduce((sum, p) => sum + p.tasks.length, 0)
-  const doneTasks = phases.reduce(
-    (sum, p) => sum + p.tasks.filter((t) => t.status === 'done').length,
-    0,
+  // Today label — recomputed on mount; static is fine for a single session.
+  const [todayLabel] = useState<string>(() =>
+    new Date().toLocaleDateString('en-GB', TODAY_OPTIONS),
   )
 
-  return (
-    <div className="relative mx-auto flex max-w-3xl flex-col gap-5">
-      {/* Subtle ambient gradient behind the page */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-48 left-1/3 h-96 w-96 rounded-full bg-emerald-500/[0.02] blur-[100px]" />
-      </div>
+  // Title the tab so it's findable in a multi-tab session.
+  useEffect(() => {
+    const prev = document.title
+    document.title = 'Opening Roadmap · Shishka'
+    return () => {
+      document.title = prev
+    }
+  }, [])
 
-      {/* Header */}
-      <RoadmapHeader
-        overallProgress={overallProgress}
-        totalBlockers={totalBlockers}
-        lockDay={lockDay}
-        onRefresh={refetch}
-        isLoading={isLoading}
-      />
+  const lockDay =
+    OPENING_PHASES.find((p) => p.lockDay)?.lockDay ?? '2026-04-28'
 
-      {/* Task counter */}
-      <div className="flex items-center justify-between px-1">
-        <p className="text-xs text-zinc-600">
-          {doneTasks}/{totalTasks} tasks completed across {phases.length} phases
-        </p>
-        {unassignedTasks.length > 0 && (
-          <p className="text-xs text-amber-600">
-            {unassignedTasks.length} untagged
-          </p>
-        )}
-      </div>
+  /* ─── Initial load / error states ─── */
+  const hasAnyTasks = phases.some((p) => p.tasks.length > 0)
 
-      {/* Phase timeline */}
-      <div className="flex flex-col">
-        {phases.map((phase, i) => (
-          <PhaseCard
-            key={phase.config.id}
-            phase={phase}
-            isExpanded={isExpanded(phase.config.id)}
-            isCurrent={phase.config.id === currentPhaseId}
-            onToggle={() => togglePhase(phase.config.id)}
-            index={i}
-            isLast={i === phases.length - 1}
-          />
-        ))}
-      </div>
-
-      {/* Unassigned tasks warning */}
-      {unassignedTasks.length > 0 && (
-        <div className="rounded-xl border border-amber-800/30 bg-amber-950/10 p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <span className="text-xs font-semibold text-amber-300">
-              {unassignedTasks.length} task{unassignedTasks.length !== 1 ? 's' : ''} without phase tag
-            </span>
+  if (isLoading && !hasAnyTasks) {
+    return (
+      <div className="opening-roadmap-root">
+        <div className="shell">
+          <div className="rm-state">
+            <div className="rm-state-label">LOADING ROADMAP</div>
+            <div className="rm-state-detail">
+              Reading business_tasks from Supabase…
+            </div>
           </div>
-          <p className="mb-3 text-xs text-zinc-500">
-            Tag with phase-0 through phase-5 in Mission Control to assign.
-          </p>
-          <div className="flex flex-col gap-0.5">
-            {unassignedTasks.map((task) => (
-              <RoadmapTaskRow key={task.id} task={task} />
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !hasAnyTasks) {
+    return (
+      <div className="opening-roadmap-root">
+        <div className="shell">
+          <div className="rm-state">
+            <div className="rm-state-label">COULD NOT LOAD</div>
+            <div className="rm-state-detail">{error}</div>
+            <button type="button" onClick={refetch}>
+              TRY AGAIN
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="opening-roadmap-root">
+      <div className="shell">
+        <RoadmapTopbar todayLabel={todayLabel} chapterLabel="04 · Opening" />
+
+        <CalendarRibbon />
+
+        <div className="focus-row reveal r3">
+          <BeforeRecipeLock lockDay={lockDay} mustDo={mustDo} />
+          <BlockersCard blockers={blockers} />
+        </div>
+
+        <div className="section-head reveal r4">
+          <span className="num">PART TWO</span>
+          <h2>
+            The Six <em>Chapters</em>
+          </h2>
+          <span className="spacer" />
+        </div>
+
+        <div className="body-grid">
+          <div className="phases reveal r4">
+            {phases.map((phase, i) => (
+              <PhaseChapter
+                key={phase.config.id}
+                phase={phase}
+                isExpanded={isExpanded(phase.config.id, phase.status)}
+                isCurrent={phase.config.id === currentPhaseId}
+                isLast={i === phases.length - 1}
+                onToggle={() => togglePhase(phase.config.id, phase.status)}
+                marginalia={MARGINALIA[phase.config.id]}
+                showDishAccordion={phase.config.id === 0}
+              />
             ))}
           </div>
         </div>
-      )}
 
-      {/* Bottom breathing room */}
-      <div className="h-8" />
+        <footer className="foot">
+          <div>
+            <span className="serif">Opening Roadmap</span>
+            &nbsp;·&nbsp; v1.3 &nbsp;·&nbsp;{' '}
+            <span style={{ fontFamily: 'var(--f-mono)' }}>
+              agents/designer/designs/roadmap-v1/
+            </span>
+          </div>
+          <div>
+            {error && (
+              <button
+                type="button"
+                onClick={refetch}
+                style={{
+                  fontFamily: 'var(--f-sc)',
+                  letterSpacing: '0.22em',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: 'var(--brick-bright)',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                RETRY ↻
+              </button>
+            )}
+          </div>
+        </footer>
+      </div>
     </div>
   )
 }
