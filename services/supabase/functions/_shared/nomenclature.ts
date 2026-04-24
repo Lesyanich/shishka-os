@@ -7,23 +7,51 @@ export interface ResolvedSupplier {
 
 export async function resolveSupplier(name: string): Promise<string | null> {
   if (!name) return null
+  // Try exact substring: DB name contains parsed name
   const { data } = await db
     .from("suppliers")
     .select("id")
     .ilike("name", `%${name}%`)
     .limit(1)
-  return data?.[0]?.id ?? null
+  if (data?.[0]?.id) return data[0].id
+
+  // Reverse: parsed name contains DB name (e.g. "SIAM MAKRO" contains "Makro")
+  // Try each word from parsed name as a keyword
+  const words = name.split(/\s+/).filter(w => w.length >= 3)
+  for (const word of words) {
+    const { data: rev } = await db
+      .from("suppliers")
+      .select("id")
+      .ilike("name", `%${word}%`)
+      .neq("name", '') // skip empty
+      .limit(1)
+    if (rev?.[0]?.id) return rev[0].id
+  }
+  return null
 }
 
 export async function resolveSupplierWithProfile(name: string): Promise<ResolvedSupplier> {
   if (!name) return { id: null, ocr_profile: null }
+  // Try exact substring first
   const { data } = await db
     .from("suppliers")
     .select("id, ocr_profile")
     .ilike("name", `%${name}%`)
     .limit(1)
-  if (!data?.[0]) return { id: null, ocr_profile: null }
-  return { id: data[0].id, ocr_profile: data[0].ocr_profile ?? null }
+  if (data?.[0]) return { id: data[0].id, ocr_profile: data[0].ocr_profile ?? null }
+
+  // Reverse: try each word
+  const words = name.split(/\s+/).filter(w => w.length >= 3)
+  for (const word of words) {
+    const { data: rev } = await db
+      .from("suppliers")
+      .select("id, ocr_profile")
+      .ilike("name", `%${word}%`)
+      .neq("name", '')
+      .limit(1)
+    if (rev?.[0]) return { id: rev[0].id, ocr_profile: rev[0].ocr_profile ?? null }
+  }
+  return { id: null, ocr_profile: null }
 }
 
 export async function matchNomenclature(
