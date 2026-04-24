@@ -170,7 +170,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             .from('receipt_inbox')
             .select('id, created_at, status')
             .neq('id', row.id)
-            .neq('status', 'skipped')
+            .not('status', 'in', '("skipped","processing","error")')
             .filter('parsed_payload->>invoice_number', 'eq', inv)
             .limit(5)
           if (inboxDupes?.length) {
@@ -303,19 +303,20 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const calculatedTotal = items.reduce((s, it) => s + (it.total_price || 0), 0)
   const discountAmount = Math.abs(p?.discount_total || 0)
   const vatAmount = p?.vat_amount || 0
-  const vatIncluded = p?.vat_included !== false
-  // Discount may be embedded in item prices OR separate. Try both formulas, pick best match.
-  const expectedWithDiscount = vatIncluded
-    ? calculatedTotal - discountAmount
-    : calculatedTotal - discountAmount + vatAmount
-  const expectedWithoutDiscount = vatIncluded
-    ? calculatedTotal
-    : calculatedTotal + vatAmount
-  const diffWith = Math.abs(expectedWithDiscount - receiptTotal)
-  const diffWithout = Math.abs(expectedWithoutDiscount - receiptTotal)
-  // Use whichever formula matches the receipt total better
-  const discountEmbedded = discountAmount > 0 && diffWithout < diffWith
-  const expectedReceiptTotal = discountEmbedded ? expectedWithoutDiscount : expectedWithDiscount
+  // Try all 4 possible formulas and pick the one that matches the receipt total best.
+  // Covers: VAT included/excluded × discount embedded/separate.
+  const formulas = [
+    { expected: calculatedTotal - discountAmount,              vatIncl: true,  discEmbed: false, label: 'items − discount' },
+    { expected: calculatedTotal,                               vatIncl: true,  discEmbed: true,  label: 'items (discount in prices)' },
+    { expected: calculatedTotal - discountAmount + vatAmount,  vatIncl: false, discEmbed: false, label: 'items − discount + VAT' },
+    { expected: calculatedTotal + vatAmount,                   vatIncl: false, discEmbed: true,  label: 'items + VAT (discount in prices)' },
+  ]
+  const best = formulas.reduce((a, b) =>
+    Math.abs(b.expected - receiptTotal) < Math.abs(a.expected - receiptTotal) ? b : a
+  )
+  const vatIncluded = best.vatIncl
+  const discountEmbedded = best.discEmbed && discountAmount > 0
+  const expectedReceiptTotal = best.expected
   const totalMismatch = Math.abs(expectedReceiptTotal - receiptTotal) > 0.5
 
   // ── Category counts ──
