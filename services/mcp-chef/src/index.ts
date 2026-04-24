@@ -27,6 +27,7 @@ import { addBomLine } from "./tools/add-bom-line.js";
 import { removeBomLine } from "./tools/remove-bom-line.js";
 import { manageRecipeFlow } from "./tools/manage-recipe-flow.js";
 import { updateProduct } from "./tools/update-product.js";
+import { recordProduction } from "./tools/record-production.js";
 
 // Resources & Prompts
 import { staticResources, dynamicResources } from "./resources/index.js";
@@ -224,6 +225,22 @@ server.tool(
   async (args) => jsonResult(await manageRecipeFlow(args))
 );
 
+server.tool(
+  "record_production",
+  "Log daily kitchen production (baked, frozen, fermented items + quantities). Fuzzy-matches product codes to nomenclature. Unmatched items are returned for human review.",
+  {
+    items: z.array(z.object({
+      product_code: z.string().describe("Product code (e.g., PF-MANAKISH_DOUGH) or search term"),
+      quantity: z.number().describe("Amount produced (must be > 0)"),
+      unit: z.string().optional().describe("Unit (g, kg, pcs, ml, L). Defaults to product's base_unit"),
+      storage: z.enum(["fridge", "freezer", "fermented", "ambient"]).optional().describe("Storage method after production (default: fridge)"),
+      notes: z.string().optional().describe("Batch notes: yield observations, quality remarks"),
+    })).describe("Array of produced items to log"),
+    production_date: z.string().optional().describe("Date of production YYYY-MM-DD (default: today)"),
+  },
+  async (args) => jsonResult(await recordProduction(args))
+);
+
 // ─── Resources ───────────────────────────────────────────────────
 
 // Static resources (hardcoded reference data)
@@ -306,7 +323,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Chef Agent MCP server running on stdio`);
-  console.error(`   Tools: 14 | Resources: 3 | Prompts: 4`);
+  console.error(`   Tools: 15 | Resources: 3 | Prompts: 4`);
 }
 
 main().catch((err) => {
