@@ -144,6 +144,8 @@ update_task(task_id="...", notes="Applied: [action]. Result: [outcome/output]. T
 
 When you believe the task is done, go through this checklist IN ORDER:
 
+> **Common mistake — closing before merge:** Agents have closed MC tasks before the PR was actually merged (seen in tasks 3b26278f, 71c00150, cd287a2e). This leaves merged code untracked and orphans follow-up work. **MC task status must stay `in_progress` until `gh pr view` confirms state `MERGED`.** The `update_task(status="done")` call in Step 3 is the final step — run it only after Step 5b confirms the PR is merged.
+
 ### Step 1: Verify build
 ```bash
 cd apps/admin-panel && npm run build && cd ../..
@@ -182,6 +184,19 @@ gh pr create --title "[type]: short description" --body "## Summary
 - [ ] lint passes
 - [ ] [specific tests]"
 ```
+
+### Step 5b: Confirm PR is MERGED (hard gate)
+
+**Do not close the MC task until this returns `MERGED`:**
+
+```bash
+gh pr view <PR_NUMBER> --json state --jq '.state'
+# Must print: MERGED
+```
+
+- [ ] PR is MERGED
+
+If state is `OPEN` → wait for review and merge. If state is `CLOSED` without merge → investigate before proceeding. Only after `MERGED` → run Step 3 to close the MC task.
 
 ### Step 6: Update MC with PR
 ```
