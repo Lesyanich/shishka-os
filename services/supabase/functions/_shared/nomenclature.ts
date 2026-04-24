@@ -123,6 +123,7 @@ export async function matchNomenclature(
     }
   }
   if (item.supplier_sku && supplierId) {
+    // Level 2a: supplier_catalog by supplier_sku + supplier_id
     const { data } = await db
       .from("supplier_catalog")
       .select("nomenclature_id, sku_id")
@@ -132,6 +133,41 @@ export async function matchNomenclature(
       .limit(1)
     if (data?.[0]?.nomenclature_id) {
       return { nomenclature_id: data[0].nomenclature_id, sku_id: data[0].sku_id, confidence: "high" }
+    }
+    // Level 2b: supplier_sku as barcode cross-check (Makro article numbers stored as barcode)
+    const { data: xref } = await db
+      .from("supplier_catalog")
+      .select("nomenclature_id, sku_id")
+      .eq("barcode", item.supplier_sku)
+      .not("nomenclature_id", "is", null)
+      .order("match_count", { ascending: false })
+      .limit(1)
+    if (xref?.[0]?.nomenclature_id) {
+      return { nomenclature_id: xref[0].nomenclature_id, sku_id: xref[0].sku_id, confidence: "high" }
+    }
+    // Level 2c: purchase_logs by barcode = supplier_sku (fallback)
+    const { data: plSku } = await db
+      .from("purchase_logs")
+      .select("nomenclature_id, sku_id")
+      .eq("barcode", item.supplier_sku)
+      .not("nomenclature_id", "is", null)
+      .order("invoice_date", { ascending: false })
+      .limit(1)
+    if (plSku?.[0]?.nomenclature_id) {
+      return { nomenclature_id: plSku[0].nomenclature_id, sku_id: plSku[0].sku_id, confidence: "high" }
+    }
+  }
+  // Level 2d: supplier_sku without supplier_id (global fallback)
+  if (item.supplier_sku && !supplierId) {
+    const { data: globalSku } = await db
+      .from("supplier_catalog")
+      .select("nomenclature_id, sku_id")
+      .or(`supplier_sku.eq.${item.supplier_sku},barcode.eq.${item.supplier_sku}`)
+      .not("nomenclature_id", "is", null)
+      .order("match_count", { ascending: false })
+      .limit(1)
+    if (globalSku?.[0]?.nomenclature_id) {
+      return { nomenclature_id: globalSku[0].nomenclature_id, sku_id: globalSku[0].sku_id, confidence: "medium" }
     }
   }
   // Fallback: match translated_name against supplier_catalog.product_name (English cross-check)
