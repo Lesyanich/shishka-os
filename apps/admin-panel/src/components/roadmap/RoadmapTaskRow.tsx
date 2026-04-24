@@ -8,7 +8,7 @@ const STATUS_ICON: Record<
   { icon: typeof CheckCircle2; className: string }
 > = {
   done: { icon: CheckCircle2, className: 'text-emerald-400' },
-  in_progress: { icon: Clock, className: 'text-amber-400' },
+  in_progress: { icon: Clock, className: 'text-amber-400 animate-pulse' },
   blocked: { icon: AlertTriangle, className: 'text-red-400' },
   inbox: { icon: Circle, className: 'text-zinc-600' },
   backlog: { icon: Circle, className: 'text-zinc-600' },
@@ -45,14 +45,17 @@ export function RoadmapTaskRow({ task }: RoadmapTaskRowProps) {
   const StatusIcon = statusEntry.icon
 
   const isDone = task.status === 'done'
+  const isBlocker = task.isBlocker && !isDone
 
   return (
     <div
       className={[
-        'group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors',
+        'group flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-200',
         isDone
-          ? 'opacity-60'
-          : 'hover:bg-zinc-800/40',
+          ? 'opacity-50'
+          : isBlocker
+            ? 'bg-red-950/10 hover:bg-red-950/20'
+            : 'hover:bg-zinc-800/40',
       ].join(' ')}
     >
       {/* Status icon */}
@@ -64,7 +67,9 @@ export function RoadmapTaskRow({ task }: RoadmapTaskRowProps) {
           'min-w-0 flex-1 truncate text-sm',
           isDone
             ? 'text-zinc-500 line-through decoration-zinc-700'
-            : 'text-zinc-200',
+            : isBlocker
+              ? 'font-medium text-zinc-100'
+              : 'text-zinc-300',
         ].join(' ')}
       >
         {task.title}
@@ -74,8 +79,8 @@ export function RoadmapTaskRow({ task }: RoadmapTaskRowProps) {
       <div className="flex shrink-0 items-center gap-1.5">
         <PriorityBadge priority={task.priority} />
 
-        {task.isBlocker && task.status !== 'done' && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-red-900/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-300 ring-1 ring-red-800/50">
+        {isBlocker && (
+          <span className="inline-flex items-center gap-1 rounded-md bg-red-900/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-300 ring-1 ring-red-800/50">
             <ShieldAlert className="h-3 w-3" />
             blocker
           </span>
