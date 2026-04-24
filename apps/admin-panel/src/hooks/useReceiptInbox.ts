@@ -237,8 +237,9 @@ export function useReceiptInbox(): UseReceiptInboxResult {
 
   const approve = useCallback(async (inboxId: string, payload: Record<string, unknown>) => {
     try {
-      const { data, error: rpcErr } = await supabase.rpc('fn_approve_receipt', {
+      const { data, error: rpcErr } = await supabase.rpc('fn_approve_receipt_with_learning', {
         p_payload: payload,
+        p_inbox_id: inboxId,
       })
       if (rpcErr) return { ok: false, error: rpcErr.message }
       if (data && !data.ok) return { ok: false, error: data.error || 'RPC returned error' }
