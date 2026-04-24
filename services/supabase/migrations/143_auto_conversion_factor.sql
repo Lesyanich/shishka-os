@@ -206,11 +206,10 @@ BEGIN
 END $$;
 
 -- ── Self-register in migration_log ──
-INSERT INTO public.migration_log (filename, applied_by, reviewed_by, description)
+INSERT INTO public.migration_log (filename, applied_by, notes)
 VALUES (
   '143_auto_conversion_factor.sql',
   'claude-code',
-  'lesia',
   'Auto-derive conversion_factor trigger on supplier_catalog. Prevents cost inflation from package-as-unit pricing.'
 ) ON CONFLICT (filename) DO NOTHING;
 
