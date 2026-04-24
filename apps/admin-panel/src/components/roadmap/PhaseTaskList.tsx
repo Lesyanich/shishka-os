@@ -1,3 +1,4 @@
+import { ClipboardList } from 'lucide-react'
 import type { RoadmapTask } from '../../hooks/useOpeningRoadmap'
 import { RoadmapTaskRow } from './RoadmapTaskRow'
 
@@ -34,8 +35,14 @@ function sortTasks(tasks: RoadmapTask[]): RoadmapTask[] {
 export function PhaseTaskList({ tasks }: PhaseTaskListProps) {
   if (tasks.length === 0) {
     return (
-      <div className="px-3 py-4 text-center text-xs text-zinc-600">
-        No tasks assigned to this phase yet
+      <div className="flex flex-col items-center gap-2 px-3 py-6 text-center">
+        <ClipboardList className="h-5 w-5 text-zinc-700" />
+        <p className="text-xs text-zinc-600">
+          No tasks assigned yet
+        </p>
+        <p className="text-[10px] text-zinc-700">
+          Tag tasks with phase-N in Mission Control
+        </p>
       </div>
     )
   }

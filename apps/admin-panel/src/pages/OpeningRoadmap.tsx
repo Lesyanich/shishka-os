@@ -44,7 +44,6 @@ export function OpeningRoadmap() {
     setUserToggled((prev) => new Set(prev).add(phaseId))
     setExpandedSet((prev) => {
       const next = new Set(prev)
-      // If currently expanded (either by default or explicit), close it
       if (isExpanded(phaseId)) {
         next.delete(phaseId)
       } else {
@@ -60,9 +59,14 @@ export function OpeningRoadmap() {
   /* ─── Loading state ─── */
   if (isLoading && phases.every((p) => p.tasks.length === 0)) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 text-zinc-500">
-        <Loader2 className="mb-3 h-6 w-6 animate-spin text-emerald-500" />
-        <p className="text-xs">Loading roadmap...</p>
+      <div className="flex flex-col items-center justify-center py-32">
+        <div className="relative">
+          <div className="absolute inset-0 animate-ping rounded-full bg-emerald-500/20" />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-zinc-800">
+            <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+          </div>
+        </div>
+        <p className="mt-4 text-xs text-zinc-500">Loading roadmap...</p>
       </div>
     )
   }
@@ -71,8 +75,10 @@ export function OpeningRoadmap() {
   if (error && phases.every((p) => p.tasks.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-32">
-        <AlertTriangle className="mb-3 h-6 w-6 text-red-400" />
-        <p className="text-sm text-red-300">Failed to load roadmap</p>
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-950/40 ring-1 ring-red-800/40">
+          <AlertTriangle className="h-6 w-6 text-red-400" />
+        </div>
+        <p className="mt-4 text-sm font-medium text-red-300">Failed to load roadmap</p>
         <p className="mt-1 text-xs text-zinc-500">{error}</p>
         <button
           onClick={refetch}
@@ -84,8 +90,20 @@ export function OpeningRoadmap() {
     )
   }
 
+  /* ─── Task summary line ─── */
+  const totalTasks = phases.reduce((sum, p) => sum + p.tasks.length, 0)
+  const doneTasks = phases.reduce(
+    (sum, p) => sum + p.tasks.filter((t) => t.status === 'done').length,
+    0,
+  )
+
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
+    <div className="relative mx-auto flex max-w-3xl flex-col gap-5">
+      {/* Subtle ambient gradient behind the page */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-48 left-1/3 h-96 w-96 rounded-full bg-emerald-500/[0.02] blur-[100px]" />
+      </div>
+
       {/* Header */}
       <RoadmapHeader
         overallProgress={overallProgress}
@@ -95,31 +113,44 @@ export function OpeningRoadmap() {
         isLoading={isLoading}
       />
 
-      {/* Phase cards */}
-      <div className="flex flex-col gap-3">
-        {phases.map((phase) => (
+      {/* Task counter */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-xs text-zinc-600">
+          {doneTasks}/{totalTasks} tasks completed across {phases.length} phases
+        </p>
+        {unassignedTasks.length > 0 && (
+          <p className="text-xs text-amber-600">
+            {unassignedTasks.length} untagged
+          </p>
+        )}
+      </div>
+
+      {/* Phase timeline */}
+      <div className="flex flex-col">
+        {phases.map((phase, i) => (
           <PhaseCard
             key={phase.config.id}
             phase={phase}
             isExpanded={isExpanded(phase.config.id)}
             isCurrent={phase.config.id === currentPhaseId}
             onToggle={() => togglePhase(phase.config.id)}
+            index={i}
+            isLast={i === phases.length - 1}
           />
         ))}
       </div>
 
       {/* Unassigned tasks warning */}
       {unassignedTasks.length > 0 && (
-        <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-4">
+        <div className="rounded-xl border border-amber-800/30 bg-amber-950/10 p-4">
           <div className="mb-2 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
             <span className="text-xs font-semibold text-amber-300">
               {unassignedTasks.length} task{unassignedTasks.length !== 1 ? 's' : ''} without phase tag
             </span>
           </div>
           <p className="mb-3 text-xs text-zinc-500">
-            These tasks are under the Opening initiative but lack a phase-N tag.
-            Tag them in Mission Control to assign them to a phase.
+            Tag with phase-0 through phase-5 in Mission Control to assign.
           </p>
           <div className="flex flex-col gap-0.5">
             {unassignedTasks.map((task) => (
@@ -128,6 +159,9 @@ export function OpeningRoadmap() {
           </div>
         </div>
       )}
+
+      {/* Bottom breathing room */}
+      <div className="h-8" />
     </div>
   )
 }
