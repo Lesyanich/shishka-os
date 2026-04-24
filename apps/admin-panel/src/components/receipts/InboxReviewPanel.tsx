@@ -5,36 +5,22 @@ import { supabase } from '../../lib/supabase'
 
 /* ────────────────────────── Types ────────────────────────── */
 
-interface FoodItem {
+type FlowType = 'COGS' | 'OpEx' | 'CapEx'
+
+interface UnifiedItem {
   name: string
   original_name?: string
   quantity: number
   unit: string
   unit_price: number
   total_price: number
+  flow_type: FlowType
   nomenclature_id?: string | null
   barcode?: string | null
   supplier_sku?: string | null
   brand?: string | null
   package_weight?: string | null
   confidence?: 'high' | 'medium' | 'low'
-}
-
-interface CapexItem {
-  name: string
-  quantity: number
-  unit_price: number
-  total_price: number
-  barcode?: string | null
-}
-
-interface OpexItem {
-  description: string
-  quantity: number
-  unit: string
-  unit_price: number
-  total_price: number
-  barcode?: string | null
 }
 
 /* ────────────────────────── Props ────────────────────────── */
@@ -53,13 +39,14 @@ function fmt(n: number | undefined | null): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+const FLOW_STYLES: Record<FlowType, string> = {
+  COGS: 'bg-emerald-500/15 text-emerald-400',
+  OpEx: 'bg-amber-500/15 text-amber-400',
+  CapEx: 'bg-sky-500/15 text-sky-400',
+}
+
 function flowBadge(ft: string) {
-  const map: Record<string, string> = {
-    COGS: 'bg-emerald-500/15 text-emerald-400',
-    OpEx: 'bg-amber-500/15 text-amber-400',
-    CapEx: 'bg-sky-500/15 text-sky-400',
-  }
-  return map[ft] || 'bg-slate-500/15 text-slate-400'
+  return FLOW_STYLES[ft as FlowType] || 'bg-slate-500/15 text-slate-400'
 }
 
 function confidenceBadge(level?: 'high' | 'medium' | 'low') {
@@ -78,14 +65,64 @@ function confidenceBadge(level?: 'high' | 'medium' | 'low') {
 const inputCls = 'w-full rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-200 outline-none focus:border-indigo-500'
 const numInputCls = `${inputCls} text-right`
 
-function emptyFood(): FoodItem {
-  return { name: '', quantity: 1, unit: 'pcs', unit_price: 0, total_price: 0 }
+function emptyItem(flowType: FlowType = 'COGS'): UnifiedItem {
+  return { name: '', quantity: 1, unit: 'pcs', unit_price: 0, total_price: 0, flow_type: flowType }
 }
-function emptyCapex(): CapexItem {
-  return { name: '', quantity: 1, unit_price: 0, total_price: 0 }
+
+/* ── Payload conversion helpers ── */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function loadItemsFromPayload(p: Record<string, any>): UnifiedItem[] {
+  const items: UnifiedItem[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const f of (p.food_items ?? []) as any[]) {
+    items.push({
+      name: f.name || '', original_name: f.original_name, quantity: f.quantity ?? 1,
+      unit: f.unit || 'pcs', unit_price: f.unit_price ?? 0, total_price: f.total_price ?? 0,
+      flow_type: 'COGS', nomenclature_id: f.nomenclature_id, barcode: f.barcode,
+      supplier_sku: f.supplier_sku, brand: f.brand, package_weight: f.package_weight,
+      confidence: f.confidence,
+    })
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const c of (p.capex_items ?? []) as any[]) {
+    items.push({
+      name: c.name || '', original_name: c.original_name, quantity: c.quantity ?? 1,
+      unit: c.unit || 'pcs', unit_price: c.unit_price ?? 0, total_price: c.total_price ?? 0,
+      flow_type: 'CapEx', nomenclature_id: c.nomenclature_id, barcode: c.barcode,
+      supplier_sku: c.supplier_sku, brand: c.brand, package_weight: c.package_weight,
+      confidence: c.confidence,
+    })
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const o of (p.opex_items ?? []) as any[]) {
+    items.push({
+      name: o.description || o.name || '', original_name: o.original_name, quantity: o.quantity ?? 1,
+      unit: o.unit || 'pcs', unit_price: o.unit_price ?? 0, total_price: o.total_price ?? 0,
+      flow_type: 'OpEx', nomenclature_id: o.nomenclature_id, barcode: o.barcode,
+      supplier_sku: o.supplier_sku, brand: o.brand, package_weight: o.package_weight,
+      confidence: o.confidence,
+    })
+  }
+  return items
 }
-function emptyOpex(): OpexItem {
-  return { description: '', quantity: 1, unit: 'pcs', unit_price: 0, total_price: 0 }
+
+function splitItemsToPayload(items: UnifiedItem[]) {
+  const food_items = items.filter(i => i.flow_type === 'COGS').map(i => ({
+    name: i.name, original_name: i.original_name, quantity: i.quantity, unit: i.unit,
+    unit_price: i.unit_price, total_price: i.total_price, nomenclature_id: i.nomenclature_id,
+    barcode: i.barcode, supplier_sku: i.supplier_sku, brand: i.brand,
+    package_weight: i.package_weight, confidence: i.confidence,
+  }))
+  const capex_items = items.filter(i => i.flow_type === 'CapEx').map(i => ({
+    name: i.name, quantity: i.quantity, unit_price: i.unit_price, total_price: i.total_price,
+    barcode: i.barcode,
+  }))
+  const opex_items = items.filter(i => i.flow_type === 'OpEx').map(i => ({
+    description: i.name, quantity: i.quantity, unit: i.unit, unit_price: i.unit_price,
+    total_price: i.total_price, barcode: i.barcode,
+  }))
+  return { food_items, capex_items, opex_items }
 }
 
 /* ────────────────────────── Component ────────────────────────── */
@@ -99,10 +136,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [nomMap, setNomMap] = useState<Record<string, { code: string; name: string }>>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
 
-  // NOTE: All hooks must run unconditionally (react-hooks/rules-of-hooks).
-  // The `if (!p) return null` early return is moved below the hook block;
-  // initializers use optional chaining so they are safe when p is null.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parsed_payload shape is dynamic, typing out of scope for this fix
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const p = row.parsed_payload as Record<string, any> | null
 
   // ── Editable header state ──
@@ -113,15 +147,11 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [hasTaxInvoice, setHasTaxInvoice] = useState<boolean>(p?.has_tax_invoice ?? false)
   const [editingHeader, setEditingHeader] = useState(false)
 
-  // ── Editable item state ──
-  const [foodItems, setFoodItems] = useState<FoodItem[]>(() => (p?.food_items ?? []) as FoodItem[])
-  const [capexItems, setCapexItems] = useState<CapexItem[]>(() => (p?.capex_items ?? []) as CapexItem[])
-  const [opexItems, setOpexItems] = useState<OpexItem[]>(() => (p?.opex_items ?? []) as OpexItem[])
+  // ── Unified items state ──
+  const [items, setItems] = useState<UnifiedItem[]>(() => p ? loadItemsFromPayload(p) : [])
 
   // ── Checkboxes ──
-  const [foodChecked, setFoodChecked] = useState<Set<number>>(() => new Set())
-  const [capexChecked, setCapexChecked] = useState<Set<number>>(() => new Set())
-  const [opexChecked, setOpexChecked] = useState<Set<number>>(() => new Set())
+  const [checkedItems, setCheckedItems] = useState<Set<number>>(() => new Set())
 
   // ── Duplicate detection ──
   const [dupeWarnings, setDupeWarnings] = useState<string[]>([])
@@ -136,7 +166,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       const warnings: string[] = []
       try {
         if (inv) {
-          // Check inbox for same invoice_number (other rows)
           const { data: inboxDupes } = await supabase
             .from('receipt_inbox')
             .select('id, created_at, status')
@@ -149,7 +178,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               warnings.push(`Inbox duplicate: receipt ${inv} also in row ${d.id.slice(0, 8)}… (${d.status}, ${new Date(d.created_at).toLocaleDateString()})`)
             }
           }
-          // Check ledger for already-approved
           const { data: ledgerDupes } = await supabase
             .from('expense_ledger')
             .select('id, transaction_date, amount_original, details')
@@ -161,7 +189,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             }
           }
         } else if (date && amount && amount > 0) {
-          // Fallback: date + amount + supplier fuzzy match
           const { data: fuzzyDupes } = await supabase
             .from('expense_ledger')
             .select('id, transaction_date, amount_original, details')
@@ -184,7 +211,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     checkDuplicates()
   }, [row.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Auto-save edits on unmount (prevents data loss on row switch) ──
+  // ── Auto-save edits on unmount ──
   const isDirty = useRef(false)
   const isInitialRender = useRef(true)
   const latestPayload = useRef(p)
@@ -195,6 +222,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       return
     }
     if (!p) return
+    const { food_items, capex_items, opex_items } = splitItemsToPayload(items)
     latestPayload.current = {
       ...p,
       supplier_name: supplierName,
@@ -202,12 +230,12 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       amount_original: receiptTotal,
       invoice_number: invoiceNumber || null,
       has_tax_invoice: hasTaxInvoice,
-      food_items: foodItems,
-      capex_items: capexItems,
-      opex_items: opexItems,
+      food_items,
+      capex_items,
+      opex_items,
     }
     isDirty.current = true
-  }, [supplierName, transactionDate, receiptTotal, invoiceNumber, hasTaxInvoice, foodItems, capexItems, opexItems]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supplierName, transactionDate, receiptTotal, invoiceNumber, hasTaxInvoice, items]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const rowId = row.id
@@ -257,41 +285,13 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
 
   const handleMouseUp = useCallback(() => { setIsDragging(false) }, [])
 
-  // Reset zoom when switching photos
   useEffect(() => { resetView() }, [selectedPhotoIdx, resetView])
 
   // ── Edit mode per row ──
-  const [editingRows, setEditingRows] = useState<Set<string>>(() => new Set())
+  const [editingRows, setEditingRows] = useState<Set<number>>(() => new Set())
 
-  const toggleEdit = (key: string) => {
+  const toggleEdit = (idx: number) => {
     setEditingRows((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-  const isEditing = (key: string) => editingRows.has(key)
-
-  // ── Computed totals ──
-  const foodTotal = foodItems.reduce((s, it) => s + (it.total_price || 0), 0)
-  const capexTotal = capexItems.reduce((s, it) => s + (it.total_price || 0), 0)
-  const opexTotal = opexItems.reduce((s, it) => s + (it.total_price || 0), 0)
-  const calculatedTotal = foodTotal + capexTotal + opexTotal
-  const discountAmount = Math.abs(p?.discount_total || 0)
-  const vatAmount = p?.vat_amount || 0
-  const vatIncluded = p?.vat_included !== false // default true — most Thai receipts include VAT in item prices
-  // If VAT is included in item prices → don't add it again. If separate line → add on top.
-  const expectedReceiptTotal = vatIncluded
-    ? calculatedTotal - discountAmount
-    : calculatedTotal - discountAmount + vatAmount
-  const totalMismatch = Math.abs(expectedReceiptTotal - receiptTotal) > 0.5
-  const totalItems = foodItems.length + capexItems.length + opexItems.length
-  const totalChecked = foodChecked.size + capexChecked.size + opexChecked.size
-
-  // ── Checkbox helpers ──
-  function toggleCheck(_set: Set<number>, setFn: React.Dispatch<React.SetStateAction<Set<number>>>, idx: number) {
-    setFn((prev) => {
       const next = new Set(prev)
       if (next.has(idx)) next.delete(idx)
       else next.add(idx)
@@ -299,14 +299,39 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     })
   }
 
-  function toggleAll(set: Set<number>, setFn: React.Dispatch<React.SetStateAction<Set<number>>>, total: number) {
-    if (set.size === total) setFn(new Set())
-    else setFn(new Set(Array.from({ length: total }, (_, i) => i)))
+  // ── Computed totals ──
+  const calculatedTotal = items.reduce((s, it) => s + (it.total_price || 0), 0)
+  const discountAmount = Math.abs(p?.discount_total || 0)
+  const vatAmount = p?.vat_amount || 0
+  const vatIncluded = p?.vat_included !== false
+  const expectedReceiptTotal = vatIncluded
+    ? calculatedTotal - discountAmount
+    : calculatedTotal - discountAmount + vatAmount
+  const totalMismatch = Math.abs(expectedReceiptTotal - receiptTotal) > 0.5
+
+  // ── Category counts ──
+  const foodCount = items.filter(i => i.flow_type === 'COGS').length
+  const capexCount = items.filter(i => i.flow_type === 'CapEx').length
+  const opexCount = items.filter(i => i.flow_type === 'OpEx').length
+
+  // ── Checkbox helpers ──
+  function toggleCheck(idx: number) {
+    setCheckedItems((prev) => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
+      return next
+    })
   }
 
-  // ── Item field updates ──
-  function updateFood(idx: number, field: keyof FoodItem, value: string | number) {
-    setFoodItems((prev) => {
+  function toggleAll() {
+    if (checkedItems.size === items.length) setCheckedItems(new Set())
+    else setCheckedItems(new Set(items.map((_, i) => i)))
+  }
+
+  // ── Item operations ──
+  function updateItem(idx: number, field: keyof UnifiedItem, value: string | number) {
+    setItems((prev) => {
       const next = [...prev]
       const item = { ...next[idx], [field]: value }
       if (field === 'quantity' || field === 'unit_price') {
@@ -317,77 +342,24 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     })
   }
 
-  function removeFood(idx: number) {
-    setFoodItems((prev) => prev.filter((_, i) => i !== idx))
-    setFoodChecked((prev) => {
+  function removeItem(idx: number) {
+    setItems((prev) => prev.filter((_, i) => i !== idx))
+    setCheckedItems((prev) => {
       const next = new Set<number>()
       prev.forEach((v) => { if (v < idx) next.add(v); else if (v > idx) next.add(v - 1) })
       return next
     })
-    setEditingRows((prev) => { const next = new Set(prev); next.delete(`food:${idx}`); return next })
+    setEditingRows((prev) => { const next = new Set(prev); next.delete(idx); return next })
   }
 
-  function updateCapex(idx: number, field: keyof CapexItem, value: string | number | null) {
-    setCapexItems((prev) => {
-      const next = [...prev]
-      const item = { ...next[idx], [field]: value }
-      if (field === 'quantity' || field === 'unit_price') {
-        item.total_price = Number(item.quantity) * Number(item.unit_price)
-      }
-      next[idx] = item
-      return next
-    })
-  }
-
-  function removeCapex(idx: number) {
-    setCapexItems((prev) => prev.filter((_, i) => i !== idx))
-    setCapexChecked((prev) => {
-      const next = new Set<number>()
-      prev.forEach((v) => { if (v < idx) next.add(v); else if (v > idx) next.add(v - 1) })
-      return next
-    })
-    setEditingRows((prev) => { const next = new Set(prev); next.delete(`capex:${idx}`); return next })
-  }
-
-  function updateOpex(idx: number, field: keyof OpexItem, value: string | number | null) {
-    setOpexItems((prev) => {
-      const next = [...prev]
-      const item = { ...next[idx], [field]: value }
-      if (field === 'quantity' || field === 'unit_price') {
-        item.total_price = Number(item.quantity) * Number(item.unit_price)
-      }
-      next[idx] = item
-      return next
-    })
-  }
-
-  function removeOpex(idx: number) {
-    setOpexItems((prev) => prev.filter((_, i) => i !== idx))
-    setOpexChecked((prev) => {
-      const next = new Set<number>()
-      prev.forEach((v) => { if (v < idx) next.add(v); else if (v > idx) next.add(v - 1) })
-      return next
-    })
-    setEditingRows((prev) => { const next = new Set(prev); next.delete(`opex:${idx}`); return next })
-  }
-
-  // ── Add row helpers ──
-  function addFood() {
-    setFoodItems((prev) => [...prev, emptyFood()])
-    setEditingRows((prev) => new Set(prev).add(`food:${foodItems.length}`))
-  }
-  function addCapex() {
-    setCapexItems((prev) => [...prev, emptyCapex()])
-    setEditingRows((prev) => new Set(prev).add(`capex:${capexItems.length}`))
-  }
-  function addOpex() {
-    setOpexItems((prev) => [...prev, emptyOpex()])
-    setEditingRows((prev) => new Set(prev).add(`opex:${opexItems.length}`))
+  function addItem(flowType: FlowType = 'COGS') {
+    setItems((prev) => [...prev, emptyItem(flowType)])
+    setEditingRows((prev) => new Set(prev).add(items.length))
   }
 
   // Fetch nomenclature names for matched items
   useEffect(() => {
-    const ids = foodItems
+    const ids = items
       .map((it) => it.nomenclature_id)
       .filter((id): id is string => !!id)
     if (ids.length === 0) return
@@ -407,10 +379,8 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       })
   }, [row.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Early return after all hooks have been called (rules-of-hooks).
   if (!p) return null
 
-  // If expense_id exists, this receipt was already approved regardless of status
   const isReadOnly = row.status === 'processed' || !!row.expense_id
   const isSkippedStatus = row.status === 'skipped' && !row.expense_id
 
@@ -418,12 +388,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     const errs: string[] = []
     if (!supplierName.trim()) errs.push('Supplier is required')
     if (!transactionDate.trim()) errs.push('Date is required')
-    if (totalItems === 0) errs.push('No items (food/capex/opex)')
+    if (items.length === 0) errs.push('No items')
     if (receiptTotal <= 0) errs.push('Receipt total must be > 0')
-    // Check for empty item names
-    foodItems.forEach((it, i) => { if (!it.name.trim()) errs.push(`Food #${i + 1}: empty name`) })
-    capexItems.forEach((it, i) => { if (!it.name.trim()) errs.push(`CapEx #${i + 1}: empty name`) })
-    opexItems.forEach((it, i) => { if (!it.description.trim()) errs.push(`OpEx #${i + 1}: empty description`) })
+    items.forEach((it, i) => { if (!it.name.trim()) errs.push(`Item #${i + 1}: empty name`) })
     return errs
   }
 
@@ -439,7 +406,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     // ── Duplicate detection before confirm dialog ──
     try {
       if (invoiceNumber) {
-        // Check by invoice number (exact match)
         const { data: dupes } = await supabase
           .from('expense_ledger')
           .select('id, details, transaction_date, amount_original')
@@ -457,7 +423,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           if (!proceed) return
         }
       } else if (supplierName && receiptTotal > 0 && transactionDate) {
-        // Fallback: check by supplier + amount + date
         const { data: dupes } = await supabase
           .from('expense_ledger')
           .select('id, details, transaction_date, amount_original, invoice_number')
@@ -479,16 +444,14 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
         }
       }
     } catch (err) {
-      // Non-blocking: if dupe check fails, still allow approval
       console.warn('[InboxReviewPanel] Duplicate check failed:', err)
     }
 
-    // Go straight to approve (no extra confirm dialog)
     setIsApproving(true)
     setError(null)
     const photos = row.photo_urls || []
-    // Auto-generate invoice number if empty (REC-YYYYMMDD-XXXXXX)
     const finalInvoice = invoiceNumber || `REC-${transactionDate.replace(/-/g, '')}-${row.id.slice(0, 6)}`
+    const { food_items, capex_items, opex_items } = splitItemsToPayload(items)
     const editedPayload = {
       ...p,
       supplier_name: supplierName,
@@ -496,9 +459,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       amount_original: receiptTotal,
       invoice_number: finalInvoice,
       has_tax_invoice: hasTaxInvoice,
-      food_items: foodItems,
-      capex_items: capexItems,
-      opex_items: opexItems,
+      food_items,
+      capex_items,
+      opex_items,
       receipt_supplier_url: p.receipt_supplier_url || photos[0] || null,
       receipt_bank_url: p.receipt_bank_url || (photos[1] && photos[1] !== photos[0] ? photos[1] : null),
       tax_invoice_url: p.tax_invoice_url || (hasTaxInvoice && photos.length > 1 ? photos[1] : null),
@@ -531,17 +494,18 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     if (err) setError(err)
   }
 
-  /* ────────── Checkbox column header ────────── */
-  const checkboxTh = (checked: Set<number>, setFn: React.Dispatch<React.SetStateAction<Set<number>>>, total: number) => (
-    <th className="w-10 px-2 py-1.5 text-center">
-      <input
-        type="checkbox"
-        checked={total > 0 && checked.size === total}
-        ref={(el) => { if (el) el.indeterminate = checked.size > 0 && checked.size < total }}
-        onChange={() => toggleAll(checked, setFn, total)}
-        className="h-3.5 w-3.5 cursor-pointer rounded border-slate-600 bg-slate-800 accent-indigo-500"
-      />
-    </th>
+  /* ── Category dropdown for each row ── */
+  const flowSelect = (idx: number, current: FlowType) => (
+    <select
+      value={current}
+      onChange={(e) => updateItem(idx, 'flow_type', e.target.value)}
+      disabled={isReadOnly}
+      className={`rounded border-0 px-1.5 py-0.5 text-[10px] font-medium outline-none cursor-pointer ${FLOW_STYLES[current]} ${isReadOnly ? 'opacity-60' : ''}`}
+    >
+      <option value="COGS">COGS</option>
+      <option value="OpEx">OpEx</option>
+      <option value="CapEx">CapEx</option>
+    </select>
   )
 
   return (
@@ -605,7 +569,6 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               }}
             />
           </div>
-          {/* Prev/Next arrows for multi-page */}
           {row.photo_urls.length > 1 && (
             <>
               <button
@@ -773,302 +736,160 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
         </div>
       </div>
 
-      {/* ── Food items ── */}
-      {foodItems.length > 0 && (
-        <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <h4 className="text-[10px] font-medium uppercase tracking-wide text-emerald-400">
-              Food Items ({foodItems.length})
-              {foodChecked.size > 0 && (
-                <span className="ml-2 text-emerald-300/60">— {foodChecked.size}/{foodItems.length} verified</span>
-              )}
-            </h4>
+      {/* ── Unified items table ── */}
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <h4 className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+            Items ({items.length})
+            {checkedItems.size > 0 && (
+              <span className="ml-2 text-slate-500">— {checkedItems.size}/{items.length} verified</span>
+            )}
+          </h4>
+          <div className="flex items-center gap-2 text-[9px]">
+            {foodCount > 0 && <span className="text-emerald-400">COGS: {foodCount}</span>}
+            {opexCount > 0 && <span className="text-amber-400">OpEx: {opexCount}</span>}
+            {capexCount > 0 && <span className="text-sky-400">CapEx: {capexCount}</span>}
           </div>
-          <div className="max-h-[28rem] overflow-y-auto overflow-x-auto rounded-lg border border-slate-800">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-slate-900 text-[9px] uppercase tracking-wide text-slate-500">
-                <tr>
-                  {checkboxTh(foodChecked, setFoodChecked, foodItems.length)}
-                  <th className="w-8 px-2 py-1.5 text-left">#</th>
-                  <th className="min-w-[140px] px-2 py-1.5 text-left">Product</th>
-                  <th className="min-w-[100px] px-2 py-1.5 text-left">Barcode</th>
-                  <th className="w-16 px-2 py-1.5 text-right">Qty</th>
-                  <th className="w-14 px-2 py-1.5 text-left">Unit</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Price</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Total</th>
-                  <th className="px-2 py-1.5 text-left">Nomenclature</th>
-                  {!isReadOnly && <th className="w-16 px-1 py-1.5" />}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {foodItems.map((item, i) => {
-                  const nom = item.nomenclature_id ? nomMap[item.nomenclature_id] : null
-                  const key = `food:${i}`
-                  const editing = isEditing(key)
-                  const checked = foodChecked.has(i)
-                  return (
-                    <tr key={i} className={`hover:bg-slate-800/30 ${checked ? 'bg-emerald-500/5' : ''}`}>
-                      <td className="w-10 px-2 py-1.5 text-center">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleCheck(foodChecked, setFoodChecked, i)}
-                          className="h-3.5 w-3.5 cursor-pointer rounded border-slate-600 bg-slate-800 accent-emerald-500"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
-                      <td className="px-2 py-1.5">
-                        {editing ? (
-                          <input value={item.name} onChange={(e) => updateFood(i, 'name', e.target.value)} className={inputCls} />
-                        ) : (
-                          <>
-                            <div className="text-slate-200">{item.name}</div>
-                            {item.original_name && item.original_name !== item.name && (
-                              <div className="text-[10px] text-slate-500">{item.original_name}</div>
-                            )}
-                            {item.brand && (
-                              <span className="text-[10px] text-slate-600">{item.brand} {item.package_weight || ''}</span>
-                            )}
-                          </>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5">
-                        {editing ? (
-                          <input value={item.barcode || ''} onChange={(e) => updateFood(i, 'barcode', e.target.value)} className={`${inputCls} font-mono text-[10px]`} placeholder="barcode" />
-                        ) : (
-                          <span className="font-mono text-[10px] text-slate-500">{item.barcode || item.supplier_sku || '\u2014'}</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5 text-right">
-                        {editing ? (
-                          <input type="number" step="any" value={item.quantity} onChange={(e) => updateFood(i, 'quantity', Number(e.target.value))} className={`${numInputCls} w-16`} />
-                        ) : (
-                          <span className="text-slate-300">{item.quantity}</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5">
-                        {editing ? (
-                          <input value={item.unit} onChange={(e) => updateFood(i, 'unit', e.target.value)} className={`${inputCls} w-12`} />
-                        ) : (
-                          <span className="text-slate-400">{item.unit}</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5 text-right">
-                        {editing ? (
-                          <input type="number" step="any" value={item.unit_price} onChange={(e) => updateFood(i, 'unit_price', Number(e.target.value))} className={`${numInputCls} w-20`} />
-                        ) : (
-                          <span className="text-slate-300">{fmt(item.unit_price)}</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5 text-right text-slate-200">{fmt(item.total_price)}</td>
-                      <td className="px-2 py-1.5">
-                        {nom ? (
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-[10px] text-emerald-500">{nom.code}</span>
-                              {confidenceBadge(item.confidence)}
-                            </div>
-                            <div className="text-[10px] text-emerald-400/70">{nom.name}</div>
-                          </div>
-                        ) : (
+        </div>
+        <div className="max-h-[36rem] overflow-y-auto overflow-x-auto rounded-lg border border-slate-800">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-slate-900 text-[9px] uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="w-10 px-2 py-1.5 text-center">
+                  <input
+                    type="checkbox"
+                    checked={items.length > 0 && checkedItems.size === items.length}
+                    ref={(el) => { if (el) el.indeterminate = checkedItems.size > 0 && checkedItems.size < items.length }}
+                    onChange={toggleAll}
+                    className="h-3.5 w-3.5 cursor-pointer rounded border-slate-600 bg-slate-800 accent-indigo-500"
+                  />
+                </th>
+                <th className="w-8 px-2 py-1.5 text-left">#</th>
+                <th className="w-16 px-2 py-1.5 text-left">Type</th>
+                <th className="min-w-[140px] px-2 py-1.5 text-left">Product</th>
+                <th className="min-w-[100px] px-2 py-1.5 text-left">Barcode</th>
+                <th className="w-16 px-2 py-1.5 text-right">Qty</th>
+                <th className="w-14 px-2 py-1.5 text-left">Unit</th>
+                <th className="w-20 px-2 py-1.5 text-right">Price</th>
+                <th className="w-20 px-2 py-1.5 text-right">Total</th>
+                <th className="px-2 py-1.5 text-left">Nomenclature</th>
+                {!isReadOnly && <th className="w-16 px-1 py-1.5" />}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50">
+              {items.map((item, i) => {
+                const nom = item.nomenclature_id ? nomMap[item.nomenclature_id] : null
+                const editing = editingRows.has(i)
+                const checked = checkedItems.has(i)
+                const rowBg = checked
+                  ? item.flow_type === 'CapEx' ? 'bg-sky-500/5' : item.flow_type === 'OpEx' ? 'bg-amber-500/5' : 'bg-emerald-500/5'
+                  : ''
+                return (
+                  <tr key={i} className={`hover:bg-slate-800/30 ${rowBg}`}>
+                    <td className="w-10 px-2 py-1.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCheck(i)}
+                        className="h-3.5 w-3.5 cursor-pointer rounded border-slate-600 bg-slate-800 accent-indigo-500"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
+                    <td className="px-2 py-1.5">
+                      {flowSelect(i, item.flow_type)}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {editing ? (
+                        <input value={item.name} onChange={(e) => updateItem(i, 'name', e.target.value)} className={inputCls} />
+                      ) : (
+                        <>
+                          <div className="text-slate-200">{item.name}</div>
+                          {item.original_name && item.original_name !== item.name && (
+                            <div className="text-[10px] text-slate-500">{item.original_name}</div>
+                          )}
+                          {item.brand && (
+                            <span className="text-[10px] text-slate-600">{item.brand} {item.package_weight || ''}</span>
+                          )}
+                        </>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {editing ? (
+                        <input value={item.barcode || ''} onChange={(e) => updateItem(i, 'barcode', e.target.value)} className={`${inputCls} font-mono text-[10px]`} placeholder="barcode" />
+                      ) : (
+                        <span className="font-mono text-[10px] text-slate-500">{item.barcode || item.supplier_sku || '\u2014'}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      {editing ? (
+                        <input type="number" step="any" value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))} className={`${numInputCls} w-16`} />
+                      ) : (
+                        <span className="text-slate-300">{item.quantity}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {editing ? (
+                        <input value={item.unit} onChange={(e) => updateItem(i, 'unit', e.target.value)} className={`${inputCls} w-12`} />
+                      ) : (
+                        <span className="text-slate-400">{item.unit}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      {editing ? (
+                        <input type="number" step="any" value={item.unit_price} onChange={(e) => updateItem(i, 'unit_price', Number(e.target.value))} className={`${numInputCls} w-20`} />
+                      ) : (
+                        <span className="text-slate-300">{fmt(item.unit_price)}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-right text-slate-200">{fmt(item.total_price)}</td>
+                    <td className="px-2 py-1.5">
+                      {nom ? (
+                        <div>
                           <div className="flex items-center gap-1">
-                            <span className="text-amber-400">New (auto)</span>
+                            <span className="font-mono text-[10px] text-emerald-500">{nom.code}</span>
                             {confidenceBadge(item.confidence)}
                           </div>
-                        )}
-                      </td>
-                      {!isReadOnly && (
-                        <td className="px-1 py-1.5 text-center">
-                          <div className="flex items-center gap-0.5">
-                            <button type="button" onClick={() => toggleEdit(key)} className={`rounded p-0.5 hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-500'}`} title={editing ? 'Done' : 'Edit'}>
-                              {editing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
-                            </button>
-                            <button type="button" onClick={() => removeFood(i)} className="rounded p-0.5 text-slate-600 hover:bg-slate-700 hover:text-rose-400" title="Delete">
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </td>
+                          <div className="text-[10px] text-emerald-400/70">{nom.name}</div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <span className="text-amber-400">New (auto)</span>
+                          {confidenceBadge(item.confidence)}
+                        </div>
                       )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          {!isReadOnly && (
-            <button type="button" onClick={addFood} className="mt-1.5 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-emerald-500 hover:bg-emerald-500/10">
-              <Plus className="h-3 w-3" /> Add row
-            </button>
-          )}
+                    </td>
+                    {!isReadOnly && (
+                      <td className="px-1 py-1.5 text-center">
+                        <div className="flex items-center gap-0.5">
+                          <button type="button" onClick={() => toggleEdit(i)} className={`rounded p-0.5 hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-500'}`} title={editing ? 'Done' : 'Edit'}>
+                            {editing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+                          </button>
+                          <button type="button" onClick={() => removeItem(i)} className="rounded p-0.5 text-slate-600 hover:bg-slate-700 hover:text-rose-400" title="Delete">
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      {/* ── CapEx items ── */}
-      {capexItems.length > 0 && (
-        <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <h4 className="text-[10px] font-medium uppercase tracking-wide text-sky-400">
-              CapEx Items ({capexItems.length})
-              {capexChecked.size > 0 && (
-                <span className="ml-2 text-sky-300/60">— {capexChecked.size}/{capexItems.length} verified</span>
-              )}
-            </h4>
-          </div>
-          <div className="overflow-x-auto rounded-lg border border-slate-800">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-900 text-[9px] uppercase tracking-wide text-slate-500">
-                <tr>
-                  {checkboxTh(capexChecked, setCapexChecked, capexItems.length)}
-                  <th className="w-8 px-2 py-1.5 text-left">#</th>
-                  <th className="px-2 py-1.5 text-left">Equipment</th>
-                  <th className="min-w-[100px] px-2 py-1.5 text-left">Barcode</th>
-                  <th className="w-16 px-2 py-1.5 text-right">Qty</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Price</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Total</th>
-                  {!isReadOnly && <th className="w-16 px-1 py-1.5" />}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {capexItems.map((item, i) => {
-                  const key = `capex:${i}`
-                  const editing = isEditing(key)
-                  const checked = capexChecked.has(i)
-                  return (
-                    <tr key={i} className={`hover:bg-slate-800/30 ${checked ? 'bg-sky-500/5' : ''}`}>
-                      <td className="w-10 px-2 py-1.5 text-center">
-                        <input type="checkbox" checked={checked} onChange={() => toggleCheck(capexChecked, setCapexChecked, i)} className="h-3.5 w-3.5 cursor-pointer rounded border-slate-600 bg-slate-800 accent-sky-500" />
-                      </td>
-                      <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
-                      <td className="px-2 py-1.5">
-                        {editing ? <input value={item.name} onChange={(e) => updateCapex(i, 'name', e.target.value)} className={inputCls} /> : <span className="text-slate-200">{item.name}</span>}
-                      </td>
-                      <td className="px-2 py-1.5">
-                        {editing ? <input value={item.barcode || ''} onChange={(e) => updateCapex(i, 'barcode', e.target.value || null)} className={`${inputCls} font-mono`} placeholder="barcode / sku" /> : <span className="font-mono text-[10px] text-slate-400">{item.barcode || (item as unknown as Record<string, unknown>).supplier_sku as string || '\u2014'}</span>}
-                      </td>
-                      <td className="px-2 py-1.5 text-right">
-                        {editing ? <input type="number" step="any" value={item.quantity} onChange={(e) => updateCapex(i, 'quantity', Number(e.target.value))} className={`${numInputCls} w-16`} /> : <span className="text-slate-300">{item.quantity}</span>}
-                      </td>
-                      <td className="px-2 py-1.5 text-right">
-                        {editing ? <input type="number" step="any" value={item.unit_price} onChange={(e) => updateCapex(i, 'unit_price', Number(e.target.value))} className={`${numInputCls} w-20`} /> : <span className="text-slate-300">{fmt(item.unit_price)}</span>}
-                      </td>
-                      <td className="px-2 py-1.5 text-right text-slate-200">{fmt(item.total_price)}</td>
-                      {!isReadOnly && (
-                        <td className="px-1 py-1.5 text-center">
-                          <div className="flex items-center gap-0.5">
-                            <button type="button" onClick={() => toggleEdit(key)} className={`rounded p-0.5 hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-500'}`}>{editing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}</button>
-                            <button type="button" onClick={() => removeCapex(i)} className="rounded p-0.5 text-slate-600 hover:bg-slate-700 hover:text-rose-400"><Trash2 className="h-3 w-3" /></button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          {!isReadOnly && (
-            <button type="button" onClick={addCapex} className="mt-1.5 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-sky-500 hover:bg-sky-500/10">
-              <Plus className="h-3 w-3" /> Add row
+        {!isReadOnly && (
+          <div className="mt-1.5 flex items-center gap-2">
+            <button type="button" onClick={() => addItem('COGS')} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-emerald-500 hover:bg-emerald-500/10">
+              <Plus className="h-3 w-3" /> Food
             </button>
-          )}
-        </div>
-      )}
-
-      {/* ── OpEx items ── */}
-      {opexItems.length > 0 && (
-        <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <h4 className="text-[10px] font-medium uppercase tracking-wide text-amber-400">
-              OpEx Items ({opexItems.length})
-              {opexChecked.size > 0 && (
-                <span className="ml-2 text-amber-300/60">— {opexChecked.size}/{opexItems.length} verified</span>
-              )}
-            </h4>
-          </div>
-          <div className="overflow-x-auto rounded-lg border border-slate-800">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-900 text-[9px] uppercase tracking-wide text-slate-500">
-                <tr>
-                  {checkboxTh(opexChecked, setOpexChecked, opexItems.length)}
-                  <th className="w-8 px-2 py-1.5 text-left">#</th>
-                  <th className="min-w-[140px] px-2 py-1.5 text-left">Expense</th>
-                  <th className="min-w-[100px] px-2 py-1.5 text-left">Barcode</th>
-                  <th className="w-16 px-2 py-1.5 text-right">Qty</th>
-                  <th className="w-14 px-2 py-1.5 text-left">Unit</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Price</th>
-                  <th className="w-20 px-2 py-1.5 text-right">Total</th>
-                  {!isReadOnly && <th className="w-16 px-1 py-1.5" />}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {opexItems.map((item, i) => {
-                  const key = `opex:${i}`
-                  const editing = isEditing(key)
-                  const checked = opexChecked.has(i)
-                  return (
-                    <tr key={i} className={`hover:bg-slate-800/30 ${checked ? 'bg-amber-500/5' : ''}`}>
-                      <td className="w-10 px-2 py-1.5 text-center">
-                        <input type="checkbox" checked={checked} onChange={() => toggleCheck(opexChecked, setOpexChecked, i)} className="h-3.5 w-3.5 cursor-pointer rounded border-slate-600 bg-slate-800 accent-amber-500" />
-                      </td>
-                      <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
-                      <td className="px-2 py-1.5">
-                        {editing ? <input value={item.description} onChange={(e) => updateOpex(i, 'description', e.target.value)} className={inputCls} /> : <span className="text-slate-200">{item.description}</span>}
-                      </td>
-                      <td className="px-2 py-1.5">
-                        {editing ? (
-                          <input value={item.barcode || ''} onChange={(e) => updateOpex(i, 'barcode', e.target.value)} className={`${inputCls} font-mono text-[10px]`} placeholder="barcode" />
-                        ) : (
-                          <span className="font-mono text-[10px] text-slate-500">{item.barcode || (item as unknown as Record<string, unknown>).supplier_sku as string || '\u2014'}</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5 text-right">
-                        {editing ? <input type="number" step="any" value={item.quantity} onChange={(e) => updateOpex(i, 'quantity', Number(e.target.value))} className={`${numInputCls} w-16`} /> : <span className="text-slate-300">{item.quantity}</span>}
-                      </td>
-                      <td className="px-2 py-1.5">
-                        {editing ? <input value={item.unit} onChange={(e) => updateOpex(i, 'unit', e.target.value)} className={`${inputCls} w-12`} /> : <span className="text-slate-400">{item.unit}</span>}
-                      </td>
-                      <td className="px-2 py-1.5 text-right">
-                        {editing ? <input type="number" step="any" value={item.unit_price} onChange={(e) => updateOpex(i, 'unit_price', Number(e.target.value))} className={`${numInputCls} w-20`} /> : <span className="text-slate-300">{fmt(item.unit_price)}</span>}
-                      </td>
-                      <td className="px-2 py-1.5 text-right text-slate-200">{fmt(item.total_price)}</td>
-                      {!isReadOnly && (
-                        <td className="px-1 py-1.5 text-center">
-                          <div className="flex items-center gap-0.5">
-                            <button type="button" onClick={() => toggleEdit(key)} className={`rounded p-0.5 hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-500'}`}>{editing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}</button>
-                            <button type="button" onClick={() => removeOpex(i)} className="rounded p-0.5 text-slate-600 hover:bg-slate-700 hover:text-rose-400"><Trash2 className="h-3 w-3" /></button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          {!isReadOnly && (
-            <button type="button" onClick={addOpex} className="mt-1.5 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-amber-500 hover:bg-amber-500/10">
-              <Plus className="h-3 w-3" /> Add row
+            <button type="button" onClick={() => addItem('OpEx')} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-amber-500 hover:bg-amber-500/10">
+              <Plus className="h-3 w-3" /> OpEx
             </button>
-          )}
-        </div>
-      )}
-
-      {/* Show add buttons even when sections are empty */}
-      {!isReadOnly && foodItems.length === 0 && (
-        <button type="button" onClick={addFood} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-emerald-500 hover:bg-emerald-500/10">
-          <Plus className="h-3 w-3" /> Add Food Item
-        </button>
-      )}
-      {!isReadOnly && capexItems.length === 0 && (
-        <button type="button" onClick={addCapex} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-sky-500 hover:bg-sky-500/10">
-          <Plus className="h-3 w-3" /> Add CapEx Item
-        </button>
-      )}
-      {!isReadOnly && opexItems.length === 0 && (
-        <button type="button" onClick={addOpex} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-amber-500 hover:bg-amber-500/10">
-          <Plus className="h-3 w-3" /> Add OpEx Item
-        </button>
-      )}
+            <button type="button" onClick={() => addItem('CapEx')} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-sky-500 hover:bg-sky-500/10">
+              <Plus className="h-3 w-3" /> CapEx
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ── GDrive paths ── */}
       {row.gdrive_paths && row.gdrive_paths.length > 0 && (
@@ -1131,7 +952,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
             >
               {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              Approve ({totalItems} items)
+              Approve ({items.length} items)
             </button>
             <button
               type="button"
@@ -1145,9 +966,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           </>
         )}
         <div className="ml-auto flex items-center gap-3 text-[10px] text-slate-600">
-          {totalChecked > 0 && (
+          {checkedItems.size > 0 && (
             <span className="text-emerald-500/70">
-              Verified: {totalChecked}/{totalItems}
+              Verified: {checkedItems.size}/{items.length}
             </span>
           )}
           <span>{p.currency ?? 'THB'} | {p.flow_type} | cat {p.category_code ?? '\u2014'}</span>
