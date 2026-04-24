@@ -14,6 +14,7 @@
 | `/coo` | Auto-router | Classifies message (tech vs strategic) and loads `/strategy` or `/techlead` — see `docs/plans/spec-agents-split.md` §3.1 |
 | `/strategy` | Strategic COO | `agents/strategy/AGENT.md` + `core-rules.md` + `agent-rules.md` + `DISPATCH_RULES.md` |
 | `/techlead` | Technical Tech-Lead | `agents/tech-lead/AGENT.md` + `core-rules.md` + `agent-rules.md` + `engineering-rules.md` + `docs/operations/skills-services-policy.md` |
+| `/procurement` | Procurement Analyst | `agents/procurement/AGENT.md` + MC tasks (domain=procurement) + finance/chef read-only |
 
 ---
 
@@ -28,6 +29,7 @@ Guidelines:
 - Dish, menu, BOM, recipe, ingredient, nutrition → **kitchen** → load `/chef`
 - PR, bug, deploy, commit, migration, CI, code → **tech** → load `/techlead`
 - Roadmap, priority, strategy, initiative, business idea → **strategy** → load `/strategy`
+- Equipment, supplier, purchase, buy, price comparison, sourcing → **procurement** → load `/procurement`
 - Inbox triage, sprint, task coordination → **tech** (hygiene is Tech-Lead's job); priority re-ranking → **strategy**
 
 **When unsure:** ask the user: "This sounds like [domain]. Should I load [agent]?"
