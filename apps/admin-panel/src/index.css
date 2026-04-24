@@ -38,6 +38,21 @@
   --font-display-sc: "Alegreya SC", ui-serif, Georgia, serif;
   --font-sans: "Geist", "DM Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Warmer-dark surface tokens (v1.3 prototype) — consumed via var(--s-N) */
+  --s-0: #0A0D08;  /* page */
+  --s-1: #10150D;  /* panel */
+  --s-2: #171E12;  /* elevated */
+  --s-3: #1F2818;  /* hover */
+  --line:        rgba(240, 234, 214, 0.09);
+  --line-strong: rgba(240, 234, 214, 0.18);
+
+  /* AA-safe semantic red, 6.82:1 contrast on --s-0 */
+  --brick-bright: #E27A7F;
+
+  /* Motion easing (prototype-aligned) */
+  --e-out:  cubic-bezier(0.2, 0.8, 0.2, 1);
+  --e-emph: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 :root {
