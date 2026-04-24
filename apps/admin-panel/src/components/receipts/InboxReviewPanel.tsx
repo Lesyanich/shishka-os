@@ -864,16 +864,13 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                     <td className="px-2 py-1.5 text-right text-slate-200">{fmt(item.total_price)}</td>
                     <td className="px-2 py-1.5">
                       {nom ? (
-                        <div>
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono text-[10px] text-emerald-500">{nom.code}</span>
-                            {confidenceBadge(item.confidence)}
-                          </div>
-                          <div className="text-[10px] text-emerald-400/70">{nom.name}</div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-emerald-400">{nom.name}</span>
+                          {confidenceBadge(item.confidence)}
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
-                          <span className="text-amber-400">New (auto)</span>
+                          <span className="text-[10px] text-amber-400">New</span>
                           {confidenceBadge(item.confidence)}
                         </div>
                       )}
