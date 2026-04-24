@@ -304,9 +304,18 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const discountAmount = Math.abs(p?.discount_total || 0)
   const vatAmount = p?.vat_amount || 0
   const vatIncluded = p?.vat_included !== false
-  const expectedReceiptTotal = vatIncluded
+  // Discount may be embedded in item prices OR separate. Try both formulas, pick best match.
+  const expectedWithDiscount = vatIncluded
     ? calculatedTotal - discountAmount
     : calculatedTotal - discountAmount + vatAmount
+  const expectedWithoutDiscount = vatIncluded
+    ? calculatedTotal
+    : calculatedTotal + vatAmount
+  const diffWith = Math.abs(expectedWithDiscount - receiptTotal)
+  const diffWithout = Math.abs(expectedWithoutDiscount - receiptTotal)
+  // Use whichever formula matches the receipt total better
+  const discountEmbedded = discountAmount > 0 && diffWithout < diffWith
+  const expectedReceiptTotal = discountEmbedded ? expectedWithoutDiscount : expectedWithDiscount
   const totalMismatch = Math.abs(expectedReceiptTotal - receiptTotal) > 0.5
 
   // ── Category counts ──
@@ -740,7 +749,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           {totalMismatch && (
             <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
               <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              Items ({'\u0E3F'}{fmt(calculatedTotal)}) − discount ({'\u0E3F'}{fmt(discountAmount)}){!vatIncluded && vatAmount ? ` + VAT (฿${fmt(vatAmount)})` : ''}{vatIncluded && vatAmount ? ` [VAT ฿${fmt(vatAmount)} incl.]` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} ≠ receipt ({'\u0E3F'}{fmt(receiptTotal)}).
+              Items ({'\u0E3F'}{fmt(calculatedTotal)}){discountEmbedded ? ` [discount ฿${fmt(discountAmount)} already in prices]` : ` − discount (฿${fmt(discountAmount)})`}{!vatIncluded && vatAmount ? ` + VAT (฿${fmt(vatAmount)})` : ''}{vatIncluded && vatAmount ? ` [VAT ฿${fmt(vatAmount)} incl.]` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} ≠ receipt ({'\u0E3F'}{fmt(receiptTotal)}).
               Diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))}
             </div>
           )}
