@@ -557,17 +557,25 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             onMouseLeave={handleMouseUp}
             className={`h-[300px] lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
           >
-            <img
-              src={row.photo_urls[selectedPhotoIdx]}
-              alt="Receipt"
-              draggable={false}
-              className="h-full w-full select-none"
-              style={{
-                objectFit: 'contain',
-                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                transformOrigin: 'center center',
-              }}
-            />
+            {row.photo_urls[selectedPhotoIdx]?.toLowerCase().endsWith('.pdf') ? (
+              <iframe
+                src={row.photo_urls[selectedPhotoIdx]}
+                title="Receipt PDF"
+                className="h-full w-full border-0"
+              />
+            ) : (
+              <img
+                src={row.photo_urls[selectedPhotoIdx]}
+                alt="Receipt"
+                draggable={false}
+                className="h-full w-full select-none"
+                style={{
+                  objectFit: 'contain',
+                  transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                  transformOrigin: 'center center',
+                }}
+              />
+            )}
           </div>
           {row.photo_urls.length > 1 && (
             <>
@@ -601,7 +609,10 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 onClick={() => setSelectedPhotoIdx(i)}
                 className={`h-14 w-10 overflow-hidden rounded border ${i === selectedPhotoIdx ? 'border-indigo-500 ring-1 ring-indigo-500/50' : 'border-slate-700 hover:border-slate-500'} bg-slate-800`}
               >
-                <img src={url} alt={`page ${i + 1}`} className="h-full w-full object-cover" />
+                {url.toLowerCase().endsWith('.pdf')
+                  ? <span className="flex h-full w-full items-center justify-center text-[8px] text-slate-400">PDF</span>
+                  : <img src={url} alt={`page ${i + 1}`} className="h-full w-full object-cover" />
+                }
               </button>
             ))}
             <p className="ml-1 text-[9px] text-slate-600">
