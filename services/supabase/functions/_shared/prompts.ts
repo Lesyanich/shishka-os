@@ -210,8 +210,8 @@ Thai receipts use Buddhist Era years. SUBTRACT 543 to convert:
 | Food ingredients | COGS | 4100 | Flour, pasta, meat, vegetables, dairy, oil, spices |
 | Beverages (alcohol) | COGS | 4200 | Wine, beer |
 | Packaging | COGS | 4300 | Containers, bags |
-| Cleaning, household | OpEx | 2100 | Floor cleaner, soap, sponges, gloves, detergent |
-| Small inventory (<2000 THB) | OpEx | 2100 | Basins, spatulas |
+| Cleaning, household, kitchen consumables | OpEx | 2100 | Floor cleaner, soap, sponges, gloves, detergent, baking paper, parchment paper, aluminum foil, cling wrap, plastic wrap, garbage bags, paper towels |
+| Small inventory (<2000 THB) | OpEx | 2100 | Basins, spatulas, storage containers |
 | Equipment (>2000 THB) | CapEx | 1100 | Fans, ovens, fridges |
 
 ## ARITHMETIC VERIFICATION (MANDATORY)

@@ -31,6 +31,7 @@ export async function matchNomenclature(
   item: { barcode?: string | null; supplier_sku?: string | null; translated_name?: string; original_name?: string | null },
 ): Promise<{ nomenclature_id: string | null; sku_id: string | null; confidence: string }> {
   if (item.barcode) {
+    // Level 1a: supplier_catalog by barcode
     const { data } = await db
       .from("supplier_catalog")
       .select("nomenclature_id, sku_id")
@@ -39,6 +40,29 @@ export async function matchNomenclature(
       .limit(1)
     if (data?.[0]?.nomenclature_id) {
       return { nomenclature_id: data[0].nomenclature_id, sku_id: data[0].sku_id, confidence: "high" }
+    }
+
+    // Level 1b: SKU table by barcode (mirrors fn_approve_receipt Level 1)
+    const { data: skuMatch } = await db
+      .from("sku")
+      .select("nomenclature_id, id")
+      .eq("barcode", item.barcode)
+      .not("nomenclature_id", "is", null)
+      .limit(1)
+    if (skuMatch?.[0]?.nomenclature_id) {
+      return { nomenclature_id: skuMatch[0].nomenclature_id, sku_id: skuMatch[0].id, confidence: "high" }
+    }
+
+    // Level 1c: purchase_logs by barcode (items previously approved)
+    const { data: plMatch } = await db
+      .from("purchase_logs")
+      .select("nomenclature_id, sku_id")
+      .eq("barcode", item.barcode)
+      .not("nomenclature_id", "is", null)
+      .order("invoice_date", { ascending: false })
+      .limit(1)
+    if (plMatch?.[0]?.nomenclature_id) {
+      return { nomenclature_id: plMatch[0].nomenclature_id, sku_id: plMatch[0].sku_id, confidence: "high" }
     }
   }
   if (item.supplier_sku && supplierId) {
