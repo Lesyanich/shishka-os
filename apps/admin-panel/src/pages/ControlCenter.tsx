@@ -1,3 +1,4 @@
+// DEPRECATED: replaced by OpeningRoadmap 2026-04-24
 import { BOMHealthBar } from '../components/control-center/BOMHealthBar'
 import { lazy, Suspense } from 'react'
 const CapExMiniChart = lazy(() => import('../components/control-center/CapExMiniChart').then(m => ({ default: m.CapExMiniChart })))
