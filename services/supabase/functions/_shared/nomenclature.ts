@@ -75,8 +75,10 @@ export async function matchNomenclature(
   item: { barcode?: string | null; supplier_sku?: string | null; translated_name?: string; original_name?: string | null },
 ): Promise<{ nomenclature_id: string | null; sku_id: string | null; confidence: string }> {
   // Level 0: GS1 variable-weight barcode (prefix "2", >13 digits)
-  if (item.barcode) {
-    const gs1 = parseGS1WeightBarcode(item.barcode)
+  // LLM may put weight barcodes in barcode OR supplier_sku field
+  const gs1Candidate = item.barcode || item.supplier_sku || null
+  if (gs1Candidate) {
+    const gs1 = parseGS1WeightBarcode(gs1Candidate)
     if (gs1) {
       const gs1Match = await matchGS1WeightItem(gs1.base)
       if (gs1Match.nomenclature_id) {
