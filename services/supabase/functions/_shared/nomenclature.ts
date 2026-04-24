@@ -1,4 +1,5 @@
 import { db } from "./supabase.ts"
+import { parseGS1WeightBarcode, matchGS1WeightItem } from "./gs1.ts"
 
 export interface ResolvedSupplier {
   id: string | null
@@ -7,57 +8,83 @@ export interface ResolvedSupplier {
 
 export async function resolveSupplier(name: string): Promise<string | null> {
   if (!name) return null
-  // Try exact substring: DB name contains parsed name
-  const { data } = await db
-    .from("suppliers")
-    .select("id")
-    .ilike("name", `%${name}%`)
-    .limit(1)
-  if (data?.[0]?.id) return data[0].id
-
-  // Reverse: parsed name contains DB name (e.g. "SIAM MAKRO" contains "Makro")
-  // Try each word from parsed name as a keyword
-  const words = name.split(/\s+/).filter(w => w.length >= 3)
-  for (const word of words) {
-    const { data: rev } = await db
-      .from("suppliers")
-      .select("id")
-      .ilike("name", `%${word}%`)
-      .neq("name", '') // skip empty
-      .limit(1)
-    if (rev?.[0]?.id) return rev[0].id
-  }
-  return null
+  const resolved = await resolveSupplierWithProfile(name)
+  return resolved.id
 }
 
 export async function resolveSupplierWithProfile(name: string): Promise<ResolvedSupplier> {
   if (!name) return { id: null, ocr_profile: null }
-  // Try exact substring first
-  const { data } = await db
+
+  // Level 1: Exact alias match (fastest — learned from previous receipts)
+  const { data: aliasHit } = await db
+    .from("supplier_aliases")
+    .select("supplier_id")
+    .ilike("alias", name)
+    .limit(1)
+  if (aliasHit?.[0]?.supplier_id) {
+    const { data: sup } = await db
+      .from("suppliers")
+      .select("id, ocr_profile")
+      .eq("id", aliasHit[0].supplier_id)
+      .limit(1)
+    if (sup?.[0]) return { id: sup[0].id, ocr_profile: sup[0].ocr_profile ?? null }
+  }
+
+  // Level 2: Substring match against suppliers.name
+  const { data: subHit } = await db
     .from("suppliers")
     .select("id, ocr_profile")
     .ilike("name", `%${name}%`)
     .limit(1)
-  if (data?.[0]) return { id: data[0].id, ocr_profile: data[0].ocr_profile ?? null }
+  if (subHit?.[0]) {
+    await saveAlias(name, subHit[0].id)
+    return { id: subHit[0].id, ocr_profile: subHit[0].ocr_profile ?? null }
+  }
 
-  // Reverse: try each word
+  // Level 3: Word-by-word fallback
   const words = name.split(/\s+/).filter(w => w.length >= 3)
   for (const word of words) {
-    const { data: rev } = await db
+    const { data: wordHit } = await db
       .from("suppliers")
       .select("id, ocr_profile")
       .ilike("name", `%${word}%`)
-      .neq("name", '')
+      .neq("name", "")
       .limit(1)
-    if (rev?.[0]) return { id: rev[0].id, ocr_profile: rev[0].ocr_profile ?? null }
+    if (wordHit?.[0]) {
+      await saveAlias(name, wordHit[0].id)
+      return { id: wordHit[0].id, ocr_profile: wordHit[0].ocr_profile ?? null }
+    }
   }
+
   return { id: null, ocr_profile: null }
+}
+
+async function saveAlias(alias: string, supplierId: string): Promise<void> {
+  try {
+    await db.from("supplier_aliases").upsert(
+      { alias: alias.trim(), supplier_id: supplierId, source: "auto" },
+      { onConflict: "alias" },
+    )
+  } catch {
+    // Non-critical: if alias save fails, resolution still worked
+  }
 }
 
 export async function matchNomenclature(
   supplierId: string | null,
   item: { barcode?: string | null; supplier_sku?: string | null; translated_name?: string; original_name?: string | null },
 ): Promise<{ nomenclature_id: string | null; sku_id: string | null; confidence: string }> {
+  // Level 0: GS1 variable-weight barcode (prefix "2", >13 digits)
+  if (item.barcode) {
+    const gs1 = parseGS1WeightBarcode(item.barcode)
+    if (gs1) {
+      const gs1Match = await matchGS1WeightItem(gs1.base)
+      if (gs1Match.nomenclature_id) {
+        return { nomenclature_id: gs1Match.nomenclature_id, sku_id: gs1Match.sku_id, confidence: "high" }
+      }
+    }
+  }
+
   if (item.barcode) {
     // Level 1a: supplier_catalog by barcode
     const { data } = await db

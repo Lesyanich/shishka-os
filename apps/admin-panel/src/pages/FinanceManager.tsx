@@ -534,9 +534,9 @@ export function FinanceManager() {
     return data.id
   }
 
-  /* ── Approve handler — calls fn_approve_receipt RPC ── */
+  /* ── Approve handler — calls fn_approve_receipt_with_learning RPC ── */
   const handleApprove = async (payload: ApprovePayload) => {
-    const { data, error: rpcErr } = await supabase.rpc('fn_approve_receipt', {
+    const { data, error: rpcErr } = await supabase.rpc('fn_approve_receipt_with_learning', {
       p_payload: payload,
     })
 

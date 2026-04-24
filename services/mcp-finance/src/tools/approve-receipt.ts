@@ -122,8 +122,8 @@ export async function approveReceipt(args: ApproveReceiptArgs) {
     };
   }
 
-  // Call the RPC
-  const { data, error } = await sb.rpc("fn_approve_receipt", {
+  // Call the RPC (with learning wrapper)
+  const { data, error } = await sb.rpc("fn_approve_receipt_with_learning", {
     p_payload: payload,
   });
 

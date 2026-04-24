@@ -15,6 +15,7 @@ import { callLLM } from "../_shared/llm-providers.ts"
 import type { ApiResult, ImageInput } from "../_shared/llm-providers.ts"
 import { SYSTEM_PROMPT, OUTPUT_SCHEMA, MODEL_PRICING, MODEL_MAP } from "../_shared/prompts.ts"
 import { resolveSupplier, resolveSupplierWithProfile, matchNomenclature, classifyItems, determineFlowType } from "../_shared/nomenclature.ts"
+import { applyCategoryOverrides, learnSupplierAlias } from "../_shared/learning.ts"
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -189,6 +190,13 @@ ${fullOcrText}
     const supplierName = (parsed.supplier_name as string) || row.supplier_hint || ""
     const supplierId = await resolveSupplier(supplierName)
 
+    // ── Auto-learn supplier aliases ──
+    await learnSupplierAlias(
+      parsed.supplier_name as string | null,
+      parsed.supplier_name_th as string | null,
+      supplierId,
+    )
+
     for (const item of lineItems) {
       const match = await matchNomenclature(supplierId, {
         barcode: item.barcode as string | null,
@@ -199,6 +207,12 @@ ${fullOcrText}
       item.nomenclature_id = match.nomenclature_id
       item.sku_id = match.sku_id
       if (!item.confidence || item.confidence === "low") item.confidence = match.confidence
+    }
+
+    // ── Apply learned category overrides (before classification) ──
+    const overrideCount = await applyCategoryOverrides(lineItems, supplierId)
+    if (overrideCount > 0) {
+      console.log(`[ocr-receipt] Applied ${overrideCount} category override(s)`)
     }
 
     // ── Classify items ──
