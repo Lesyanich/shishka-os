@@ -487,14 +487,116 @@ export function BrainKnowledgePage() {
         {/* ─── Section 2: Knowledge Domains Treemap ─── */}
         {!selectedCat ? (
           <section>
-            <p className="text-slate-500 text-sm">Treemap — Task 3</p>
+            <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-slate-500">
+              Knowledge Domains
+            </h3>
+            {loading ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-20 animate-pulse rounded-xl border border-slate-800 bg-slate-900/50" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {cats.map(({ def, nodes }, i) => (
+                  <button
+                    key={def.name}
+                    onClick={() => setSelectedCat(def.name)}
+                    className={[
+                      'group relative overflow-hidden rounded-xl border text-left transition-all duration-200',
+                      'hover:scale-[1.02] hover:border-slate-600',
+                      i === 0 ? 'sm:row-span-2 sm:min-h-[172px]' : 'min-h-[80px]',
+                    ].join(' ')}
+                    style={{
+                      background: `${ACCENT_HEX[def.accent] ?? '#94a3b8'}08`,
+                      borderColor: `${ACCENT_HEX[def.accent] ?? '#94a3b8'}25`,
+                    }}
+                  >
+                    <div className="flex h-full flex-col justify-between p-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <def.icon className={`h-4 w-4 ${def.accent}`} />
+                          <span className="text-sm font-medium text-slate-200">{def.nameRu}</span>
+                        </div>
+                        <p className="mt-0.5 text-[10px] text-slate-500">{def.name}</p>
+                      </div>
+                      <div className="mt-2 flex items-end justify-between">
+                        <span
+                          className="text-2xl font-bold"
+                          style={{ color: ACCENT_HEX[def.accent] ?? '#94a3b8' }}
+                        >
+                          {nodes.length}
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-slate-700 transition group-hover:text-slate-400" />
+                      </div>
+                    </div>
+                  </button>
+                ))}
+                {other.length > 0 && (
+                  <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-800 p-4">
+                    <p className="text-[10px] text-slate-600">+{other.length} uncategorized</p>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         ) : null}
 
         {/* ─── Section 2b: Category Detail (inline) ─── */}
         {selectedCat && selectedDef && selectedNodes ? (
           <section>
-            <p className="text-slate-500 text-sm">Category Detail — Task 3</p>
+            <button
+              onClick={() => setSelectedCat(null)}
+              className="mb-3 flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition"
+            >
+              <ArrowRight className="h-3 w-3 rotate-180" />
+              Back to categories
+            </button>
+            <div
+              className="rounded-xl border border-l-2 border-slate-800 bg-slate-900/50 p-4"
+              style={{ borderLeftColor: ACCENT_HEX[selectedDef.accent] ?? '#94a3b8' }}
+            >
+              <div className="mb-4 flex items-center gap-3">
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-lg"
+                  style={{ background: `${ACCENT_HEX[selectedDef.accent] ?? '#94a3b8'}15` }}
+                >
+                  <selectedDef.icon className={`h-5 w-5 ${selectedDef.accent}`} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-100">{selectedDef.nameRu}</h3>
+                  <p className="text-[10px] text-slate-500">
+                    {selectedDef.name} · {selectedNodes.length} entities
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1">
+                {selectedNodes.slice(0, 30).map((n) => (
+                  <div
+                    key={n.id}
+                    className="flex items-center justify-between rounded-lg border border-slate-800/50 bg-slate-800/20 px-3 py-2 text-xs hover:bg-slate-800/40 transition"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="truncate font-medium text-slate-200">{n.label}</span>
+                      <span className="shrink-0 rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">
+                        {n.file_type}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-2">
+                      <span className="text-[10px] text-slate-600">community {n.community}</span>
+                      <span className={`text-[10px] ${(connectionCount.get(n.id) || 0) > 5 ? 'text-fuchsia-400' : 'text-slate-600'}`}>
+                        {connectionCount.get(n.id) || 0} links
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {selectedNodes.length > 30 && (
+                  <p className="py-2 text-center text-[10px] text-slate-600">
+                    +{selectedNodes.length - 30} more entities
+                  </p>
+                )}
+              </div>
+            </div>
           </section>
         ) : null}
 
