@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useRef, createPortal } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, createPortal } from 'react'
+import { Network } from 'vis-network'
+import { DataSet } from 'vis-data'
 import {
   Search,
   Plus,
   X,
-  ChevronRight,
   Maximize2,
   Minimize2,
   Shield,
@@ -223,7 +224,9 @@ export function BrainKnowledgePage() {
   const [graph, setGraph] = useState<GraphData | null>(null)
   const [search, setSearch] = useState('')
   const [graphFullscreen, setGraphFullscreen] = useState(false)
-  const [expandedComms, setExpandedComms] = useState<Set<number>>(new Set())
+  const [selectedComms, setSelectedComms] = useState<Set<number> | 'all'>('all')
+  const graphRef = useRef<HTMLDivElement>(null)
+  const networkRef = useRef<Network | null>(null)
   const [mode, setMode] = useState<'search' | 'add'>('search')
   const [noteText, setNoteText] = useState('')
   const [notes, setNotes] = useState<BrainNote[]>(loadNotes)
@@ -350,6 +353,91 @@ export function BrainKnowledgePage() {
     }))
   }, [graph, analytics, connectionCount])
 
+  // Community color palette
+  const COMM_COLORS = useMemo(() => {
+    const palette = ['#fb7185', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#e879f9', '#38bdf8', '#2dd4bf', '#818cf8', '#94a3b8', '#f97316', '#06b6d4', '#84cc16', '#ec4899', '#8b5cf6']
+    const map = new Map<number, string>()
+    commGroups.forEach((c, i) => map.set(c.id, palette[i % palette.length]))
+    return map
+  }, [commGroups])
+
+  // Render vis-network graph
+  useEffect(() => {
+    if (!graph || !graphRef.current) return
+
+    const visibleComms = selectedComms === 'all'
+      ? null
+      : selectedComms
+
+    const filteredNodes = visibleComms
+      ? graph.nodes.filter((n) => visibleComms.has(n.community))
+      : graph.nodes
+
+    const nodeIds = new Set(filteredNodes.map((n) => n.id))
+    const filteredEdges = graph.edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+
+    const nodes = new DataSet(filteredNodes.map((n) => ({
+      id: n.id,
+      label: n.label,
+      color: {
+        background: COMM_COLORS.get(n.community) ?? '#94a3b8',
+        border: COMM_COLORS.get(n.community) ?? '#94a3b8',
+        highlight: { background: '#fff', border: COMM_COLORS.get(n.community) ?? '#94a3b8' },
+      },
+      font: { color: '#e0e0e0', size: 10 },
+      size: Math.max(5, Math.min(20, (connectionCount.get(n.id) || 1) * 2)),
+    })))
+
+    const edges = new DataSet(filteredEdges.map((e, i) => ({
+      id: `e${i}`,
+      from: e.source,
+      to: e.target,
+      color: { color: 'rgba(100,116,139,0.15)', highlight: 'rgba(100,116,139,0.4)' },
+      width: 0.5,
+    })))
+
+    if (networkRef.current) {
+      networkRef.current.destroy()
+    }
+
+    networkRef.current = new Network(graphRef.current, { nodes, edges }, {
+      physics: {
+        solver: 'forceAtlas2Based',
+        forceAtlas2Based: { gravitationalConstant: -30, centralGravity: 0.005, springLength: 100 },
+        stabilization: { iterations: 150 },
+      },
+      nodes: { shape: 'dot', borderWidth: 1 },
+      edges: { smooth: { type: 'continuous' } },
+      interaction: { hover: true, tooltipDelay: 100, zoomView: true, dragView: true },
+      layout: { improvedLayout: false },
+    })
+
+    return () => {
+      if (networkRef.current) {
+        networkRef.current.destroy()
+        networkRef.current = null
+      }
+    }
+  }, [graph, selectedComms, COMM_COLORS, connectionCount])
+
+  // Toggle community selection
+  const toggleComm = useCallback((id: number) => {
+    setSelectedComms((prev) => {
+      if (prev === 'all') {
+        // Deselect this one → show all except this
+        const all = new Set(commGroups.map((c) => c.id))
+        all.delete(id)
+        return all
+      }
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      // If all selected, switch back to 'all'
+      if (next.size === commGroups.length) return 'all'
+      return next
+    })
+  }, [commGroups])
+
   // Add note
   function addNote() {
     if (!noteText.trim()) return
@@ -432,14 +520,20 @@ export function BrainKnowledgePage() {
           </div>
         </section>
 
-        {/* ─── Interactive Graph (always visible) ─── */}
+        {/* ─── Graph + Community Filter ─── */}
         <section>
           <div className={graphFullscreen ? 'fixed inset-0 z-50 flex flex-col bg-slate-950' : 'flex flex-col'}>
+            {/* Header bar */}
             <div className="flex items-center justify-between rounded-t-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-[11px]">
               <div className="flex items-center gap-4 text-slate-400">
                 <GitGraph className="h-3 w-3 text-fuchsia-400" />
                 <span className="text-slate-200">{graph?.nodes.length.toLocaleString() ?? '...'}</span> nodes ·{' '}
                 <span className="text-slate-200">{graph?.edges.length.toLocaleString() ?? '...'}</span> edges
+                {selectedComms !== 'all' && (
+                  <span className="text-amber-400">
+                    · showing {selectedComms.size} of {commGroups.length} communities
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => setGraphFullscreen((f) => !f)}
@@ -448,84 +542,58 @@ export function BrainKnowledgePage() {
                 {graphFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
               </button>
             </div>
-            <iframe
-              src="/graph.html"
-              title="Graphify knowledge graph"
+
+            {/* Community filter chips */}
+            {commGroups.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 border-x border-slate-800 bg-slate-900/40 px-3 py-2">
+                <div className="flex gap-1.5 mr-2">
+                  <button
+                    onClick={() => setSelectedComms('all')}
+                    className={`rounded px-2 py-0.5 text-[10px] font-medium transition ${selectedComms === 'all' ? 'bg-fuchsia-500/20 text-fuchsia-300' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setSelectedComms(new Set())}
+                    className="rounded px-2 py-0.5 text-[10px] font-medium text-slate-500 hover:text-slate-300 transition"
+                  >
+                    None
+                  </button>
+                </div>
+                {commGroups.map((c) => {
+                  const isSelected = selectedComms === 'all' || selectedComms.has(c.id)
+                  const color = COMM_COLORS.get(c.id) ?? '#94a3b8'
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => toggleComm(c.id)}
+                      className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] transition"
+                      style={{
+                        background: isSelected ? `${color}20` : 'transparent',
+                        color: isSelected ? color : '#64748b',
+                        border: `1px solid ${isSelected ? `${color}40` : '#334155'}`,
+                      }}
+                      title={`${c.label} · ${c.size} nodes`}
+                    >
+                      <span
+                        className="inline-block h-1.5 w-1.5 rounded-full"
+                        style={{ background: isSelected ? color : '#475569' }}
+                      />
+                      {c.label.replace(' cluster', '')}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Graph canvas */}
+            <div
+              ref={graphRef}
               className="rounded-b-lg border border-t-0 border-slate-800"
-              style={{ height: graphFullscreen ? '100%' : 500, minHeight: 400 }}
+              style={{ height: graphFullscreen ? 'calc(100% - 76px)' : 500, minHeight: 400, background: '#0f0f1a' }}
             />
           </div>
         </section>
-
-        {/* ─── Communities (expandable) ─── */}
-        {commGroups.length > 0 && (
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                Communities · {commGroups.length}
-              </h3>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setExpandedComms(new Set(commGroups.map((c) => c.id)))}
-                  className="text-[10px] text-slate-500 hover:text-slate-300 transition"
-                >
-                  Expand all
-                </button>
-                <span className="text-slate-700">|</span>
-                <button
-                  onClick={() => setExpandedComms(new Set())}
-                  className="text-[10px] text-slate-500 hover:text-slate-300 transition"
-                >
-                  Collapse all
-                </button>
-              </div>
-            </div>
-            <div className="space-y-1">
-              {commGroups.map((c) => {
-                const isOpen = expandedComms.has(c.id)
-                return (
-                  <div key={c.id}>
-                    <button
-                      onClick={() => {
-                        setExpandedComms((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(c.id)) next.delete(c.id)
-                          else next.add(c.id)
-                          return next
-                        })
-                      }}
-                      className="flex w-full items-center justify-between rounded-lg bg-slate-800/30 px-3 py-2 text-xs hover:bg-slate-800/50 transition text-left"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ChevronRight className={`h-3 w-3 shrink-0 text-slate-600 transition ${isOpen ? 'rotate-90' : ''}`} />
-                        <span className="truncate font-medium text-slate-200">{c.label}</span>
-                      </div>
-                      <span className="shrink-0 ml-2 text-[10px] text-amber-400">{c.size} nodes</span>
-                    </button>
-                    {isOpen && c.nodes.length > 0 && (
-                      <div className="ml-5 mt-1 mb-2 space-y-0.5">
-                        {c.nodes.slice(0, 20).map((n) => (
-                          <div key={n.id} className="flex items-center justify-between rounded px-3 py-1 text-xs text-slate-400 hover:bg-slate-800/20">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="truncate text-slate-300">{n.label}</span>
-                              <span className="shrink-0 rounded bg-slate-700 px-1 py-0.5 text-[9px] text-slate-500">{n.file_type}</span>
-                            </div>
-                            <span className={`shrink-0 ml-2 text-[10px] ${(connectionCount.get(n.id) || 0) > 5 ? 'text-fuchsia-400' : 'text-slate-600'}`}>
-                              {connectionCount.get(n.id) || 0} links
-                            </span>
-                          </div>
-                        ))}
-                        {c.nodes.length > 20 && (
-                          <p className="pl-3 text-[10px] text-slate-600">+{c.nodes.length - 20} more</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        )}
       </div>
 
       {/* ─── Floating Search Pill ─── */}
