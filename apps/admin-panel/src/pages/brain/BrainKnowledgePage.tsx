@@ -225,6 +225,7 @@ export function BrainKnowledgePage() {
   const [search, setSearch] = useState('')
   const [graphFullscreen, setGraphFullscreen] = useState(false)
   const [selectedComms, setSelectedComms] = useState<Set<number> | 'all'>('all')
+  const [expandedComms, setExpandedComms] = useState<Set<number>>(new Set())
   const graphRef = useRef<HTMLDivElement>(null)
   const networkRef = useRef<Network | null>(null)
   const [mode, setMode] = useState<'search' | 'add'>('search')
@@ -384,6 +385,7 @@ export function BrainKnowledgePage() {
         border: COMM_COLORS.get(n.community) ?? '#94a3b8',
         highlight: { background: '#fff', border: COMM_COLORS.get(n.community) ?? '#94a3b8' },
       },
+      title: `${n.label}\n${n.file_type} · ${connectionCount.get(n.id) || 0} links`,
       font: { color: '#e0e0e0', size: 10 },
       size: Math.max(5, Math.min(20, (connectionCount.get(n.id) || 1) * 2)),
     })))
@@ -520,7 +522,7 @@ export function BrainKnowledgePage() {
           </div>
         </section>
 
-        {/* ─── Graph + Community Filter ─── */}
+        {/* ─── Graph + Community Sidebar ─── */}
         <section>
           <div className={graphFullscreen ? 'fixed inset-0 z-50 flex flex-col bg-slate-950' : 'flex flex-col'}>
             {/* Header bar */}
@@ -543,55 +545,101 @@ export function BrainKnowledgePage() {
               </button>
             </div>
 
-            {/* Community filter chips */}
-            {commGroups.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 border-x border-slate-800 bg-slate-900/40 px-3 py-2">
-                <div className="flex gap-1.5 mr-2">
-                  <button
-                    onClick={() => setSelectedComms('all')}
-                    className={`rounded px-2 py-0.5 text-[10px] font-medium transition ${selectedComms === 'all' ? 'bg-fuchsia-500/20 text-fuchsia-300' : 'text-slate-500 hover:text-slate-300'}`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setSelectedComms(new Set())}
-                    className="rounded px-2 py-0.5 text-[10px] font-medium text-slate-500 hover:text-slate-300 transition"
-                  >
-                    None
-                  </button>
-                </div>
-                {commGroups.map((c) => {
-                  const isSelected = selectedComms === 'all' || selectedComms.has(c.id)
-                  const color = COMM_COLORS.get(c.id) ?? '#94a3b8'
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => toggleComm(c.id)}
-                      className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] transition"
-                      style={{
-                        background: isSelected ? `${color}20` : 'transparent',
-                        color: isSelected ? color : '#64748b',
-                        border: `1px solid ${isSelected ? `${color}40` : '#334155'}`,
-                      }}
-                      title={`${c.label} · ${c.size} nodes`}
-                    >
-                      <span
-                        className="inline-block h-1.5 w-1.5 rounded-full"
-                        style={{ background: isSelected ? color : '#475569' }}
-                      />
-                      {c.label.replace(' cluster', '')}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+            {/* Graph + Sidebar row */}
+            <div className="flex border-x border-b border-slate-800 rounded-b-lg overflow-hidden" style={{ height: graphFullscreen ? 'calc(100% - 36px)' : 500, minHeight: 400 }}>
+              {/* Graph canvas */}
+              <div
+                ref={graphRef}
+                className="flex-1"
+                style={{ background: '#0f0f1a' }}
+              />
 
-            {/* Graph canvas */}
-            <div
-              ref={graphRef}
-              className="rounded-b-lg border border-t-0 border-slate-800"
-              style={{ height: graphFullscreen ? 'calc(100% - 76px)' : 500, minHeight: 400, background: '#0f0f1a' }}
-            />
+              {/* Communities sidebar */}
+              {commGroups.length > 0 && (
+                <div className="w-56 shrink-0 border-l border-slate-800 bg-slate-900/70 flex flex-col overflow-hidden">
+                  {/* Sidebar header */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Communities</span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setSelectedComms('all')}
+                        className={`rounded px-1.5 py-0.5 text-[9px] font-medium transition ${selectedComms === 'all' ? 'bg-fuchsia-500/20 text-fuchsia-300' : 'text-slate-500 hover:text-slate-300'}`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setSelectedComms(new Set())}
+                        className={`rounded px-1.5 py-0.5 text-[9px] font-medium transition ${selectedComms !== 'all' && selectedComms.size === 0 ? 'bg-slate-700 text-slate-300' : 'text-slate-500 hover:text-slate-300'}`}
+                      >
+                        None
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Community list */}
+                  <div className="flex-1 overflow-y-auto py-1">
+                    {commGroups.map((c) => {
+                      const isSelected = selectedComms === 'all' || selectedComms.has(c.id)
+                      const color = COMM_COLORS.get(c.id) ?? '#94a3b8'
+                      const isExpanded = expandedComms.has(c.id)
+                      return (
+                        <div key={c.id}>
+                          <div className="flex items-center gap-1 px-2 py-1 hover:bg-slate-800/40">
+                            {/* Select checkbox */}
+                            <button
+                              onClick={() => toggleComm(c.id)}
+                              className="shrink-0 flex h-3.5 w-3.5 items-center justify-center rounded border transition"
+                              style={{
+                                borderColor: isSelected ? color : '#475569',
+                                background: isSelected ? `${color}30` : 'transparent',
+                              }}
+                            >
+                              {isSelected && (
+                                <span className="block h-1.5 w-1.5 rounded-sm" style={{ background: color }} />
+                              )}
+                            </button>
+                            {/* Expand / label */}
+                            <button
+                              onClick={() => {
+                                setExpandedComms((prev) => {
+                                  const next = new Set(prev)
+                                  if (next.has(c.id)) next.delete(c.id)
+                                  else next.add(c.id)
+                                  return next
+                                })
+                              }}
+                              className="flex flex-1 items-center gap-1 min-w-0 text-left"
+                            >
+                              <span
+                                className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                                style={{ background: color }}
+                              />
+                              <span className={`truncate text-[10px] ${isSelected ? 'text-slate-200' : 'text-slate-500'}`}>
+                                {c.label.replace(' cluster', '')}
+                              </span>
+                              <span className="shrink-0 text-[9px] text-slate-600 ml-auto">{c.size}</span>
+                            </button>
+                          </div>
+                          {/* Expanded node list */}
+                          {isExpanded && (
+                            <div className="pl-7 pr-2 pb-1">
+                              {c.nodes.slice(0, 15).map((n) => (
+                                <p key={n.id} className="truncate text-[9px] text-slate-500 py-0.5" title={n.label}>
+                                  {n.label}
+                                </p>
+                              ))}
+                              {c.nodes.length > 15 && (
+                                <p className="text-[9px] text-slate-600">+{c.nodes.length - 15} more</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </div>
