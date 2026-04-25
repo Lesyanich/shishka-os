@@ -1,0 +1,103 @@
+# What graphify must NOT pull into the Knowledge Graph.
+# graphify reads THIS file, not .claudeignore. The two ignore files have
+# different audiences: .claudeignore narrows what Claude Code reads in chat;
+# .graphifyignore narrows what /graphify ingests when (re)building the Brain.
+
+# ── Binary / media files ─────────────────────────────────────────────
+# Owner decision: no auto-vision/transcription on receipts, location videos,
+# branding PDFs, or scanned books. Cost-to-knowledge ratio is bad.
+*.webp
+*.png
+*.jpg
+*.jpeg
+*.heic
+*.ico
+*.gif
+*.svg
+*.pdf
+*.mov
+*.MOV
+*.mp4
+*.mp3
+*.m4a
+*.wav
+*.docx
+*.xlsx
+*.csv
+*.psd
+*.ai
+
+# ── Google Drive content folders (not source, not knowledge) ─────────
+# Receipts, location photos, brand bibles, archived experiments live here.
+# Pointers into 01_Business/Branding/ that ARE knowledge live in
+# docs/branding/assets-index.md.
+01_Business/
+01_Source_Data/
+04_Knowledge/
+04_Financial_Control/
+Bills/
+Cooking lessons /
+Industry trends/
+Menu design/
+Photo (Locations & Renovations)/
+POSsystem/
+Инструкции ИИ/
+
+# ── Archived code experiments ────────────────────────────────────────
+_archive/
+
+# ── Build / venv / dependencies ──────────────────────────────────────
+node_modules/
+dist/
+.vercel/
+.vite/
+venv/
+.venv/
+.git/
+
+# ── graphify's own intermediate output (don't index your own indexer) ─
+graphify-out/
+
+# ── Obsidian internals ───────────────────────────────────────────────
+.obsidian/
+**/.obsidian/
+
+# ── Claude tooling artifacts ─────────────────────────────────────────
+.claude-flow/
+.claude/projects/
+.worktrees/
+
+# ── Transactional / fixture data — not knowledge ─────────────────────
+# Receipt line-items as nodes pollute the graph. Mirror in BrainKnowledgePage
+# EXCLUDED_SOURCE_PATTERNS so deployed UI also filters anything that slips through.
+services/supabase/migrations/*backfill*
+agents/*/examples/
+agents/finance/RECEIPT_PROCESSING_PROMPT_v1_archive.md
+
+# ── Tests and build configs (infrastructure, not knowledge) ──────────
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+**/*.test.jsx
+**/__tests__/
+**/vitest.config.ts
+**/vitest.config.js
+**/vitest.setup.ts
+**/vitest.setup.js
+**/vite.config.ts
+**/vite.config.js
+**/eslint.config.js
+**/eslint.config.ts
+**/tailwind.config.ts
+**/tailwind.config.js
+**/postcss.config.js
+**/playwright.config.ts
+**/tsconfig*.json
+**/package-lock.json
+
+# ── Lockfiles, env, large binary outputs ─────────────────────────────
+**/.DS_Store
+.env
+.env.*
+*.lock
+*.lockb
