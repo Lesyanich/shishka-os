@@ -25,6 +25,7 @@
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-force-graph": "^1.48.2",
     "react-force-graph-2d": "^1.29.1",
     "react-router-dom": "^7.13.1",
     "recharts": "^3.8.0",

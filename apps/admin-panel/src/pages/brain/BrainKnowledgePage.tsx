@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef, createPortal } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, createPortal } from 'react'
+import { ForceGraph3D } from 'react-force-graph'
 import {
   Search,
   Plus,
@@ -224,6 +225,8 @@ export function BrainKnowledgePage() {
   const [search, setSearch] = useState('')
   const [graphFullscreen, setGraphFullscreen] = useState(false)
   const [expandedComms, setExpandedComms] = useState<Set<number>>(new Set())
+  const graphContainerRef = useRef<HTMLDivElement>(null)
+  const [graphDimensions, setGraphDimensions] = useState({ width: 800, height: 500 })
   const [mode, setMode] = useState<'search' | 'add'>('search')
   const [noteText, setNoteText] = useState('')
   const [notes, setNotes] = useState<BrainNote[]>(loadNotes)
@@ -280,6 +283,32 @@ export function BrainKnowledgePage() {
       .then((data: GraphAnalytics) => setAnalytics(data))
       .catch(() => {})
   }, [])
+
+  // Track graph container size for ForceGraph3D
+  useEffect(() => {
+    const el = graphContainerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      setGraphDimensions({ width: entry.contentRect.width, height: entry.contentRect.height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [graphFullscreen])
+
+  // Community color palette for 3D graph
+  const commColor = useCallback((node: { community?: number }) => {
+    const palette = ['#fb7185', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#e879f9', '#38bdf8', '#2dd4bf', '#818cf8', '#94a3b8', '#f97316', '#06b6d4', '#84cc16', '#ec4899', '#8b5cf6']
+    return palette[(node.community ?? 0) % palette.length]
+  }, [])
+
+  // Graph data in ForceGraph3D format
+  const graphData3D = useMemo(() => {
+    if (!graph) return { nodes: [], links: [] }
+    return {
+      nodes: graph.nodes.map((n) => ({ id: n.id, label: n.label, community: n.community, file_type: n.file_type })),
+      links: graph.edges.map((e) => ({ source: e.source, target: e.target })),
+    }
+  }, [graph])
 
   // Cmd+K / Ctrl+K shortcut to open search
   useEffect(() => {
@@ -432,7 +461,7 @@ export function BrainKnowledgePage() {
           </div>
         </section>
 
-        {/* ─── Interactive Graph (always visible) ─── */}
+        {/* ─── 3D Brain Graph ─── */}
         <section>
           <div className={graphFullscreen ? 'fixed inset-0 z-50 flex flex-col bg-slate-950' : 'flex flex-col'}>
             <div className="flex items-center justify-between rounded-t-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-[11px]">
@@ -448,12 +477,29 @@ export function BrainKnowledgePage() {
                 {graphFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
               </button>
             </div>
-            <iframe
-              src="/graph.html"
-              title="Graphify knowledge graph"
-              className="rounded-b-lg border border-t-0 border-slate-800"
-              style={{ height: graphFullscreen ? '100%' : 500, minHeight: 400 }}
-            />
+            <div
+              ref={graphContainerRef}
+              className="rounded-b-lg border border-t-0 border-slate-800 overflow-hidden"
+              style={{ height: graphFullscreen ? 'calc(100% - 36px)' : 500, minHeight: 400, background: '#060612' }}
+            >
+              {graphData3D.nodes.length > 0 && (
+                <ForceGraph3D
+                  width={graphDimensions.width}
+                  height={graphFullscreen ? window.innerHeight - 36 : 500}
+                  graphData={graphData3D}
+                  backgroundColor="#060612"
+                  nodeColor={commColor}
+                  nodeOpacity={0.9}
+                  nodeResolution={8}
+                  nodeVal={(node: { community?: number }) => Math.max(2, (connectionCount.get((node as { id: string }).id) || 1) * 0.5)}
+                  linkColor={() => 'rgba(100, 116, 139, 0.15)'}
+                  linkWidth={0.3}
+                  linkOpacity={0.2}
+                  showNavInfo={false}
+                  nodeLabel={(node: { label?: string; file_type?: string }) => `${node.label ?? ''} (${node.file_type ?? ''})`}
+                />
+              )}
+            </div>
           </div>
         </section>
 
