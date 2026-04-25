@@ -1,167 +1,221 @@
-import { useMemo, useState } from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
-import { useOpeningRoadmap } from '../hooks/useOpeningRoadmap'
-import { OPENING_PHASES } from '../components/roadmap/roadmap-config'
-import { RoadmapHeader } from '../components/roadmap/RoadmapHeader'
-import { PhaseCard } from '../components/roadmap/PhaseCard'
-import { RoadmapTaskRow } from '../components/roadmap/RoadmapTaskRow'
+import shishkaLogo from '../assets/shishka-logo.png'
+import './OpeningRoadmap.css'
+
+type MustdoStatus = 'done' | 'in_progress' | 'idle'
+
+interface MustdoItem {
+  status: MustdoStatus
+  label: string
+  who: string
+  id: string
+  due?: string
+}
+
+interface BlockerItem {
+  title: string
+  age: string
+  why: string
+  who: string
+  phase: string
+}
+
+const MUSTDO: MustdoItem[] = [
+  { status: 'done', label: 'Final tasting — shakshuka variant B', who: 'BAS', id: 'MC-0041' },
+  { status: 'in_progress', label: "Lock za'atar dough hydration %", who: 'BAS', id: 'MC-0042', due: '· DUE TODAY' },
+  { status: 'in_progress', label: 'Chicken bowl — reduce sauce salinity by 8%', who: 'BAS', id: 'MC-0043', due: '· DUE SUN' },
+  { status: 'idle', label: 'CEO & Bas signoff on final 12 dishes', who: 'LESYA', id: 'MC-0044', due: '· DUE MON' },
+  { status: 'idle', label: 'Announce experiment moratorium to kitchen team', who: 'LESYA', id: 'MC-0045' },
+]
+
+const BLOCKERS: BlockerItem[] = [
+  {
+    title: 'Cold prep station SOP blocked by layout',
+    age: '5d',
+    why: 'Cannot finalize cold prep SOP until L2 floor layout is locked. Layout locks when architect returns final drawings.',
+    who: 'BAS → CEO',
+    phase: 'PHASE 01',
+  },
+  {
+    title: 'Fiber install — provider rescheduled twice',
+    age: '3d',
+    why: 'ToT marked install "pending" without a new date. Without internet, POS + KDS can\'t commission on time.',
+    who: 'COO → PROVIDER',
+    phase: 'PHASE 03',
+  },
+]
+
+const STATUS_BADGE: Record<MustdoStatus, string> = {
+  done: 'DONE',
+  in_progress: 'DOING',
+  idle: 'TODO',
+}
 
 export function OpeningRoadmap() {
-  const {
-    phases,
-    unassignedTasks,
-    overallProgress,
-    totalBlockers,
-    isLoading,
-    error,
-    refetch,
-  } = useOpeningRoadmap()
-
-  // Auto-expand: first non-done phase is the "current" one
-  const currentPhaseId = useMemo(() => {
-    for (const p of phases) {
-      if (p.status !== 'done') return p.config.id
-    }
-    return phases[phases.length - 1]?.config.id ?? 0
-  }, [phases])
-
-  // Track which phases are expanded — current phase starts expanded
-  const [expandedSet, setExpandedSet] = useState<Set<number>>(() => new Set())
-
-  // Derived: a phase is expanded if it's in the set OR if it's the current
-  // phase and the user hasn't explicitly toggled it
-  const [userToggled, setUserToggled] = useState<Set<number>>(() => new Set())
-
-  function isExpanded(phaseId: number): boolean {
-    if (userToggled.has(phaseId)) return expandedSet.has(phaseId)
-    // Default: expand current, collapse done, expand others
-    if (phaseId === currentPhaseId) return true
-    const phase = phases.find((p) => p.config.id === phaseId)
-    return phase?.status !== 'done'
-  }
-
-  function togglePhase(phaseId: number) {
-    setUserToggled((prev) => new Set(prev).add(phaseId))
-    setExpandedSet((prev) => {
-      const next = new Set(prev)
-      if (isExpanded(phaseId)) {
-        next.delete(phaseId)
-      } else {
-        next.add(phaseId)
-      }
-      return next
-    })
-  }
-
-  // Lock Day from Phase 0 config
-  const lockDay = OPENING_PHASES.find((p) => p.lockDay)?.lockDay
-
-  /* ─── Loading state ─── */
-  if (isLoading && phases.every((p) => p.tasks.length === 0)) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32">
-        <div className="relative">
-          <div className="absolute inset-0 animate-ping rounded-full bg-emerald-500/20" />
-          <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-zinc-800">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
-          </div>
-        </div>
-        <p className="mt-4 text-xs text-zinc-500">Loading roadmap...</p>
-      </div>
-    )
-  }
-
-  /* ─── Error state ─── */
-  if (error && phases.every((p) => p.tasks.length === 0)) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-950/40 ring-1 ring-red-800/40">
-          <AlertTriangle className="h-6 w-6 text-red-400" />
-        </div>
-        <p className="mt-4 text-sm font-medium text-red-300">Failed to load roadmap</p>
-        <p className="mt-1 text-xs text-zinc-500">{error}</p>
-        <button
-          onClick={refetch}
-          className="mt-4 rounded-lg bg-zinc-800 px-4 py-2 text-xs text-zinc-300 transition-colors hover:bg-zinc-700"
-        >
-          Try again
-        </button>
-      </div>
-    )
-  }
-
-  /* ─── Task summary line ─── */
-  const totalTasks = phases.reduce((sum, p) => sum + p.tasks.length, 0)
-  const doneTasks = phases.reduce(
-    (sum, p) => sum + p.tasks.filter((t) => t.status === 'done').length,
-    0,
-  )
-
   return (
-    <div className="relative mx-auto flex max-w-3xl flex-col gap-5">
-      {/* Subtle ambient gradient behind the page */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-48 left-1/3 h-96 w-96 rounded-full bg-emerald-500/[0.02] blur-[100px]" />
-      </div>
-
-      {/* Header */}
-      <RoadmapHeader
-        overallProgress={overallProgress}
-        totalBlockers={totalBlockers}
-        lockDay={lockDay}
-        onRefresh={refetch}
-        isLoading={isLoading}
-      />
-
-      {/* Task counter */}
-      <div className="flex items-center justify-between px-1">
-        <p className="text-xs text-zinc-600">
-          {doneTasks}/{totalTasks} tasks completed across {phases.length} phases
-        </p>
-        {unassignedTasks.length > 0 && (
-          <p className="text-xs text-amber-600">
-            {unassignedTasks.length} untagged
-          </p>
-        )}
-      </div>
-
-      {/* Phase timeline */}
-      <div className="flex flex-col">
-        {phases.map((phase, i) => (
-          <PhaseCard
-            key={phase.config.id}
-            phase={phase}
-            isExpanded={isExpanded(phase.config.id)}
-            isCurrent={phase.config.id === currentPhaseId}
-            onToggle={() => togglePhase(phase.config.id)}
-            index={i}
-            isLast={i === phases.length - 1}
-          />
-        ))}
-      </div>
-
-      {/* Unassigned tasks warning */}
-      {unassignedTasks.length > 0 && (
-        <div className="rounded-xl border border-amber-800/30 bg-amber-950/10 p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <span className="text-xs font-semibold text-amber-300">
-              {unassignedTasks.length} task{unassignedTasks.length !== 1 ? 's' : ''} without phase tag
-            </span>
-          </div>
-          <p className="mb-3 text-xs text-zinc-500">
-            Tag with phase-0 through phase-5 in Mission Control to assign.
-          </p>
-          <div className="flex flex-col gap-0.5">
-            {unassignedTasks.map((task) => (
-              <RoadmapTaskRow key={task.id} task={task} />
-            ))}
+    <div className="roadmap-shell">
+      {/* Topbar */}
+      <div className="r-topbar">
+        <div className="r-brand">
+          <img className="r-brand-icon" src={shishkaLogo} alt="Shishka pine cone" />
+          <div>
+            <div className="r-brand-text">SHISHKA</div>
+            <div className="r-brand-sub">Healthy Kitchen</div>
           </div>
         </div>
-      )}
+        <div className="r-top-meta">
+          <div className="r-item-today">
+            <div className="r-k">Today</div>
+            <div className="r-v">Sat 25 Apr</div>
+          </div>
+          <div>
+            <div className="r-k">Recipe Lock</div>
+            <div className="r-v">Tue 28 Apr</div>
+          </div>
+        </div>
+      </div>
 
-      {/* Bottom breathing room */}
-      <div className="h-8" />
+      {/* PART ONE — Calendar */}
+      <div className="r-section-head">
+        <span className="r-num">PART ONE</span>
+        <h2>The <em>Calendar</em></h2>
+        <span className="r-spacer" />
+        <span className="r-tag">TODAY → SOFT OPENING</span>
+      </div>
+
+      <section className="r-calendar">
+        <div className="r-cal-track">
+          <div className="r-cal-line">
+            <div className="r-cal-days">
+              <div className="r-t r-maj"><span>Apr 25</span></div>
+              <div className="r-t" />
+              <div className="r-t r-maj"><span>Apr 28</span></div>
+              <div className="r-t" />
+              <div className="r-t r-maj"><span>May 05</span></div>
+              <div className="r-t" />
+              <div className="r-t r-maj"><span>May 12</span></div>
+              <div className="r-t" />
+              <div className="r-t r-maj"><span>May 22</span></div>
+              <div className="r-t" />
+              <div className="r-t r-maj"><span>Jun 05</span></div>
+            </div>
+          </div>
+          <div className="r-cal-markers">
+            <div className="r-marker r-today r-pin-left" style={{ left: '0%' }}>
+              <div className="r-m-flag" />
+              <div className="r-m-pin" />
+              <div className="r-m-label">Today</div>
+              <div className="r-m-date">Sat 25 Apr</div>
+            </div>
+            <div className="r-marker r-menu" style={{ left: '18%' }}>
+              <div className="r-m-flag" />
+              <div className="r-m-pin" />
+              <div className="r-m-label">Recipe Lock</div>
+              <div className="r-m-date">Tue 28 Apr</div>
+            </div>
+            <div className="r-marker r-trial" style={{ left: '50%' }}>
+              <div className="r-m-flag" />
+              <div className="r-m-pin" />
+              <div className="r-m-label">Test Batch 1</div>
+              <div className="r-m-date">Tue 12 May</div>
+            </div>
+            <div className="r-marker r-trial" style={{ left: '78%' }}>
+              <div className="r-m-flag" />
+              <div className="r-m-pin" />
+              <div className="r-m-label">Dry-run Service</div>
+              <div className="r-m-date">Fri 22 May</div>
+            </div>
+            <div className="r-marker r-open r-pin-right" style={{ left: '100%' }}>
+              <div className="r-m-flag" />
+              <div className="r-m-pin" />
+              <div className="r-m-label">Soft Opening</div>
+              <div className="r-m-date">Fri 05 Jun</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FOCUS ROW — Primary + Blockers */}
+      <div className="r-focus-row">
+        {/* PRIMARY */}
+        <section className="r-primary">
+          <div className="r-overline-strong">
+            <span className="r-dot" />
+            PRIMARY FOCUS · TO SHIP BEFORE LOCK
+          </div>
+
+          <div className="r-primary-grid">
+            <div>
+              <h1 className="r-primary-title">Before Recipe <em>Lock</em></h1>
+              <div className="r-primary-sub">
+                Everything that must be finished before Tuesday, April 28 — the day the menu is frozen.
+              </div>
+              <div className="r-countdown-big">
+                <div className="r-cd-number">03</div>
+                <div className="r-cd-unit">days <em>remaining</em></div>
+                <div className="r-cd-lockdate">
+                  <span className="r-cd-when">Locks Tue 28 Apr · 9:00 AM</span>
+                  <span className="r-cd-tz">ICT</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="r-mustdo-head">
+                <span className="r-caption">The five things standing between us and a locked menu.</span>
+              </div>
+              <ol className="r-mustdo">
+                {MUSTDO.map((item) => (
+                  <li key={item.id} className="r-mi" data-status={item.status}>
+                    <span className="r-mi-dot" />
+                    <div className="r-mi-body">
+                      <div className="r-mi-label">{item.label}</div>
+                      <div className="r-mi-meta">
+                        <span className="r-mi-who">{item.who}</span>
+                        <span className="r-mi-id">{item.id}</span>
+                        {item.due && <span className="r-mi-due">{item.due}</span>}
+                      </div>
+                    </div>
+                    <span className="r-mi-badge">{STATUS_BADGE[item.status]}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </section>
+
+        {/* BLOCKERS */}
+        <section className="r-blockers-card">
+          <div className="r-overline-blockers">
+            <span className="r-dot" />
+            STOPPERS · {BLOCKERS.length} OPEN
+          </div>
+          <h3>Blockers &amp; <em>Stoppers</em></h3>
+          <div className="r-blockers-sub">Everything waiting on someone else before the team can move.</div>
+
+          {BLOCKERS.map((blocker) => (
+            <article key={blocker.title} className="r-blocker-row">
+              <div className="r-br-title">{blocker.title}</div>
+              <span className="r-br-age">{blocker.age}</span>
+              <p className="r-br-why">{blocker.why}</p>
+              <div className="r-br-meta">
+                <span className="r-br-who">{blocker.who}</span>
+                <span className="r-br-phase">{blocker.phase}</span>
+                <span className="r-br-link">VIEW ↗</span>
+              </div>
+            </article>
+          ))}
+
+          {/* Wax seal */}
+          <div className="r-seal-big" aria-hidden="true">
+            <svg viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="28" fill="#9B1C21" />
+              <circle cx="32" cy="32" r="23" fill="none" stroke="#F0EAD6" strokeWidth="0.6" opacity="0.6" />
+              <text x="32" y="30" textAnchor="middle" fontFamily="Alegreya SC, serif" fontWeight="800" fontSize="7.5" fill="#F0EAD6" letterSpacing="1.2">STOPPER</text>
+              <text x="32" y="40" textAnchor="middle" fontFamily="Alegreya, serif" fontStyle="italic" fontWeight="500" fontSize="9" fill="#F0EAD6">· {BLOCKERS.length} ·</text>
+            </svg>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
