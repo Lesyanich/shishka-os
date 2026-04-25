@@ -52,7 +52,7 @@ const NAV_SECTIONS: NavSection[] = [
     minRole: 'owner',
     defaultOpen: true,
     items: [
-      { path: '/', icon: LayoutDashboard, label: 'Control Center' },
+      { path: '/', icon: Rocket, label: 'Opening Roadmap' },
       { path: '/mission', icon: Rocket, label: 'Mission Control' },
       { path: '/brain', icon: Brain, label: 'Brain' },
     ],

@@ -10,7 +10,7 @@ import { Loader2 } from 'lucide-react'
 
 // Static — always in main bundle (login + first screen)
 import { LoginPage } from './pages/LoginPage'
-import { ControlCenter } from './pages/ControlCenter'
+import { OpeningRoadmap } from './pages/OpeningRoadmap'
 
 // Lazy — loaded on-demand per route
 const BOMHub = lazy(() => import('./pages/BOMHub').then(m => ({ default: m.BOMHub })))
@@ -86,7 +86,7 @@ function App() {
               <Route element={<AppShell />}>
                 {/* ── Owner-only routes ── */}
                 <Route element={<RoleGuard minRole="owner" />}>
-                  <Route path="/" element={<ControlCenter />} />
+                  <Route path="/" element={<OpeningRoadmap />} />
                   <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
                   <Route path="/brain" element={<Suspense fallback={<PageLoader />}><BrainPage /></Suspense>}>
                     <Route index element={<Navigate to="knowledge" replace />} />
