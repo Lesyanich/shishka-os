@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useCallback, createPortal } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Network } from 'vis-network'
 import { DataSet } from 'vis-data'
 import {
@@ -411,7 +412,7 @@ export function BrainKnowledgePage() {
         stabilization: { iterations: 150 },
       },
       nodes: { shape: 'dot', borderWidth: 1, font: { vadjust: -8 } },
-      edges: { smooth: { type: 'continuous' } },
+      edges: { smooth: { enabled: true, type: 'continuous', roundness: 0.5 } },
       interaction: { hover: true, tooltipDelay: 200, zoomView: true, dragView: true, hideEdgesOnDrag: true, hideEdgesOnZoom: true },
       layout: { improvedLayout: false },
     })
