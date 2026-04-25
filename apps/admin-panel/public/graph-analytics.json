@@ -1,0 +1,163 @@
+{
+  "generated_at": "2026-04-25T08:21:12.739755+00:00",
+  "summary": {
+    "nodes": 1696,
+    "edges": 1761,
+    "communities": 424,
+    "cross_community_edges": 31
+  },
+  "confidence": {
+    "extracted": 1188,
+    "inferred": 212,
+    "ambiguous": 0
+  },
+  "god_nodes": [
+    {
+      "id": "supabase_getsupabase",
+      "label": "getSupabase()",
+      "degree": 50,
+      "source_file": "services/mcp-finance/src/lib/supabase.ts",
+      "community": 0
+    },
+    {
+      "id": "receipt-062501118002",
+      "label": "Receipt #062501118002",
+      "degree": 28,
+      "source_file": "",
+      "community": 8
+    },
+    {
+      "id": "ollama_agent_log",
+      "label": "log()",
+      "degree": 26,
+      "source_file": "agents/finance/ollama-agent.js",
+      "community": 5
+    },
+    {
+      "id": "chef_agent",
+      "label": "Chef Agent",
+      "degree": 26,
+      "source_file": "agents/chef/AGENT.md",
+      "community": 1
+    },
+    {
+      "id": "services_mcp_chef_src_index_ts",
+      "label": "index.ts",
+      "degree": 19,
+      "source_file": "services/mcp-chef/src/index.ts",
+      "community": 0
+    },
+    {
+      "id": "services_mcp_finance_src_index_ts",
+      "label": "index.ts",
+      "degree": 19,
+      "source_file": "services/mcp-finance/src/index.ts",
+      "community": 0
+    },
+    {
+      "id": "services_mcp_finance_src_lib_supabase_ts",
+      "label": "supabase.ts",
+      "degree": 18,
+      "source_file": "services/mcp-finance/src/lib/supabase.ts",
+      "community": 0
+    },
+    {
+      "id": "apps_admin_panel_src_components_finance_stagingarea_tsx",
+      "label": "StagingArea.tsx",
+      "degree": 17,
+      "source_file": "apps/admin-panel/src/components/finance/StagingArea.tsx",
+      "community": 12
+    },
+    {
+      "id": "services_mcp_mission_control_src_index_ts",
+      "label": "index.ts",
+      "degree": 16,
+      "source_file": "services/mcp-mission-control/src/index.ts",
+      "community": 0
+    },
+    {
+      "id": "constitution_core_rules",
+      "label": "Core Rules (Immutable Foundation)",
+      "degree": 16,
+      "source_file": "",
+      "community": 3
+    }
+  ],
+  "top_communities": [
+    {
+      "id": 0,
+      "label": "Community 0",
+      "size": 139
+    },
+    {
+      "id": 1,
+      "label": "Community 1",
+      "size": 114
+    },
+    {
+      "id": 2,
+      "label": "Community 2",
+      "size": 74
+    },
+    {
+      "id": 3,
+      "label": "Community 3",
+      "size": 56
+    },
+    {
+      "id": 4,
+      "label": "Community 4",
+      "size": 55
+    },
+    {
+      "id": 5,
+      "label": "Community 5",
+      "size": 48
+    },
+    {
+      "id": 6,
+      "label": "Community 6",
+      "size": 45
+    },
+    {
+      "id": 7,
+      "label": "Community 7",
+      "size": 41
+    },
+    {
+      "id": 8,
+      "label": "Community 8",
+      "size": 30
+    },
+    {
+      "id": 9,
+      "label": "Community 9",
+      "size": 26
+    },
+    {
+      "id": 10,
+      "label": "Community 10",
+      "size": 20
+    },
+    {
+      "id": 11,
+      "label": "Community 11",
+      "size": 20
+    },
+    {
+      "id": 12,
+      "label": "Community 12",
+      "size": 18
+    },
+    {
+      "id": 13,
+      "label": "Community 13",
+      "size": 18
+    },
+    {
+      "id": 14,
+      "label": "Community 14",
+      "size": 16
+    }
+  ]
+}
