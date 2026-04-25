@@ -176,14 +176,25 @@ const CATEGORIES: CategoryDef[] = [
 
 const NOTES_KEY = 'shishka-brain-notes'
 
-// Source-file patterns that contain transactional / fixture data, not knowledge.
-// graphify scans the whole repo and turns receipt JSON / SQL backfills into nodes
-// (each line item becomes its own node). The Brain is for concepts/architecture/rules,
-// so we filter those nodes out at load time.
+// Source-file patterns that don't belong in the Knowledge Graph:
+//  - transactional/fixture data (receipt JSON, SQL backfills)
+//  - tests and configs (infrastructure, not knowledge)
+// graphify scans the whole repo and turns receipt JSON, line-items, test
+// scaffolding etc. into nodes. The Brain is for concepts/architecture/rules,
+// so we filter those nodes out at load time. Mirror this list in .claudeignore
+// to keep noise out of future graph rebuilds at extraction time.
 const EXCLUDED_SOURCE_PATTERNS: RegExp[] = [
+  // Transactional / fixture data
   /\/migrations\/.*backfill/i,
   /agents\/[^/]+\/examples\//,
   /agents\/finance\/RECEIPT_PROCESSING/i,
+  // Tests
+  /\.test\.[jt]sx?$/,
+  /\/__tests__\//,
+  /(^|\/)vitest\.(setup|config)\.[jt]s$/,
+  // Build / tool configs
+  /(^|\/)(vite|eslint|tailwind|postcss|playwright)\.config\.[jt]s$/,
+  /(^|\/)tsconfig(\.[\w.-]+)?\.json$/,
 ]
 
 function loadNotes(): BrainNote[] {
