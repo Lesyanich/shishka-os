@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, createPortal } from 'react'
-import { ForceGraph3D } from 'react-force-graph'
+import ForceGraph3D from 'react-force-graph-3d'
 import {
   Search,
   Plus,
