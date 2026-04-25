@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars -- scaffold phase: imports/state used in Tasks 2-6 */
 import { useState, useEffect, useMemo, useRef, createPortal } from 'react'
 import {
   Search,
@@ -237,6 +236,17 @@ function constellationDots(
   }))
 }
 
+/** Derive human-readable community label from god nodes in that community */
+function communityLabel(
+  communityId: number,
+  godNodes: GraphAnalytics['god_nodes'],
+  fallbackLabel: string,
+): string {
+  const god = godNodes.find((g) => g.community === communityId)
+  if (god) return `${god.label} cluster`
+  return fallbackLabel
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
@@ -252,6 +262,7 @@ export function BrainKnowledgePage() {
   const [noteText, setNoteText] = useState('')
   const [notes, setNotes] = useState<BrainNote[]>(loadNotes)
   const searchRef = useRef<HTMLInputElement>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   // Graph analytics
   const [analytics, setAnalytics] = useState<GraphAnalytics | null>(null)
@@ -303,6 +314,24 @@ export function BrainKnowledgePage() {
       .then((r) => r.json())
       .then((data: GraphAnalytics) => setAnalytics(data))
       .catch(() => {})
+  }, [])
+
+  // Cmd+K / Ctrl+K shortcut to open search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen((v) => !v)
+      }
+      if (e.key === 'Escape') {
+        setSearchOpen(false)
+        setSearch('')
+        setMode('search')
+        setNoteText('')
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   // Categorized nodes
@@ -602,8 +631,78 @@ export function BrainKnowledgePage() {
 
         {/* ─── Section 3: God Nodes & Analytics ─── */}
         {!selectedCat && analytics ? (
-          <section>
-            <p className="text-slate-500 text-sm">Analytics — Task 4</p>
+          <section className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {/* God Nodes */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+                <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">God Nodes</h4>
+                <p className="mb-3 text-[10px] text-slate-600">Most connected entities in the knowledge graph</p>
+                <div className="space-y-1.5">
+                  {analytics.god_nodes.slice(0, 7).map((g, i) => (
+                    <div key={g.id} className="flex items-center justify-between rounded-lg bg-slate-800/30 px-3 py-1.5 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="shrink-0 text-[10px] text-slate-600 w-4">{i + 1}.</span>
+                        <span className="truncate font-medium text-slate-200">{g.label}</span>
+                      </div>
+                      <span className="shrink-0 ml-2 text-[10px] text-fuchsia-400">{g.degree} links</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top Communities */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+                <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">Top Communities</h4>
+                <p className="mb-3 text-[10px] text-slate-600">Largest clusters of related knowledge</p>
+                <div className="space-y-1.5">
+                  {analytics.top_communities.slice(0, 7).map((c) => (
+                    <div key={c.id} className="flex items-center justify-between rounded-lg bg-slate-800/30 px-3 py-1.5 text-xs">
+                      <span className="truncate font-medium text-slate-200">
+                        {communityLabel(c.id, analytics.god_nodes, c.label)}
+                      </span>
+                      <span className="shrink-0 ml-2 text-[10px] text-amber-400">{c.size} nodes</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Confidence bar */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+              <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">Edge Confidence</h4>
+              <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-slate-800">
+                {analytics.confidence.extracted > 0 && (
+                  <div
+                    className="bg-emerald-500 rounded-full"
+                    style={{ width: `${(analytics.confidence.extracted / analytics.summary.edges) * 100}%` }}
+                  />
+                )}
+                {analytics.confidence.inferred > 0 && (
+                  <div
+                    className="bg-amber-500 rounded-full"
+                    style={{ width: `${(analytics.confidence.inferred / analytics.summary.edges) * 100}%` }}
+                  />
+                )}
+                {analytics.confidence.ambiguous > 0 && (
+                  <div
+                    className="bg-red-500 rounded-full"
+                    style={{ width: `${(analytics.confidence.ambiguous / analytics.summary.edges) * 100}%` }}
+                  />
+                )}
+              </div>
+              <div className="mt-2 flex gap-4 text-[10px]">
+                <span className="text-emerald-400">Extracted {analytics.confidence.extracted}</span>
+                <span className="text-amber-400">Inferred {analytics.confidence.inferred}</span>
+                {analytics.confidence.ambiguous > 0 && (
+                  <span className="text-red-400">Ambiguous {analytics.confidence.ambiguous}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Updated timestamp */}
+            <p className="text-[10px] text-slate-600 text-right">
+              Updated {new Date(analytics.generated_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
           </section>
         ) : null}
 
@@ -645,9 +744,181 @@ export function BrainKnowledgePage() {
       </div>
 
       {/* ─── Floating Search Pill ─── */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-        <p className="text-slate-500 text-xs bg-slate-900 border border-slate-700 rounded-full px-4 py-2">Search pill — Task 5</p>
-      </div>
+      <button
+        onClick={() => setSearchOpen(true)}
+        className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/90 px-4 py-2 text-xs text-slate-500 backdrop-blur-sm transition hover:border-slate-500 hover:text-slate-300"
+      >
+        <Search className="h-3.5 w-3.5" />
+        Search...
+        <kbd className="ml-1 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-500">⌘K</kbd>
+      </button>
+
+      {/* ─── Search Modal (portal) ─── */}
+      {searchOpen && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
+          onClick={(e) => { if (e.target === e.currentTarget) { setSearchOpen(false); setSearch(''); setMode('search'); setNoteText('') } }}
+        >
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative z-10 w-full max-w-xl rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-3">
+              {mode === 'search' ? (
+                <Search className="h-4 w-4 shrink-0 text-fuchsia-400" />
+              ) : (
+                <Plus className="h-4 w-4 shrink-0 text-amber-400" />
+              )}
+              {mode === 'search' ? (
+                <input
+                  ref={searchRef}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Найди в базе знаний... (файлы, концепты, правила)"
+                  className="flex-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 outline-none"
+                  autoFocus
+                />
+              ) : (
+                <input
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') addNote() }}
+                  placeholder="Добавь заметку в мозг..."
+                  className="flex-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 outline-none"
+                  autoFocus
+                />
+              )}
+              {mode === 'add' && noteText && (
+                <button onClick={addNote} className="rounded-lg bg-amber-500/20 px-3 py-1 text-xs font-medium text-amber-300 transition hover:bg-amber-500/30">
+                  <Save className="inline-block h-3 w-3 mr-1" />Save
+                </button>
+              )}
+              <div className="ml-1 flex gap-1 border-l border-slate-700 pl-2">
+                <button
+                  onClick={() => setMode('search')}
+                  className={`rounded-md px-2 py-1 text-[10px] font-medium transition ${mode === 'search' ? 'bg-fuchsia-500/20 text-fuchsia-300' : 'text-slate-500 hover:text-slate-300'}`}
+                >Search</button>
+                <button
+                  onClick={() => setMode('add')}
+                  className={`rounded-md px-2 py-1 text-[10px] font-medium transition ${mode === 'add' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-500 hover:text-slate-300'}`}
+                >+ Note</button>
+              </div>
+              <button
+                onClick={() => { setSearchOpen(false); setSearch(''); setMode('search'); setNoteText('') }}
+                className="rounded p-1 text-slate-500 hover:text-slate-300"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Results */}
+            <div className="max-h-[50vh] overflow-y-auto p-4 space-y-4">
+              {/* File search results */}
+              {search.length >= 2 && searchResults && (
+                <div>
+                  <p className="mb-2 text-xs text-slate-500">
+                    {searchResults.total} {searchResults.total === 1 ? 'result' : 'results'} for &ldquo;{search}&rdquo;
+                  </p>
+                  {searchResults.total === 0 ? (
+                    <p className="py-4 text-center text-sm text-slate-600">Nothing found.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {[...searchResults.grouped.entries()].map(([catName, nodes]) => {
+                        const def = CATEGORIES.find((c) => c.name === catName)
+                        return (
+                          <div key={catName}>
+                            <h4 className={`mb-1.5 text-xs font-medium ${def?.accent ?? 'text-slate-400'}`}>
+                              {catName} ({nodes.length})
+                            </h4>
+                            <div className="space-y-1">
+                              {nodes.slice(0, 8).map((n) => (
+                                <div key={n.id} className="flex items-center justify-between rounded-lg border border-slate-800/50 bg-slate-800/30 px-3 py-2 text-xs">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="truncate font-medium text-slate-200">{n.label}</span>
+                                    <span className="shrink-0 rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">{n.file_type}</span>
+                                  </div>
+                                  <span className="shrink-0 text-[10px] text-slate-600 ml-2">{connectionCount.get(n.id) || 0} links</span>
+                                </div>
+                              ))}
+                              {nodes.length > 8 && <p className="pl-3 text-[10px] text-slate-600">+{nodes.length - 8} more</p>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* MemPalace semantic results */}
+              {search.length >= 3 && (
+                <div>
+                  <h4 className="mb-2 flex items-center gap-2 text-xs font-medium text-indigo-400">
+                    <MessagesSquare className="h-3.5 w-3.5" />
+                    Из разговоров
+                    <span className="text-[10px] font-normal text-slate-600">MemPalace</span>
+                    {memLoading && <span className="text-[10px] font-normal text-slate-600">ищу...</span>}
+                  </h4>
+                  {memError === 'offline' ? (
+                    <p className="text-xs text-slate-500">MemPalace не запущен.</p>
+                  ) : memError === 'error' ? (
+                    <p className="text-xs text-slate-500">Ошибка запроса к MemPalace.</p>
+                  ) : memHits && memHits.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {memHits.map((h, i) => (
+                        <div key={`${h.source_file}-${i}`} className="rounded-lg border border-slate-800/50 bg-slate-800/30 px-3 py-2">
+                          <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+                            <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-indigo-300">{h.wing}</span>
+                            <span className="rounded bg-slate-700 px-1.5 py-0.5 text-slate-400">{h.room}</span>
+                            <span className="text-slate-600">{(h.similarity * 100).toFixed(0)}% match</span>
+                          </div>
+                          <p className="line-clamp-2 text-xs text-slate-300">{h.text}</p>
+                          <p className="mt-1 truncate text-[10px] text-slate-600">{h.source_file}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : memHits && memHits.length === 0 ? (
+                    <p className="text-xs text-slate-600">Ничего не найдено.</p>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Notes */}
+              {!search && notes.length > 0 && (
+                <div>
+                  <h4 className="mb-2 flex items-center gap-2 text-xs font-medium text-amber-400">
+                    <StickyNote className="h-3.5 w-3.5" />
+                    My notes ({notes.length})
+                  </h4>
+                  <div className="space-y-1.5">
+                    {notes.slice(0, 10).map((n) => (
+                      <div key={n.id} className="group flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-amber-500/5">
+                        <p className="flex-1 text-xs text-slate-300">{n.text}</p>
+                        <span className="shrink-0 text-[10px] text-slate-600">
+                          {new Date(n.ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                        </span>
+                        <button
+                          onClick={() => deleteNote(n.id)}
+                          className="shrink-0 rounded p-0.5 text-slate-700 opacity-0 transition group-hover:opacity-100 hover:text-red-400"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {!search && notes.length === 0 && mode === 'search' && (
+                <p className="py-8 text-center text-sm text-slate-600">
+                  Type to search knowledge graph, or switch to + Note
+                </p>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </>
   )
 }
