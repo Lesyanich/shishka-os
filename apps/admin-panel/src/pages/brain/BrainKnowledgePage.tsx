@@ -228,6 +228,7 @@ export function BrainKnowledgePage() {
   const [expandedComms, setExpandedComms] = useState<Set<number>>(new Set())
   const graphRef = useRef<HTMLDivElement>(null)
   const networkRef = useRef<Network | null>(null)
+  const [hoverNode, setHoverNode] = useState<{ label: string; x: number; y: number } | null>(null)
   const [mode, setMode] = useState<'search' | 'add'>('search')
   const [noteText, setNoteText] = useState('')
   const [notes, setNotes] = useState<BrainNote[]>(loadNotes)
@@ -386,7 +387,8 @@ export function BrainKnowledgePage() {
         highlight: { background: '#fff', border: COMM_COLORS.get(n.community) ?? '#94a3b8' },
       },
       title: `${n.label}\n${n.file_type} · ${connectionCount.get(n.id) || 0} links`,
-      font: { color: '#e0e0e0', size: 10 },
+      font: { color: '#e0e0e0', size: 14, strokeWidth: 3, strokeColor: '#0f0f1a' },
+      scaling: { label: { enabled: true, min: 10, max: 20 } },
       size: Math.max(5, Math.min(20, (connectionCount.get(n.id) || 1) * 2)),
     })))
 
@@ -408,17 +410,34 @@ export function BrainKnowledgePage() {
         forceAtlas2Based: { gravitationalConstant: -30, centralGravity: 0.005, springLength: 100 },
         stabilization: { iterations: 150 },
       },
-      nodes: { shape: 'dot', borderWidth: 1 },
+      nodes: { shape: 'dot', borderWidth: 1, font: { vadjust: -8 } },
       edges: { smooth: { type: 'continuous' } },
-      interaction: { hover: true, tooltipDelay: 100, zoomView: true, dragView: true },
+      interaction: { hover: true, tooltipDelay: 200, zoomView: true, dragView: true, hideEdgesOnDrag: true, hideEdgesOnZoom: true },
       layout: { improvedLayout: false },
     })
+
+    // Custom hover tooltip via vis-network events
+    const nodeMap = new Map(filteredNodes.map((n) => [n.id, n.label]))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    networkRef.current.on('hoverNode', (p: any) => {
+      const label = nodeMap.get(p.node as string)
+      if (label && p.event?.center) {
+        const rect = graphRef.current?.getBoundingClientRect()
+        if (rect) {
+          setHoverNode({ label, x: rect.left + p.event.center.x, y: rect.top + p.event.center.y })
+        }
+      }
+    })
+    networkRef.current.on('blurNode', () => setHoverNode(null))
+    networkRef.current.on('zoom', () => setHoverNode(null))
+    networkRef.current.on('dragStart', () => setHoverNode(null))
 
     return () => {
       if (networkRef.current) {
         networkRef.current.destroy()
         networkRef.current = null
       }
+      setHoverNode(null)
     }
   }, [graph, selectedComms, COMM_COLORS, connectionCount])
 
@@ -643,6 +662,17 @@ export function BrainKnowledgePage() {
           </div>
         </section>
       </div>
+
+      {/* ─── Node Hover Tooltip ─── */}
+      {hoverNode && createPortal(
+        <div
+          className="pointer-events-none fixed z-[60] rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-sm font-medium text-slate-100 shadow-xl"
+          style={{ left: hoverNode.x + 12, top: hoverNode.y - 10, maxWidth: 300 }}
+        >
+          {hoverNode.label}
+        </div>,
+        document.body,
+      )}
 
       {/* ─── Floating Search Pill ─── */}
       <button
