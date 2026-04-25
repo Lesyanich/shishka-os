@@ -13,13 +13,29 @@
 02_Obsidian_Vault/_Archive/CLAUDE_TASK.md
 02_Obsidian_Vault/_Archive/CLAUDE_COMMANDS.md
 
-# Binary / media files
+# Binary / media files — graphify must not vision/transcribe these.
+# Owner decision: no auto-analysis of receipt images, location videos,
+# branding PDFs, or scanned books — the cost-to-knowledge ratio is bad.
 *.webp
 *.png
 *.jpg
 *.jpeg
 *.heic
 *.ico
+*.gif
+*.svg
+*.pdf
+*.mov
+*.MOV
+*.mp4
+*.mp3
+*.m4a
+*.wav
+*.docx
+*.xlsx
+*.csv
+*.psd
+*.ai
 
 # Gemini context (irrelevant for Claude Code)
 gemini.md
@@ -29,6 +45,27 @@ gemini.md
 
 # Python venv
 venv/
+
+# Google Drive content folders — not source, not knowledge.
+# Receipts, location photos, brand bibles, archived experiments live here.
+# Pointers into these folders that ARE knowledge live in docs/branding/assets-index.md.
+01_Business/
+01_Source_Data/
+04_Knowledge/
+04_Financial_Control/
+Bills/
+Cooking lessons /
+Industry trends/
+Menu design/
+Photo (Locations & Renovations)/
+POSsystem/
+Инструкции ИИ/
+
+# Archived code experiments
+_archive/
+
+# graphify's own intermediate output (don't index your own indexer)
+graphify-out/
 
 # Transactional / fixture data — graphify must NOT pull these into the Brain.
 # Receipt line-items as nodes pollute the knowledge graph (see BrainKnowledgePage
