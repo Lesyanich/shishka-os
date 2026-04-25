@@ -169,6 +169,14 @@ const CATEGORIES: CategoryDef[] = [
   },
 ]
 
+/** Hex colors for dynamic styles where Tailwind classes can't be used */
+const ACCENT_HEX: Record<string, string> = {
+  'text-rose-400': '#fb7185', 'text-amber-400': '#fbbf24', 'text-emerald-400': '#34d399',
+  'text-blue-400': '#60a5fa', 'text-violet-400': '#a78bfa', 'text-fuchsia-400': '#e879f9',
+  'text-sky-400': '#38bdf8', 'text-teal-400': '#2dd4bf', 'text-indigo-400': '#818cf8',
+  'text-slate-400': '#94a3b8',
+}
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -209,6 +217,24 @@ function categorizeNodes(nodes: GraphNode[]) {
   // Only include categories with nodes, sorted by count desc
   const filled = result.filter((c) => c.nodes.length > 0).sort((a, b) => b.nodes.length - a.nodes.length)
   return { categories: filled, other }
+}
+
+/** Generate deterministic constellation dot positions from community data */
+function constellationDots(
+  communities: GraphAnalytics['top_communities'],
+) {
+  const seed = (id: number) => {
+    const x = Math.sin(id * 127.1 + 311.7) * 43758.5453
+    return x - Math.floor(x)
+  }
+  const colors = ['#fb7185', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#e879f9', '#38bdf8', '#2dd4bf', '#818cf8', '#94a3b8']
+  return communities.slice(0, 12).map((c, i) => ({
+    id: c.id,
+    cx: seed(c.id * 3 + 1) * 80 + 10,
+    cy: seed(c.id * 7 + 3) * 70 + 15,
+    r: Math.max(3, Math.min(10, c.size / 8)),
+    color: colors[i % colors.length],
+  }))
 }
 
 /* ------------------------------------------------------------------ */
@@ -359,8 +385,103 @@ export function BrainKnowledgePage() {
       `}</style>
       <div className="space-y-12">
         {/* ─── Section 1: Constellation Hero ─── */}
-        <section className="relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border border-slate-800/50" style={{ background: '#060612', minHeight: 340 }}>
-          <p className="text-slate-500 text-sm">Constellation Hero — Task 2</p>
+        <section
+          className="relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border border-slate-800/50"
+          style={{ background: '#060612', minHeight: 340 }}
+        >
+          {/* Radial gradient depth */}
+          <div className="pointer-events-none absolute inset-0" style={{
+            background: 'radial-gradient(ellipse at 30% 40%, rgba(139,92,246,0.08) 0%, transparent 60%), radial-gradient(ellipse at 70% 60%, rgba(56,189,248,0.06) 0%, transparent 50%)',
+          }} />
+
+          {/* SVG constellation */}
+          {analytics && (
+            <svg className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="none">
+              <defs>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                  <feMerge>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              {(() => {
+                const dots = constellationDots(analytics.top_communities)
+                return (
+                  <>
+                    {dots.map((d, i) =>
+                      dots.slice(i + 1).filter((_, j) => j < 2).map((d2) => (
+                        <line
+                          key={`${d.id}-${d2.id}`}
+                          x1={`${d.cx}%`} y1={`${d.cy}%`}
+                          x2={`${d2.cx}%`} y2={`${d2.cy}%`}
+                          stroke={d.color}
+                          strokeOpacity={0.1}
+                          strokeWidth={1}
+                        />
+                      )),
+                    )}
+                    {dots.map((d, i) => (
+                      <circle
+                        key={d.id}
+                        cx={`${d.cx}%`} cy={`${d.cy}%`}
+                        r={d.r}
+                        fill={d.color}
+                        fillOpacity={0.7}
+                        filter="url(#glow)"
+                        style={{ animation: `pulse 3s ease-in-out ${i * 0.3}s infinite` }}
+                      />
+                    ))}
+                  </>
+                )
+              })()}
+            </svg>
+          )}
+
+          {/* Center content */}
+          <div className="relative z-10 flex flex-col items-center py-12">
+            <p className="text-[11px] uppercase tracking-[3px] text-purple-400/60 mb-2">Shishka Brain</p>
+            <p
+              className="text-5xl font-extrabold tracking-tight"
+              style={{
+                background: 'linear-gradient(135deg, #a78bfa, #38bdf8, #34d399)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              {analytics?.summary.nodes.toLocaleString() ?? '...'}
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              nodes across {analytics?.summary.communities.toLocaleString() ?? '...'} constellations
+            </p>
+
+            {/* Stat pills */}
+            <div className="mt-6 flex gap-6">
+              {[
+                { value: analytics?.summary.edges, label: 'connections', color: 'text-sky-400' },
+                { value: analytics?.summary.communities, label: 'clusters', color: 'text-amber-400' },
+                { value: analytics ? Math.round((analytics.confidence.extracted / analytics.summary.edges) * 100) : null, label: '% extracted', color: 'text-emerald-400' },
+              ].map((s) => (
+                <div key={s.label} className="text-center">
+                  <p className={`text-lg font-semibold ${s.color}`}>{s.value?.toLocaleString() ?? '...'}</p>
+                  <p className="text-[9px] uppercase tracking-wider text-slate-600">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Category color legend */}
+            <div className="mt-4 flex gap-1.5">
+              {cats.slice(0, 7).map(({ def }) => (
+                <div
+                  key={def.name}
+                  className="h-2 w-2 rounded-full"
+                  title={def.nameRu}
+                  style={{ background: ACCENT_HEX[def.accent] ?? '#94a3b8' }}
+                />
+              ))}
+            </div>
+          </div>
         </section>
 
         {/* ─── Section 2: Knowledge Domains Treemap ─── */}
