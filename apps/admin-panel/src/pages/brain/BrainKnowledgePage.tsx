@@ -176,6 +176,16 @@ const CATEGORIES: CategoryDef[] = [
 
 const NOTES_KEY = 'shishka-brain-notes'
 
+// Source-file patterns that contain transactional / fixture data, not knowledge.
+// graphify scans the whole repo and turns receipt JSON / SQL backfills into nodes
+// (each line item becomes its own node). The Brain is for concepts/architecture/rules,
+// so we filter those nodes out at load time.
+const EXCLUDED_SOURCE_PATTERNS: RegExp[] = [
+  /\/migrations\/.*backfill/i,
+  /agents\/[^/]+\/examples\//,
+  /agents\/finance\/RECEIPT_PROCESSING/i,
+]
+
 function loadNotes(): BrainNote[] {
   try {
     return JSON.parse(localStorage.getItem(NOTES_KEY) || '[]')
@@ -278,7 +288,19 @@ export function BrainKnowledgePage() {
   useEffect(() => {
     fetch('/graph.json')
       .then((r) => r.json())
-      .then((data) => setGraph({ nodes: data.nodes, edges: data.links || [] }))
+      .then((data) => {
+        const isExcluded = (sourceFile: string) =>
+          EXCLUDED_SOURCE_PATTERNS.some((p) => p.test(sourceFile))
+        const nodes: GraphNode[] = (data.nodes ?? []).filter(
+          (n: GraphNode) => !isExcluded(n.source_file ?? ''),
+        )
+        const keepIds = new Set(nodes.map((n) => n.id))
+        const edges = (data.links ?? []).filter(
+          (e: { source: string; target: string }) =>
+            keepIds.has(e.source) && keepIds.has(e.target),
+        )
+        setGraph({ nodes, edges })
+      })
       .catch(() => {})
 
     fetch('/graph-analytics.json')

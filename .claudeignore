@@ -29,3 +29,10 @@ gemini.md
 
 # Python venv
 venv/
+
+# Transactional / fixture data — graphify must NOT pull these into the Brain.
+# Receipt line-items as nodes pollute the knowledge graph (see BrainKnowledgePage
+# EXCLUDED_SOURCE_PATTERNS for the runtime safety net).
+services/supabase/migrations/*backfill*
+agents/*/examples/
+agents/finance/RECEIPT_PROCESSING_PROMPT_v1_archive.md
