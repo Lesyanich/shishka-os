@@ -8,7 +8,7 @@
 import { getSupabase } from "../lib/supabase.js";
 
 export interface ManageCapexAssetsArgs {
-  action: "create" | "update" | "list";
+  action: "create" | "update" | "list" | "delete";
   // create fields
   asset_name?: string;
   vendor?: string;
@@ -135,6 +135,55 @@ export async function manageCapexAssets(args: ManageCapexAssetsArgs) {
     const { data, error } = await query;
     if (error) return { ok: false, error: error.message };
     return { ok: true, count: data?.length || 0, assets: data };
+  }
+
+  if (args.action === "delete") {
+    if (!args.asset_id) {
+      return { ok: false, error: "asset_id is required for delete" };
+    }
+
+    // Verify asset exists
+    const { data: existing, error: fetchErr } = await sb
+      .from("capex_assets")
+      .select("id, asset_name, equipment_id")
+      .eq("id", args.asset_id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return { ok: false, error: `Asset not found: ${args.asset_id}` };
+    }
+
+    // Check for capex_transactions referencing this asset
+    const { count: txCount } = await sb
+      .from("capex_transactions")
+      .select("*", { count: "exact", head: true })
+      .eq("asset_id", args.asset_id);
+
+    if (txCount && txCount > 0) {
+      // Delete related transactions first
+      const { error: txErr } = await sb
+        .from("capex_transactions")
+        .delete()
+        .eq("asset_id", args.asset_id);
+
+      if (txErr) {
+        return { ok: false, error: `Failed to delete related transactions: ${txErr.message}` };
+      }
+    }
+
+    // Delete the asset
+    const { error: delErr } = await sb
+      .from("capex_assets")
+      .delete()
+      .eq("id", args.asset_id);
+
+    if (delErr) return { ok: false, error: delErr.message };
+
+    return {
+      ok: true,
+      deleted: { id: existing.id, asset_name: existing.asset_name },
+      transactions_removed: txCount || 0,
+    };
   }
 
   return { ok: false, error: `Unknown action: ${args.action}` };

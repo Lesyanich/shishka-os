@@ -354,9 +354,9 @@ server.tool(
 
 server.tool(
   "manage_capex_assets",
-  "Create, update, or list CapEx assets. Use after approve_receipt for equipment purchases to register on balance sheet. Can auto-create equipment entries.",
+  "Create, update, delete, or list CapEx assets. Use after approve_receipt for equipment purchases to register on balance sheet. Can auto-create equipment entries.",
   {
-    action: z.enum(["create", "update", "list"]).describe("Action: create new asset, update existing, or list/search"),
+    action: z.enum(["create", "update", "list", "delete"]).describe("Action: create new asset, update existing, delete, or list/search"),
     asset_name: z.string().optional().describe("Asset name (required for create)"),
     vendor: z.string().optional().describe("Vendor/supplier name"),
     initial_value: z.number().optional().describe("Purchase price in THB (required for create)"),
@@ -367,7 +367,7 @@ server.tool(
     equipment_id: z.string().optional().describe("UUID of existing equipment to link"),
     equipment_name: z.string().optional().describe("Name for auto-creating equipment entry (if equipment_id not provided)"),
     equipment_category: z.string().optional().describe("Equipment category: oven, refrigeration, cooking, prep, beverage, fermentation, storage, service, infrastructure"),
-    asset_id: z.string().optional().describe("UUID of asset (required for update)"),
+    asset_id: z.string().optional().describe("UUID of asset (required for update/delete)"),
     date_from: z.string().optional().describe("Filter: purchase date from YYYY-MM-DD (for list)"),
     date_to: z.string().optional().describe("Filter: purchase date to YYYY-MM-DD (for list)"),
     limit: z.number().optional().describe("Max results for list (default: 20)"),
