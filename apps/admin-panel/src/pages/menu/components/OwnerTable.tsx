@@ -15,7 +15,7 @@ interface OwnerTableProps {
   subcategories: Map<string, MenuSubcategory[]>
   childrenByParent: Map<string, MenuBomChild[]>
   dualTypeIds: Set<string>
-  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'>>) => Promise<{ ok: boolean; error?: string }>
+  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'>>) => Promise<{ ok: boolean; error?: string }>
   /** Parent-provided: true when a recent inline commit failed for this id. */
   isFailed?: (id: string) => boolean
   /** Parent-provided: last error message (used as row-level tooltip). */
@@ -73,6 +73,13 @@ function foodCostColor(pct: number): string {
   if (pct <= 45) return 'text-amber-watch bg-amber-watch/15'
   return 'text-brick-soft bg-brick-soft/15'
 }
+
+const PHASE_STYLE: Record<number, string> = {
+  1: 'bg-[var(--color-royal-green)]/20 text-[color:var(--color-forest-soft)] ring-[var(--color-forest-soft)]/40',
+  2: 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-[var(--color-amber-watch)]/40',
+}
+const PHASE_DEFAULT_STYLE = 'bg-surface-3/50 text-cream/60 ring-cream/20'
+const PHASE_OPTIONS = [1, 2, 3, 4, 5] as const
 
 function formatThb(v: number | null): string {
   if (v == null) return '-'
@@ -161,7 +168,7 @@ export function OwnerTable({
       patch: Partial<
         Pick<
           MenuDish,
-          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'
+          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'
         >
       >,
     ) => {
@@ -361,6 +368,7 @@ export function OwnerTable({
             <th role="columnheader" className="px-3 py-2.5 text-right">Margin</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Available</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Featured</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Phase</th>
           </tr>
         </thead>
         <tbody>
@@ -368,7 +376,7 @@ export function OwnerTable({
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-surface-1/30">
-                  <td colSpan={14} className="px-3 py-2">
+                  <td colSpan={15} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-cream/50">
                       {item.subcategory.name}
                     </span>
@@ -636,6 +644,26 @@ export function OwnerTable({
                     {dish.is_featured ? <Star className="h-4 w-4" /> : <StarOff className="h-4 w-4" />}
                   </button>
                 </td>
+
+                {/* Launch phase */}
+                <td className="px-3 py-2 text-center">
+                  <select
+                    value={dish.launch_phase}
+                    onChange={(e) => {
+                      const next = Number(e.target.value)
+                      if (next !== dish.launch_phase) {
+                        void commitPatch(dish.id, { launch_phase: next })
+                      }
+                    }}
+                    className={`cursor-pointer appearance-none rounded-full px-2 py-0.5 text-center text-[10px] font-semibold ring-1 ring-inset focus:outline-none focus:ring-2 ${PHASE_STYLE[dish.launch_phase] ?? PHASE_DEFAULT_STYLE}`}
+                    style={{ fontFamily: 'var(--font-display-sc)' }}
+                    title={`Launch phase ${dish.launch_phase}`}
+                  >
+                    {PHASE_OPTIONS.map((p) => (
+                      <option key={p} value={p}>P{p}</option>
+                    ))}
+                  </select>
+                </td>
               </tr>
               {isDrilled && bomChildren.length > 0 && (
                 <BomChildRows
@@ -646,7 +674,7 @@ export function OwnerTable({
               )}
               {isExpanded && (
                 <tr className="bg-surface-1/60">
-                  <td colSpan={14} className="p-0">
+                  <td colSpan={15} className="p-0">
                     <DishExpandedCard dish={dish} />
                     {onOpenDrawer && (
                       <div className="flex justify-end border-t border-surface-3/50 bg-surface-1/40 px-4 py-2">
@@ -756,6 +784,7 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
                 </span>
               )}
             </td>
+            <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />

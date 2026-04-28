@@ -47,7 +47,7 @@ export interface UseMenuDataResult {
     patch: Partial<
       Pick<
         MenuDish,
-        'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'
+        'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'
       >
     >,
   ) => Promise<{ ok: boolean; error?: string }>
@@ -77,6 +77,7 @@ interface RawNomenclatureRow {
   fat: number | string | null
   portion_size: number | string | null
   portion_unit: PortionUnit | null
+  launch_phase: number | string | null
   category_id: string | null
   product_categories: {
     id: string
@@ -114,7 +115,7 @@ export function useMenuData(): UseMenuDataResult {
           id, name, product_code, base_unit, price, cost_per_unit,
           is_available, is_featured, image_url,
           calories, protein, carbs, fat,
-          portion_size, portion_unit,
+          portion_size, portion_unit, launch_phase,
           category_id,
           product_categories!category_id(id, code, name, sort_order)
         `)
@@ -195,6 +196,7 @@ export function useMenuData(): UseMenuDataResult {
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
         display_order: null,
+        launch_phase: raw.launch_phase != null ? Number(raw.launch_phase) : 1,
         tags: tagMap.get(raw.id) ?? [],
         kind,
         isDualType: false,
@@ -255,7 +257,7 @@ export function useMenuData(): UseMenuDataResult {
       patch: Partial<
         Pick<
           MenuDish,
-          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'
+          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'
         >
       >,
     ): Promise<{ ok: boolean; error?: string }> => {
@@ -266,6 +268,7 @@ export function useMenuData(): UseMenuDataResult {
       if (patch.is_featured !== undefined) updates.is_featured = patch.is_featured
       if (patch.portion_size !== undefined) updates.portion_size = patch.portion_size
       if (patch.portion_unit !== undefined) updates.portion_unit = patch.portion_unit
+      if (patch.launch_phase !== undefined) updates.launch_phase = patch.launch_phase
 
       const { error: updateErr } = await supabase
         .from('nomenclature')
