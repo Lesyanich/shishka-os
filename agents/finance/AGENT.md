@@ -257,6 +257,7 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 | "Big C", "Lotus's", "เซ็นทรัล" | `bigc` | bigc.md (TODO) |
 | Рукописный, термопринтер, без артикулов | `market-small` | market-small.md |
 | "Grab", "LINE MAN", электронный чек | `delivery` | delivery.md |
+| Скриншот Lazada, Order ID 16+ цифр | `lazada` | lazada.md |
 | "TAX INVOICE", "ใบกำกับภาษี" | `tax-invoice` | tax-invoice.md (+ основной) |
 | Оборудование, мебель, >2000 THB | `capex` | capex.md (+ основной) |
 

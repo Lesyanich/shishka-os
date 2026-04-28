@@ -11,6 +11,7 @@
 | Рынок / мелкие | Рукописный или термопринтер | Свободный формат: название — цена |
 | Tax Invoice | "TAX INVOICE" / "ใบกำกับภาษี" | Таблица с VAT, номером счёта |
 | Delivery | Электронный чек Grab/LINE | Структурированный список |
+| Lazada | Скриншот приложения Lazada, Order ID 16+ цифр | Карточки товаров, shipping per shop, VAT-inclusive |
 
 ## ШАГ 2: Считай HEADER
 
@@ -18,7 +19,7 @@
 - **Название поставщика** (English И Thai, если есть оба)
 - **Адрес** → raw_parse
 - **Телефон** → raw_parse
-- **Tax ID** → raw_parse
+- **Tax ID** → raw_parse **И** в `supplier_tax_id` на верхнем уровне payload (13 цифр, เลขประจำตัวผู้เสียภาษี). Это главный ключ матчинга поставщиков — предотвращает дубли!
 - **Номер чека / invoice** → invoice_number
 - **Дата** → transaction_date (формат YYYY-MM-DD)
   - ⚠️ Buddhist Era: год 2569 = 2026 CE. Вычитай 543!
