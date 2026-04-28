@@ -37,12 +37,17 @@ pnpm-debug.log*
 !.claude/skills/
 !.claude/.claude-plugin/
 !.claude/commands/
+!.claude/settings.json
+!.claude/hooks/
 .claude/commands/*
 !.claude/commands/chef.md
 !.claude/commands/finance.md
 !.claude/commands/coo.md
 !.claude/commands/strategy.md
 !.claude/commands/techlead.md
+# Per-machine overrides and ephemeral session state stay ignored
+.claude/settings.local.json
+.claude/.session-id
 .agent/
 .cursorrules
 

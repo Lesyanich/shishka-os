@@ -1,38 +1,135 @@
 #!/bin/sh
 # ============================================================
-# Shishka OS — Session Start Reminder
-# Prints context for Claude Code agent at session start.
-# This is a REMINDER, not enforcement — the agent must act.
+# Shishka OS — Active Session Start Hook
+# Runs at every Claude Code session start. Emits JSON to inject
+# additionalContext containing:
+#   - this session's unique ID (seeded into .claude/.session-id)
+#   - live MC in_progress tasks with claimed_by, branch, phase
+#   - hard claim-gate warning if any task is owned by another session
+#
+# Hook event: SessionStart (cannot block; injects context only).
+# Output:
+#   - stdout = JSON {hookSpecificOutput: {hookEventName, additionalContext}}
+#   - stderr = none (visible only on hook errors)
 # ============================================================
 
-echo "=== Shishka OS Session Start ==="
-echo ""
+set -e
 
-# Current branch
-BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
-echo "Branch: $BRANCH"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$REPO_ROOT"
 
-# Last commit
-LAST_COMMIT=$(git log --oneline -1 2>/dev/null || echo "no commits")
-echo "Last commit: $LAST_COMMIT"
-
-# Dirty tree check
-DIRTY=$(git status --porcelain 2>/dev/null | head -5)
-if [ -n "$DIRTY" ]; then
-  DIRTY_COUNT=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-  echo "⚠ Dirty tree: $DIRTY_COUNT modified files"
+# --- Read hook payload from stdin (Claude Code SessionStart event) ---
+STDIN_JSON=""
+if [ ! -t 0 ]; then
+  STDIN_JSON=$(cat 2>/dev/null || true)
 fi
 
-echo ""
-echo "→ Read CLAUDE.md L0 protocol"
-echo "→ Check MC tasks: list_tasks(status='in_progress')"
-echo "→ If no tasks: list_tasks(status='inbox', priority='critical')"
-echo ""
-echo "Agents:"
-echo "  /chef     — menu, BOM, recipes, kitchen"
-echo "  /finance  — receipts, expenses, suppliers"
-echo "  /coo      — coordination, triage, architecture"
-echo ""
-echo "Or just say what you need — auto-routing will find the right agent."
-echo ""
-echo "=== Ready ==="
+CLAUDE_SID=""
+SOURCE="startup"
+MODEL=""
+if [ -n "$STDIN_JSON" ] && command -v jq >/dev/null 2>&1; then
+  CLAUDE_SID=$(printf '%s' "$STDIN_JSON" | jq -r '.session_id // empty' 2>/dev/null)
+  SOURCE=$(printf '%s' "$STDIN_JSON" | jq -r '.source // "startup"' 2>/dev/null)
+  MODEL=$(printf '%s' "$STDIN_JSON" | jq -r '.model // empty' 2>/dev/null)
+fi
+export CLAUDE_MODEL="$MODEL"
+
+# --- Generate or load this session's unique ID ---
+SID_FILE="$REPO_ROOT/.claude/.session-id"
+mkdir -p "$REPO_ROOT/.claude" 2>/dev/null || true
+
+# On resume, keep existing ID if file exists. Otherwise generate fresh.
+MY_SESSION_ID=""
+if [ "$SOURCE" = "resume" ] && [ -f "$SID_FILE" ]; then
+  MY_SESSION_ID=$(cat "$SID_FILE" 2>/dev/null || true)
+fi
+if [ -z "$MY_SESSION_ID" ]; then
+  MY_SESSION_ID=$(printf '%s' "$STDIN_JSON" | sh "$REPO_ROOT/scripts/new-session-id.sh" 2>/dev/null || sh "$REPO_ROOT/scripts/new-session-id.sh" "$CLAUDE_SID" < /dev/null)
+  printf '%s\n' "$MY_SESSION_ID" > "$SID_FILE"
+fi
+
+# --- Git context ---
+BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+LAST_COMMIT=$(git log --oneline -1 2>/dev/null || echo "no commits")
+DIRTY_COUNT=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+
+# --- Fetch live MC in_progress tasks (best-effort; never block) ---
+MC_TASKS=""
+MC_ERROR=""
+SUPABASE_URL="https://qcqgtcsjoacuktcewpvo.supabase.co"
+SERVICE_KEY=$(security find-generic-password -s "SUPABASE_SERVICE_ROLE_KEY" -w 2>/dev/null || true)
+
+if [ -n "$SERVICE_KEY" ] && command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  MC_RAW=$(curl -fsS --max-time 5 \
+    -H "apikey: $SERVICE_KEY" \
+    -H "Authorization: Bearer $SERVICE_KEY" \
+    "$SUPABASE_URL/rest/v1/business_tasks?status=eq.in_progress&select=id,title,related_ids&order=updated_at.desc&limit=20" 2>/dev/null || true)
+  if [ -n "$MC_RAW" ]; then
+    MC_TASKS=$(printf '%s' "$MC_RAW" | jq -r --arg me "$MY_SESSION_ID" '
+      if length == 0 then "  (none)"
+      else
+        map(
+          "  - " + (.id[:8]) + " | " + (.title[:60]) +
+          "\n      claimed_by=" + (.related_ids.claimed_by // "—") +
+          " phase=" + (.related_ids.phase // "—") +
+          " branch=" + (.related_ids.git_branch // "—") +
+          (if .related_ids.claimed_by and .related_ids.claimed_by != $me then "  ⚠ OWNED BY ANOTHER SESSION" else "" end)
+        ) | join("\n")
+      end
+    ' 2>/dev/null || true)
+  else
+    MC_ERROR="(MC unreachable; skipping live conflict check)"
+  fi
+else
+  MC_ERROR="(no SUPABASE_SERVICE_ROLE_KEY or curl/jq missing; skipping live conflict check)"
+fi
+
+# --- Persist session marker for session-end.sh ---
+SESSION_DIR="$HOME/.shishka-sessions"
+mkdir -p "$SESSION_DIR" 2>/dev/null || true
+{
+  date -u +%Y-%m-%dT%H:%M:%SZ
+  git rev-parse HEAD 2>/dev/null || echo "none"
+} > "$SESSION_DIR/current"
+
+# --- Build additionalContext for Claude Code ---
+CONTEXT=$(cat <<EOF
+=== Shishka OS Session Start ===
+
+My session ID: $MY_SESSION_ID
+Branch: $BRANCH
+Last commit: $LAST_COMMIT
+Dirty tree: $DIRTY_COUNT files
+Source: $SOURCE
+
+Live MC tasks (status=in_progress):
+${MC_TASKS:-  (no tasks fetched) $MC_ERROR}
+
+CLAIM-GATE RULE (hard, enforced by .claude/hooks/claim-gate-pretool.sh):
+  • Tasks marked "OWNED BY ANOTHER SESSION" above MUST NOT be claimed.
+  • Trying to update_task(status=in_progress) on such a task will be BLOCKED.
+  • If you need that work done — pick a different task or notify the user.
+
+Standard pickup flow:
+  1. list_tasks(status='in_progress') — resume only tasks with claimed_by == "$MY_SESSION_ID"
+  2. If none yours → list_tasks(status='inbox', priority='critical')
+  3. Before working: update_task(status='in_progress', assigned_to='$MY_SESSION_ID', related_ids={claimed_by:'$MY_SESSION_ID', claimed_at:NOW, phase:'context-loading', git_branch:'<branch>'})
+
+Agents: /chef · /finance · /coo · /techlead — or just say what you need.
+=== Ready ===
+EOF
+)
+
+# --- Emit JSON for Claude Code (SessionStart cannot block; additionalContext only) ---
+# Use jq to safely encode multi-line context
+if command -v jq >/dev/null 2>&1; then
+  printf '%s' "$CONTEXT" | jq -Rs '{
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: .
+    }
+  }'
+else
+  # Fallback: print plain text (Claude Code captures stdout)
+  printf '%s\n' "$CONTEXT"
+fi
