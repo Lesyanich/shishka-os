@@ -1,8 +1,19 @@
 # Multi-Agent Task Coordination Protocol
 
-> MC Task: cd287a2e
-> Status: Approved (CEO, 2026-04-11)
+> MC Task: cd287a2e (v1, merged PR #51 2026-04-21)
+> v2 Task: 3f41841d (in_progress, follow-up addressing v1 enforcement gaps)
+> Status: Approved (CEO, 2026-04-11; v2 scope CEO-approved 2026-04-28)
 > Size: M
+
+## v2 Architecture Revision (2026-04-28)
+
+v1 shipped the protocol as convention. v2 makes it enforced. Three additions:
+
+1. **Unique session IDs** (`Session ID Generation` section, revised) — replaces collision-prone date-only format with Claude Code's own `session_id` (8-char prefix) or fallback `MMDD-HHMM-rand4`.
+2. **Active SessionStart hook** (`Active Session Start` section, new) — `scripts/session-start.sh` now calls MC live, injects `additionalContext` JSON listing every `in_progress` task with `claimed_by` flagged.
+3. **PreToolUse claim-gate hook** (`Claim Gate Enforcement` section, new) — `.claude/hooks/claim-gate-pretool.sh` matches `mcp__shishka-mission-control__update_task`. On `status=in_progress` claim attempts, queries MC; if task is fresh-claimed by another session, returns `permissionDecision: "deny"` so Claude Code blocks the call before it reaches Supabase.
+
+Trigger: today 2026-04-28 two parallel sessions both claimed task 2d709466 because both generated session ID `claude-opus-session-0428` (same date). Tech-lead's PR #51 monitor predicted this gap.
 
 ## Problem Statement
 
@@ -176,16 +187,84 @@ With 2-3 agents, true races are rare but possible. The protocol uses optimistic 
 
 This is a simple last-writer-wins model. At our scale (2-3 agents), the probability of collision is low, and the recovery cost (pick another task) is trivial.
 
-## Session ID Generation
+## Session ID Generation (v2 — revised)
 
-Session IDs are short, human-readable identifiers for agent sessions:
+> v1 used `claude-{model}-session-{MMDD}` and the `-{seq}` suffix was advisory only. This caused two same-day sessions to share an ID and silently collude on the same task. v2 replaces the format.
 
-Format: `claude-{model}-session-{MMDD}-{seq}`
+Session IDs are short, human-readable, **globally unique** identifiers:
+
+Format: `claude-{model}-session-{suffix}`
+
+Where `suffix` is, in order of preference:
+1. **First 8 chars of Claude Code's own `session_id`** (from SessionStart hook payload). E.g. session_id `abc12345-def6-7890-abcd-ef1234567890` → suffix `abc12345`. Already globally unique by Claude Code's UUID guarantee.
+2. **Fallback** when no Claude session_id is available (manual generation, scripted use): `{MMDD}-{HHMM}-{rand4}`. E.g. `0428-1050-700d`. Time + 16-bit random gives collision probability ≈ 0 within a single day.
 
 Examples:
-- `claude-opus-session-0412`
-- `claude-sonnet-session-0412-2` (second session that day)
+- `claude-opus-session-abc12345` (hook-driven, preferred)
+- `claude-opus-session-0428-1050-700d` (fallback)
+- `claude-sonnet-session-f1e2d3c4`
+
+**Generation:**
+```sh
+sh scripts/new-session-id.sh                       # standalone (fallback format)
+sh scripts/new-session-id.sh "<claude_session_id>" # explicit (hook format)
+echo '<json>' | sh scripts/new-session-id.sh       # parse from SessionStart JSON payload
+```
+
+**Persistence:** the active SessionStart hook writes the chosen ID to `.claude/.session-id` (per worktree). All downstream tools — `task-lifecycle` skill, `claim-gate-pretool.sh`, manual scripts — read from this file. On `source: resume`, the existing file is preserved.
 
 Used in: `assigned_to`, `related_ids.claimed_by`.
 
-Not globally unique across all time — only needs to be unique among currently-active sessions.
+## Active Session Start (v2 — new)
+
+`scripts/session-start.sh` runs at every Claude Code session start and now does three things actively:
+
+1. **Seeds `.claude/.session-id`** using Claude's `session_id` from the hook payload (or fallback).
+2. **Curls MC live**: queries `business_tasks?status=eq.in_progress` via Supabase REST with `SUPABASE_SERVICE_ROLE_KEY` from macOS Keychain.
+3. **Emits JSON `additionalContext`** to Claude Code:
+   ```json
+   {
+     "hookSpecificOutput": {
+       "hookEventName": "SessionStart",
+       "additionalContext": "...My session ID: ...\nLive MC tasks (status=in_progress):\n  - <id> | <title>\n      claimed_by=<sid> phase=<p> branch=<b>  ⚠ OWNED BY ANOTHER SESSION\n..."
+     }
+   }
+   ```
+   The `⚠ OWNED BY ANOTHER SESSION` marker fires whenever a task's `claimed_by != MY_SESSION_ID`. Claude Code surfaces this as `<system-reminder>` at session start, so the agent knows about live conflicts before any tool call.
+
+**Failure modes are non-fatal:** if MC is unreachable, Keychain lookup fails, or `jq`/`curl` is missing, the hook falls back to plain-text output and never blocks session start. The PreToolUse claim-gate (below) catches collisions even if SessionStart degraded.
+
+## Claim Gate Enforcement (v2 — new)
+
+> v1 specified the claim algorithm as skill text. v2 makes it harness-enforced.
+
+Hook: `.claude/hooks/claim-gate-pretool.sh`
+Event: `PreToolUse`
+Matcher: `mcp__shishka-mission-control__update_task`
+Wired in: `.claude/settings.json` → `hooks.PreToolUse[]`.
+
+**Trigger condition:** every call to `update_task` where `tool_input.status == "in_progress"`.
+
+**Logic:**
+1. Read `tool_input.task_id` and `MY_SESSION_ID` from `.claude/.session-id`.
+2. Curl MC for current task state.
+3. Decide:
+   - No `claimed_by` on existing task → **allow** (fresh claim).
+   - `claimed_by == MY_SESSION_ID` → **allow** (re-claim or phase update).
+   - `claimed_at > 2h` ago → **allow** (stale takeover, CEO already approved per skill).
+   - Else → **deny** with structured reason:
+     ```json
+     {
+       "hookSpecificOutput": {
+         "hookEventName": "PreToolUse",
+         "permissionDecision": "deny",
+         "permissionDecisionReason": "Task <id> is currently claimed by '<other>' (you are '<me>') on branch '<b>'. Per multi-agent coordination protocol, you MUST NOT take over a task held by an active session..."
+       }
+     }
+     ```
+
+**Fail-open philosophy:** missing keychain key, network error, missing `jq`/`curl`, missing `.session-id` → all exit 0 (allow). The hook only blocks on **proven** collisions where it can confirm MC state. Infrastructure problems must not paralyze agent work.
+
+**Non-status updates pass through:** updating `phase`, `notes`, `pr_number`, etc. on a claimed task is unrestricted — only the actual claim moment (`status: in_progress` transition) is policed.
+
+**Testing:** five scenarios verified end-to-end (own claim, foreign claim, phase update, free task, wrong tool) — see PR description for command transcripts.
