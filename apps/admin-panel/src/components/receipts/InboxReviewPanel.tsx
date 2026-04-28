@@ -303,13 +303,14 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const calculatedTotal = items.reduce((s, it) => s + (it.total_price || 0), 0)
   const discountAmount = Math.abs(p?.discount_total || 0)
   const vatAmount = p?.vat_amount || 0
+  const deliveryFee = p?.delivery_fee || 0
   // Try all 4 possible formulas and pick the one that matches the receipt total best.
-  // Covers: VAT included/excluded × discount embedded/separate.
+  // Covers: VAT included/excluded × discount embedded/separate × delivery fee.
   const formulas = [
-    { expected: calculatedTotal - discountAmount,              vatIncl: true,  discEmbed: false, label: 'items − discount' },
-    { expected: calculatedTotal,                               vatIncl: true,  discEmbed: true,  label: 'items (discount in prices)' },
-    { expected: calculatedTotal - discountAmount + vatAmount,  vatIncl: false, discEmbed: false, label: 'items − discount + VAT' },
-    { expected: calculatedTotal + vatAmount,                   vatIncl: false, discEmbed: true,  label: 'items + VAT (discount in prices)' },
+    { expected: calculatedTotal - discountAmount + deliveryFee,              vatIncl: true,  discEmbed: false, label: 'items − discount + delivery' },
+    { expected: calculatedTotal + deliveryFee,                               vatIncl: true,  discEmbed: true,  label: 'items + delivery (discount in prices)' },
+    { expected: calculatedTotal - discountAmount + vatAmount + deliveryFee,  vatIncl: false, discEmbed: false, label: 'items − discount + VAT + delivery' },
+    { expected: calculatedTotal + vatAmount + deliveryFee,                   vatIncl: false, discEmbed: true,  label: 'items + VAT + delivery (discount in prices)' },
   ]
   const best = formulas.reduce((a, b) =>
     Math.abs(b.expected - receiptTotal) < Math.abs(a.expected - receiptTotal) ? b : a
@@ -757,7 +758,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           {totalMismatch && (
             <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
               <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              Items ({'\u0E3F'}{fmt(calculatedTotal)}){discountEmbedded ? ` [discount \u0E3F${fmt(discountAmount)} already in prices]` : ` \u2212 discount (\u0E3F${fmt(discountAmount)})`}{!vatIncluded && vatAmount ? ` + VAT (\u0E3F${fmt(vatAmount)})` : ''}{vatIncluded && vatAmount ? ` [VAT \u0E3F${fmt(vatAmount)} incl.]` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} \u2260 receipt ({'\u0E3F'}{fmt(receiptTotal)}).
+              Items ({'\u0E3F'}{fmt(calculatedTotal)}){discountEmbedded ? ` [discount \u0E3F${fmt(discountAmount)} already in prices]` : ` \u2212 discount (\u0E3F${fmt(discountAmount)})`}{!vatIncluded && vatAmount ? ` + VAT (\u0E3F${fmt(vatAmount)})` : ''}{vatIncluded && vatAmount ? ` [VAT \u0E3F${fmt(vatAmount)} incl.]` : ''}{deliveryFee ? ` + delivery (\u0E3F${fmt(deliveryFee)})` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} \u2260 receipt ({'\u0E3F'}{fmt(receiptTotal)}).
               Diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))}
             </div>
           )}

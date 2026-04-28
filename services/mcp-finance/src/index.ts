@@ -335,6 +335,7 @@ server.tool(
         "makro",
         "market-small",
         "delivery",
+        "lazada",
         "tax-invoice",
         "capex",
         "classification",
@@ -343,7 +344,7 @@ server.tool(
         "payload-capex",
       ])
       .describe(
-        "ID of guideline to load. Supplier-specific: makro, market-small, delivery. Protocols: image-reading-protocol, arithmetic-check, classification, capex, tax-invoice. Examples: payload-cogs, payload-capex"
+        "ID of guideline to load. Supplier-specific: makro, market-small, delivery, lazada. Protocols: image-reading-protocol, arithmetic-check, classification, capex, tax-invoice. Examples: payload-cogs, payload-capex"
       ),
   },
   async (args) => jsonResult(await readGuideline(args))

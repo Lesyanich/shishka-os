@@ -26,6 +26,7 @@ const GUIDELINE_IDS = new Set([
   "makro",
   "market-small",
   "delivery",
+  "lazada",
   "tax-invoice",
   "capex",
   "classification",
