@@ -54,7 +54,7 @@ export async function manageCapexAssets(args: ManageCapexAssetsArgs) {
           equipment_code: equipmentCode,
           name: args.equipment_name,
           category: args.equipment_category || "infrastructure",
-          status: "active",
+          status: "available",
           is_available: true,
         })
         .select("id, equipment_code")
