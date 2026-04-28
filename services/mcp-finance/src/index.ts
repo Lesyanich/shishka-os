@@ -38,6 +38,7 @@ import { updateInbox } from "./tools/update-inbox.js";
 import { updateExpense } from "./tools/update-expense.js";
 import { readGuideline } from "./tools/read-guideline.js";
 import { manageCapexAssets } from "./tools/manage-capex-assets.js";
+import { updateEquipment } from "./tools/update-equipment.js";
 
 // ─── Server Setup ────────────────────────────────────────────────
 
@@ -373,6 +374,27 @@ server.tool(
     limit: z.number().optional().describe("Max results for list (default: 20)"),
   },
   async (args) => jsonResult(await manageCapexAssets(args))
+);
+
+// ─── Equipment Management ───────────────────────────────────
+
+server.tool(
+  "update_equipment",
+  "Update equipment specs: capacity, timing, notes, category, status. Use to enrich equipment cards created during CapEx flow.",
+  {
+    equipment_id: z.string().describe("UUID of equipment to update"),
+    name: z.string().optional().describe("Rename the equipment"),
+    category: z.string().optional().describe("Category: oven, refrigeration, cooking, prep, beverage, fermentation, storage, service, infrastructure"),
+    status: z.string().optional().describe("Status: available, active, maintenance, out_of_service, retired"),
+    is_available: z.boolean().optional().describe("Availability flag"),
+    capacity: z.number().optional().describe("Max load per cycle"),
+    capacity_unit: z.string().optional().describe("Unit for capacity (kg, liters, pcs, trays)"),
+    processing_time_min: z.number().optional().describe("Standard cycle time in minutes"),
+    setup_time_min: z.number().optional().describe("Cleanup/setup time between uses in minutes"),
+    max_parallel: z.number().optional().describe("Parallel batches supported"),
+    notes: z.string().optional().describe("Free-text notes about the equipment"),
+  },
+  async (args) => jsonResult(await updateEquipment(args))
 );
 
 // ─── Start ───────────────────────────────────────────────────────

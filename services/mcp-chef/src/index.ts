@@ -21,6 +21,7 @@ import { suggestPrice } from "./tools/suggest-price.js";
 import { validateBom } from "./tools/validate-bom.js";
 import { auditAllDishes } from "./tools/audit-all-dishes.js";
 import { listEquipment } from "./tools/list-equipment.js";
+import { updateEquipment } from "./tools/update-equipment.js";
 import { checkInventory } from "./tools/check-inventory.js";
 import { createProduct } from "./tools/create-product.js";
 import { addBomLine } from "./tools/add-bom-line.js";
@@ -123,6 +124,25 @@ server.tool(
     available_only: z.boolean().optional().describe("Only show available equipment"),
   },
   async (args) => jsonResult(await listEquipment(args))
+);
+
+server.tool(
+  "update_equipment",
+  "Update equipment specs: capacity, timing, notes, category, status. Use after list_equipment to enrich empty cards.",
+  {
+    equipment_id: z.string().describe("UUID of equipment to update"),
+    name: z.string().optional().describe("Rename the equipment"),
+    category: z.string().optional().describe("Category: oven, refrigeration, cooking, prep, beverage, fermentation, storage, service, infrastructure"),
+    status: z.string().optional().describe("Status: available, active, maintenance, out_of_service, retired"),
+    is_available: z.boolean().optional().describe("Availability flag"),
+    capacity: z.number().optional().describe("Max load per cycle (e.g., 5 for 5kg capacity)"),
+    capacity_unit: z.string().optional().describe("Unit for capacity (e.g., kg, liters, pcs, trays)"),
+    processing_time_min: z.number().optional().describe("Standard cycle time in minutes"),
+    setup_time_min: z.number().optional().describe("Cleanup/setup time between uses in minutes"),
+    max_parallel: z.number().optional().describe("Parallel batches supported (e.g., oven trays)"),
+    notes: z.string().optional().describe("Free-text notes about the equipment"),
+  },
+  async (args) => jsonResult(await updateEquipment(args))
 );
 
 server.tool(
