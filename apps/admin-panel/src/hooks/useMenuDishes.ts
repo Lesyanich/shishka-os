@@ -23,6 +23,7 @@ export interface MenuDish {
   category_name: string | null
   category_code: string | null
   display_order: number | null
+  launch_phase: number
   tags: MenuTag[]
 }
 
@@ -53,7 +54,7 @@ export interface UseMenuDishesResult {
   subcategories: Map<string, MenuSubcategory[]>
   isLoading: boolean
   error: string | null
-  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'>>) => Promise<{ ok: boolean; error?: string }>
+  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'>>) => Promise<{ ok: boolean; error?: string }>
   refetch: () => void
 }
 
@@ -75,7 +76,7 @@ export function useMenuDishes(): UseMenuDishesResult {
           id, name, product_code, price, cost_per_unit,
           is_available, is_featured, image_url,
           calories, protein, carbs, fat,
-          portion_size, portion_unit,
+          portion_size, portion_unit, launch_phase,
           category_id,
           product_categories!category_id(id, code, name, sort_order)
         `)
@@ -153,6 +154,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
         display_order: null,
+        launch_phase: d.launch_phase != null ? Number(d.launch_phase) : 1,
         tags: tagMap.get(d.id) ?? [],
       }
     })
@@ -172,7 +174,7 @@ export function useMenuDishes(): UseMenuDishesResult {
   const updateDish = useCallback(
     async (
       id: string,
-      patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit'>>,
+      patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'>>,
     ): Promise<{ ok: boolean; error?: string }> => {
       const updates: Record<string, unknown> = {}
       if (patch.name !== undefined) updates.name = patch.name.trim()
@@ -181,6 +183,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       if (patch.is_featured !== undefined) updates.is_featured = patch.is_featured
       if (patch.portion_size !== undefined) updates.portion_size = patch.portion_size
       if (patch.portion_unit !== undefined) updates.portion_unit = patch.portion_unit
+      if (patch.launch_phase !== undefined) updates.launch_phase = patch.launch_phase
 
       const { error: updateErr } = await supabase
         .from('nomenclature')
