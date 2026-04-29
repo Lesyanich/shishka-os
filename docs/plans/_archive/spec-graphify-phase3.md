@@ -1,3 +1,5 @@
+> **[SUPERSEDED 2026-04-29]** This spec is archived. See [`docs/plans/spec-brain-system.md`](../spec-brain-system.md) §5 for the consolidated description of Graphify in the current system. Reason: original spike plan; Graphify was adopted with broader scope (multimodal: code + docs + bible + agents + PDFs + images).
+
 # Spec: Graphify — L3 Code Structure (Phase 3)
 
 > MC Task: TBD (blocked by `3cc98121` MC RPC bugfix; originally pre-staged in running log comment `4d465fd2`)

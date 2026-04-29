@@ -6,7 +6,7 @@ tags:
   - <domain>
 date: YYYY-MM-DD            # project start
 status: active              # active | paused | done | cancelled
-domain: "[[Domains/<name>]]"
+entity: "[[<EntityFolder>/<page>]]"   # e.g. [[Menu/]] or [[Finance/Ledger]]
 mc_task: <UUID or null>
 spec: docs/plans/spec-<name>.md
 branch: feature/<area>/<name>
@@ -25,7 +25,7 @@ aliases: []
 
 ## Objective
 
-Two to four sentences. What is being built? Why does it matter? Link to the driving [[Domains/<name>]] and any [[Decisions/D-NNN-...]] that justify it.
+Two to four sentences. What is being built? Why does it matter? Link to the driving entity page (e.g. `[[Menu/]]`, `[[Finance/Ledger]]`) and any `[[Decisions/D-NNN-...]]` that justify it.
 
 ## Current State
 
@@ -48,5 +48,5 @@ Two to four sentences. What is being built? Why does it matter? Link to the driv
 ## See Also
 
 - Spec: `docs/plans/spec-<name>.md`
-- Domain: [[Domains/<name>]]
+- Entity page: [[<EntityFolder>/]] or [[<EntityFolder>/<sub-page>]]
 - Decisions: [[Decisions/D-NNN-...]]

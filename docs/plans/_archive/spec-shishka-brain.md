@@ -1,3 +1,5 @@
+> **[SUPERSEDED 2026-04-29]** This spec is archived. See [`docs/plans/spec-brain-system.md`](../spec-brain-system.md) for the consolidated current architecture. Reason: 3-layer L1/L2/L3 framing assumed LightRAG (decommissioned 2026-04-12). Replaced by §2 "Layer Map" in spec-brain-system.
+
 # Spec: Shishka Brain v2 — Three-Layer Memory Architecture
 
 > MC Initiative: TBD (blocked by `3cc98121` MC RPC bugfix)

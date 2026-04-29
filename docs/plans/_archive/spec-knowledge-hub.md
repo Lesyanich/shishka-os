@@ -1,3 +1,5 @@
+> **[SUPERSEDED 2026-04-29]** This spec is archived. See [`docs/plans/spec-brain-system.md`](../spec-brain-system.md) §4 for the replacement design. Reason: Supabase `bible_pages` / `bible_page_history` tables are redundant — `vault/*.md` in git is sufficient SSoT. Replaced by the read+edit Confluence Reader (Tab 2) which writes to git via GitHub App, not Supabase.
+
 # Spec: Knowledge Hub — Admin Panel Bible UI
 
 > **Initiative**: Knowledge System for Shishka OS
