@@ -119,15 +119,23 @@ export function GraphCanvas({ selectedPath, onNodeClick, className }: Props) {
         return {
           id: n.id,
           label: n.label,
-          shape: isVault ? 'dot' : 'dot',
+          shape: 'dot',
           size,
           color: {
             background: color,
             border: isSelected ? '#f0abfc' : isVault ? '#94a3b8' : color,
             highlight: { background: color, border: '#f0abfc' },
+            hover: { background: color, border: '#f0abfc' },
           },
           borderWidth: isSelected ? 3 : isVault ? 1.5 : 0.5,
-          font: { size: 10, color: '#cbd5e1' },
+          // Default font: small + dim. We swap to a big bright font on hover
+          // via hoverNode/blurNode events below — that gives the "label grows
+          // when you point at the node" UX without cluttering the default view.
+          font: {
+            size: 10,
+            color: 'rgba(203, 213, 225, 0.55)',
+            strokeWidth: 0,
+          },
         }
       })
     )
@@ -137,8 +145,12 @@ export function GraphCanvas({ selectedPath, onNodeClick, className }: Props) {
         id: i,
         from: e.source,
         to: e.target,
-        color: { color: 'rgba(148, 163, 184, 0.15)', highlight: '#f0abfc' },
-        width: 0.5,
+        // Edges visible enough at default zoom (was 0.15, much too faint).
+        // Highlight color for hovered/selected node's neighborhood.
+        color: { color: 'rgba(148, 163, 184, 0.38)', highlight: '#f0abfc', hover: '#f0abfc' },
+        width: 0.8,
+        selectionWidth: 2,
+        hoverWidth: 1.5,
         smooth: false,
       }))
     )
@@ -158,17 +170,44 @@ export function GraphCanvas({ selectedPath, onNodeClick, className }: Props) {
           forceAtlas2Based: { gravitationalConstant: -50, springLength: 90 },
           stabilization: { iterations: 200 },
         },
-        interaction: { hover: true, dragNodes: true, zoomView: true, hideEdgesOnDrag: true },
+        interaction: {
+          hover: true,
+          dragNodes: true,
+          zoomView: true,
+          hideEdgesOnDrag: true,
+          hoverConnectedEdges: true, // light up the hovered node's edges
+        },
         nodes: { shadow: false },
         edges: { shadow: false },
         layout: { improvedLayout: false },
       }
     )
 
+    // Hover UX: enlarge the node + show a big readable label (white with
+    // black stroke for contrast on dark + colorful backgrounds). Restore on
+    // blur. This is what makes node names visible without zooming in.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     networkRef.current.on('hoverNode', (p: any) => {
-      const node = graph.nodes.find((n) => n.id === p.node)
-      if (node && p.event?.center) {
+      const id = p.node as string
+      const node = graph.nodes.find((n) => n.id === id)
+      if (!node) return
+      const conn = connectionCount.get(node.id) || 0
+      const baseSize = Math.min(8 + conn * 0.8, 26)
+      // strokeColor is supported by vis-network v9+ but missing from its
+      // shipped TS types — cast through to keep the font outline.
+      nodes.update({
+        id,
+        size: baseSize * 1.6,
+        font: {
+          size: 18,
+          color: '#ffffff',
+          strokeWidth: 4,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          strokeColor: '#0f172a' as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+      })
+      if (p.event?.center) {
         const rect = containerRef.current?.getBoundingClientRect()
         if (rect) {
           setHoverNode({
@@ -179,7 +218,24 @@ export function GraphCanvas({ selectedPath, onNodeClick, className }: Props) {
         }
       }
     })
-    networkRef.current.on('blurNode', () => setHoverNode(null))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    networkRef.current.on('blurNode', (p: any) => {
+      const id = p.node as string
+      const node = graph.nodes.find((n) => n.id === id)
+      if (!node) return
+      const conn = connectionCount.get(node.id) || 0
+      const baseSize = Math.min(8 + conn * 0.8, 26)
+      nodes.update({
+        id,
+        size: baseSize,
+        font: {
+          size: 10,
+          color: 'rgba(203, 213, 225, 0.55)',
+          strokeWidth: 0,
+        },
+      })
+      setHoverNode(null)
+    })
     networkRef.current.on('zoom', () => setHoverNode(null))
     networkRef.current.on('dragStart', () => setHoverNode(null))
 
