@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Brain, BookOpen, Sparkles, MapPin, DollarSign, Activity } from 'lucide-react'
+import { Brain, Sparkles, MapPin, DollarSign, Activity } from 'lucide-react'
 import { BrainPulseBar } from './components/BrainPulseBar'
 
 const TABS = [
-  { to: '/brain/knowledge', label: 'Map', icon: Sparkles },
-  { to: '/brain/wiki', label: 'Pages', icon: BookOpen },
+  // Unified explore view = graph + reader side-by-side, default landing
+  { to: '/brain', label: 'Brain', icon: Sparkles, end: true },
+  // Other surfaces: Drive Map, Cost, Quality
   { to: '/brain/drive', label: 'Drive Map', icon: MapPin },
   { to: '/brain/cost', label: 'Cost', icon: DollarSign },
   { to: '/brain/quality', label: 'Quality', icon: Activity },
@@ -20,7 +21,7 @@ export function BrainPage() {
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Brain</h1>
           <p className="text-xs text-slate-500">
-            Knowledge map · Vault pages · Brain quality
+            Map · Pages · Drive · Cost · Quality
           </p>
         </div>
       </header>
@@ -30,10 +31,11 @@ export function BrainPage() {
       </div>
 
       <nav className="mb-4 flex gap-1 border-b border-slate-800">
-        {TABS.map(({ to, label, icon: Icon }) => (
+        {TABS.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
+            end={end}
             className={({ isActive }) =>
               [
                 '-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-xs font-medium transition',
