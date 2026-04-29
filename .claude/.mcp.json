@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "shishka-mission-control": {
+      "command": "node",
+      "args": ["services/mcp-mission-control/dist/index.js"],
+      "cwd": "/Users/lesianich/Library/CloudStorage/GoogleDrive-lesia@shishka.health/Общие диски/Shishka healthy kitchen",
+      "env": {
+        "SUPABASE_URL": "https://qcqgtcsjoacuktcewpvo.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}"
+      }
+    },
+    "shishka-graphify": {
+      "command": "node",
+      "args": ["services/mcp-graphify/dist/index.js"],
+      "cwd": "/Users/lesianich/Library/CloudStorage/GoogleDrive-lesia@shishka.health/Общие диски/Shishka healthy kitchen"
+    }
+  }
+}
