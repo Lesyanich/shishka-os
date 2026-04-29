@@ -6,9 +6,11 @@ date: 2026-04-29
 status: active
 assets:
   - label: "Receipt scans archive (Drive)"
-    path: "Drive: 01_Business/Finance/Receipts/"
-  - label: "Bank statements"
-    path: "Drive: 01_Business/Finance/Bank/"
+    path: "Drive: 01_Business/Receipts/"
+    url: "https://drive.google.com/drive/folders/14OGn_hOSlOB0TNotMHD9_geKojVYlYAt"
+  - label: "POS exports"
+    path: "Drive: 01_Business/POS/"
+    url: "https://drive.google.com/drive/folders/1KZ-Rb6MuXkQxmapN9h6dMX3Fg9_-q7TA"
 related:
   - "[[Procurement/]]"
   - "[[Equipment/CapEx Flow]]"

@@ -4,6 +4,10 @@ type: entity
 tags: [operations, daily-ops]
 date: 2026-04-29
 status: active
+assets:
+  - label: "Locations folder (Drive)"
+    path: "Drive: 01_Business/Locations/"
+    url: "https://drive.google.com/drive/folders/13Js9CD74DPIZjtIC39ZeUeZKDZZrEyIf"
 related:
   - "[[Recipes/Production Routing]]"
   - "[[Equipment/]]"

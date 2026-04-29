@@ -5,18 +5,39 @@ tags: [operations, drive, navigation]
 date: 2026-04-29
 status: active
 assets:
-  - label: "Brand kit"
+  - label: "01_Business (root of all business knowledge)"
+    path: "Drive: 01_Business/"
+    url: "https://drive.google.com/drive/folders/1jwlrA0zmLySYjT-mNBe2LxKWLVJCbEkl"
+  - label: "Branding (logos, signboards, brand bible)"
     path: "Drive: 01_Business/Branding/"
+    url: "https://drive.google.com/drive/folders/1ZPEpohxTsVYgGX6oEt4iNPuf60kIwJ4l"
   - label: "Receipts archive"
-    path: "Drive: 01_Business/Finance/Receipts/"
-  - label: "Menu photos"
+    path: "Drive: 01_Business/Receipts/"
+    url: "https://drive.google.com/drive/folders/14OGn_hOSlOB0TNotMHD9_geKojVYlYAt"
+  - label: "Menu (photos, PDFs)"
     path: "Drive: 01_Business/Menu/"
-  - label: "Equipment manuals"
+    url: "https://drive.google.com/drive/folders/1T6aMaLB0Wtc-J1O3LUYSW_FJ3ZQXjLDf"
+  - label: "Equipment"
     path: "Drive: 01_Business/Equipment/"
-  - label: "Contracts"
-    path: "Drive: 01_Business/Legal/"
-  - label: "Operations SOPs"
-    path: "Drive: 01_Business/Operations/"
+    url: "https://drive.google.com/drive/folders/18FgX46HOdG4JiAGWas_aSB0bcrEVHuHv"
+  - label: "Equipment Manuals"
+    path: "Drive: 01_Business/Equipment_Manuals/"
+    url: "https://drive.google.com/drive/folders/1752rOM1M0BrBdUA0PAgvzdVoz7UgmWkD"
+  - label: "Locations"
+    path: "Drive: 01_Business/Locations/"
+    url: "https://drive.google.com/drive/folders/13Js9CD74DPIZjtIC39ZeUeZKDZZrEyIf"
+  - label: "POS"
+    path: "Drive: 01_Business/POS/"
+    url: "https://drive.google.com/drive/folders/1KZ-Rb6MuXkQxmapN9h6dMX3Fg9_-q7TA"
+  - label: "Salad Bar (R&D)"
+    path: "Drive: 01_Business/Salad_Bar/"
+    url: "https://drive.google.com/drive/folders/1vU64GVWOfKmbZ75vDN7rV3pZYJqnA8HW"
+  - label: "Source Data (raw imports)"
+    path: "Drive: 01_Business/Source_Data/"
+    url: "https://drive.google.com/drive/folders/1J0zDtwgL_-XJrywH-eUebiy45EtQdncW"
+  - label: "Notion exports"
+    path: "Drive: 01_Business/Notion_Exports/"
+    url: "https://drive.google.com/drive/folders/1P-aP9h-6ihI2p53xpFx6hbWW6elqsLDp"
 related:
   - "[[Operations/]]"
   - "[[Brand/]]"
@@ -25,116 +46,96 @@ related:
 
 # Drive Map
 
-The Confluence-style index of where every important file lives on Google Drive — for the moments when "I know we have a contract for X, where is it?" needs to be answered in 5 seconds, not 5 minutes of folder digging.
+The Confluence-style index of where every important file lives on Google Drive. Direct clickable links to each folder — for the moments when "I know we have a contract for X, where is it?" needs to be answered in 5 seconds.
 
 > [!info] How this page works
-> - **Manually curated** — keep it organized, scannable, accurate
-> - **`assets:` frontmatter** above auto-aggregates into the [`/brain/drive`](https://shishka-os.vercel.app/brain/drive) admin tab
-> - When you add a new top-level folder on Drive, add an entry here AND mention it in the relevant entity page's `assets:` block
+> - Every entry below has a **direct Drive URL** (verified via the Drive MCP, not a search guess)
+> - The `assets:` frontmatter above auto-aggregates into the [`/brain/drive`](https://shishka-os.vercel.app/brain/drive) admin tab
+> - When a new top-level folder is created on Drive, search for it with the Drive MCP and add a row here
 
 ## Top-level — `01_Business/`
 
-The root of all Shishka business-knowledge on Drive. Owned by Lesia + Bas.
+[Open `01_Business/` on Drive ↗](https://drive.google.com/drive/folders/1jwlrA0zmLySYjT-mNBe2LxKWLVJCbEkl) — root of all Shishka business-knowledge. Owned by Lesia + Bas.
 
-```
-Drive: 01_Business/
-├── Branding/                Logos, photos, signboards, brand bible PDF
-├── Finance/                 Receipts, bank, payroll, contracts (financial)
-├── Menu/                    Customer-facing photography, menu PDFs
-├── Equipment/               Manuals, warranty PDFs, supplier specs
-├── Legal/                   Lease, work permits, FDA filings
-├── Operations/              SOPs, HACCP archives, training materials
-├── Marketing/               Campaign assets, social posts, partnerships
-└── Phases/                  Phase planning archives, milestone records
-```
-
-## By topic
-
-### Brand → see [[Brand/]]
-
-| What | Drive path |
+| Folder | Drive |
 |---|---|
-| Master horizontal logo | `01_Business/Branding/Main Logo/Shishka-Kitchen-Logo-24-12-25.png` |
-| Logo on dark bg | `01_Business/Branding/Main Logo/Shishka-Kitchen-Logo-WG-24-12-25.jpg` |
-| Vertical logo | `01_Business/Branding/Virtical Logo/Shishka-Kitchen-Logo-VIRTICAL-24-12-25.png` |
-| Editable .ai source | `01_Business/Branding/Main Logo/Shishka Kitchen Logo 24-12-25.ai` |
-| **SHISHKA BIBLE PDF** | `01_Business/Branding/SHISHKA BIBLE/SHISHKA BIBLE – The Future of Food 34.pdf` |
-| 7X Guidelines PDF | `01_Business/Branding/SHISHKA BIBLE/7X_Guidelines_Final 13.3.2024.pdf` |
-| Round stamp | `01_Business/Branding/STAMP/Shishka Stamp.pdf` |
-| Storefront signboard | `01_Business/Branding/Signboard/Side Signboard shishka2 for print 140x100cm.pdf` |
-| Pylon sign | `01_Business/Branding/Pylon Sign/Pylon-Sign-Shishka-2.jpg` |
+| **Branding** | [Open ↗](https://drive.google.com/drive/folders/1ZPEpohxTsVYgGX6oEt4iNPuf60kIwJ4l) |
+| **Receipts** | [Open ↗](https://drive.google.com/drive/folders/14OGn_hOSlOB0TNotMHD9_geKojVYlYAt) |
+| **Menu** | [Open ↗](https://drive.google.com/drive/folders/1T6aMaLB0Wtc-J1O3LUYSW_FJ3ZQXjLDf) |
+| **Equipment** | [Open ↗](https://drive.google.com/drive/folders/18FgX46HOdG4JiAGWas_aSB0bcrEVHuHv) |
+| **Equipment_Manuals** | [Open ↗](https://drive.google.com/drive/folders/1752rOM1M0BrBdUA0PAgvzdVoz7UgmWkD) |
+| **Locations** | [Open ↗](https://drive.google.com/drive/folders/13Js9CD74DPIZjtIC39ZeUeZKDZZrEyIf) |
+| **POS** | [Open ↗](https://drive.google.com/drive/folders/1KZ-Rb6MuXkQxmapN9h6dMX3Fg9_-q7TA) |
+| **Salad_Bar** | [Open ↗](https://drive.google.com/drive/folders/1vU64GVWOfKmbZ75vDN7rV3pZYJqnA8HW) |
+| **Source_Data** | [Open ↗](https://drive.google.com/drive/folders/1J0zDtwgL_-XJrywH-eUebiy45EtQdncW) |
+| **Notion_Exports** | [Open ↗](https://drive.google.com/drive/folders/1P-aP9h-6ihI2p53xpFx6hbWW6elqsLDp) |
 
-### Finance → see [[Finance/]]
+## Branding (drilldown) → see [[Brand/]]
 
-| What | Drive path |
+The most-trafficked folder for marketing + design work.
+
+| Sub-folder / file | Drive |
 |---|---|
-| Receipt scans (auto-archive after approve) | `01_Business/Finance/Receipts/<YYYY-MM>/` |
-| Bank statements (downloaded monthly) | `01_Business/Finance/Bank/<YYYY-MM>/` |
-| Payroll records | `01_Business/Finance/Payroll/<YYYY-MM>/` |
-| VAT / WHT filings | `01_Business/Finance/Tax/<YYYY-Q>/` |
-| Annual P&L | `01_Business/Finance/Reports/<YYYY>/` |
+| **Main Logo** (master horizontal) | [Open folder ↗](https://drive.google.com/drive/folders/1ERSc__FEnnjNct3w6-BIAkQgNJBULLzN) |
+| Vertical Logo | [Open folder ↗](https://drive.google.com/drive/folders/1Pmi7KUxh8OWM5jld0XEwtRe1nGmjqJKW) |
+| Logo Icon | [Open folder ↗](https://drive.google.com/drive/folders/1oUitd04jHOk-ZyrOaEtv1pG_J4Y3VzDc) |
+| Signboard (storefront print) | [Open folder ↗](https://drive.google.com/drive/folders/1OwHce3VW69MpOYghfxUKAFE-oGMeY0Yc) |
+| STAMP | [Open folder ↗](https://drive.google.com/drive/folders/1BLM3zWYO7_14nwRWD3mFAglxWsWIZRqD) |
+| Stickers | [Open folder ↗](https://drive.google.com/drive/folders/1rGL9PCddTCu4yzgyX4pdyM7xPGoNMcYt) |
+| Pylon Sign (street pole) | [Open folder ↗](https://drive.google.com/drive/folders/1nfP1IJA39zxw4SlwyjIqNyFonqAqaHe6) |
+| **SHISHKA BIBLE** (folder) | [Open folder ↗](https://drive.google.com/drive/folders/13u-QLmewCj3q6qMGYNUVuvn0Gqx6kOzV) |
+| Drawing | [Open folder ↗](https://drive.google.com/drive/folders/1eTdoq0ocGgNrKlUwGtLctNAmEiN9VHi8) |
+| Books | [Open folder ↗](https://drive.google.com/drive/folders/1rg-KT11yykZN-1yJ3zSjPGJA4YTsYpWP) |
+| Admin Design BTL | [Open folder ↗](https://drive.google.com/drive/folders/1red2qnOTlw0xztEDSBQXZQeGfJAd5LBK) |
 
-### Menu → see [[Menu/]]
+### Key files (deep-link)
 
-| What | Drive path |
+| File | Drive |
 |---|---|
-| Customer-facing dish photography (originals) | `01_Business/Menu/Photos/Originals/` |
-| Web-optimized dish photos | `01_Business/Menu/Photos/Web/` |
-| Menu PDFs (printed for L2 take-away) | `01_Business/Menu/PDFs/<version>/` |
-| Recipe development photos | `01_Business/Menu/R&D/<dish-name>/` |
+| Master horizontal logo PNG (`Shishka-Kitchen-Logo-24-12-25.png`) | [Open file ↗](https://drive.google.com/file/d/1uReh8k2cmN_8cP2VbJyaXT2MEtAMzuEp/view) |
+| Vertical logo PNG (`Shishka-Kitchen-Logo-VIRTICAL-24-12-25.png`) | [Open file ↗](https://drive.google.com/file/d/1WLkRVemFyWFsPxOgryoxS3SBM-taOAdI/view) |
+| Vertical logo on warm-grey (`-WG-VIRTICAL-`) | [Open file ↗](https://drive.google.com/file/d/1XqdNx60UAerUA4rgGurYLnWNvD3F0_BW/view) |
+| Icon / favicon source PNG | [Open file ↗](https://drive.google.com/file/d/1kb1SQMiUaIjrfmB_wE7IbP9Z6nJgMvB_/view) |
+| **SHISHKA BIBLE — The Future of Food 34.pdf** | [Open file ↗](https://drive.google.com/file/d/1bOqvo1WBGG3O2IvVzD7ERzI1OvCcyFMm/view) |
 
-### Equipment → see [[Equipment/]]
+## Folders not yet on Drive (planned)
 
-| What | Drive path |
-|---|---|
-| Equipment manuals (PDFs from manufacturers) | `01_Business/Equipment/Manuals/` |
-| Warranty docs | `01_Business/Equipment/Warranty/` |
-| Supplier spec sheets | `01_Business/Equipment/Specs/` |
-| Maintenance log photos | `01_Business/Equipment/Maintenance/<YYYY-MM>/` |
+These are referenced in the vault but **don't have a corresponding Drive folder yet**. Create one when you need it; once it exists, search by name via the Drive MCP and add a row above.
 
-### Legal
+- `Finance/Bank` (bank statements archive)
+- `Finance/Payroll` (payroll records)
+- `Finance/Tax` (VAT / WHT / CIT filings)
+- `Finance/Reports` (annual P&L)
+- `Legal/` (lease, work permits, FDA filings, company registration)
+- `Operations/HACCP` (daily HACCP archive)
+- `Operations/Checklists` (cleaning checklists)
+- `Operations/Training/` (videos + docs)
+- `Marketing/`
+- `Phases/` (project history)
 
-| What | Drive path |
-|---|---|
-| L1 lease agreement | `01_Business/Legal/Lease/L1-2026-2027.pdf` |
-| L2 lease agreement | `01_Business/Legal/Lease/L2-2026-2026.pdf` |
-| Work permits (Burmese prep staff) | `01_Business/Legal/Permits/<staff-name>/` |
-| Thai FDA (อย.) filings | `01_Business/Legal/FDA/<filing-id>/` |
-| Company registration | `01_Business/Legal/Company/` |
+When you create any of these on Drive, the workflow is:
 
-### Operations → see [[Operations/]]
-
-| What | Drive path |
-|---|---|
-| HACCP daily sheets archive | `01_Business/Operations/HACCP/<YYYY-MM>/` |
-| Cleaning checklists | `01_Business/Operations/Checklists/` |
-| Staff training videos | `01_Business/Operations/Training/Videos/` |
-| Staff training docs | `01_Business/Operations/Training/Docs/` |
-| Photos of L1 / L2 sites | `01_Business/Operations/Sites/` |
-
-### Phases / Project history
-
-| What | Drive path |
-|---|---|
-| Phase 1 launch plan | `01_Business/Phases/Phase-1-Launch/` |
-| Pre-launch milestone records | `01_Business/Phases/Milestones/` |
+1. Drop the folder into `Drive: 01_Business/<name>/`
+2. Get the folder ID by right-click → "Get link" or via Drive MCP search
+3. Edit this page in admin (`/brain` → click on Drive Map → Edit) and add a row with the URL
+4. Save → committed to git → next deploy + Graphify run picks it up
 
 ## How to access from agents
 
-- **Local filesystem** — paths above resolve on any machine with the shared Drive mounted (Lesia's + Bas's laptops, agent workstations). Use `Read` tool with full path.
-- **Google Drive MCP** — when local FS not available, `mcp__*__search_files` / `read_file_content` MCP tools work directly against Drive (search by filename, e.g. `Shishka-Kitchen-Logo-24-12-25`)
-- **Don't commit binaries from `01_Business/`** — that folder is gitignored on purpose (see `.gitignore`)
+- **Local filesystem** — Drive paths above resolve on any machine with the shared Drive mounted (Lesia's + Bas's laptops, agent workstations). Use the `Read` tool with the local path
+- **Drive MCP** — when local FS not available, `mcp__*__search_files` / `read_file_content` MCP tools work directly against Drive (search by filename, e.g. `Shishka-Kitchen-Logo-24-12-25`)
+- **Direct URL** — every entry above has a Drive URL — paste into a browser to open the folder/file
 
 ## Adding a new top-level folder
 
-If you create a new top-level folder under `01_Business/` on Drive:
+When you create a new top-level folder under `01_Business/` on Drive:
 
-1. Add an entry in this page's frontmatter `assets:` block
-2. Add a row in the relevant section above
-3. If it's a new entity (e.g., a new domain), consider whether a vault folder for it makes sense (currently 9 entity folders + 4 sidebar)
+1. Get its Drive folder ID (URL after `/folders/`)
+2. Add a row to the table above + an entry to the `assets:` frontmatter (so it shows on `/brain/drive`)
+3. If it's a new entity, consider whether a vault folder makes sense (currently 9 entity folders + 4 sidebar)
 
 ## See Also
 
-- [[Brand/]] — full asset table (overlapping with §Brand here)
+- [[Brand/]] — full brand-asset deep-dive
 - [[Operations/]]
-- [`docs/branding/assets-index.md`](../../docs/branding/assets-index.md) — auto-generated filesystem index for Branding
+- [`docs/branding/assets-index.md`](../../docs/branding/assets-index.md) — auto-generated filesystem index for Branding (older format, kept for reference)

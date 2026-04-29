@@ -5,10 +5,21 @@ tags: [brand]
 date: 2026-04-29
 status: active
 assets:
-  - label: "Brand kit (logos, photos, signboards)"
+  - label: "Brand kit folder (Drive)"
     path: "Drive: 01_Business/Branding/"
+    url: "https://drive.google.com/drive/folders/1ZPEpohxTsVYgGX6oEt4iNPuf60kIwJ4l"
+  - label: "Main horizontal logo (PNG)"
+    path: "Drive: 01_Business/Branding/Main Logo/Shishka-Kitchen-Logo-24-12-25.png"
+    url: "https://drive.google.com/file/d/1uReh8k2cmN_8cP2VbJyaXT2MEtAMzuEp/view"
+  - label: "Vertical logo (PNG)"
+    path: "Drive: 01_Business/Branding/Virtical Logo/Shishka-Kitchen-Logo-VIRTICAL-24-12-25.png"
+    url: "https://drive.google.com/file/d/1WLkRVemFyWFsPxOgryoxS3SBM-taOAdI/view"
+  - label: "Icon / favicon (PNG)"
+    path: "Drive: 01_Business/Branding/Logo iCone/Shishka-Kitchen-Logo-Icone-WG-24-12-25.png"
+    url: "https://drive.google.com/file/d/1kb1SQMiUaIjrfmB_wE7IbP9Z6nJgMvB_/view"
   - label: "SHISHKA BIBLE PDF"
-    path: "Drive: 01_Business/Branding/SHISHKA BIBLE/SHISHKA BIBLE – The Future of Food 34.pdf"
+    path: "Drive: 01_Business/Branding/SHISHKA BIBLE/"
+    url: "https://drive.google.com/file/d/1bOqvo1WBGG3O2IvVzD7ERzI1OvCcyFMm/view"
   - label: "Logo (admin-panel inline copy)"
     path: "apps/admin-panel/src/assets/shishka-logo.png"
 related:

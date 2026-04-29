@@ -4,6 +4,13 @@ type: entity
 tags: [equipment, kitchen, capex]
 date: 2026-04-29
 status: active
+assets:
+  - label: "Equipment folder (Drive)"
+    path: "Drive: 01_Business/Equipment/"
+    url: "https://drive.google.com/drive/folders/18FgX46HOdG4JiAGWas_aSB0bcrEVHuHv"
+  - label: "Equipment manuals (Drive)"
+    path: "Drive: 01_Business/Equipment_Manuals/"
+    url: "https://drive.google.com/drive/folders/1752rOM1M0BrBdUA0PAgvzdVoz7UgmWkD"
 related:
   - "[[Recipes/Production Routing]]"
   - "[[Finance/Ledger]]"
