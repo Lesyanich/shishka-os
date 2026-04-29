@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { Network } from 'vis-network'
 import { DataSet } from 'vis-data'
 import {
@@ -378,6 +379,7 @@ function communityLabel(
 /* ------------------------------------------------------------------ */
 
 export function BrainKnowledgePage() {
+  const navigate = useNavigate()
   const [graph, setGraph] = useState<GraphData | null>(null)
   const [search, setSearch] = useState('')
   const [graphFullscreen, setGraphFullscreen] = useState(false)
@@ -601,6 +603,18 @@ export function BrainKnowledgePage() {
     networkRef.current.on('zoom', () => setHoverNode(null))
     networkRef.current.on('dragStart', () => setHoverNode(null))
 
+    // Click on a vault node → open it in the Pages tab.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    networkRef.current.on('click', (p: any) => {
+      const id = (p?.nodes?.[0] as string) || null
+      if (!id) return
+      const node = filteredNodes.find((n) => n.id === id)
+      if (!node) return
+      // Match `vault/<entity>/<page>.md` and route to /brain/wiki/<entity>/<page>.md
+      const m = /^vault\/(.+\.md)$/.exec(node.source_file)
+      if (m) navigate(`/brain/wiki/${m[1]}`)
+    })
+
     return () => {
       if (networkRef.current) {
         networkRef.current.destroy()
@@ -608,7 +622,7 @@ export function BrainKnowledgePage() {
       }
       setHoverNode(null)
     }
-  }, [graph, selectedComms, COMM_COLORS, connectionCount])
+  }, [graph, selectedComms, COMM_COLORS, connectionCount, navigate])
 
   // Toggle community selection
   const toggleComm = useCallback((id: number) => {

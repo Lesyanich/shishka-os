@@ -34,6 +34,7 @@ const MenuPage = lazy(() => import('./pages/menu/MenuPage').then(m => ({ default
 const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
 const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
 const BrainWikiPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainWikiPage })))
+const BrainDriveMapPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainDriveMapPage })))
 const QualityPage = lazy(() => import('./pages/brain').then(m => ({ default: m.QualityPage })))
 const BrainKnowledgePage = lazy(() => import('./pages/brain/BrainKnowledgePage').then(m => ({ default: m.BrainKnowledgePage })))
 const ProductionTargets = lazy(() => import('./pages/ProductionTargets').then(m => ({ default: m.ProductionTargets })))
@@ -93,6 +94,7 @@ function App() {
                     <Route path="knowledge" element={<Suspense fallback={<PageLoader />}><BrainKnowledgePage /></Suspense>} />
                     <Route path="cost" element={<Suspense fallback={<PageLoader />}><BrainCostPage /></Suspense>} />
                     <Route path="wiki/*" element={<Suspense fallback={<PageLoader />}><BrainWikiPage /></Suspense>} />
+                    <Route path="drive" element={<Suspense fallback={<PageLoader />}><BrainDriveMapPage /></Suspense>} />
                     <Route path="quality" element={<Suspense fallback={<PageLoader />}><QualityPage /></Suspense>} />
                   </Route>
                   <Route path="/menu/*" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />

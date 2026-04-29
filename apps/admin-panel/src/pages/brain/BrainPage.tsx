@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Brain, BookOpen, Sparkles, DollarSign, Activity } from 'lucide-react'
+import { Brain, BookOpen, Sparkles, MapPin, DollarSign, Activity } from 'lucide-react'
 import { BrainPulseBar } from './components/BrainPulseBar'
 
 const TABS = [
   { to: '/brain/knowledge', label: 'Map', icon: Sparkles },
   { to: '/brain/wiki', label: 'Pages', icon: BookOpen },
+  { to: '/brain/drive', label: 'Drive Map', icon: MapPin },
   { to: '/brain/cost', label: 'Cost', icon: DollarSign },
   { to: '/brain/quality', label: 'Quality', icon: Activity },
 ]
