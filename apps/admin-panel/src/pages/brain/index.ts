@@ -1,5 +1,5 @@
 export { BrainPage } from './BrainPage'
 export { BrainPlaceholder } from './BrainPlaceholder'
 export { BrainCostPage } from './BrainCostPage'
-export { MemPalaceBrowser } from './MemPalaceBrowser'
+export { BrainWikiPage } from './BrainWikiPage'
 export { QualityPage } from './QualityPage'

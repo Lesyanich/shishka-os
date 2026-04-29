@@ -1,10 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Brain, Network, Sparkles, DollarSign, Activity } from 'lucide-react'
+import { Brain, BookOpen, Sparkles, DollarSign, Activity } from 'lucide-react'
 import { BrainPulseBar } from './components/BrainPulseBar'
 
 const TABS = [
-  { to: '/brain/knowledge', label: 'Knowledge', icon: Sparkles },
-  { to: '/brain/mempalace', label: 'MemPalace', icon: Network },
+  { to: '/brain/knowledge', label: 'Map', icon: Sparkles },
+  { to: '/brain/wiki', label: 'Pages', icon: BookOpen },
   { to: '/brain/cost', label: 'Cost', icon: DollarSign },
   { to: '/brain/quality', label: 'Quality', icon: Activity },
 ]
@@ -19,7 +19,7 @@ export function BrainPage() {
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Brain</h1>
           <p className="text-xs text-slate-500">
-            Knowledge graph · MemPalace · Graphify
+            Knowledge map · Vault pages · Brain quality
           </p>
         </div>
       </header>
