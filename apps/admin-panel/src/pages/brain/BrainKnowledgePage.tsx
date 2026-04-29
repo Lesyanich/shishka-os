@@ -611,7 +611,7 @@ export function BrainKnowledgePage() {
       const node = filteredNodes.find((n) => n.id === id)
       if (!node) return
       // Match `vault/<entity>/<page>.md` and route to /brain/wiki/<entity>/<page>.md
-      const m = /^vault\/(.+\.md)$/.exec(node.source_file)
+      const m = /^vault\/(.+\.md)$/.exec(node.source_file ?? '')
       if (m) navigate(`/brain/wiki/${m[1]}`)
     })
 
