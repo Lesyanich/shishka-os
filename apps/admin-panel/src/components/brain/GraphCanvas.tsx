@@ -100,7 +100,7 @@ export function GraphCanvas({ selectedPath, onNodeClick, className }: Props) {
   const selectedNodeId = useMemo(() => {
     if (!graph || !selectedPath) return null
     const wanted = `vault/${selectedPath}`
-    return graph.nodes.find((n) => n.source_file === wanted)?.id ?? null
+    return graph.nodes.find((n) => (n.source_file ?? '') === wanted)?.id ?? null
   }, [graph, selectedPath])
 
   // Initialize / re-initialize network
@@ -110,7 +110,9 @@ export function GraphCanvas({ selectedPath, onNodeClick, className }: Props) {
     const nodes = new DataSet(
       graph.nodes.map((n) => {
         const isSelected = selectedNodeId === n.id
-        const isVault = n.source_file.startsWith('vault/')
+        // Some Graphify nodes (community aggregates) lack source_file —
+        // coerce to empty string before startsWith.
+        const isVault = (n.source_file ?? '').startsWith('vault/')
         const color = COMM_COLORS[n.community % COMM_COLORS.length]
         const conn = connectionCount.get(n.id) || 0
         const size = Math.min(8 + conn * 0.8, 26)
@@ -187,7 +189,7 @@ export function GraphCanvas({ selectedPath, onNodeClick, className }: Props) {
       if (!id) return
       const node = graph.nodes.find((n) => n.id === id)
       if (!node) return
-      const m = /^vault\/(.+\.md)$/.exec(node.source_file)
+      const m = /^vault\/(.+\.md)$/.exec(node.source_file ?? '')
       if (m) onNodeClick(m[1])
     })
 
