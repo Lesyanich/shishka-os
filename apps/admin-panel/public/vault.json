@@ -1,75 +1,75 @@
 {
-  "generated_at": "2026-04-29T10:58:28.716Z",
+  "generated_at": "2026-04-29T11:36:26.672Z",
   "count": 46,
   "tree": [
     {
       "path": "Brand/README.md",
       "title": "Brand",
       "type": "entity",
-      "lastModified": "2026-04-29T13:55:21+07:00",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": true
     },
     {
       "path": "Brand/Identity.md",
       "title": "Brand Identity",
       "type": "page",
-      "lastModified": "2026-04-29T10:30:50.337Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Brand/Visual System.md",
       "title": "Brand Visual System",
       "type": "page",
-      "lastModified": "2026-04-29T10:33:09.763Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Brand/Voice & Tone.md",
       "title": "Brand Voice & Tone",
       "type": "page",
-      "lastModified": "2026-04-29T10:32:03.634Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Database/README.md",
       "title": "Database",
       "type": "entity",
-      "lastModified": "2026-04-29T13:55:21+07:00",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": true
     },
     {
       "path": "Database/Domain Contracts.md",
       "title": "Database Domain Contracts",
       "type": "page",
-      "lastModified": "2026-04-29T10:55:17.428Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Database/Migrations.md",
       "title": "Database Migrations",
       "type": "page",
-      "lastModified": "2026-04-29T10:53:07.799Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Database/RLS Policies.md",
       "title": "Database RLS Policies",
       "type": "page",
-      "lastModified": "2026-04-29T10:54:28.112Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Database/RPC Catalog.md",
       "title": "Database RPC Catalog",
       "type": "page",
-      "lastModified": "2026-04-29T10:55:23.321Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Database/Schema.md",
       "title": "Database Schema",
       "type": null,
-      "lastModified": "2026-04-29T06:00:51.439Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
@@ -83,63 +83,63 @@
       "path": "Equipment/README.md",
       "title": "Equipment",
       "type": "entity",
-      "lastModified": "2026-04-29T13:55:21+07:00",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": true
     },
     {
       "path": "Equipment/CapEx Flow.md",
       "title": "CapEx Flow",
       "type": "page",
-      "lastModified": "2026-04-29T10:39:54.728Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Equipment/Inventory.md",
       "title": "Equipment Inventory",
       "type": "page",
-      "lastModified": "2026-04-29T10:38:49.425Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Equipment/Routing.md",
       "title": "Equipment Routing",
       "type": "page",
-      "lastModified": "2026-04-29T10:39:32.507Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Finance/README.md",
       "title": "Finance",
       "type": "entity",
-      "lastModified": "2026-04-29T13:55:21+07:00",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": true
     },
     {
       "path": "Finance/Classification.md",
       "title": "Finance Classification",
       "type": "page",
-      "lastModified": "2026-04-29T10:44:03.160Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Finance/Ledger.md",
       "title": "Financial Ledger",
       "type": null,
-      "lastModified": "2026-04-29T06:00:51.440Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Finance/Receipt Routing.md",
       "title": "Receipt Routing Architecture",
       "type": null,
-      "lastModified": "2026-04-29T06:00:51.441Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Finance/Targets & KPIs.md",
       "title": "Finance Targets & KPIs",
       "type": "page",
-      "lastModified": "2026-04-29T10:44:54.675Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
@@ -153,35 +153,35 @@
       "path": "Menu/README.md",
       "title": "Menu",
       "type": "entity",
-      "lastModified": "2026-04-29T13:55:21+07:00",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": true
     },
     {
       "path": "Menu/Categories.md",
       "title": "Menu Categories",
       "type": "page",
-      "lastModified": "2026-04-29T10:27:46.162Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Menu/Concept.md",
       "title": "Menu Concept",
       "type": "page",
-      "lastModified": "2026-04-29T10:26:31.060Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Menu/Pricing & Margins.md",
       "title": "Menu Pricing & Margins",
       "type": "page",
-      "lastModified": "2026-04-29T10:28:48.980Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Menu/Product Categorization.md",
       "title": "Product Categorization Architecture",
       "type": null,
-      "lastModified": "2026-04-29T06:00:51.441Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
@@ -195,133 +195,133 @@
       "path": "Operations/README.md",
       "title": "Operations",
       "type": "entity",
-      "lastModified": "2026-04-29T13:55:21+07:00",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": true
     },
     {
       "path": "Operations/Daily Standards.md",
       "title": "Daily Standards",
       "type": "page",
-      "lastModified": "2026-04-29T10:48:53.868Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Operations/Drive Map.md",
       "title": "Drive Map",
       "type": "page",
-      "lastModified": "2026-04-29T10:50:11.991Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Operations/KDS.md",
       "title": "KDS — Kitchen Display System",
       "type": "page",
-      "lastModified": "2026-04-29T10:49:05.521Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Operations/Locations.md",
       "title": "Locations",
       "type": "page",
-      "lastModified": "2026-04-29T10:46:52.907Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Operations/Staff.md",
       "title": "Staff",
       "type": "page",
-      "lastModified": "2026-04-29T10:47:44.468Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Procurement/README.md",
       "title": "Procurement",
       "type": "entity",
-      "lastModified": "2026-04-29T13:55:21+07:00",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": true
     },
     {
       "path": "Procurement/Purchase Logs.md",
       "title": "Purchase Logs",
       "type": "page",
-      "lastModified": "2026-04-29T10:41:40.378Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Procurement/Receiving.md",
       "title": "Procurement & Receiving Architecture",
       "type": null,
-      "lastModified": "2026-04-29T06:00:51.440Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Procurement/Suppliers.md",
       "title": "Suppliers",
       "type": "page",
-      "lastModified": "2026-04-29T10:41:11.131Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Recipes/README.md",
       "title": "Recipes",
       "type": "entity",
-      "lastModified": "2026-04-29T13:55:21+07:00",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": true
     },
     {
       "path": "Recipes/BOM Structure.md",
       "title": "BOM Structure",
       "type": "page",
-      "lastModified": "2026-04-29T10:35:59.845Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Recipes/Kitchen Philosophy.md",
       "title": "Kitchen Philosophy",
       "type": "page",
-      "lastModified": "2026-04-29T10:34:44.575Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Recipes/Production Routing.md",
       "title": "Production Routing",
       "type": "page",
-      "lastModified": "2026-04-29T10:36:46.456Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Tech/README.md",
       "title": "Tech",
       "type": "entity",
-      "lastModified": "2026-04-29T13:55:21+07:00",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": true
     },
     {
       "path": "Tech/Agent System.md",
       "title": "Agent System",
       "type": "page",
-      "lastModified": "2026-04-29T10:57:42.004Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Tech/Architecture.md",
       "title": "Shishka OS Architecture",
       "type": null,
-      "lastModified": "2026-04-29T06:00:51.442Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Tech/MCP Servers.md",
       "title": "MCP Servers",
       "type": "page",
-      "lastModified": "2026-04-29T10:58:01.477Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     },
     {
       "path": "Tech/Stack.md",
       "title": "Tech Stack",
       "type": "page",
-      "lastModified": "2026-04-29T10:57:32.509Z",
+      "lastModified": "2026-04-29T18:06:06+07:00",
       "isFolderIndex": false
     }
   ],

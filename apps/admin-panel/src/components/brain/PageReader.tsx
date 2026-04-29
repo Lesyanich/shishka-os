@@ -227,7 +227,14 @@ export function PageReader({
                   },
                   a: ({ href, children, ...rest }) => {
                     if (href?.startsWith('wiki:')) {
-                      const target = decodeURIComponent(href.slice('wiki:'.length))
+                      // Defensive: malformed %XX sequences would throw URIError
+                      // and crash the whole tree. Catch and render as plain text.
+                      let target: string
+                      try {
+                        target = decodeURIComponent(href.slice('wiki:'.length))
+                      } catch {
+                        return <span className="text-amber-300">{children}</span>
+                      }
                       return (
                         <button
                           type="button"
