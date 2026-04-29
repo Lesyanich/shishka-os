@@ -22,6 +22,7 @@ import {
   type VaultJson,
   type VaultPage,
 } from '../../lib/vault'
+import { driveLinkFor } from '../../lib/drive'
 import {
   fetchVaultPageFresh,
   saveVaultPage,
@@ -462,25 +463,41 @@ function AssetsPanel({ assets }: { assets: AssetEntry[] }) {
         <MapPin className="h-3 w-3" />
         Where things live
       </div>
-      <ul className="space-y-1.5">
-        {assets.map((a, idx) => (
-          <li key={`${a.label}-${idx}`} className="text-xs">
-            <div className="font-medium text-slate-300">{a.label}</div>
-            {a.path && (
-              <div className="text-[11px] text-slate-500">{a.path}</div>
-            )}
-            {a.url && (
-              <a
-                href={a.url}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:underline"
-              >
-                Open <ExternalLink className="h-2.5 w-2.5" />
-              </a>
-            )}
-          </li>
-        ))}
+      <ul className="space-y-2">
+        {assets.map((a, idx) => {
+          // Best link for this asset: explicit url wins, else turn the
+          // Drive: path into a search URL, else null (render as plain text).
+          const href = a.url ?? driveLinkFor(a.path)
+          const Inner = (
+            <>
+              <div className="flex items-center gap-1 font-medium text-slate-300 group-hover:text-fuchsia-300">
+                {a.label}
+                {href && (
+                  <ExternalLink className="h-2.5 w-2.5 text-slate-500 group-hover:text-fuchsia-300" />
+                )}
+              </div>
+              {a.path && (
+                <div className="text-[11px] text-slate-500">{a.path}</div>
+              )}
+            </>
+          )
+          return (
+            <li key={`${a.label}-${idx}`} className="text-xs">
+              {href ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="group block"
+                >
+                  {Inner}
+                </a>
+              ) : (
+                Inner
+              )}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

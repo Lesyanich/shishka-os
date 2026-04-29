@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, MapPin, FileText } from 'lucide-react'
+import { driveLinkFor } from '../../lib/drive'
 
 interface VaultPage {
   title: string
@@ -137,14 +138,38 @@ export function BrainDriveMapPage() {
                     key={`${a.sourcePath}-${a.label}-${idx}`}
                     className="rounded-lg border border-slate-800 bg-slate-900/60 p-3"
                   >
-                    <div className="text-xs font-medium text-slate-100">
-                      {a.label}
-                    </div>
-                    {a.path && (
-                      <div className="mt-0.5 font-mono text-[11px] text-slate-400">
-                        {a.path}
-                      </div>
-                    )}
+                    {(() => {
+                      // Build the best-guess Drive link: explicit url wins,
+                      // otherwise turn the path into a Drive search.
+                      const href = a.url ?? driveLinkFor(a.path)
+                      const Card = (
+                        <>
+                          <div className="text-xs font-medium text-slate-100 group-hover:text-fuchsia-300">
+                            {a.label}
+                            {href && (
+                              <ExternalLink className="ml-1 inline h-2.5 w-2.5 align-baseline text-slate-500 group-hover:text-fuchsia-300" />
+                            )}
+                          </div>
+                          {a.path && (
+                            <div className="mt-0.5 font-mono text-[11px] text-slate-400">
+                              {a.path}
+                            </div>
+                          )}
+                        </>
+                      )
+                      return href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="group block focus:outline-none"
+                        >
+                          {Card}
+                        </a>
+                      ) : (
+                        <div>{Card}</div>
+                      )
+                    })()}
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <button
                         type="button"
@@ -154,16 +179,6 @@ export function BrainDriveMapPage() {
                         <FileText className="h-3 w-3" />
                         {a.sourceTitle}
                       </button>
-                      {a.url && (
-                        <a
-                          href={a.url}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:underline"
-                        >
-                          Open <ExternalLink className="h-2.5 w-2.5" />
-                        </a>
-                      )}
                     </div>
                   </li>
                 ))}
