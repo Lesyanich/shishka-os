@@ -5,7 +5,7 @@ tags:
   - knowledge-graph
   - ontology
   - meta
-date: 2026-04-28
+date: 2026-04-29
 status: active
 aliases:
   - Knowledge Vault
@@ -14,48 +14,77 @@ aliases:
 
 # Vault — Shishka Knowledge Vault
 
-The vault is Shishka's **business-knowledge graph** — a folder of plain Markdown notes describing the business as concepts (decisions, domains, projects, open questions, milestones, people), not as files.
+The vault is Shishka's **business-knowledge layer**. Plain markdown files describing the business as concepts you can read, link, and grow over time. Three consumers read the same files:
 
-Two consumers read this vault:
-- **Obsidian** (Lesia) — direct edit, Graph View
-- **Graphify → admin panel** at `/brain/knowledge` — visualises the graph for the whole team
+- **Lesia (CEO)** in Obsidian (direct edit, Graph View) and in the admin panel at `/brain` (read + inline edit)
+- **Other humans** in the admin panel `/brain` Confluence reader
+- **AI agents** through file reads and the Graphify MCP (planned)
+
+All three see the same content. There is no agent-private fork and no human-private fork.
 
 > [!info] Single Source of Truth
-> The vault is the SSoT for **business knowledge that does not live in code or in the database**. Decisions, domain definitions, project status, who-owns-what. Operational state (orders, inventory) lives in Supabase. Code lives in `apps/`, `services/`, `agents/`. The vault holds everything between.
+> The vault is the SSoT for **business knowledge that does not live in code or in the database**. Decisions, domain definitions, project status, where assets live, who owns what. Operational state (orders, inventory, receipts) lives in Supabase. Code lives in `apps/`, `services/`, `agents/`. The vault holds everything between.
 
 ## Folder Taxonomy
 
-| Folder | Purpose | Naming convention | Example |
-|---|---|---|---|
-| `Architecture/` | System diagrams, schemas, integration maps | Title Case | `Database Schema.md` |
-| `Decisions/` | One note per CEO-ratified decision | `D-NNN-<slug>.md` | `D-014-erp-merge.md` |
-| `Domains/` | Business domains as concepts | PascalCase | `Menu.md`, `Procurement.md` |
-| `Projects/` | Current and recent initiatives | Title Case | `Menu Control Page.md` |
-| `Open Questions/` | Unresolved questions awaiting decisions | `<question-slug>.md` | `mempalace-fate.md` |
-| `Milestones/` | Releases, pivots, incidents, launches | `<YYYY-MM-DD>-<slug>.md` | `2026-04-12-lightrag-decommissioned.md` |
-| `People/` | Team members | First name | `Lesia.md`, `Bas.md` |
-| `Handover/` | Cross-session handover docs | Title Case | `HANDOVER.md` |
-| `_Templates/` | Frontmatter templates per type | `<Type>.md` | `Decision.md` |
-| `_Archive/` | Deprecated content (kept for history) | mirror folder | `_Archive/Blueprints/` |
+The vault has two zones: **front-door entity folders** (where humans browse) and **sidebar audit-log folders** (history accumulating over time).
 
-## Edges = Wikilinks Only
+### Front-door — entity folders (encyclopedic, 50–500 lines per page)
 
-The vault graph is built **only** from wikilinks `[[Note Name]]` inside note bodies. Do not maintain edge lists, JSON, or front-matter `links:` arrays. Graphify reads wikilinks during the pipeline run.
+| Folder | Scope |
+|---|---|
+| `Menu/` | Customer-facing menu, dish concept, nutrition, pricing, customer experience |
+| `Brand/` | Identity, voice, visual system, design tokens, logo, photography |
+| `Recipes/` | Cooking knowledge, BOMs, technique, food cost rollup |
+| `Equipment/` | Machines, kitchen gear, capex, routing, maintenance |
+| `Procurement/` | Suppliers, sourcing, purchase logs, comparison protocol |
+| `Finance/` | Receipts, COGS/CAPEX/OPEX, ledger model, financial targets |
+| `Operations/` | Locations, shifts, staff workflow, food safety, daily standards, KDS |
+| `Database/` | Schema, RLS, migrations index, RPC catalog |
+| `Tech/` | Stack, infra, CI/CD, deployment, agent system, security, architecture |
+
+### Sidebar — audit log (short, 5–30 lines per page)
+
+| Folder | Scope | Naming |
+|---|---|---|
+| `Decisions/` | One note per CEO-ratified decision | `D-NNN-<slug>.md` (global, never renumbered) |
+| `Milestones/` | Releases, pivots, launches, incidents | `<YYYY-MM-DD>-<slug>.md` |
+| `People/` | Team members | `<FirstName>.md` |
+| `Open Questions/` | Unresolved questions awaiting CEO decision | `<question-slug>.md` |
+
+### Existing folders (legacy and meta)
+
+| Folder | Status |
+|---|---|
+| `Architecture/` | Legacy — 6 notes will migrate into `Database/`, `Finance/`, `Procurement/`, `Menu/`, `Tech/` during content build-out (B-3) |
+| `Handover/` | Cross-session handover docs |
+| `_Templates/` | Frontmatter templates per type |
+| `_Archive/` | Deprecated content (kept for history) |
+
+## Edges = wikilinks only
+
+The vault graph is built **only** from `[[Note Name]]` wikilinks inside note bodies. No edge JSON, no manual edge maintenance. Graphify reads wikilinks during the pipeline run.
 
 ## Frontmatter
 
-Every note has YAML frontmatter. Common fields (always present):
+Every note carries YAML frontmatter:
 
 ```yaml
 ---
 title: <human-readable title>
-type: decision | domain | project | question | milestone | person | architecture
+type: domain | decision | milestone | person | question | project | architecture
 tags: [tag1, tag2]
-date: YYYY-MM-DD          # creation date
+date: YYYY-MM-DD
 status: <type-specific>
-aliases: []               # optional, for Obsidian linking
+aliases: []          # optional — for Obsidian linking
+assets:              # optional — Drive paths and external links
+  - label: "Logo files"
+    path: "Drive: Brand/Logos/"
+    url: "https://drive.google.com/..."   # optional, if a direct URL exists
 ---
 ```
+
+The `assets:` block renders as a "Where things live" panel in the admin Pages tab and is aggregated into `/brain/drive` (Drive Map). Use it for receipts folders, photo libraries, signed contracts, brand kits — anything stored on Drive that the page references.
 
 Type-specific fields are documented in `_Templates/<Type>.md`.
 
@@ -63,19 +92,21 @@ Type-specific fields are documented in `_Templates/<Type>.md`.
 
 - **English only** (RULE-LANGUAGE-CONTRACT). Russian goes in conversation, not in repo.
 - **Decisions** are numbered globally and never renumbered: `D-014-erp-merge.md` stays `D-014` even if a later decision supersedes it.
-- **Projects** use title case (`Menu Control Page.md`), match the title used in MC tasks.
-- **Domains** use PascalCase singular (`Procurement.md`, not `procurement` or `procurements`).
+- **Entity pages** use Title Case (`Menu/Salads.md`, `Brand/Voice.md`).
+- **Domain folder names** are PascalCase singular (`Procurement/`, not `procurement` or `procurements`).
 - **Milestones** are date-prefixed for sortability: `2026-04-12-lightrag-decommissioned.md`.
 
-## Dual Write-Path
+## Two writers, same files
 
 The vault is maintained automatically by agents AND manually by Lesia. Both paths converge in the same folder structure.
 
-**Agent path** — `RULE-VAULT-WRITE-ON-CLOSURE` (see `docs/constitution/agent-rules.md`): when an agent calls `update_task(status='done')`, it must also append or update one note in the appropriate folder. Decision made → `Decisions/D-NNN-<slug>.md`. Project advanced → update `Projects/<name>.md` status. New open question → `Open Questions/<slug>.md`. Cross-cutting domain knowledge → update `Domains/<name>.md`.
+**Agent path** — `RULE-VAULT-WRITE-ON-CLOSURE` (in `docs/constitution/agent-rules.md`): when an agent closes an MC task, it appends or updates the relevant vault note(s). Decision → `Decisions/D-NNN-…`. Project advanced → update relevant entity page. New question → `Open Questions/<slug>.md`. Skip only when the task is purely operational.
 
-Skip the vault write only when the task is purely operational (cleanup, retry, mechanical fix, no new knowledge produced).
+**CEO path** — two interchangeable surfaces:
+- **Admin Pages tab** at `/brain` — `Edit` button → markdown editor in browser → `Save` commits to git via GitHub App. Works from any device with admin login.
+- **Obsidian on Mac** — direct file edit → `git pull` / `git push` (Obsidian Git plugin recommended). Live Graph View, drag-and-drop image attachments.
 
-**Manual path** — Lesia edits any vault file in Obsidian. Graph View shows changes live. The next Graphify run propagates to the admin panel at `/brain/knowledge`.
+Both paths write to the same `vault/<path>.md`. Graphify picks up the edit on the next run regardless of source.
 
 ## Render Pipeline
 
@@ -84,12 +115,18 @@ vault/*.md
    │
    ├─→ Obsidian (live, Lesia)
    │
-   └─→ graphify run
+   ├─→ /api/vault/save (admin Pages tab editor)
+   │       │
+   │       └─→ GitHub App commit → git
+   │
+   └─→ graphify run (nightly)
           │
           ├─→ apps/admin-panel/public/graph.json
           └─→ apps/admin-panel/public/graph-analytics.json
                    │
-                   └─→ /brain/knowledge (vis-network)
+                   ├─→ /brain (Map tab, vis-network)
+                   ├─→ /brain (Pages tab, Confluence reader)
+                   └─→ /brain (Drive Map tab)
 ```
 
 `BrainKnowledgePage.tsx` colours nodes by category. Categories matching `^vault/<Folder>/` regex live in the `CATEGORIES` array — see `apps/admin-panel/src/pages/brain/BrainKnowledgePage.tsx`.
@@ -97,14 +134,13 @@ vault/*.md
 ## What the Vault Is NOT
 
 - **Not an action ledger** — that's MC tasks
-- **Not a verbatim transcript** — that's MemPalace (when wired) or COO Running Log
+- **Not a verbatim transcript** — that's `session-diary` git-log handover
 - **Not Claude-private memory** — that's Auto Memory at `~/.claude/projects/.../memory/`
-- **Not technical specs** — those live in `docs/plans/spec-*.md` and link back to `Projects/`
+- **Not technical specs** — those live in `docs/plans/spec-*.md` and link back to entity pages
 - **Not the database** — operational state belongs in Supabase
 
 ## See Also
 
-- `docs/plans/spec-knowledge-vault-bootstrap.md` — the spec for this vault structure
-- `docs/plans/spec-shishka-brain.md` — the parent three-layer memory architecture
-- `docs/plans/spec-graphify-phase3.md` — Graphify pipeline that renders this vault
+- `docs/plans/spec-brain-system.md` — consolidated spec for the brain system
 - `docs/constitution/agent-rules.md` — `RULE-VAULT-WRITE-ON-CLOSURE`
+- `apps/admin-panel/src/pages/brain/` — admin `/brain` source

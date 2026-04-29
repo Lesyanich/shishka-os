@@ -1,3 +1,5 @@
+> **[SUPERSEDED 2026-04-29]** This spec is archived. See [`docs/plans/spec-brain-system.md`](../spec-brain-system.md) §3 for the entity-first ontology. Reason: Phase 1 (templates + folders) shipped in PR #151. Phase 2 ontology was agent-centric (Decisions/Domains/Projects first); CEO requested entity-first (Menu/Brand/Recipes/… first). PR #153 closed unmerged 2026-04-28.
+
 # Spec: Knowledge Vault Bootstrap — Brain page from doc-graph to business-knowledge graph
 
 > MC Task: `1ad969ae-9d1f-4959-b8ab-4b02524da7a7`

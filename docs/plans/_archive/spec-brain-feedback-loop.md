@@ -1,3 +1,5 @@
+> **[SUPERSEDED 2026-04-29]** This spec is archived. See [`docs/plans/spec-brain-system.md`](../spec-brain-system.md) §7. Reason: partially implemented in `services/brain/` (judge.py, gap_monitor.py, regression.py, run-nightly.sh). The running code is the source of truth; this spec is preserved for design rationale only.
+
 # Spec: Brain Quality Feedback Loop
 
 > MC Task: `f91580be-1064-4358-94f8-95fe173036a9`

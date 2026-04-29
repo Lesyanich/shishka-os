@@ -1,3 +1,5 @@
+> **[SUPERSEDED 2026-04-29]** This spec is archived. See [`docs/plans/spec-brain-system.md`](../spec-brain-system.md) §6 for the deprecation decision. Reason: MemPalace never wired to MCP; replaced by `session-diary` skill (git-log handover). Code to be archived to `_archive/services/mempalace/`.
+
 # Spec: MemPalace — L1 Conversation Memory (Phase 2)
 
 > MC Task: TBD (blocked by `3cc98121` MC RPC bugfix)

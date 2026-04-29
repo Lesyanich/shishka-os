@@ -1,3 +1,5 @@
+> **[SUPERSEDED 2026-04-29]** This spec is archived. See [`docs/plans/spec-brain-system.md`](../spec-brain-system.md) §8 for the current state. Reason: partially executed (`knowledge/ai-learning/` and `knowledge/phases/` moved; cooking and industry deferred). Residual work non-critical.
+
 # Spec: Knowledge Base Consolidation
 
 > **Task:** Knowledge base audit: consolidate vault + 04_Knowledge, eliminate duplication
