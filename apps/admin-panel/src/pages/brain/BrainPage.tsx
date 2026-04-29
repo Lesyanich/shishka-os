@@ -1,6 +1,7 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Brain, Sparkles, MapPin, DollarSign, Activity } from 'lucide-react'
 import { BrainPulseBar } from './components/BrainPulseBar'
+import { BrainErrorBoundary } from '../../components/brain/BrainErrorBoundary'
 
 const TABS = [
   // Unified explore view = graph + reader side-by-side, default landing
@@ -12,6 +13,11 @@ const TABS = [
 ]
 
 export function BrainPage() {
+  const location = useLocation()
+  // Use the route path as the boundary key so a thrown error on one tab
+  // doesn't persist into a different tab — switching tabs resets the boundary.
+  const scope =
+    location.pathname.replace(/^\/brain\/?/, '').split('/')[0] || 'Map'
   return (
     <div className="flex h-full flex-col">
       <header className="mb-4 flex items-center gap-3">
@@ -52,7 +58,9 @@ export function BrainPage() {
       </nav>
 
       <div className="flex-1 min-h-0">
-        <Outlet />
+        <BrainErrorBoundary key={location.pathname} scope={scope}>
+          <Outlet />
+        </BrainErrorBoundary>
       </div>
     </div>
   )
