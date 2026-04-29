@@ -4,6 +4,10 @@ type: entity
 tags: [procurement, suppliers, purchasing]
 date: 2026-04-29
 status: active
+assets:
+  - label: "Receipts archive (Drive)"
+    path: "Drive: 01_Business/Receipts/"
+    url: "https://drive.google.com/drive/folders/14OGn_hOSlOB0TNotMHD9_geKojVYlYAt"
 related:
   - "[[Recipes/]]"
   - "[[Finance/Receipt Routing]]"

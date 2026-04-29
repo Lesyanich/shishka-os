@@ -5,8 +5,12 @@ tags: [menu]
 date: 2026-04-29
 status: active
 assets:
-  - label: "Menu photos (Drive)"
+  - label: "Menu photos & PDFs (Drive)"
     path: "Drive: 01_Business/Menu/"
+    url: "https://drive.google.com/drive/folders/1T6aMaLB0Wtc-J1O3LUYSW_FJ3ZQXjLDf"
+  - label: "Salad Bar R&D"
+    path: "Drive: 01_Business/Salad_Bar/"
+    url: "https://drive.google.com/drive/folders/1vU64GVWOfKmbZ75vDN7rV3pZYJqnA8HW"
 related:
   - "[[Brand/]]"
   - "[[Recipes/]]"
