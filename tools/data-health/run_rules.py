@@ -72,8 +72,8 @@ def get_db_url() -> str:
 # Fix strategies — pure functions: (row, extra_json) -> (field, new_value) or None
 # ---------------------------------------------------------------------------
 
-WEIGHT_TAIL_RE = re.compile(r"[,\s]+\d+\s*(?:g|kg|ml|l|L|G|KG|ML)\s*$", re.IGNORECASE)
-UNIT_IN_NAME_RE = re.compile(r"(\d+)\s*(kg|g|ml|l|L|KG|G|ML)\s*$", re.IGNORECASE)
+WEIGHT_TAIL_RE = re.compile(r"[,\s]+\d+(?:\.\d+)?\s*(?:g|kg|ml|l|L|G|KG|ML)\s*$", re.IGNORECASE)
+UNIT_IN_NAME_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(kg|g|ml|l|L|KG|G|ML)\s*$", re.IGNORECASE)
 
 # Category code → default base_unit when we can't infer from name
 CATEGORY_DEFAULT_UNIT = {
