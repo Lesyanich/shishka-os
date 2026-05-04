@@ -24,15 +24,6 @@ if [ -n "$REPO_ROOT" ]; then
   CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null || true)
 fi
 
-# ── Brain: LightRAG auto-reindex on bible/domain change ──
-if [ -n "$CHANGED_FILES" ]; then
-  DOCS_MD=$(echo "$CHANGED_FILES" | grep -E '^docs/.*\.md$' || true)
-  if [ -n "$DOCS_MD" ]; then
-    echo "[post-commit] Brain: LightRAG reindex triggered"
-    echo "$DOCS_MD" | sh "$REPO_ROOT/scripts/lightrag-reindex-changed.sh" &
-  fi
-fi
-
 # ── Brain: MemPalace session-log auto-ingest ──
 if [ -n "$CHANGED_FILES" ]; then
   SESSION_LOGS=$(echo "$CHANGED_FILES" | grep -E '^agents/.*/session-log\.md$' || true)
