@@ -130,6 +130,31 @@ MEM_DIR=$(find_memory_dir)
 MEM_COUNT=0
 MEM_STALE_60=0
 MEM_LAST_UPDATE_TS=0
+MEM_MISSING_LV=0
+
+# Parse last_verified from frontmatter; empty if missing
+parse_last_verified() {
+  awk '
+    /^---$/ { c++; if (c==2) exit; next }
+    c==1 && /^last_verified:/ {
+      sub(/^last_verified:[ \t]+/, "")
+      gsub(/["\047]/, "")
+      print
+      exit
+    }
+  ' "$1"
+}
+
+# YYYY-MM-DD → epoch (cross-platform)
+date_to_epoch() {
+  d="$1"
+  [ -z "$d" ] && { echo 0; return; }
+  if [ "$(uname)" = "Darwin" ]; then
+    date -j -f "%Y-%m-%d" "$d" "+%s" 2>/dev/null || echo 0
+  else
+    date -d "$d" +%s 2>/dev/null || echo 0
+  fi
+}
 
 if [ -n "$MEM_DIR" ] && [ -d "$MEM_DIR" ]; then
   for f in "$MEM_DIR"/*.md; do
@@ -137,7 +162,16 @@ if [ -n "$MEM_DIR" ] && [ -d "$MEM_DIR" ]; then
     bn=$(basename "$f")
     [ "$bn" = "MEMORY.md" ] && continue
     MEM_COUNT=$(( MEM_COUNT + 1 ))
-    ts=$(mtime_epoch "$f")
+
+    # Freshness: prefer frontmatter `last_verified`, fall back to mtime
+    lv=$(parse_last_verified "$f")
+    if [ -n "$lv" ]; then
+      ts=$(date_to_epoch "$lv")
+    else
+      ts=$(mtime_epoch "$f")
+      MEM_MISSING_LV=$(( MEM_MISSING_LV + 1 ))
+    fi
+
     [ "$ts" -gt "$MEM_LAST_UPDATE_TS" ] && MEM_LAST_UPDATE_TS=$ts
     age_days=$(( ( $(date +%s) - ts ) / 86400 ))
     [ "$age_days" -gt 60 ] && MEM_STALE_60=$(( MEM_STALE_60 + 1 ))
@@ -233,17 +267,21 @@ NOW_DATE=$(date "+%Y-%m-%d %H:%M")
 [ -z "$DH_ERRORS" ] || [ "$DH_ERRORS" = "null" ] && DH_ERRORS=0
 [ -z "$DH_WARNINGS" ] || [ "$DH_WARNINGS" = "null" ] && DH_WARNINGS=0
 
-# Stale memory verdict
+# Memory verdict (last_verified-aware)
 if [ "$MEM_COUNT" -eq 0 ]; then
   MEM_VERDICT="директория памяти не найдена"
+elif [ "$MEM_MISSING_LV" -gt 0 ] && [ "$MEM_STALE_60" -eq 0 ]; then
+  MEM_VERDICT="$MEM_MISSING_LV без last_verified — запусти bash scripts/memory-backfill.sh"
 elif [ "$MEM_STALE_60" -eq 0 ]; then
   MEM_VERDICT="чисто"
 else
   pct=$(( MEM_STALE_60 * 100 / MEM_COUNT ))
+  hint=""
+  [ "$MEM_MISSING_LV" -gt 0 ] && hint=" · $MEM_MISSING_LV без last_verified"
   if [ "$pct" -ge 30 ]; then
-    MEM_VERDICT="нужна ревизия (см. WS-2)"
+    MEM_VERDICT="нужна ревизия — bash scripts/memory-audit.sh${hint}"
   else
-    MEM_VERDICT="нормально"
+    MEM_VERDICT="нормально${hint}"
   fi
 fi
 
@@ -266,6 +304,7 @@ if [ "$JSON_OUTPUT" = "true" ] && command -v jq >/dev/null 2>&1; then
     --arg dirty "$DIRTY_COUNT" \
     --arg mem_count "$MEM_COUNT" \
     --arg mem_stale "$MEM_STALE_60" \
+    --arg mem_missing_lv "$MEM_MISSING_LV" \
     --arg mem_last_ago "$(human_ago "$MEM_LAST_UPDATE_TS")" \
     --arg mem_verdict "$MEM_VERDICT" \
     --arg dh_score "$DH_SCORE" \
@@ -288,6 +327,7 @@ if [ "$JSON_OUTPUT" = "true" ] && command -v jq >/dev/null 2>&1; then
       memory: {
         count: ($mem_count|tonumber),
         stale_60d: ($mem_stale|tonumber),
+        missing_last_verified: ($mem_missing_lv|tonumber),
         last_update_ago: $mem_last_ago,
         verdict: $mem_verdict
       },
@@ -327,6 +367,7 @@ cat <<EOF
 
 🧠 Память ($MEM_COUNT записей)
   Последнее обновление: $(human_ago "$MEM_LAST_UPDATE_TS")
+  Без last_verified:    $MEM_MISSING_LV запис(ей)
   Старше 60 дней:       $MEM_STALE_60 запис(ей)
   Статус:               $MEM_VERDICT
 
