@@ -118,9 +118,12 @@ server.tool(
 
 server.tool(
   "list_equipment",
-  "List kitchen equipment with availability and category.",
+  "List kitchen equipment with availability and category. Supports multilingual search by name/alias.",
   {
     category: z.string().optional().describe("Filter by equipment category"),
+    name_search: z.string().optional().describe(
+      "Search equipment by name or alias in any language (e.g., 'salad bar', 'салат-бар', 'vacuum'). Matches name, equipment_code, and aliases."
+    ),
     available_only: z.boolean().optional().describe("Only show available equipment"),
   },
   async (args) => jsonResult(await listEquipment(args))
