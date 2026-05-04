@@ -51,8 +51,8 @@ server.tool(
     title: z.string().min(5).max(200).describe(
       "Task title. Concise, business-readable. Example: 'New dish created: SALE-PUMPKIN-SOUP (margin 68%)'"
     ),
-    description: z.string().max(1000).optional().describe(
-      "Optional details. Price, quantities, what was found, why it's blocked."
+    description: z.string().max(4000).optional().describe(
+      "Optional details. Price, quantities, what was found, why it's blocked. Use add_comment for longer content."
     ),
     domain: z.enum([
       "kitchen", "procurement", "finance", "marketing",
@@ -150,8 +150,8 @@ server.tool(
       .describe("New priority"),
     title: z.string().min(5).max(200).optional()
       .describe("Rename the task. Use sparingly — titles should be stable."),
-    description: z.string().max(1000).optional()
-      .describe("Update description (e.g. add result summary)"),
+    description: z.string().max(4000).optional()
+      .describe("Update description (e.g. add result summary). Use add_comment for longer content."),
     notes: z.string().max(500).optional()
       .describe("Add notes (e.g. why blocked, what was done)"),
     due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
