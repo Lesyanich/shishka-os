@@ -178,6 +178,7 @@ erDiagram
     suppliers {
         UUID id PK
         TEXT name
+        TEXT tax_id "Thai 13-digit, UNIQUE WHERE NOT NULL AND NOT is_deleted (158)"
         TEXT contact_info
         BOOLEAN is_deleted
         INTEGER category_code FK
@@ -466,7 +467,7 @@ erDiagram
 | `locations` | `id` UUID | name (UNIQUE), type | -- | 018 |
 | `inventory_batches` | `id` UUID | barcode (UNIQUE), status, expires_at | nomenclature_id -> nomenclature, location_id -> locations, production_task_id -> production_tasks | 018 |
 | `stock_transfers` | `id` UUID | from_location, to_location | batch_id -> inventory_batches, from/to -> locations | 018 |
-| `suppliers` | `id` UUID | name (UNIQUE), is_deleted, category_code, sub_category_code | category_code -> fin_categories | 021, 025, 032 |
+| `suppliers` | `id` UUID | name (UNIQUE), tax_id (UNIQUE WHERE NOT NULL AND NOT is_deleted — Thai 13-digit taxpayer ID), is_deleted, category_code, sub_category_code | category_code -> fin_categories | 021, 025, 032, 158 |
 | `purchase_logs` | `id` UUID | quantity, price_per_unit, invoice_date, expense_id, sku_id | nomenclature_id -> nomenclature, supplier_id -> suppliers, expense_id -> expense_ledger, sku_id -> sku | 021, 030, 057 |
 | `orders` | `id` UUID | source, status, customer_name, total_amount | -- | 022 |
 | `order_items` | `id` UUID | quantity, price_at_purchase, parent_item_id, modifier_type | order_id -> orders (CASCADE), nomenclature_id -> nomenclature, parent_item_id -> order_items (self-ref CASCADE) | 022, 051 |
@@ -518,7 +519,7 @@ erDiagram
 | `fn_run_mrp(UUID)` | RPC | MRP v2: reads stock from v_inventory_by_nomenclature (was inventory_balances) | 023, 058 |
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
 | `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter | 021 |
-| `fn_approve_receipt(JSONB)` | RPC | Receipt approval v11: SKU resolution + sku_balances UPSERT + receiving_records audit trail | 030, 038, 040, 041, 047, 049, 058, 065 |
+| `fn_approve_receipt(JSONB)` | RPC | Receipt approval v15: supplier resolution chain (tax_id → supplier_aliases → name ILIKE → auto-create + tax_id backfill) atop v11 SKU resolution + sku_balances UPSERT + receiving_records audit trail | 030, 038, 040, 041, 047, 049, 058, 065, 158 |
 | `fn_generate_sku_code()` | UTIL FN | Generates next SKU code: SKU-0001, SKU-0002, etc. | 057 |
 | `fn_sku_set_code()` | TRIGGER FN | Auto-assigns sku_code on INSERT if not provided | 057 |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | Lazy cleanup: marks zombie receipt_jobs (processing >5min) as failed | 036 |
