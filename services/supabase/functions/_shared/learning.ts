@@ -1,26 +1,45 @@
 import { db } from "./supabase.ts"
 
 /**
+ * Record of one rule application during ocr-receipt's apply phase.
+ * Caller persists these to receipt_inbox.applied_overrides; the
+ * approve_receipt RPC diffs them against the approved payload to
+ * increment counters atomically (RULE-LEARNING-COUNTERS).
+ */
+export interface AppliedOverride {
+  table: "category_overrides"
+  rule_id: string
+  item_match_key: string         // lowercased item name used to find in approved payload
+  suggested_flow_type: "COGS" | "OpEx" | "CapEx"
+}
+
+/**
  * Apply learned category overrides to parsed line items.
  * Runs AFTER LLM classification, BEFORE classifyItems().
- * Overrides LLM category when a matching rule exists.
+ *
+ * For each rule that fires, returns an AppliedOverride record. Caller
+ * (ocr-receipt) writes the array to receipt_inbox.applied_overrides;
+ * counter increments happen on approval inside the persist transaction.
+ * Increments are NOT performed here (was fire-and-forget — broke
+ * RULE-LEARNING-COUNTERS atomicity).
  */
 export async function applyCategoryOverrides(
   lineItems: Record<string, unknown>[],
   supplierId: string | null,
-): Promise<number> {
-  let overrideCount = 0
+): Promise<AppliedOverride[]> {
+  const applied: AppliedOverride[] = []
 
   for (const item of lineItems) {
-    const name = (item.translated_name as string) || (item.original_name as string) || ""
+    const original = (item.original_name as string) || ""
+    const translated = (item.translated_name as string) || ""
+    const name = translated || original
     if (!name || name.length < 3) continue
 
     const pattern = name.slice(0, 60).toLowerCase()
 
-    // Build query: match pattern against name, prefer supplier-specific rules
     let query = db
       .from("category_overrides")
-      .select("id, flow_type, category_code, times_applied")
+      .select("id, flow_type, category_code")
 
     if (supplierId) {
       query = query.or(`supplier_id.eq.${supplierId},supplier_id.is.null`)
@@ -42,17 +61,17 @@ export async function applyCategoryOverrides(
 
       if (oldCat !== newCat) {
         item.category = newCat
-        overrideCount++
-        // Increment times_applied (fire and forget)
-        db.from("category_overrides")
-          .update({ times_applied: (override.times_applied ?? 0) + 1 })
-          .eq("id", override.id)
-          .then(() => {})
+        applied.push({
+          table: "category_overrides",
+          rule_id: override.id,
+          item_match_key: (original || translated).toLowerCase(),
+          suggested_flow_type: override.flow_type as "COGS" | "OpEx" | "CapEx",
+        })
       }
     }
   }
 
-  return overrideCount
+  return applied
 }
 
 /**

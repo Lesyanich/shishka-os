@@ -174,48 +174,65 @@ const { data } = await sb.from("table").select("id").gte("id", lo).lte("id", hi)
 
 ## RULE-LEARNING-COUNTERS
 
-When code applies or reverses an auto-learned correction (OCR rules, supplier aliases, category overrides), it **must** also update the matching counter columns so the system can detect bad-rule learning loops.
+When code applies or reverses an auto-learned correction (category overrides, supplier aliases, GS1 weight items, or OCR correction rules), it **must** also update the matching counter columns so the system can detect bad-rule learning loops.
 
-### Schema (migration 165)
+### Schema
 
-`correction_rules` carries:
-- `times_applied INTEGER DEFAULT 0` — increment when the rule's match fires during ingestion
-- `times_overridden INTEGER DEFAULT 0` — increment when an admin manually overrides a value the rule auto-set
-- `last_applied_at TIMESTAMPTZ` — set to `now()` on each apply
+Counter columns live on **all four self-learning tables**:
 
-`v_learning_metrics` aggregates these into a single row (override_rate_pct, last_activity, etc.) and powers the `/health` Самообучение section.
+| Table | `times_applied` | `times_overridden` | `last_applied_at` | Apply phase wired? |
+|---|---|---|---|---|
+| `category_overrides` | ✅ (mig 150) | ✅ (mig 166) | ✅ (mig 166) | ✅ via `fn_apply_inbox_overrides` (mig 166) |
+| `correction_rules` | ✅ (mig 165) | ✅ (mig 165) | ✅ (mig 165) | ❌ — no apply phase exists in code yet (only post-approval triggers WRITE rows). Counters dormant until ingestion path consults the table. |
+| `supplier_aliases` | ✅ (mig 166) | ✅ (mig 166) | ✅ (mig 166) | 🔧 schema-only (apply happens in `nomenclature.ts:resolveSupplierWithProfile`; counter wiring is a follow-up — same pattern as `fn_apply_inbox_overrides`) |
+| `gs1_weight_items` | ✅ (mig 166) | ✅ (mig 166) | ✅ (mig 166) | 🔧 schema-only (apply happens in `gs1.ts:matchGS1WeightItem`; counter wiring follow-up) |
+
+`v_learning_metrics` (mig 166) UNIONs across all four tables and aggregates into a single row (`total_rules`, `used_rules`, `sum_applied`, `sum_overridden`, `override_rate_pct`, `last_activity`) for `/health`.
+
+### Architecture: apply-record / approve-increment
+
+Counters must be atomic with the persist of the corrected value. Live apply-phases run in Edge Functions (Deno, async) — fire-and-forget UPDATE from there breaks atomicity if the approval transaction later rolls back. Pattern instead:
+
+1. **Apply phase** — Edge Function (e.g. `ocr-receipt`) records each rule that fired into a per-inbox ledger:
+   `receipt_inbox.applied_overrides JSONB` — array of `{ table, rule_id, item_match_key, suggested_flow_type }` entries. **No counter writes here.**
+2. **Approve phase** — `fn_approve_receipt_with_learning` (Postgres) calls `fn_apply_inbox_overrides(p_inbox_id, p_payload)` inside the same transaction as `fn_approve_receipt`. The function reads `applied_overrides`, diffs each entry against the approved payload, and atomically:
+   - if approved value matches the rule's suggestion → `times_applied++`, `last_applied_at = now()`
+   - if admin moved/dropped the item to a different flow_type → `times_overridden++`
+3. **Admin override detection** — happens server-side in step 2. No UI code change needed; the modal already submits the approved payload.
+
+If the approval transaction rolls back, counters stay untouched (atomicity).
 
 ### Where to call
 
-The increments live in the path that **actually writes the corrected value**, not the path that proposed it:
-
 | Event | Where | Action |
 |---|---|---|
-| Receipt approval applies a rule | `services/mcp-finance` `approve_receipt` flow (or the Edge Function/RPC that persists the corrected expense_ledger row) | `UPDATE correction_rules SET times_applied = times_applied + 1, last_applied_at = now() WHERE id = $1` |
-| Admin manually overrides an auto-set value | `apps/admin-panel` receipt review modal save handler (when user changes a field that was auto-suggested by a rule) | `UPDATE correction_rules SET times_overridden = times_overridden + 1 WHERE id = $1` |
+| Receipt approval persists corrected expense_ledger | `fn_approve_receipt_with_learning` (Postgres) | calls `fn_apply_inbox_overrides` in same txn — increments `times_applied` / `times_overridden` / `last_applied_at` based on diff against `applied_overrides` ledger |
+| Edge Function applies a category override | `services/supabase/functions/_shared/learning.ts:applyCategoryOverrides` | returns `AppliedOverride[]`, caller persists to `receipt_inbox.applied_overrides`. Never increments counters directly. |
 
-Both updates **must** be inside the same transaction as the value persist — never increment on UI hover, never increment without the underlying write succeeding.
+Both rules: **never increment on UI hover, never increment outside the approval transaction, never increment fire-and-forget from an Edge Function.**
 
 ### Threshold
 
-`v_learning_metrics.override_rate_pct > 30` is the "system is learning the wrong thing" signal. `/health` surfaces it; investigate by querying:
+`v_learning_metrics.override_rate_pct > 30` is the "system is learning the wrong thing" signal. `/health` surfaces it; drill into the offending table:
 
 ```sql
-SELECT id, rule_type, match_pattern, times_applied, times_overridden,
+SELECT id, match_pattern, flow_type, times_applied, times_overridden,
        100.0 * times_overridden / NULLIF(times_applied, 0) AS override_pct
-FROM correction_rules
+FROM category_overrides
 WHERE times_applied > 0
 ORDER BY times_overridden DESC
 LIMIT 20;
 ```
 
-The top rows are the rules to review or delete.
+(Swap `category_overrides` for whichever table is dominating overrides.) The top rows are the rules to review or delete.
 
-### Out of scope (when this rule was added)
+### Follow-ups
 
-Migration 165 (WS-4 of 75e735e5) ships only the schema + the view. Application-side increments are a follow-up because they require touching `approve_receipt` and the admin override flow, which is a feature-level change outside the metrics-infra task. Until those are wired, the view returns zeros and `/health` shows "нет применений" — that's correct, honest behavior.
+- Wire counter increments for `supplier_aliases` and `gs1_weight_items` (apply phases exist; mirror the `fn_apply_inbox_overrides` pattern with new ledger entries).
+- Build apply phase for `correction_rules` (currently only post-approval triggers WRITE to it; nothing READS it during ingestion). Until then its counters are reserved schema.
+- mcp-finance `approve-receipt.ts` does not pass `p_inbox_id` to the RPC — MCP-driven approvals bypass the inbox flow entirely, so they have no `applied_overrides` to count. Acceptable: no apply ran for that path either. If MCP starts applying rules in-process, mirror the ledger pattern.
 
-> Origin: 2026-05-04. WS-4 of 75e735e5 (MC `30808669`). Council Audit finding: "self-learning loops record patterns but have no feedback validation — can't tell if system is improving or reinforcing errors."
+> Origin: 2026-05-04. WS-4 of 75e735e5 (MC `30808669`) added counter schema for `correction_rules`; follow-up `15f2a50f` extended counters to all four learning tables, replaced fire-and-forget increment in `learning.ts` with the apply-record / approve-increment pattern, and added `fn_apply_inbox_overrides` for atomic counter updates inside the approval transaction.
 
 ---
 
