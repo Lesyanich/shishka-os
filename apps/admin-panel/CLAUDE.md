@@ -76,7 +76,7 @@ src/
 - **Vercel project:** `shishka-os` (old `admin-panel` project deleted 2026-04-11)
 - **URL:** shishka-os.vercel.app
 
-## Immutable Rules (из core-rules.md)
+## Immutable Rules (из operational-rules.md)
 - SSoT = Supabase. UI — зеркало.
 - UUID everywhere.
 - No Direct DB Edits — только SQL миграции.
