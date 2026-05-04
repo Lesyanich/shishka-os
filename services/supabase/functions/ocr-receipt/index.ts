@@ -210,9 +210,11 @@ ${fullOcrText}
     }
 
     // ── Apply learned category overrides (before classification) ──
-    const overrideCount = await applyCategoryOverrides(lineItems, supplierId)
-    if (overrideCount > 0) {
-      console.log(`[ocr-receipt] Applied ${overrideCount} category override(s)`)
+    // Returns ledger of which rules fired; counters increment atomically
+    // on approval inside fn_apply_inbox_overrides (RULE-LEARNING-COUNTERS).
+    const appliedOverrides = await applyCategoryOverrides(lineItems, supplierId)
+    if (appliedOverrides.length > 0) {
+      console.log(`[ocr-receipt] Recorded ${appliedOverrides.length} category override(s) — counters bump on approval`)
     }
 
     // ── Classify items ──
@@ -278,6 +280,7 @@ ${fullOcrText}
       .update({
         status: "parsed",
         parsed_payload: payload,
+        applied_overrides: appliedOverrides,
         parsed_at: new Date().toISOString(),
         parse_cost_usd: totalCost,
         parse_tokens_in: result.tokensIn,

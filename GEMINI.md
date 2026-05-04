@@ -18,16 +18,16 @@ the relevant file content when you need it:
 | Working on...          | Ask user to provide                              |
 |------------------------|--------------------------------------------------|
 | Any task               | `STATUS.md`                                      |
-| Core rules             | `docs/constitution/core-rules.md`                |
-| Engineering rules      | `docs/constitution/engineering-rules.md`         |
-| Agent rules            | `docs/constitution/agent-rules.md`               |
+| Core rules             | `docs/constitution/operational-rules.md`                |
+| Engineering rules      | `docs/constitution/technical-rules.md`         |
+| Agent rules            | `docs/constitution/operational-rules.md`               |
 | Finance / Receipts     | `docs/modules/finance.md`                        |
 | Inventory              | `docs/modules/inventory.md`                      |
 | Kitchen / KDS          | `docs/modules/kitchen.md`                        |
 | BOM / Nomenclature     | `docs/modules/bom.md`                            |
 | Procurement            | `docs/modules/procurement.md`                    |
 | Database schema        | `vault/Architecture/Database Schema.md`          |
-| Frontend rules         | `docs/constitution/frontend-rules.md`            |
+| Frontend rules         | `docs/constitution/technical-rules.md`            |
 | Keys & config          | `docs/keys-config.md`                            |
 | Phase history          | `docs/phases/phase-N-*.md`                       |
 | Agent (chef)           | `agents/chef/AGENT.md`                           |

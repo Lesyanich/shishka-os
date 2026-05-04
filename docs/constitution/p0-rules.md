@@ -1,16 +1,16 @@
 # [DEPRECATED] p0-rules.md
 
-> **This file is deprecated as of 2026-04-07.**
+> **Deprecated 2026-04-07, retargeted 2026-05-04 (WS-3 of 75e735e5).**
 >
-> Renamed to `core-rules.md` and reorganized with semantic rule IDs. The "P0 Rule #N" numbering scheme had drifted and conflicted with rule numbers in `boris-rules.md` and `agent-tracking.md`.
->
-> See `core-rules.md` for the foundational rules and `boris-rules.md` (also deprecated) for the full migration map.
+> All foundational rules now live in `operational-rules.md` § Part I.
+> Code/DB rules in `technical-rules.md` § Parts I-II.
+> Agent behavior rules in `operational-rules.md` § Part II.
 
 ## Quick redirect
 
-- All foundational rules → `core-rules.md`
-- Engineering / DB / git rules → `engineering-rules.md`
-- Agent behavior / tracking / MCP rules → `agent-rules.md`
-- New rule added 2026-04-07: `RULE-LANGUAGE-CONTRACT` in `core-rules.md` (CEO speaks Russian, partner speaks Arabic, but DB and code are English-only)
+- All foundational rules → `operational-rules.md` § Part I
+- Engineering / DB / git rules → `technical-rules.md`
+- Agent behavior / tracking / MCP rules → `operational-rules.md` § Part II
+- `RULE-LANGUAGE-CONTRACT` → `operational-rules.md` § Part I
 
-**Do not add new content to this file.** A planned sed pass (MC task) will rewrite all references to point at the new files.
+**Do not add new content to this file.**

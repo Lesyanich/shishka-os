@@ -5,9 +5,9 @@ Agent identity: `agents/tech-lead/AGENT.md`
 
 ## Context Loading (in this exact order)
 
-1. `docs/constitution/core-rules.md` — foundational immutable rules
-2. `docs/constitution/agent-rules.md` — **especially** RULE-HANDOFF-PACKET, RULE-SCOPED-CONTEXT, RULE-SPEC-PROMOTION, RULE-AUTONOMOUS-LANE
-3. `docs/constitution/engineering-rules.md` — Tech-Lead's primary compound-engineering target
+1. `docs/constitution/operational-rules.md` — foundational immutable rules
+2. `docs/constitution/operational-rules.md` — **especially** RULE-HANDOFF-PACKET, RULE-SCOPED-CONTEXT, RULE-SPEC-PROMOTION, RULE-AUTONOMOUS-LANE
+3. `docs/constitution/technical-rules.md` — Tech-Lead's primary compound-engineering target
 4. `agents/tech-lead/AGENT.md` — your role and workflow
 5. `docs/operations/skills-services-policy.md` — `kind:*` taxonomy and per-kind skills mapping
 

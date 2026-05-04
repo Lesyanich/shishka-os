@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { Network } from 'vis-network'
 import { DataSet } from 'vis-data'
 import {
@@ -18,6 +19,20 @@ import {
   Server,
   Wrench,
   BookOpen,
+  // Vault entity categories
+  ChefHat,
+  Sparkles,
+  Cog,
+  Truck,
+  Coins,
+  Building2,
+  Database,
+  Cpu,
+  // Vault sidebar categories
+  Gavel,
+  Flag,
+  Users,
+  HelpCircle,
 
   Save,
   StickyNote,
@@ -168,6 +183,127 @@ const CATEGORIES: CategoryDef[] = [
     accentBg: 'bg-slate-500/10',
     accentBorder: 'border-l-slate-500',
   },
+
+  /* ─── Vault — entity-first ontology (B-1, spec-brain-system §3.1) ─── */
+  {
+    name: 'Menu',
+    nameRu: 'Меню',
+    icon: UtensilsCrossed,
+    pattern: /^vault\/Menu(\/|$)/,
+    accent: 'text-amber-300',
+    accentBg: 'bg-amber-500/15',
+    accentBorder: 'border-l-amber-400',
+  },
+  {
+    name: 'Brand',
+    nameRu: 'Бренд',
+    icon: Sparkles,
+    pattern: /^vault\/Brand(\/|$)/,
+    accent: 'text-pink-300',
+    accentBg: 'bg-pink-500/15',
+    accentBorder: 'border-l-pink-400',
+  },
+  {
+    name: 'Recipes',
+    nameRu: 'Рецепты',
+    icon: ChefHat,
+    pattern: /^vault\/Recipes(\/|$)/,
+    accent: 'text-orange-300',
+    accentBg: 'bg-orange-500/15',
+    accentBorder: 'border-l-orange-400',
+  },
+  {
+    name: 'Equipment',
+    nameRu: 'Оборудование',
+    icon: Cog,
+    pattern: /^vault\/Equipment(\/|$)/,
+    accent: 'text-zinc-300',
+    accentBg: 'bg-zinc-500/15',
+    accentBorder: 'border-l-zinc-400',
+  },
+  {
+    name: 'Procurement',
+    nameRu: 'Закупки',
+    icon: Truck,
+    pattern: /^vault\/Procurement(\/|$)/,
+    accent: 'text-lime-300',
+    accentBg: 'bg-lime-500/15',
+    accentBorder: 'border-l-lime-400',
+  },
+  {
+    name: 'Finance (vault)',
+    nameRu: 'Финансы (vault)',
+    icon: Coins,
+    pattern: /^vault\/Finance(\/|$)/,
+    accent: 'text-emerald-300',
+    accentBg: 'bg-emerald-500/15',
+    accentBorder: 'border-l-emerald-400',
+  },
+  {
+    name: 'Operations (vault)',
+    nameRu: 'Операции (vault)',
+    icon: Building2,
+    pattern: /^vault\/Operations(\/|$)/,
+    accent: 'text-cyan-300',
+    accentBg: 'bg-cyan-500/15',
+    accentBorder: 'border-l-cyan-400',
+  },
+  {
+    name: 'Database',
+    nameRu: 'База данных',
+    icon: Database,
+    pattern: /^vault\/Database(\/|$)/,
+    accent: 'text-blue-300',
+    accentBg: 'bg-blue-500/15',
+    accentBorder: 'border-l-blue-400',
+  },
+  {
+    name: 'Tech',
+    nameRu: 'Технологии',
+    icon: Cpu,
+    pattern: /^vault\/Tech(\/|$)/,
+    accent: 'text-violet-300',
+    accentBg: 'bg-violet-500/15',
+    accentBorder: 'border-l-violet-400',
+  },
+
+  /* ─── Vault — sidebar audit-log folders ─── */
+  {
+    name: 'Decisions',
+    nameRu: 'Решения',
+    icon: Gavel,
+    pattern: /^vault\/Decisions(\/|$)/,
+    accent: 'text-rose-300',
+    accentBg: 'bg-rose-500/15',
+    accentBorder: 'border-l-rose-400',
+  },
+  {
+    name: 'Milestones',
+    nameRu: 'Вехи',
+    icon: Flag,
+    pattern: /^vault\/Milestones(\/|$)/,
+    accent: 'text-indigo-300',
+    accentBg: 'bg-indigo-500/15',
+    accentBorder: 'border-l-indigo-400',
+  },
+  {
+    name: 'People',
+    nameRu: 'Команда',
+    icon: Users,
+    pattern: /^vault\/People(\/|$)/,
+    accent: 'text-fuchsia-300',
+    accentBg: 'bg-fuchsia-500/15',
+    accentBorder: 'border-l-fuchsia-400',
+  },
+  {
+    name: 'Open Questions',
+    nameRu: 'Открытые вопросы',
+    icon: HelpCircle,
+    pattern: /^vault\/Open Questions(\/|$)/,
+    accent: 'text-yellow-300',
+    accentBg: 'bg-yellow-500/15',
+    accentBorder: 'border-l-yellow-400',
+  },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -243,6 +379,7 @@ function communityLabel(
 /* ------------------------------------------------------------------ */
 
 export function BrainKnowledgePage() {
+  const navigate = useNavigate()
   const [graph, setGraph] = useState<GraphData | null>(null)
   const [search, setSearch] = useState('')
   const [graphFullscreen, setGraphFullscreen] = useState(false)
@@ -466,6 +603,18 @@ export function BrainKnowledgePage() {
     networkRef.current.on('zoom', () => setHoverNode(null))
     networkRef.current.on('dragStart', () => setHoverNode(null))
 
+    // Click on a vault node → open it in the Pages tab.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    networkRef.current.on('click', (p: any) => {
+      const id = (p?.nodes?.[0] as string) || null
+      if (!id) return
+      const node = filteredNodes.find((n) => n.id === id)
+      if (!node) return
+      // Match `vault/<entity>/<page>.md` and route to /brain/wiki/<entity>/<page>.md
+      const m = /^vault\/(.+\.md)$/.exec(node.source_file ?? '')
+      if (m) navigate(`/brain/wiki/${m[1]}`)
+    })
+
     return () => {
       if (networkRef.current) {
         networkRef.current.destroy()
@@ -473,7 +622,7 @@ export function BrainKnowledgePage() {
       }
       setHoverNode(null)
     }
-  }, [graph, selectedComms, COMM_COLORS, connectionCount])
+  }, [graph, selectedComms, COMM_COLORS, connectionCount, navigate])
 
   // Toggle community selection
   const toggleComm = useCallback((id: number) => {

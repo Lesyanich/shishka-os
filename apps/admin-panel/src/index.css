@@ -178,3 +178,90 @@ body {
 .font-mono {
   font-family: var(--font-mono);
 }
+
+/* ----------------------------------------------------------------------
+ * Brain Wiki — markdown prose styles
+ * Used by BrainWikiPage.tsx for the Confluence-style reader.
+ * Tailwind v4 + manual prose (we don't ship @tailwindcss/typography to keep
+ * the bundle small).
+ * -------------------------------------------------------------------- */
+.wiki-prose {
+  color: rgb(203 213 225);             /* slate-300 */
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+.wiki-prose h1,
+.wiki-prose h2,
+.wiki-prose h3,
+.wiki-prose h4 {
+  color: rgb(241 245 249);             /* slate-100 */
+  font-weight: 600;
+  line-height: 1.3;
+}
+.wiki-prose h1 { font-size: 1.5rem;   margin: 1.5rem 0 0.75rem; }
+.wiki-prose h2 { font-size: 1.25rem;  margin: 1.25rem 0 0.5rem; border-top: 1px solid rgb(30 41 59); padding-top: 1rem; }
+.wiki-prose h3 { font-size: 1.05rem;  margin: 1rem 0 0.5rem; }
+.wiki-prose h4 { font-size: 0.95rem;  margin: 0.75rem 0 0.25rem; }
+.wiki-prose p  { margin: 0.5rem 0; }
+.wiki-prose ul,
+.wiki-prose ol { margin: 0.5rem 0; padding-left: 1.25rem; }
+.wiki-prose ul { list-style: disc; }
+.wiki-prose ol { list-style: decimal; }
+.wiki-prose li { margin: 0.25rem 0; }
+.wiki-prose code {
+  background: rgb(15 23 42);            /* slate-900 */
+  color: rgb(244 114 182);              /* pink-400 */
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.825em;
+  font-family: var(--font-mono);
+}
+.wiki-prose pre {
+  background: rgb(15 23 42);
+  border: 1px solid rgb(30 41 59);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.wiki-prose pre code {
+  background: transparent;
+  color: rgb(203 213 225);
+  padding: 0;
+}
+.wiki-prose blockquote {
+  border-left: 3px solid rgb(168 85 247);  /* purple-500 */
+  background: rgb(30 41 59 / 0.4);
+  padding: 0.5rem 0.75rem;
+  margin: 0.75rem 0;
+  border-radius: 0 0.25rem 0.25rem 0;
+  color: rgb(203 213 225);
+}
+.wiki-prose blockquote p { margin: 0.25rem 0; }
+.wiki-prose table {
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  width: 100%;
+  font-size: 0.825rem;
+}
+.wiki-prose th,
+.wiki-prose td {
+  border: 1px solid rgb(30 41 59);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.wiki-prose th {
+  background: rgb(15 23 42);
+  color: rgb(241 245 249);
+  font-weight: 600;
+}
+.wiki-prose hr {
+  border: none;
+  border-top: 1px solid rgb(30 41 59);
+  margin: 1.25rem 0;
+}
+.wiki-prose strong { color: rgb(248 250 252); font-weight: 600; }
+.wiki-prose em     { color: rgb(226 232 240); }
+.wiki-prose img    { max-width: 100%; border-radius: 0.5rem; margin: 0.5rem 0; }
+

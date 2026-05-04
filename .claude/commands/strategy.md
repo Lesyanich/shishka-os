@@ -5,8 +5,8 @@ Agent identity: `agents/strategy/AGENT.md`
 
 ## Context Loading (in this exact order)
 
-1. `docs/constitution/core-rules.md` — foundational immutable rules (incl. RULE-LANGUAGE-CONTRACT, RULE-IDEA-CAPTURE)
-2. `docs/constitution/agent-rules.md` — behavior protocol (RULE-IDEA-CAPTURE, RULE-BACKLOG-FIRST, RULE-COMPOUND-ENGINEERING, RULE-SOCRATIC-GATE)
+1. `docs/constitution/operational-rules.md` — foundational immutable rules (incl. RULE-LANGUAGE-CONTRACT, RULE-IDEA-CAPTURE)
+2. `docs/constitution/operational-rules.md` — behavior protocol (RULE-IDEA-CAPTURE, RULE-BACKLOG-FIRST, RULE-COMPOUND-ENGINEERING, RULE-SOCRATIC-GATE)
 3. `docs/business/DISPATCH_RULES.md` — task routing, including Strategic COO vs Tech-Lead keyword table
 4. `agents/strategy/AGENT.md` — your role and workflow
 5. `docs/PROJECT_REGISTRY.md` — project map (if exists)

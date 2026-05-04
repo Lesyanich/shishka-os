@@ -65,6 +65,30 @@ source: "Notion SHISHKA CORE HUB, Section 3.2"
 | L1-KITCH-BLND-CHINA-13 | Blender | High-power blender | Table in cold zone |
 | L1-JUIC-EXTR-CHINA-15 | Juicer | Juice extractor | Cold zone |
 
+## Zone 5: L2 Service — Salad Bars
+
+Two identical refrigerated salad bars (Shandong Lingfan, SUP-003). 150x80x135 cm, 304 SS, Glass Top, LED.
+
+| Unit ID | Name | Slots | Volume | Location |
+|---------|------|-------|--------|----------|
+| L2-SB-150-9 | Salad Bar (Unit 1) | 28 GN pans | 62.4 L | L2-Service |
+| L2-SB-150-10 | Salad Bar (Unit 2) | 28 GN pans | 62.4 L | L2-Service |
+
+**Slot layout per unit (28 slots):**
+- **S1-S2:** GN 1/3 shallow (100mm, 4L) — Base Ingredient
+- **S3-S6:** GN 1/3 deep (150mm, 6L) — Large Base
+- **S7-S18:** GN 1/6 shallow (100mm, 1.5L) — Topping (12 slots)
+- **S19-S22:** GN 1/6 deep (150mm, 2.2L) — Deep Topping
+- **S23-S28:** GN 1/9 shallow (100mm, 0.6L) — Garnish/Seeds
+- **Surface:** 150x25 cm — plating/assembly
+- **Bottom shelf:** 100 kg refrigerated storage
+
+**Combined capacity:** 56 GN pans, 124.8L ingredients, 200kg refrigerated storage, 300cm assembly.
+
+**Full slot-by-slot layout:** `docs/business/equipment/salad-bar-layout.md`
+**Visual scheme (in project):** `01_Business/Salad_Bar/salad bar scheme.jpeg`
+**Visual scheme (GDrive):** folder `Salad_Bar` → file ID `1d11jLKS2KGd9Q7AHT4_w7i20X_sPD8ix`
+
 ## Future CapEx (Dairy/Fermentation)
 
 | Unit ID | Name | Type | Purpose |

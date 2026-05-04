@@ -45,6 +45,7 @@ pnpm-debug.log*
 !.claude/commands/coo.md
 !.claude/commands/strategy.md
 !.claude/commands/techlead.md
+!.claude/commands/health.md
 # Per-machine overrides and ephemeral session state stay ignored
 .claude/settings.local.json
 .claude/.session-id

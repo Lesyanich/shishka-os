@@ -39,7 +39,7 @@
 
 ## COO Autonomous Lane
 
-The COO may route low-risk, reversible tasks directly to Code without CEO mediation by tagging them `coo-autonomous`. See `RULE-AUTONOMOUS-LANE` in `docs/constitution/agent-rules.md` for the full protocol.
+The COO may route low-risk, reversible tasks directly to Code without CEO mediation by tagging them `coo-autonomous`. See `RULE-AUTONOMOUS-LANE` in `docs/constitution/operational-rules.md` for the full protocol.
 
 | Signal | Routing |
 |---|---|
