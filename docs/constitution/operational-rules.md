@@ -396,6 +396,40 @@ Pure conversation ("how are you", "what do you think of X") is exempt — but wh
 
 > Origin: 2026-04-07.
 
+## RULE-EPIC-ON-CREATE
+
+Every MC task ends up in one of two valid states: `initiative_id` set (linked to a `business_initiatives` row), or `kind:standalone` tag with reason in `description`. No third state.
+
+### How auto-route works
+
+Agents creating tasks let `emit_business_task` route by tag overlap with active initiatives' `match_tags`:
+
+| Outcome | Result |
+|---|---|
+| 1 match | `initiative_id` set automatically |
+| 0 matches | `needs-triage` tag added; COO resolves weekly |
+| 2+ matches | `needs-triage` + `ambiguous-epic` tags; COO disambiguates |
+
+Caller-provided `initiative_id` always wins. Explicit `epic:<slug>` tag forces a slug lookup. `kind:standalone` skips routing entirely — use only for genuine one-offs (single bug fix, isolated cleanup, no follow-up).
+
+### Catalog
+
+Active epics live in `business_initiatives` (slug + match_tags columns). To add an epic:
+1. CEO authorizes (typical trigger: ≥3 standalones share a tag in 30 days).
+2. Insert row with slug, title, status='active', domains, match_tags.
+3. Affected open tasks pick up `initiative_id` via the same overlap logic.
+
+### COO weekly triage
+
+Each week COO scans `needs-triage`:
+- Obvious match → set `initiative_id`
+- Genuine one-off → swap to `kind:standalone`
+- Cluster forming (≥3 sharing a tag) → propose new epic to CEO
+
+> Origin: 2026-04-28. CEO-ratified epic routing design.
+
+---
+
 ## RULE-AUTONOMOUS-LANE
 
 The COO may route **low-risk, reversible** tasks directly to Code without CEO mediation by tagging them `coo-autonomous`. Code picks these up in session-start, runs the full lifecycle, and reports on the next morning loop. Full design: `docs/plans/spec-coo-autonomous-lane.md`.
