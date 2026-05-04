@@ -39,6 +39,7 @@ import { updateExpense } from "./tools/update-expense.js";
 import { readGuideline } from "./tools/read-guideline.js";
 import { manageCapexAssets } from "./tools/manage-capex-assets.js";
 import { updateEquipment } from "./tools/update-equipment.js";
+import { archiveReceiptGdrive } from "./tools/archive-receipt-gdrive.js";
 
 // ─── Server Setup ────────────────────────────────────────────────
 
@@ -397,13 +398,24 @@ server.tool(
   async (args) => jsonResult(await updateEquipment(args))
 );
 
+// ─── GDrive Archive Tool ───────────────────────────────────────
+
+server.tool(
+  "archive_receipt_gdrive",
+  "Download receipt photos from Supabase Storage, rename with convention {Supplier}_{Date}_{Invoice}_p{N}.{ext}, save to GDrive processed folder, update gdrive_paths in inbox. Call after receipt is approved (status=processed).",
+  {
+    inbox_id: z.string().describe("UUID of the receipt_inbox record to archive"),
+  },
+  async (args) => jsonResult(await archiveReceiptGdrive(args))
+);
+
 // ─── Start ───────────────────────────────────────────────────────
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Finance Agent MCP server running on stdio`);
-  console.error(`   Tools: 18 | Resources: 0 | Prompts: 0`);
+  console.error(`   Tools: 19 | Resources: 0 | Prompts: 0`);
 }
 
 main().catch((err) => {
