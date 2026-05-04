@@ -420,7 +420,9 @@ export function OwnerTable({
                   isFocused
                     ? 'ring-2 ring-inset ring-[var(--color-brick-soft)]/70 bg-[var(--color-royal-red)]/5'
                     : ''
-                } ${rowFailed ? 'animate-[inline-flash_1200ms_ease-out]' : ''}`}
+                } ${rowFailed ? 'animate-[inline-flash_1200ms_ease-out]' : ''} ${
+                  !dish.is_available ? 'opacity-45' : ''
+                }`}
               >
                 {/* Expand toggle (tech card) */}
                 <td className="px-2 py-2">
