@@ -788,6 +788,86 @@ No "session summary" task. No batch end-of-session writes. Live tracking only.
 
 ---
 
+# PART VII — Memory Layer Protocol
+
+> Added 2026-05-04 (WS-2 of 75e735e5). Governs `~/.claude/projects/<encoded>/memory/*.md`
+> auto-memory files. Council Audit finding: append-only memory accumulates noise and
+> contradictions over time without a freshness signal.
+
+## Frontmatter contract
+
+Every memory file (except `MEMORY.md` index) MUST have this frontmatter:
+
+```markdown
+---
+name: <human title>
+description: <one-line — used for relevance ranking>
+type: <user|feedback|project|reference>
+last_verified: YYYY-MM-DD
+---
+```
+
+`last_verified` is the date the memory was last *checked against reality*, not just touched.
+
+## When to set / update `last_verified`
+
+- **On creation** — set to today's date.
+- **On any content edit** — update to today.
+- **On verification without edit** — when the agent reads a memory, confirms it's still
+  accurate against current code/DB/MC state, and acts on it → update to today. This is
+  the staleness-decay countermeasure: actively used memory stays fresh.
+- **Do NOT update** when the agent merely loads the memory but does not actually verify
+  or act on it (avoid trivializing the field into a read-counter).
+
+## Staleness rule
+
+- Files with `last_verified > 60 days ago` → flagged for review by `bash scripts/memory-audit.sh`
+- Stale ≥ 30% of total → `/health` returns "нужна ревизия" verdict
+- Files without `last_verified` at all → MUST be backfilled with `bash scripts/memory-backfill.sh`
+  (one-shot uses mtime as honest "last touched" proxy)
+
+## Pruning policy
+
+- `bash scripts/prune-memories.sh` defaults to **dry-run** — never auto-deletes
+- `bash scripts/prune-memories.sh --apply --ttl 60` actually removes files where
+  `last_verified` is older than TTL (or mtime fallback if field missing)
+- Uses `last_verified` as freshness signal, falling back to mtime
+- Removes the matching entry from `MEMORY.md` index too
+
+## Contradiction handling
+
+When the agent discovers two memories that contradict (e.g., one says "X is deprecated",
+another references X as live):
+
+1. Verify which one matches current reality (read code / DB / commits)
+2. Update the correct one's `last_verified` to today
+3. Either delete the obsolete one OR rewrite it to reflect current state, then update
+   `last_verified` to today
+4. Update `MEMORY.md` index if the file was removed/renamed
+
+`scripts/memory-audit.sh` surfaces contradiction candidates by name-prefix overlap
+(2-token grouping) — review queue, not auto-resolution.
+
+## Target: < 30 active entries
+
+Council finding: a memory with 40+ entries reads as noise. Aim for ≤ 30 active entries.
+Drop the bottom-of-relevance entries via the contradiction/pruning path. New entries
+should pay rent — if they're not surfacing in agent decisions, they're noise.
+
+## Tooling summary
+
+| Script | Purpose | Default |
+|---|---|---|
+| `scripts/memory-audit.sh` | Read-only audit; counts, top stale, contradictions | text output |
+| `scripts/memory-audit.sh --json` | Same, machine-readable | for `/health` |
+| `scripts/memory-backfill.sh` | Add `last_verified=mtime-date` to files missing it | apply (idempotent) |
+| `scripts/memory-backfill.sh --dry-run` | Show what would change | preview |
+| `scripts/prune-memories.sh` | Audit stale (60d default) | DRY-RUN |
+| `scripts/prune-memories.sh --apply` | Actually delete stale + clean index | destructive |
+| `scripts/health.sh` | Memory section uses `last_verified` automatically | — |
+
+---
+
 # Cross-References
 
 - Code, DB, git, frontend → `technical-rules.md`
