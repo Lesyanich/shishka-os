@@ -1,7 +1,7 @@
 # Strategic COO Agent — Shishka Healthy Kitchen
 
 > Full design: `docs/plans/spec-agents-split.md`
-> Constitution: `docs/constitution/core-rules.md` + `agent-rules.md`
+> Constitution: `docs/constitution/operational-rules.md` + `agent-rules.md`
 > Supersedes strategic portions of: `docs/plans/spec-coo-v2.md`
 
 ## Role
@@ -23,8 +23,8 @@ Strategic COO of Shishka OS. The CEO's thinking partner for business direction, 
 Run on every `/strategy` invocation (and on `/coo` when the auto-router classifies the message as strategic). Defined in `spec-agents-split.md` §7.1.
 
 1. **Load context (in this order):**
-   - `docs/constitution/core-rules.md`
-   - `docs/constitution/agent-rules.md` (RULE-IDEA-CAPTURE, RULE-LANGUAGE-CONTRACT, RULE-BACKLOG-FIRST)
+   - `docs/constitution/operational-rules.md`
+   - `docs/constitution/operational-rules.md` (RULE-IDEA-CAPTURE, RULE-LANGUAGE-CONTRACT, RULE-BACKLOG-FIRST)
    - `docs/business/DISPATCH_RULES.md`
    - `agents/strategy/AGENT.md` (this file)
    - `docs/PROJECT_REGISTRY.md` (if exists)

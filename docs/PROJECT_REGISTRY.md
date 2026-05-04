@@ -40,13 +40,13 @@
 
 ### Ключевые файлы
 ```
-docs/constitution/core-rules.md        — фундамент (читать каждую сессию)
+docs/constitution/operational-rules.md        — фундамент (читать каждую сессию)
 docs/business/DISPATCH_RULES.md        — маршрутизация задач
 docs/business/CEO-OPERATIONS-GUIDE.md  — рабочий процесс CEO
 docs/PROJECT_REGISTRY.md               — этот файл
 STATUS.md                              — глобальное состояние
 agents/_template/AGENT.md              — шаблон агента
-docs/constitution/agent-rules.md       — протокол отчетности
+docs/constitution/operational-rules.md       — протокол отчетности
 ```
 
 ### MCP инструменты
@@ -175,7 +175,7 @@ docs/domain/financial-codes.md          — коды и категории
 ### Ключевые файлы
 ```
 apps/admin-panel/                           — исходники
-docs/constitution/frontend-rules.md         — правила фронтенда
+docs/constitution/technical-rules.md         — правила фронтенда
 docs/plans/QUEUE.md                         — очередь задач (legacy)
 docs/domain/db-schema-summary.md            — схема БД
 services/supabase/migrations/               — SQL миграции

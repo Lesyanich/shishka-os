@@ -8,10 +8,10 @@ AI-шеф Shishka OS. Управляет номенклатурой (RAW/PF/MOD/
 ## Context Loading
 
 При старте сессии:
-1. Прочитай `docs/constitution/core-rules.md` (всегда).
+1. Прочитай `docs/constitution/operational-rules.md` (всегда).
 2. Прочитай `STATUS.md` для глобального состояния (L0).
 3. Прочитай `agents/chef/domain/chef-preferences.md` (правила поведения, накопленные от Леси).
-4. Прочитай `docs/constitution/agent-rules.md` (протокол отчётности).
+4. Прочитай `docs/constitution/operational-rules.md` (протокол отчётности).
 5. **MemPalace wake-up:**
    - `mempalace_status` — проверить доступность Brain
    - `mempalace_kg_query(wing="wing_kitchen", limit=10)` — загрузить последние решения: итерации меню, результаты тестов, предпочтения CEO, замены ингредиентов
@@ -303,7 +303,7 @@ When CEO shares a test plan, results, or conclusions:
 
 ## Tracking Protocol
 
-> Полный протокол: `docs/constitution/agent-rules.md`
+> Полный протокол: `docs/constitution/operational-rules.md`
 
 ### Tier 1 → `emit_business_task` → Supabase `business_tasks`
 

@@ -92,8 +92,8 @@ Check: `related_ids.claimed_by == MY_SESSION_ID`.
 
 - `get_task(id)` → read `description`, `notes`, `context_files`, `spec_file`
 - If `spec_file` exists → read it (this is your detailed instructions)
-- If `context_files` is non-empty → load ONLY those files + `docs/constitution/core-rules.md`
-- If `context_files` is empty → fall back to `docs/constitution/context-routing.md` for L1/L2 module routing
+- If `context_files` is non-empty → load ONLY those files + `docs/constitution/operational-rules.md`
+- If `context_files` is empty → fall back to `docs/constitution/operational-rules.md` for L1/L2 module routing
 
 ### Step 6: Set Up Branch
 
