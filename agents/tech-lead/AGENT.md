@@ -1,7 +1,7 @@
 # Technical Tech-Lead Agent — Shishka Healthy Kitchen
 
 > Full design: `docs/plans/spec-agents-split.md`
-> Constitution: `docs/constitution/core-rules.md` + `agent-rules.md` + `engineering-rules.md`
+> Constitution: `docs/constitution/operational-rules.md` + `agent-rules.md` + `engineering-rules.md`
 > Skills routing: `docs/operations/skills-services-policy.md`
 
 ## Role
@@ -23,9 +23,9 @@ Technical Tech-Lead of Shishka OS. Owns the tech task graph, sequencing, `/code`
 Run on every `/techlead` invocation (and on `/coo` when the auto-router classifies the message as tech). Defined in `spec-agents-split.md` §7.2.
 
 1. **Load context (in this order):**
-   - `docs/constitution/core-rules.md`
-   - `docs/constitution/agent-rules.md` (RULE-HANDOFF-PACKET, RULE-SCOPED-CONTEXT, RULE-SPEC-PROMOTION, RULE-AUTONOMOUS-LANE)
-   - `docs/constitution/engineering-rules.md`
+   - `docs/constitution/operational-rules.md`
+   - `docs/constitution/operational-rules.md` (RULE-HANDOFF-PACKET, RULE-SCOPED-CONTEXT, RULE-SPEC-PROMOTION, RULE-AUTONOMOUS-LANE)
+   - `docs/constitution/technical-rules.md`
    - `agents/tech-lead/AGENT.md` (this file)
    - `docs/operations/skills-services-policy.md` (kind:* taxonomy + per-kind skill mapping)
 
@@ -91,7 +91,7 @@ On session start, read `list_tasks(status="inbox", tags="needs-tech-lead")`. For
 1. Read the strategic-context comment
 2. Decompose into `/code`-sized scope with `kind:*` classification
 3. Either:
-   - Write a full RULE-HANDOFF-PACKET packet (see `docs/constitution/agent-rules.md` § RULE-HANDOFF-PACKET) as an MC comment
+   - Write a full RULE-HANDOFF-PACKET packet (see `docs/constitution/operational-rules.md` § RULE-HANDOFF-PACKET) as an MC comment
    - OR escalate back to Strategic COO with `strategic-clarification-needed` tag + comment if intent is under-specified
 
 ### RULE-HANDOFF-PACKET authoring (routing to /code)
@@ -170,7 +170,7 @@ Shishka Brain v2 layering — route by question shape.
 |---|---|---|
 | "How did we handle X last handoff?" | L1 Conversations | MemPalace (`wing_tech`) |
 | "What MC RPC bug bit us here before?" | L1 Conversations | MemPalace (`wing_tech`) |
-| "What's RULE-HANDOFF-PACKET?" | L2+L3 Graphify | `graphify query "RULE-HANDOFF-PACKET"` or read `docs/constitution/agent-rules.md` |
+| "What's RULE-HANDOFF-PACKET?" | L2+L3 Graphify | `graphify query "RULE-HANDOFF-PACKET"` or read `docs/constitution/operational-rules.md` |
 | "Where is function X? What calls Y?" | L2+L3 Graphify | `graphify query "function X"` — code + docs in one graph (1,938 nodes) |
 | "What tasks are open?" | Action ledger | MC `shishka-mission-control` |
 
@@ -192,8 +192,8 @@ Write one MemPalace drawer in `wing_tech` capturing:
 
 ## Domain Files
 
-- `docs/constitution/engineering-rules.md` — Tech-Lead's primary compound-engineering target
-- `docs/constitution/agent-rules.md` § RULE-HANDOFF-PACKET, § RULE-SPEC-PROMOTION, § RULE-AUTONOMOUS-LANE — enforcement rulebook
+- `docs/constitution/technical-rules.md` — Tech-Lead's primary compound-engineering target
+- `docs/constitution/operational-rules.md` § RULE-HANDOFF-PACKET, § RULE-SPEC-PROMOTION, § RULE-AUTONOMOUS-LANE — enforcement rulebook
 - `docs/operations/skills-services-policy.md` — `kind:*` taxonomy and per-kind skills mapping
 - `docs/plans/spec-agents-split.md` — this agent's design
 - `docs/plans/spec-coo-v2.md` — legacy architecture (role definition superseded; patterns retained)

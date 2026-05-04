@@ -6,19 +6,18 @@ Shishka Healthy Kitchen ERP. Multiple projects, one Supabase backend.
 ## Language Contract
 - Conversation: human's language (CEO → Russian, partner → their language)
 - Storage (DB, MC, code, commits, specs): English only, no exceptions
-- Full rule: `docs/constitution/core-rules.md` § RULE-LANGUAGE-CONTRACT
+- Full rule: `docs/constitution/operational-rules.md` § RULE-LANGUAGE-CONTRACT
 
-## Session Start (MANDATORY)
-1. Read `docs/constitution/core-rules.md`
+## Session Start (MANDATORY — 3-4 tool calls)
+1. Read `docs/constitution/operational-rules.md` (foundational rules + agent behavior + routing + bible + sessions in one file)
 2. Pick up task: `list_tasks(status="in_progress")` → if empty → `list_tasks(status="inbox")`
 3. Load task context: `get_task(id)` → read `spec_file` + `context_files`
-4. If task has `context_files` → load ONLY those + `core-rules.md`. Skip everything else.
-5. If no `context_files` → read `docs/constitution/context-routing.md` for L1/L2/LK
-6. For code/DB tasks, also load `docs/constitution/engineering-rules.md`
-7. For agent behavior questions, load `docs/constitution/agent-rules.md`
+4. If task has `context_files` → load ONLY those + `operational-rules.md`. Skip everything else.
+5. If no `context_files` → use § Context Routing in `operational-rules.md` for L1/L2/LK
+6. For code/DB/frontend tasks, also load `docs/constitution/technical-rules.md`
 
 ## Agent Routing
-If user sends `/chef`, `/finance`, `/strategy`, `/techlead` → read `docs/constitution/agent-routing.md`
+If user sends `/chef`, `/finance`, `/strategy`, `/techlead`, `/procurement` → see `operational-rules.md` § Part IV
 If user sends free text → infer domain from content, load the matching `agents/{name}/AGENT.md`.
 When unsure → ask: "This sounds like [domain]. Should I load [agent]?"
 

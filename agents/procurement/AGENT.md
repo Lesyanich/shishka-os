@@ -13,8 +13,8 @@
 ## Context Loading
 
 При старте сессии:
-1. Прочитай `docs/constitution/core-rules.md` (всегда).
-2. Прочитай `docs/constitution/agent-rules.md` (протокол отчётности).
+1. Прочитай `docs/constitution/operational-rules.md` (всегда).
+2. Прочитай `docs/constitution/operational-rules.md` (протокол отчётности).
 3. Прочитай `agents/procurement/AGENT.md` (этот файл).
 4. **MemPalace wake-up:**
    - `mempalace_status` — проверить доступность Brain
@@ -200,7 +200,7 @@ Use `mempalace_diary_write` for session diary, `mempalace_kg_add` for standalone
 
 ## Tracking Protocol
 
-> Full protocol: `docs/constitution/agent-rules.md`
+> Full protocol: `docs/constitution/operational-rules.md`
 
 ### Tier 1 → `emit_business_task` (mcp-mission-control) → Supabase `business_tasks`
 

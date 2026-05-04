@@ -2,7 +2,7 @@
 
 > Quick reference for running the `coo-autonomous` lane.
 > Full design: `docs/plans/spec-coo-autonomous-lane.md`
-> Protocol rule: `RULE-AUTONOMOUS-LANE` in `docs/constitution/agent-rules.md`
+> Protocol rule: `RULE-AUTONOMOUS-LANE` in `docs/constitution/operational-rules.md`
 
 ## What it is
 
