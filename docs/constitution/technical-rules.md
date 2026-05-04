@@ -172,6 +172,51 @@ const { data } = await sb.from("table").select("id").gte("id", lo).lte("id", hi)
 
 > Origin: 2026-04-12. `get_task` prefix lookup failed every session for weeks — every agent worked around it by manually finding full UUIDs. RULE-SELF-HEAL-TOOLING triggered fix. (MC task `44a6dc52`.)
 
+## RULE-LEARNING-COUNTERS
+
+When code applies or reverses an auto-learned correction (OCR rules, supplier aliases, category overrides), it **must** also update the matching counter columns so the system can detect bad-rule learning loops.
+
+### Schema (migration 165)
+
+`correction_rules` carries:
+- `times_applied INTEGER DEFAULT 0` — increment when the rule's match fires during ingestion
+- `times_overridden INTEGER DEFAULT 0` — increment when an admin manually overrides a value the rule auto-set
+- `last_applied_at TIMESTAMPTZ` — set to `now()` on each apply
+
+`v_learning_metrics` aggregates these into a single row (override_rate_pct, last_activity, etc.) and powers the `/health` Самообучение section.
+
+### Where to call
+
+The increments live in the path that **actually writes the corrected value**, not the path that proposed it:
+
+| Event | Where | Action |
+|---|---|---|
+| Receipt approval applies a rule | `services/mcp-finance` `approve_receipt` flow (or the Edge Function/RPC that persists the corrected expense_ledger row) | `UPDATE correction_rules SET times_applied = times_applied + 1, last_applied_at = now() WHERE id = $1` |
+| Admin manually overrides an auto-set value | `apps/admin-panel` receipt review modal save handler (when user changes a field that was auto-suggested by a rule) | `UPDATE correction_rules SET times_overridden = times_overridden + 1 WHERE id = $1` |
+
+Both updates **must** be inside the same transaction as the value persist — never increment on UI hover, never increment without the underlying write succeeding.
+
+### Threshold
+
+`v_learning_metrics.override_rate_pct > 30` is the "system is learning the wrong thing" signal. `/health` surfaces it; investigate by querying:
+
+```sql
+SELECT id, rule_type, match_pattern, times_applied, times_overridden,
+       100.0 * times_overridden / NULLIF(times_applied, 0) AS override_pct
+FROM correction_rules
+WHERE times_applied > 0
+ORDER BY times_overridden DESC
+LIMIT 20;
+```
+
+The top rows are the rules to review or delete.
+
+### Out of scope (when this rule was added)
+
+Migration 165 (WS-4 of 75e735e5) ships only the schema + the view. Application-side increments are a follow-up because they require touching `approve_receipt` and the admin override flow, which is a feature-level change outside the metrics-infra task. Until those are wired, the view returns zeros and `/health` shows "нет применений" — that's correct, honest behavior.
+
+> Origin: 2026-05-04. WS-4 of 75e735e5 (MC `30808669`). Council Audit finding: "self-learning loops record patterns but have no feedback validation — can't tell if system is improving or reinforcing errors."
+
 ---
 
 # PART III — Frontend Architecture

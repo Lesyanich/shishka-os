@@ -217,6 +217,12 @@ fi
 LEARN_RULES="—"
 LEARN_ALIASES="—"
 LEARN_CATEGORIES="—"
+LEARN_USED="—"
+LEARN_APPLIED="—"
+LEARN_OVERRIDDEN="—"
+LEARN_OVERRIDE_RATE="—"
+LEARN_LAST_ACTIVITY=""
+LEARN_METRICS_AVAILABLE=false
 
 if [ -n "$SERVICE_KEY" ]; then
   # HEAD with Prefer:count=exact returns Content-Range header with total
@@ -238,6 +244,28 @@ if [ -n "$SERVICE_KEY" ]; then
   LEARN_RULES=$(count_table "correction_rules")
   LEARN_ALIASES=$(count_table "supplier_aliases")
   LEARN_CATEGORIES=$(count_table "category_overrides")
+
+  # WS-4: query v_learning_metrics aggregate view (mig 165). Falls back
+  # to plain counts above if the view is not yet applied to prod.
+  if command -v jq >/dev/null 2>&1; then
+    LM_RAW=$(sb_get "v_learning_metrics?select=*&limit=1")
+    if [ -n "$LM_RAW" ] && [ "$LM_RAW" != "[]" ]; then
+      first=$(printf '%s' "$LM_RAW" | jq -r '.[0] // empty')
+      if [ -n "$first" ]; then
+        LEARN_METRICS_AVAILABLE=true
+        LEARN_USED=$(printf '%s' "$first" | jq -r '.used_rules // 0')
+        LEARN_APPLIED=$(printf '%s' "$first" | jq -r '.sum_applied // 0')
+        LEARN_OVERRIDDEN=$(printf '%s' "$first" | jq -r '.sum_overridden // 0')
+        rate=$(printf '%s' "$first" | jq -r '.override_rate_pct // empty')
+        if [ -n "$rate" ] && [ "$rate" != "null" ]; then
+          LEARN_OVERRIDE_RATE="${rate}%"
+        else
+          LEARN_OVERRIDE_RATE="— (нет применений)"
+        fi
+        LEARN_LAST_ACTIVITY=$(printf '%s' "$first" | jq -r '.last_activity // empty')
+      fi
+    fi
+  fi
 fi
 
 # ----------------------------------------------------------------
@@ -316,6 +344,12 @@ if [ "$JSON_OUTPUT" = "true" ] && command -v jq >/dev/null 2>&1; then
     --arg learn_rules "$LEARN_RULES" \
     --arg learn_aliases "$LEARN_ALIASES" \
     --arg learn_categories "$LEARN_CATEGORIES" \
+    --arg learn_used "$LEARN_USED" \
+    --arg learn_applied "$LEARN_APPLIED" \
+    --arg learn_overridden "$LEARN_OVERRIDDEN" \
+    --arg learn_override_rate "$LEARN_OVERRIDE_RATE" \
+    --arg learn_last_activity "$LEARN_LAST_ACTIVITY" \
+    --arg learn_metrics_available "$LEARN_METRICS_AVAILABLE" \
     --arg parallel_count "$PARALLEL_COUNT" \
     --arg parallel_lines "$PARALLEL_LINES" \
     '{
@@ -342,7 +376,13 @@ if [ "$JSON_OUTPUT" = "true" ] && command -v jq >/dev/null 2>&1; then
       learning: {
         ocr_rules: $learn_rules,
         supplier_aliases: $learn_aliases,
-        category_overrides: $learn_categories
+        category_overrides: $learn_categories,
+        used_rules: $learn_used,
+        sum_applied: $learn_applied,
+        sum_overridden: $learn_overridden,
+        override_rate: $learn_override_rate,
+        last_activity: $learn_last_activity,
+        metrics_view_available: ($learn_metrics_available == "true")
       },
       parallel: {
         count: ($parallel_count|tonumber),
@@ -375,10 +415,11 @@ cat <<EOF
   $DH_VERDICT
 
 🤖 Самообучение
-  Правил OCR:           $LEARN_RULES
+  Правил OCR:           $LEARN_RULES (использовано: $LEARN_USED)
+  Срабатываний:         $LEARN_APPLIED авто  ·  $LEARN_OVERRIDDEN ручных правок
+  Override rate:        $LEARN_OVERRIDE_RATE
   Алиасов поставщиков:  $LEARN_ALIASES
-  Категорийных правок:  $LEARN_CATEGORIES
-  (метрики авто/ручных корректировок появятся после WS-4)
+  Категорийных правок:  $LEARN_CATEGORIES$([ -n "$LEARN_LAST_ACTIVITY" ] && [ "$LEARN_LAST_ACTIVITY" != "null" ] && printf "\n  Последняя активность: %s" "$LEARN_LAST_ACTIVITY")$([ "$LEARN_METRICS_AVAILABLE" = "false" ] && printf "\n  (v_learning_metrics не применена — bash после migration 165)")
 
 🚦 Параллельные сессии ($PARALLEL_COUNT)
 EOF
