@@ -8,15 +8,27 @@ set -uo pipefail
 # mempalace README mandates disabling it in every shell that touches the palace.
 export ANONYMIZED_TELEMETRY=False
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-VENV_PY="$SCRIPT_DIR/../services/mempalace/.venv/bin/python"
+# Resolve main worktree (where built artifacts live), not the calling worktree.
+# git-common-dir returns the shared .git for any worktree; its parent is main.
+GIT_COMMON_DIR="$(git -C "$(dirname "$0")" rev-parse --git-common-dir 2>/dev/null || true)"
+if [ -z "$GIT_COMMON_DIR" ]; then
+  REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+else
+  case "$GIT_COMMON_DIR" in
+    /*) ;;
+    *) GIT_COMMON_DIR="$(cd "$(dirname "$0")" && cd "$GIT_COMMON_DIR" && pwd)" ;;
+  esac
+  REPO_ROOT="$(dirname "$GIT_COMMON_DIR")"
+fi
+
+VENV_PY="$REPO_ROOT/services/mempalace/.venv/bin/python"
 
 # Retry once after 2s — Google Drive sync may delay file visibility on cold start.
 if [[ ! -x "$VENV_PY" ]]; then
   sleep 2
   if [[ ! -x "$VENV_PY" ]]; then
-    echo "ERROR: mempalace venv not found at $VENV_PY" >&2
-    echo "Run: cd services/mempalace && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt" >&2
+    echo "[launcher:mempalace] ERROR: mempalace venv not found at $VENV_PY" >&2
+    echo "Build in main checkout: cd services/mempalace && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt" >&2
     exit 1
   fi
 fi
