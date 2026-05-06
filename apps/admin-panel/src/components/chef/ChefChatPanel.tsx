@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import {
+  DefaultChatTransport,
+  isTextUIPart,
+  isToolUIPart,
+  getToolName,
+  type UIMessage,
+  type UIMessagePart,
+  type UIDataTypes,
+  type UITools,
+} from 'ai'
 import { ChefHat, Loader2, Send, X, RotateCcw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { ChefModelSelector } from './ChefModelSelector'
@@ -251,17 +260,13 @@ export function ChefChatPanel({ open, onClose, context }: ChefChatPanelProps) {
 
 // ─── Message bubble ──────────────────────────────────────────
 
-interface UIMessageLike {
-  id: string
-  role: 'user' | 'assistant' | 'system'
-  parts?: Array<{ type: string; text?: string; toolName?: string; result?: unknown; state?: string }>
-  content?: string
-}
+type ChatMessage = UIMessage
+type ChatMessagePart = UIMessagePart<UIDataTypes, UITools>
 
-function MessageBubble({ message }: { message: UIMessageLike }) {
+function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user'
-  const parts = message.parts ?? []
-  const hasToolParts = parts.some((p) => p.type === 'tool-invocation')
+  const parts: ChatMessagePart[] = message.parts ?? []
+  const hasToolParts = parts.some(isToolUIPart)
 
   // For user messages or simple text-only assistant messages, render text bubble
   if (isUser || !hasToolParts) {
@@ -285,7 +290,7 @@ function MessageBubble({ message }: { message: UIMessageLike }) {
   return (
     <div className="space-y-2">
       {parts.map((part, i) => {
-        if (part.type === 'text' && part.text) {
+        if (isTextUIPart(part) && part.text) {
           return (
             <div key={i} className="flex justify-start">
               <div className="max-w-[85%] rounded-lg border border-slate-700/50 bg-slate-800/60 px-3 py-2 text-xs text-slate-100">
@@ -295,23 +300,32 @@ function MessageBubble({ message }: { message: UIMessageLike }) {
           )
         }
 
-        if (part.type === 'tool-invocation') {
-          const toolName = part.toolName ?? 'tool'
-          const state = part.state ?? 'result'
-          const isRunning = state === 'call' || state === 'partial-call'
+        if (isToolUIPart(part)) {
+          const toolName = getToolName(part)
+          // AI SDK v6 tool states:
+          //   input-streaming / input-available  → model is calling, awaiting result
+          //   approval-requested / approval-responded → human-in-the-loop
+          //   output-available                    → call succeeded
+          //   output-error / output-denied        → call failed/refused
+          const isRunning = part.state === 'input-streaming' || part.state === 'input-available'
+          const isError = part.state === 'output-error' || part.state === 'output-denied'
+
+          const palette = isError
+            ? { border: 'border-rose-800/40', bg: 'bg-rose-950/30', fg: 'text-rose-300', mute: 'text-rose-500', dot: 'bg-rose-400' }
+            : { border: 'border-sky-800/30', bg: 'bg-sky-950/30', fg: 'text-sky-300', mute: 'text-sky-500', dot: 'bg-sky-400' }
 
           return (
             <div key={i} className="flex justify-start">
-              <div className="max-w-[85%] rounded-lg border border-sky-800/30 bg-sky-950/30 px-3 py-1.5 text-[11px]">
-                <div className="flex items-center gap-1.5 text-sky-300">
+              <div className={`max-w-[85%] rounded-lg border ${palette.border} ${palette.bg} px-3 py-1.5 text-[11px]`}>
+                <div className={`flex items-center gap-1.5 ${palette.fg}`}>
                   {isRunning ? (
-                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-sky-400" />
+                    <span className={`inline-block h-2 w-2 animate-pulse rounded-full ${palette.dot}`} />
                   ) : (
-                    <span className="text-[10px]">✓</span>
+                    <span className="text-[10px]">{isError ? '✗' : '✓'}</span>
                   )}
                   <span className="font-mono font-medium">{toolName}</span>
-                  <span className="text-sky-500">
-                    {isRunning ? 'querying...' : 'done'}
+                  <span className={palette.mute}>
+                    {isRunning ? 'querying...' : isError ? 'error' : 'done'}
                   </span>
                 </div>
               </div>
@@ -325,15 +339,12 @@ function MessageBubble({ message }: { message: UIMessageLike }) {
   )
 }
 
-function extractText(m: UIMessageLike): string {
-  if (typeof m.content === 'string') return m.content
-  if (Array.isArray(m.parts)) {
-    return m.parts
-      .filter((p) => p.type === 'text' && typeof p.text === 'string')
-      .map((p) => p.text)
-      .join('')
-  }
-  return ''
+function extractText(m: ChatMessage): string {
+  const parts: ChatMessagePart[] = m.parts ?? []
+  return parts
+    .filter(isTextUIPart)
+    .map((p) => p.text)
+    .join('')
 }
 
 // ─── Empty state ─────────────────────────────────────────────
