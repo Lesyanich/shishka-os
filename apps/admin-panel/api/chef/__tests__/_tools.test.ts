@@ -148,23 +148,65 @@ describe('searchNomenclatureImpl — PostgREST .or() escaping fix', () => {
     expect(result.items[0].type).toBe('semi')
   })
 
-  it('runs exactly one ilike per leg (name + product_code)', async () => {
+  it('runs exactly one ilike per leg (name + product_code) when initial hit is non-empty', async () => {
     const fake = makeFakeClient(FIXTURES)
-    await searchNomenclatureImpl(fake.client, { query: 'anything', limit: 5 })
+    await searchNomenclatureImpl(fake.client, { query: 'Manakish', limit: 5 })
 
     expect(fake.ilikeCalls).toEqual([
-      { col: 'name', pattern: '%anything%' },
-      { col: 'product_code', pattern: '%anything%' },
+      { col: 'name', pattern: '%Manakish%' },
+      { col: 'product_code', pattern: '%Manakish%' },
     ])
     expect(fake.orCalls).toBe(0)
   })
 
-  it('returns empty when nothing matches', async () => {
+  it('returns empty when nothing matches and query has no cyrillic to retry', async () => {
     const fake = makeFakeClient(FIXTURES)
     const result = await searchNomenclatureImpl(fake.client, { query: 'NoSuchThing' })
 
     if ('error' in result) throw new Error(result.error)
     expect(result.count).toBe(0)
     expect(result.items).toEqual([])
+    expect(result.attempts).toEqual([{ query: 'NoSuchThing', count: 0 }])
+  })
+})
+
+describe('searchNomenclatureImpl — cyrillic transliteration fallback', () => {
+  it('finds Manakish rows when CEO types in Russian "манакиш"', async () => {
+    const fake = makeFakeClient(FIXTURES)
+    const result = await searchNomenclatureImpl(fake.client, { query: 'манакиш' })
+
+    if ('error' in result) throw new Error(result.error)
+    expect(result.count).toBeGreaterThanOrEqual(3) // beef GF, beef WW, cheese GF — all have "Manakish" in name
+    expect(result.attempts).toHaveLength(2)
+    expect(result.attempts[0]).toEqual({ query: 'манакиш', count: 0 })
+    expect(result.attempts[1].query).toBe('manakish')
+    expect(result.attempts[1].count).toBe(result.count)
+  })
+
+  it('finds rows via product_code transliteration ("манаиш" → "manaish")', async () => {
+    const fake = makeFakeClient(FIXTURES)
+    const result = await searchNomenclatureImpl(fake.client, { query: 'манаиш' })
+
+    if ('error' in result) throw new Error(result.error)
+    // All Manakish rows have product_code with "MANAISH" — translit matches.
+    expect(result.count).toBeGreaterThan(0)
+    expect(result.attempts[1].query).toBe('manaish')
+  })
+
+  it('skips translit retry when initial query already returned hits', async () => {
+    const fake = makeFakeClient(FIXTURES)
+    const result = await searchNomenclatureImpl(fake.client, { query: 'Manakish' })
+
+    if ('error' in result) throw new Error(result.error)
+    expect(result.attempts).toHaveLength(1)
+    expect(fake.ilikeCalls).toHaveLength(2) // no retry → 2 legs only
+  })
+
+  it('skips translit retry when query has no cyrillic chars', async () => {
+    const fake = makeFakeClient(FIXTURES)
+    const result = await searchNomenclatureImpl(fake.client, { query: 'Bogus' })
+
+    if ('error' in result) throw new Error(result.error)
+    expect(result.attempts).toHaveLength(1)
   })
 })

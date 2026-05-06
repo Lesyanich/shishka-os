@@ -5,6 +5,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { supabaseForUser } from '../_lib/supabase.js'
+import { containsCyrillic, transliterate } from './_translit.js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ─── Public factory ─────────────────────────────────────────
@@ -97,15 +98,21 @@ interface SearchItem {
   is_available: boolean | null
 }
 
-type SearchResult = { count: number; items: SearchItem[] } | { error: string }
+interface SearchAttempt {
+  query: string
+  count: number
+}
 
-// PostgREST .or(name.ilike.%q%,product_code.ilike.%q%) silently breaks when q
-// contains "(", ")", or "," — the chars are parsed as filter-grouping syntax.
-// Run two separate .ilike() queries and merge client-side, deduping by id.
-export async function searchNomenclatureImpl(
+type SearchResult =
+  | { count: number; items: SearchItem[]; attempts: SearchAttempt[] }
+  | { error: string }
+
+async function runOneSearch(
   supa: SupabaseClient,
-  { query, types, limit = 20 }: SearchOpts,
-): Promise<SearchResult> {
+  query: string,
+  types: NomenclatureType[] | undefined,
+  limit: number,
+): Promise<{ items: SearchItem[] } | { error: string }> {
   const pattern = `%${query}%`
 
   const buildBase = () => {
@@ -139,9 +146,39 @@ export async function searchNomenclatureImpl(
       is_available: (r.is_available as boolean | null) ?? null,
     })
   }
-  const items = merged.slice(0, limit)
+  return { items: merged.slice(0, limit) }
+}
 
-  return { count: items.length, items }
+// PostgREST .or(name.ilike.%q%,product_code.ilike.%q%) silently breaks when q
+// contains "(", ")", or "," — the chars are parsed as filter-grouping syntax.
+// Run two separate .ilike() queries per attempt and merge client-side, deduping
+// by id. If the first attempt yields zero results AND the query contains
+// cyrillic characters, retry once with a transliterated query — Russian queries
+// from the AI Chef chat would otherwise never match Latin DB names.
+export async function searchNomenclatureImpl(
+  supa: SupabaseClient,
+  { query, types, limit = 20 }: SearchOpts,
+): Promise<SearchResult> {
+  const attempts: SearchAttempt[] = []
+
+  const first = await runOneSearch(supa, query, types, limit)
+  if ('error' in first) return { error: first.error }
+  attempts.push({ query, count: first.items.length })
+
+  if (first.items.length > 0 || !containsCyrillic(query)) {
+    return { count: first.items.length, items: first.items, attempts }
+  }
+
+  const translit = transliterate(query)
+  if (translit === query) {
+    return { count: 0, items: [], attempts }
+  }
+
+  const second = await runOneSearch(supa, translit, types, limit)
+  if ('error' in second) return { error: second.error }
+  attempts.push({ query: translit, count: second.items.length })
+
+  return { count: second.items.length, items: second.items, attempts }
 }
 
 function searchNomenclature(supa: SupabaseClient) {
