@@ -75,6 +75,75 @@ function listActiveDishes(supa: SupabaseClient) {
   })
 }
 
+const NOMENCLATURE_SELECT =
+  'id, name, product_code, type, base_unit, cost_per_unit, price, is_available, is_deleted'
+
+type NomenclatureType = 'dish' | 'semi' | 'modifier' | 'raw'
+
+interface SearchOpts {
+  query: string
+  types?: NomenclatureType[]
+  limit?: number
+}
+
+interface SearchItem {
+  id: string
+  name: string
+  product_code: string
+  type: string
+  base_unit: string | null
+  cost_per_unit: number
+  price: number | null
+  is_available: boolean | null
+}
+
+type SearchResult = { count: number; items: SearchItem[] } | { error: string }
+
+// PostgREST .or(name.ilike.%q%,product_code.ilike.%q%) silently breaks when q
+// contains "(", ")", or "," — the chars are parsed as filter-grouping syntax.
+// Run two separate .ilike() queries and merge client-side, deduping by id.
+export async function searchNomenclatureImpl(
+  supa: SupabaseClient,
+  { query, types, limit = 20 }: SearchOpts,
+): Promise<SearchResult> {
+  const pattern = `%${query}%`
+
+  const buildBase = () => {
+    let q = supa.from('nomenclature').select(NOMENCLATURE_SELECT).eq('is_deleted', false)
+    if (types && types.length > 0) q = q.in('type', types)
+    return q
+  }
+
+  const [byName, byCode] = await Promise.all([
+    buildBase().ilike('name', pattern).order('name').limit(limit),
+    buildBase().ilike('product_code', pattern).order('name').limit(limit),
+  ])
+
+  if (byName.error) return { error: byName.error.message }
+  if (byCode.error) return { error: byCode.error.message }
+
+  const seen = new Set<string>()
+  const merged: SearchItem[] = []
+  for (const r of [...(byName.data ?? []), ...(byCode.data ?? [])]) {
+    const id = r.id as string
+    if (seen.has(id)) continue
+    seen.add(id)
+    merged.push({
+      id,
+      name: r.name as string,
+      product_code: r.product_code as string,
+      type: r.type as string,
+      base_unit: (r.base_unit as string | null) ?? null,
+      cost_per_unit: Number(r.cost_per_unit ?? 0),
+      price: r.price ? Number(r.price) : null,
+      is_available: (r.is_available as boolean | null) ?? null,
+    })
+  }
+  const items = merged.slice(0, limit)
+
+  return { count: items.length, items }
+}
+
 function searchNomenclature(supa: SupabaseClient) {
   return tool({
     description:
@@ -87,37 +156,7 @@ function searchNomenclature(supa: SupabaseClient) {
         .describe('Filter by type(s). Omit to search all types.'),
       limit: z.number().optional().default(20).describe('Max results'),
     }),
-    execute: async ({ query, types, limit }) => {
-      let q = supa
-        .from('nomenclature')
-        .select('id, name, product_code, type, base_unit, cost_per_unit, price, is_available, is_deleted')
-        .eq('is_deleted', false)
-        .or(`name.ilike.%${query}%,product_code.ilike.%${query}%`)
-        .order('name')
-        .limit(limit)
-
-      if (types && types.length > 0) {
-        q = q.in('type', types)
-      }
-
-      const { data, error } = await q
-
-      if (error) return { error: error.message }
-
-      return {
-        count: (data ?? []).length,
-        items: (data ?? []).map((r) => ({
-          id: r.id,
-          name: r.name,
-          product_code: r.product_code,
-          type: r.type,
-          base_unit: r.base_unit,
-          cost_per_unit: Number(r.cost_per_unit ?? 0),
-          price: r.price ? Number(r.price) : null,
-          is_available: r.is_available,
-        })),
-      }
-    },
+    execute: ({ query, types, limit }) => searchNomenclatureImpl(supa, { query, types, limit }),
   })
 }
 
