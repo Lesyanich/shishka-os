@@ -25,6 +25,9 @@ import {
   Brain,
   Settings,
   Target,
+  CalendarCheck,
+  Banknote,
+  Users,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAppRole, type AppRole } from '../contexts/AppRoleContext'
@@ -97,6 +100,15 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/finance/analytics', icon: BarChart3, label: 'Analytics' },
       { path: '/receipts', icon: Inbox, label: 'Receipt Inbox' },
       { path: '/api-costs', icon: DollarSign, label: 'API Costs' },
+    ],
+  },
+  {
+    title: 'HR & Payroll',
+    minRole: 'owner',
+    items: [
+      { path: '/hr/attendance', icon: CalendarCheck, label: 'Attendance' },
+      { path: '/hr/payroll', icon: Banknote, label: 'Payroll' },
+      { path: '/hr/staff', icon: Users, label: 'Staff' },
     ],
   },
   {
