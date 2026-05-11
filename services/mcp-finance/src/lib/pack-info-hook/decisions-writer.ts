@@ -61,13 +61,16 @@ export async function writeAutoApply(sb: SupabaseClient, args: AutoApplyArgs): P
     });
   }
 
+  // Phase 2 limitation: write unconditionally — caller passes one supplier_id per
+  // receipt line, so the cache stays warm. Phase 3 sweep may need a change-guard
+  // (load current pack_* into AutoApplyArgs) to avoid noisy updated_at churn.
   await sb
     .from('supplier_catalog')
     .update({
       package_weight: resolved.package_weight,
       package_qty: resolved.package_qty,
       package_unit: resolved.package_unit,
-      updated_at: new Date().toISOString(),
+      // updated_at omitted: trg_sc_updated_at (BEFORE UPDATE) sets it automatically
     })
     .eq('nomenclature_id', result.nomenclature_id)
     .eq('supplier_id', supplier_id);
