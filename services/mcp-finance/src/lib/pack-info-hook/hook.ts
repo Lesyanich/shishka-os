@@ -31,7 +31,7 @@ export interface CorrectionReport {
 }
 
 export interface ErrorReport {
-  stage: 'fetch-purchase-logs' | 'fetch-nomenclature' | 'fetch-rule' | 'resolve' | 'write' | 'makro';
+  stage: 'fetch-purchase-logs' | 'fetch-nomenclature' | 'fetch-rule' | 'resolve' | 'write' | 'makro' | 'hook-init';
   level?: 'barcode' | 'fuzzy';
   nomenclature_id?: string;
   message: string;

@@ -163,30 +163,38 @@ export async function approveReceipt(args: ApproveReceiptArgs) {
 
   // Phase 2: pack-info resolver hook. Best-effort — never fails the receipt.
   let packHookResult: HookResult = { corrections: [], skipped: [], errors: [] };
-  try {
-    const fetchMakro = async (q: string): Promise<MakroResult> => {
-      const raw = await makroLookup({ barcode: q });
-      const r = raw as { found?: boolean; name?: string | null; unit?: string | null; brand?: string | null };
-      return {
-        found: !!r.found,
-        name: r.name ?? null,
-        unit: r.unit ?? null,
-        brand: r.brand ?? null,
-      };
-    };
-    const provider = createSupabaseProvider(sb, fetchMakro);
-    packHookResult = await runPackInfoHook(sb, provider, {
-      expense_id: expenseId,
-      food_items: (payload.food_items as Array<{ name?: string; brand?: string | null; barcode?: string | null; nomenclature_id?: string | null }>) ?? [],
-    });
-  } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    console.error("[approve-receipt] pack-info hook crashed", error);
+  if (!expenseId) {
     packHookResult = {
       corrections: [],
       skipped: [],
-      errors: [{ stage: "resolve", message: error.message }],
+      errors: [{ stage: "hook-init", message: "RPC returned no expense_id; pack-info hook skipped" }],
     };
+  } else {
+    try {
+      const fetchMakro = async (q: string): Promise<MakroResult> => {
+        const raw = await makroLookup({ barcode: q });
+        const r = raw as { found?: boolean; name?: string | null; unit?: string | null; brand?: string | null };
+        return {
+          found: !!r.found,
+          name: r.name ?? null,
+          unit: r.unit ?? null,
+          brand: r.brand ?? null,
+        };
+      };
+      const provider = createSupabaseProvider(sb, fetchMakro);
+      packHookResult = await runPackInfoHook(sb, provider, {
+        expense_id: expenseId,
+        food_items: (payload.food_items as Array<{ name?: string; brand?: string | null; barcode?: string | null; nomenclature_id?: string | null }>) ?? [],
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error("[approve-receipt] pack-info hook crashed", error);
+      packHookResult = {
+        corrections: [],
+        skipped: [],
+        errors: [{ stage: "hook-init", message: error.message }],
+      };
+    }
   }
 
   return {
