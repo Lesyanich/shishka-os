@@ -33,15 +33,6 @@ describe('resolve()', () => {
     expect(r.resolved).toBeNull();
   });
 
-  it('reaches gs1 level when supplier_catalog empty', async () => {
-    const provider = makeStubProvider({ gs1: { base_barcode: '8005121004113', weight_grams: 500 } });
-    const r = await resolve({ nomenclature_id: NID, barcode: '8005121004113', last_price_thb: 133, supplier_id: 'sup-1' }, provider);
-    expect(r.source).toBe('gs1');
-    expect(r.confidence).toBe(0.9);
-    expect(r.resolved?.package_qty).toBe(500);
-    expect(r.resolved?.package_unit).toBe('g');
-  });
-
   it('reaches makro_barcode level when local sources empty', async () => {
     const provider = makeStubProvider({
       makro_barcode: { found: true, name: 'Divella Farina 500g', unit: '500g', brand: 'Divella' },

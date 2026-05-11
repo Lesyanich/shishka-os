@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type {
   SupplierCatalogRow,
-  Gs1Row,
   MakroResult,
   PackInfoDataProvider,
 } from './data-provider.js';
@@ -20,11 +19,6 @@ describe('PackInfoDataProvider types', () => {
       brand: 'TestBrand',
     };
 
-    const gs1Row: Gs1Row = {
-      base_barcode: '2100000000000',
-      weight_grams: 500,
-    };
-
     const makroResult: MakroResult = {
       found: true,
       name: 'Test Product',
@@ -37,13 +31,11 @@ describe('PackInfoDataProvider types', () => {
     const _typeCheck: PackInfoDataProvider = {
       getSupplierCatalogExact: async () => [row],
       getSupplierCatalogFuzzy: async () => [row],
-      getGs1Item: async () => gs1Row,
       fetchMakroByBarcode: async () => makroResult,
       fetchMakroByName: async () => makroResult,
     };
 
     expect(row.supplier_id).toBe('sup-1');
-    expect(gs1Row.weight_grams).toBe(500);
     expect(makroResult.found).toBe(true);
     expect(_typeCheck).toBeDefined();
   });

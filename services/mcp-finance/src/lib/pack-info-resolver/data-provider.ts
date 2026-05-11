@@ -10,11 +10,6 @@ export interface SupplierCatalogRow {
   brand: string | null;
 }
 
-export interface Gs1Row {
-  base_barcode: string;
-  weight_grams: number;
-}
-
 export interface MakroResult {
   found: boolean;
   name: string | null;
@@ -25,7 +20,6 @@ export interface MakroResult {
 export interface PackInfoDataProvider {
   getSupplierCatalogExact(nomenclature_id: string, barcode: string): Promise<SupplierCatalogRow[]>;
   getSupplierCatalogFuzzy(nomenclature_id: string): Promise<SupplierCatalogRow[]>;
-  getGs1Item(barcode: string): Promise<Gs1Row | null>;
   fetchMakroByBarcode(barcode: string): Promise<MakroResult>;
   fetchMakroByName(query: string): Promise<MakroResult>;
 }
@@ -53,15 +47,6 @@ export function createSupabaseProvider(
         .not('package_weight', 'is', null);
       if (error) throw error;
       return data ?? [];
-    },
-    async getGs1Item(barcode) {
-      const { data, error } = await sb
-        .from('gs1_weight_items')
-        .select('base_barcode, weight_grams')
-        .eq('base_barcode', barcode)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
     },
     async fetchMakroByBarcode(barcode) {
       return fetchMakro(barcode);

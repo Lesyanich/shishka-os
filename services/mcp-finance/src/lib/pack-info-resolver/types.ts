@@ -1,7 +1,6 @@
 export type Source =
   | 'supplier_catalog_exact'
   | 'supplier_catalog_fuzzy'
-  | 'gs1'
   | 'makro_barcode'
   | 'makro_fuzzy';
 

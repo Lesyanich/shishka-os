@@ -22,7 +22,6 @@ describe('fixtures helpers', () => {
     const p = makeStubProvider({});
     expect(await p.getSupplierCatalogExact('any', 'any')).toEqual([]);
     expect(await p.getSupplierCatalogFuzzy('any')).toEqual([]);
-    expect(await p.getGs1Item('any')).toBeNull();
     const m = await p.fetchMakroByBarcode('any');
     expect(m.found).toBe(false);
     const m2 = await p.fetchMakroByName('any');

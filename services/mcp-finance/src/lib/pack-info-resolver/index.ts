@@ -11,7 +11,6 @@ export { createSupabaseProvider } from './data-provider.js';
 export type {
   PackInfoDataProvider,
   SupplierCatalogRow,
-  Gs1Row,
   MakroResult,
 } from './data-provider.js';
 export { parsePackWeight } from './parse-pack.js';

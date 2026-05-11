@@ -1,9 +1,8 @@
-import type { PackInfoDataProvider, SupplierCatalogRow, Gs1Row, MakroResult } from './data-provider.js';
+import type { PackInfoDataProvider, SupplierCatalogRow, MakroResult } from './data-provider.js';
 
 export interface StubConfig {
   sc_exact?: SupplierCatalogRow[];
   sc_fuzzy?: SupplierCatalogRow[];
-  gs1?: Gs1Row | null;
   makro_barcode?: MakroResult;
   makro_name?: MakroResult;
   throwOnMakroBarcode?: boolean;
@@ -14,7 +13,6 @@ export function makeStubProvider(cfg: StubConfig): PackInfoDataProvider {
   return {
     async getSupplierCatalogExact() { return cfg.sc_exact ?? []; },
     async getSupplierCatalogFuzzy() { return cfg.sc_fuzzy ?? []; },
-    async getGs1Item() { return cfg.gs1 ?? null; },
     async fetchMakroByBarcode() {
       if (cfg.throwOnMakroBarcode) throw new Error('makro 5xx');
       return cfg.makro_barcode ?? empty;
