@@ -10,7 +10,8 @@
     "dev": "tsx src/index.ts",
     "lint": "eslint src/",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sweep:pack-info": "tsx src/jobs/pack-info-sweep.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
