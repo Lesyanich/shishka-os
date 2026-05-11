@@ -29,6 +29,7 @@ import { checkDuplicate } from "./tools/check-duplicate.js";
 import { searchExpenses } from "./tools/search-expenses.js";
 import { expenseSummary } from "./tools/expense-summary.js";
 import { manageSuppliers } from "./tools/manage-suppliers.js";
+import { packInfoLookup } from "./tools/pack-info-lookup.js";
 // makro_lookup removed — Lesia verifies barcodes manually when needed
 import { uploadReceipt } from "./tools/upload-receipt.js";
 import { downloadReceipt } from "./tools/download-receipt.js";
@@ -409,13 +410,26 @@ server.tool(
   async (args) => jsonResult(await archiveReceiptGdrive(args))
 );
 
+// ─── Pack-Info Resolver Lookup ─────────────────────────────────
+
+server.tool(
+  "pack_info_lookup",
+  "On-demand pack-info cascade lookup for a nomenclature row. Read-only — runs the same supplier_catalog → makro-lookup cascade used by the real-time receipt hook and the nightly sweep, and returns the ResolverResult (resolved pack info, confidence, conflicts). Does NOT write to the DB; apply fixes via the Data Health admin UI.",
+  {
+    nomenclature_id: z.string().describe("UUID of the nomenclature row to look up"),
+    barcode: z.string().optional().describe("Optional barcode — improves cascade hit-rate (supplier_catalog_exact + makro_barcode levels)"),
+    last_price_thb: z.number().optional().describe("Optional last purchase price in THB — used to compute cost_per_kg in the result"),
+  },
+  async (args) => jsonResult(await packInfoLookup(args))
+);
+
 // ─── Start ───────────────────────────────────────────────────────
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Finance Agent MCP server running on stdio`);
-  console.error(`   Tools: 19 | Resources: 0 | Prompts: 0`);
+  console.error(`   Tools: 20 | Resources: 0 | Prompts: 0`);
 }
 
 main().catch((err) => {
