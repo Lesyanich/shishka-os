@@ -9,6 +9,7 @@ export interface ResolveInput {
   last_price_thb?: number;
   name?: string;
   brand?: string;
+  onMakroError?: (err: Error, level: 'barcode' | 'fuzzy') => void;
 }
 
 const CANONICAL_UNIT_MAP: Record<string, CanonicalUnit> = {
@@ -144,8 +145,8 @@ export async function resolve(input: ResolveInput, p: PackInfoDataProvider): Pro
           evidence: { makro: m },
         };
       }
-    } catch {
-      // TODO(phase2): log structured telemetry on makro fetch failures
+    } catch (err) {
+      input.onMakroError?.(err as Error, 'barcode');
     }
   }
 
@@ -165,8 +166,8 @@ export async function resolve(input: ResolveInput, p: PackInfoDataProvider): Pro
           evidence: { makro: m, query },
         };
       }
-    } catch {
-      // TODO(phase2): log structured telemetry on makro fetch failures
+    } catch (err) {
+      input.onMakroError?.(err as Error, 'fuzzy');
     }
   }
 

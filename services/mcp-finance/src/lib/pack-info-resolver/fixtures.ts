@@ -6,6 +6,7 @@ export interface StubConfig {
   makro_barcode?: MakroResult;
   makro_name?: MakroResult;
   throwOnMakroBarcode?: boolean;
+  throwOnMakroFuzzy?: boolean;
 }
 
 export function makeStubProvider(cfg: StubConfig): PackInfoDataProvider {
@@ -17,7 +18,10 @@ export function makeStubProvider(cfg: StubConfig): PackInfoDataProvider {
       if (cfg.throwOnMakroBarcode) throw new Error('makro 5xx');
       return cfg.makro_barcode ?? empty;
     },
-    async fetchMakroByName() { return cfg.makro_name ?? empty; },
+    async fetchMakroByName() {
+      if (cfg.throwOnMakroFuzzy) throw new Error('makro fuzzy 5xx');
+      return cfg.makro_name ?? empty;
+    },
   };
 }
 
