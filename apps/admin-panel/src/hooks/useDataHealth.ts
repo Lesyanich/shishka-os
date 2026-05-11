@@ -14,6 +14,11 @@ export type HealthMetricKey =
   | 'unmatched_queue'
   | 'orphan_items'
   | 'stale_prices'
+  // Added by migrations 165 + 168 (frontend caught up here)
+  | 'nutrition_missing'
+  | 'fuzzy_duplicate_candidates'
+  | 'variant_without_yield'
+  | 'equipment_missing_specs'
 
 export interface HealthMetric {
   metric: HealthMetricKey

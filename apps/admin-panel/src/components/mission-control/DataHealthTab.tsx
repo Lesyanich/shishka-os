@@ -70,6 +70,40 @@ const METRIC_META: Record<HealthMetricKey, MetricMeta> = {
     description: 'Last purchase > 30 days ago',
     entityScope: 'nomenclature (RAW)',
   },
+  nutrition_missing: {
+    label: 'Nutrition missing',
+    description: 'Active RAW items with no calories set',
+    entityScope: 'nomenclature (RAW)',
+  },
+  fuzzy_duplicate_candidates: {
+    label: 'Fuzzy duplicate candidates',
+    description: 'Pairs of RAW items with very similar names',
+    entityScope: 'nomenclature (RAW)',
+  },
+  variant_without_yield: {
+    label: 'Variant without yield',
+    description: 'Items named trimmed/peeled/cleaned but yield not set',
+    entityScope: 'nomenclature (RAW)',
+  },
+  equipment_missing_specs: {
+    label: 'Equipment missing specs',
+    description: 'Active equipment using placeholder capacity (slot=1)',
+    entityScope: 'equipment',
+  },
+}
+
+// Defensive fallback for metrics that arrive from the DB but aren't yet
+// represented in METRIC_META — keeps the UI from crashing while a typed
+// entry is being added. Mirrors the pattern of falling back to the raw
+// metric key as the label so the row is still actionable.
+function getMetricMeta(key: HealthMetricKey): MetricMeta {
+  const meta = METRIC_META[key]
+  if (meta) return meta
+  return {
+    label: key,
+    description: 'Unrecognized metric — front-end is behind v_data_health',
+    entityScope: 'unknown',
+  }
 }
 
 const SEVERITY_ORDER: HealthSeverity[] = ['error', 'warning', 'action', 'info']
@@ -244,7 +278,7 @@ interface MetricCardProps {
 }
 
 function MetricCard({ metric, fetchItems, onCreateTask }: MetricCardProps) {
-  const meta = METRIC_META[metric.metric]
+  const meta = getMetricMeta(metric.metric)
   const [expanded, setExpanded] = useState(false)
   const [items, setItems] = useState<HealthItem[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -369,7 +403,7 @@ export function DataHealthTab({ addTask }: DataHealthTabProps) {
 
   const handleCreateTask = useCallback(
     async (item: HealthItem, metric: HealthMetric) => {
-      const meta = METRIC_META[metric.metric]
+      const meta = getMetricMeta(metric.metric)
       const prefix = item.product_code ?? item.entity_kind
       const title = `Data Health (${meta.label}): ${prefix} — ${item.name}`.slice(0, 200)
       const description = [
