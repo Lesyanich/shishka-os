@@ -111,5 +111,7 @@ describe('resolve() — makro telemetry', () => {
     expect(errors.length).toBe(1);
     expect(errors[0].level).toBe('fuzzy');
     expect(r.resolved).toBeNull();
+    expect(r.source).toBeNull();
+    expect(r.confidence).toBe(0);
   });
 });

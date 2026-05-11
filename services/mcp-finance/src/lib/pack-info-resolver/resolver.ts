@@ -146,7 +146,8 @@ export async function resolve(input: ResolveInput, p: PackInfoDataProvider): Pro
         };
       }
     } catch (err) {
-      input.onMakroError?.(err as Error, 'barcode');
+      const error = err instanceof Error ? err : new Error(String(err));
+      input.onMakroError?.(error, 'barcode');
     }
   }
 
@@ -167,7 +168,8 @@ export async function resolve(input: ResolveInput, p: PackInfoDataProvider): Pro
         };
       }
     } catch (err) {
-      input.onMakroError?.(err as Error, 'fuzzy');
+      const error = err instanceof Error ? err : new Error(String(err));
+      input.onMakroError?.(error, 'fuzzy');
     }
   }
 
