@@ -74,6 +74,11 @@ describe('runPackInfoHook', () => {
     expect(result.corrections[0].source).toBe('supplier_catalog_exact');
     expect(result.corrections[0].action).toBe('auto-applied');
     expect(result.errors.length).toBe(0);
+
+    const ddhInsert = sb.captured.find((c) => c.table === 'data_health_decisions' && c.op === 'insert');
+    expect(ddhInsert).toBeDefined();
+    const nomUpdate = sb.captured.find((c) => c.table === 'nomenclature' && c.op === 'update');
+    expect(nomUpdate).toBeDefined();
   });
 
   it('skips lines whose nomenclature is in 7-day cooldown', async () => {
@@ -132,6 +137,25 @@ describe('runPackInfoHook', () => {
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.errors[0].level).toBe('barcode');
     expect(result.errors[0].nomenclature_id).toBe(NID_A);
+  });
+
+  it('captures resolve-stage error and continues batch', async () => {
+    const sb = makeStubSb({
+      purchase_logs: [
+        { nomenclature_id: NID_A, supplier_id: 'sup-1', barcode: '8005121004113', price_per_unit: 100 },
+      ],
+      nomenclature: [{ id: NID_A, base_unit: 'pcs', cost_per_unit: 100, name: 'Foo' }],
+    });
+    const provider = makeStubProvider({ throwOnScExact: true });
+    const result = await runPackInfoHook(sb as any, provider, {
+      expense_id: EXPENSE_ID,
+      food_items: [{ name: 'Foo', barcode: '8005121004113' } as any],
+    });
+    expect(result.errors.length).toBeGreaterThan(0);
+    const resolveErr = result.errors.find((e) => e.stage === 'resolve');
+    expect(resolveErr).toBeDefined();
+    expect(resolveErr?.nomenclature_id).toBe(NID_A);
+    expect(result.corrections.length).toBe(0);
   });
 
   it('returns empty corrections + an error when purchase_logs query fails (graceful)', async () => {

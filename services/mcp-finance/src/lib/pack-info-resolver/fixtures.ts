@@ -7,12 +7,16 @@ export interface StubConfig {
   makro_name?: MakroResult;
   throwOnMakroBarcode?: boolean;
   throwOnMakroFuzzy?: boolean;
+  throwOnScExact?: boolean;
 }
 
 export function makeStubProvider(cfg: StubConfig): PackInfoDataProvider {
   const empty: MakroResult = { found: false, name: null, unit: null, brand: null };
   return {
-    async getSupplierCatalogExact() { return cfg.sc_exact ?? []; },
+    async getSupplierCatalogExact() {
+      if (cfg.throwOnScExact) throw new Error('sc_exact db down');
+      return cfg.sc_exact ?? [];
+    },
     async getSupplierCatalogFuzzy() { return cfg.sc_fuzzy ?? []; },
     async fetchMakroByBarcode() {
       if (cfg.throwOnMakroBarcode) throw new Error('makro 5xx');

@@ -146,7 +146,6 @@ export async function runPackInfoHook(
               nomenclature_id: line.nomenclature_id,
               message: err.message,
             });
-            console.error('[pack-info-hook] makro fetch failed', { level, nomenclature_id: line.nomenclature_id, err: err.message });
           },
         },
         provider,
@@ -154,6 +153,15 @@ export async function runPackInfoHook(
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       errors.push({ stage: 'resolve', nomenclature_id: line.nomenclature_id, message: error.message });
+      continue;
+    }
+
+    if (result.confidence >= AUTO_APPLY_CONFIDENCE && !result.resolved && result.conflicts.length === 0) {
+      errors.push({
+        stage: 'resolve',
+        nomenclature_id: line.nomenclature_id,
+        message: 'invariant violated: high-confidence result has no resolved pack info and no conflicts',
+      });
       continue;
     }
 
