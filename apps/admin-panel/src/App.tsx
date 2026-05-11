@@ -43,6 +43,7 @@ const ApiCostPage = lazy(() => import('./pages/ApiCostPage').then(m => ({ defaul
 const HRLayout = lazy(() => import('./pages/hr/HRLayout').then(m => ({ default: m.HRLayout })))
 const AttendancePage = lazy(() => import('./pages/hr/AttendancePage').then(m => ({ default: m.AttendancePage })))
 const PayrollPage = lazy(() => import('./pages/hr/PayrollPage').then(m => ({ default: m.PayrollPage })))
+const StaffPage = lazy(() => import('./pages/hr/StaffPage').then(m => ({ default: m.StaffPage })))
 
 function PageLoader() {
   return (
@@ -115,7 +116,7 @@ function App() {
                     <Route index element={<Navigate to="attendance" replace />} />
                     <Route path="attendance" element={<AttendancePage />} />
                     <Route path="payroll" element={<PayrollPage />} />
-                    <Route path="staff" element={<div className="text-slate-500 text-sm p-4">Staff cards — coming soon</div>} />
+                    <Route path="staff" element={<StaffPage />} />
                   </Route>
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                   <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
