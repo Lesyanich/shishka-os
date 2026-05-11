@@ -42,8 +42,8 @@ function makroToPackInfo(m: MakroResult, last_price_thb: number | undefined): Pa
   const parsed = parsePackWeight(m.unit);
   if (!parsed) return null;
   const base_unit = CANONICAL_UNIT_MAP[parsed.unit] ?? 'pcs';
-  const grams = parsed.unit === 'kg' ? parsed.qty * 1000 : parsed.qty;
-  const cost_per_kg = last_price_thb != null && grams > 0 ? (last_price_thb / grams) * 1000 : null;
+  const grams_or_ml = parsed.unit === 'kg' || parsed.unit === 'L' ? parsed.qty * 1000 : parsed.qty;
+  const cost_per_kg = last_price_thb != null && grams_or_ml > 0 ? (last_price_thb / grams_or_ml) * 1000 : null;
   return {
     base_unit,
     package_weight: m.unit,
@@ -63,7 +63,7 @@ function detectConflict(rows: SupplierCatalogRow[], src: Source, last_price_thb?
     if (!r.package_weight) continue;
     const pi = rowToPackInfo(r, last_price_thb);
     if (!pi) continue;
-    const key = `${pi.package_qty}${pi.package_unit}`;
+    const key = `${pi.package_qty}|${pi.package_unit}`;
     if (!seen.has(key)) {
       seen.set(key, { source: src, pack_info: pi, evidence: { ...r } });
     }
@@ -170,7 +170,7 @@ export async function resolve(input: ResolveInput, p: PackInfoDataProvider): Pro
         };
       }
     } catch {
-      // cascade continues
+      // TODO(phase2): log structured telemetry on makro fetch failures
     }
   }
 
@@ -191,7 +191,7 @@ export async function resolve(input: ResolveInput, p: PackInfoDataProvider): Pro
         };
       }
     } catch {
-      // cascade continues
+      // TODO(phase2): log structured telemetry on makro fetch failures
     }
   }
 

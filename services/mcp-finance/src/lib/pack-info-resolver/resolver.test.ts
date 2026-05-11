@@ -62,6 +62,18 @@ describe('resolve()', () => {
     expect(r.confidence).toBe(0.6);
   });
 
+  it('correctly converts Liters to cost_per_kg (regression for L-unit bug)', async () => {
+    const provider = makeStubProvider({
+      makro_barcode: { found: true, name: 'Olive Oil 2L', unit: '2L', brand: 'Bertolli' },
+    });
+    const r = await resolve({ nomenclature_id: NID, barcode: '12345', last_price_thb: 500, supplier_id: 'sup-1' }, provider);
+    expect(r.source).toBe('makro_barcode');
+    expect(r.resolved?.package_qty).toBe(2);
+    expect(r.resolved?.package_unit).toBe('L');
+    // 500 THB / 2 L = 250 THB/L → as cost_per_kg field (semantic per-base-unit cost)
+    expect(r.resolved?.cost_per_kg).toBeCloseTo(250, 1);
+  });
+
   it('returns null resolved + 0 confidence when entire cascade fails', async () => {
     const provider = makeStubProvider({});
     const r = await resolve({ nomenclature_id: NID, last_price_thb: 133, supplier_id: 'sup-1' }, provider);
