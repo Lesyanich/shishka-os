@@ -9,6 +9,7 @@ export interface ResolveInput {
   last_price_thb?: number;
   name?: string;
   brand?: string;
+  onMakroError?: (err: Error, level: 'barcode' | 'fuzzy') => void;
 }
 
 const CANONICAL_UNIT_MAP: Record<string, CanonicalUnit> = {
@@ -129,32 +130,7 @@ export async function resolve(input: ResolveInput, p: PackInfoDataProvider): Pro
     }
   }
 
-  // Level 3: GS1 barcode lookup
-  if (input.barcode) {
-    const gs1 = await p.getGs1Item(input.barcode);
-    if (gs1) {
-      const pi: PackInfo = {
-        base_unit: 'kg',
-        package_weight: `${gs1.weight_grams}g`,
-        package_qty: gs1.weight_grams,
-        package_unit: 'g',
-        cost_per_kg:
-          input.last_price_thb != null && gs1.weight_grams > 0
-            ? (input.last_price_thb / gs1.weight_grams) * 1000
-            : null,
-      };
-      return {
-        nomenclature_id: input.nomenclature_id,
-        resolved: pi,
-        source: 'gs1',
-        confidence: 0.9,
-        conflicts: [],
-        evidence: { gs1 },
-      };
-    }
-  }
-
-  // Level 4: Makro by barcode
+  // Level 3: Makro by barcode
   if (input.barcode) {
     try {
       const m = await p.fetchMakroByBarcode(input.barcode);
@@ -169,12 +145,13 @@ export async function resolve(input: ResolveInput, p: PackInfoDataProvider): Pro
           evidence: { makro: m },
         };
       }
-    } catch {
-      // TODO(phase2): log structured telemetry on makro fetch failures
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      input.onMakroError?.(error, 'barcode');
     }
   }
 
-  // Level 5: Makro by name / brand
+  // Level 4: Makro by name / brand
   if (input.name) {
     try {
       const query = input.brand ? `${input.brand} ${input.name}` : input.name;
@@ -190,8 +167,9 @@ export async function resolve(input: ResolveInput, p: PackInfoDataProvider): Pro
           evidence: { makro: m, query },
         };
       }
-    } catch {
-      // TODO(phase2): log structured telemetry on makro fetch failures
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      input.onMakroError?.(error, 'fuzzy');
     }
   }
 

@@ -11,7 +11,6 @@ import {
   type CanonicalUnit,
   type PackInfoDataProvider,
   type SupplierCatalogRow,
-  type Gs1Row,
   type MakroResult,
 } from './index.js';
 
@@ -39,8 +38,7 @@ describe('pack-info-resolver barrel exports', () => {
     const ______: CanonicalUnit | null = null;
     const _______: PackInfoDataProvider | null = null;
     const ________: SupplierCatalogRow | null = null;
-    const _________: Gs1Row | null = null;
-    const __________: MakroResult | null = null;
+    const _________: MakroResult | null = null;
     expect(true).toBe(true);
   });
 });

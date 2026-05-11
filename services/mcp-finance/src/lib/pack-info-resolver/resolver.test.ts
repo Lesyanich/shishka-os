@@ -33,15 +33,6 @@ describe('resolve()', () => {
     expect(r.resolved).toBeNull();
   });
 
-  it('reaches gs1 level when supplier_catalog empty', async () => {
-    const provider = makeStubProvider({ gs1: { base_barcode: '8005121004113', weight_grams: 500 } });
-    const r = await resolve({ nomenclature_id: NID, barcode: '8005121004113', last_price_thb: 133, supplier_id: 'sup-1' }, provider);
-    expect(r.source).toBe('gs1');
-    expect(r.confidence).toBe(0.9);
-    expect(r.resolved?.package_qty).toBe(500);
-    expect(r.resolved?.package_unit).toBe('g');
-  });
-
   it('reaches makro_barcode level when local sources empty', async () => {
     const provider = makeStubProvider({
       makro_barcode: { found: true, name: 'Divella Farina 500g', unit: '500g', brand: 'Divella' },
@@ -77,6 +68,48 @@ describe('resolve()', () => {
   it('returns null resolved + 0 confidence when entire cascade fails', async () => {
     const provider = makeStubProvider({});
     const r = await resolve({ nomenclature_id: NID, last_price_thb: 133, supplier_id: 'sup-1' }, provider);
+    expect(r.resolved).toBeNull();
+    expect(r.source).toBeNull();
+    expect(r.confidence).toBe(0);
+  });
+});
+
+describe('resolve() — makro telemetry', () => {
+  it('invokes onMakroError when makro barcode fetch throws', async () => {
+    const errors: Array<{ err: Error; level: 'barcode' | 'fuzzy' }> = [];
+    const provider = makeStubProvider({ throwOnMakroBarcode: true });
+    const r = await resolve(
+      {
+        nomenclature_id: NID,
+        supplier_id: 'sup-1',
+        barcode: '8005121004113',
+        last_price_thb: 133,
+        onMakroError: (err, level) => errors.push({ err, level }),
+      },
+      provider,
+    );
+    expect(errors.length).toBe(1);
+    expect(errors[0].level).toBe('barcode');
+    expect(errors[0].err.message).toContain('makro');
+    expect(r.resolved).toBeNull();
+  });
+
+  it('invokes onMakroError when makro fuzzy fetch throws', async () => {
+    const errors: Array<{ err: Error; level: 'barcode' | 'fuzzy' }> = [];
+    const provider = makeStubProvider({ throwOnMakroFuzzy: true });
+    const r = await resolve(
+      {
+        nomenclature_id: NID,
+        supplier_id: 'sup-1',
+        name: 'Divella Farina',
+        brand: 'Divella',
+        last_price_thb: 133,
+        onMakroError: (err, level) => errors.push({ err, level }),
+      },
+      provider,
+    );
+    expect(errors.length).toBe(1);
+    expect(errors[0].level).toBe('fuzzy');
     expect(r.resolved).toBeNull();
     expect(r.source).toBeNull();
     expect(r.confidence).toBe(0);

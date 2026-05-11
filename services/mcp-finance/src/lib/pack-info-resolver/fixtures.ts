@@ -1,25 +1,31 @@
-import type { PackInfoDataProvider, SupplierCatalogRow, Gs1Row, MakroResult } from './data-provider.js';
+import type { PackInfoDataProvider, SupplierCatalogRow, MakroResult } from './data-provider.js';
 
 export interface StubConfig {
   sc_exact?: SupplierCatalogRow[];
   sc_fuzzy?: SupplierCatalogRow[];
-  gs1?: Gs1Row | null;
   makro_barcode?: MakroResult;
   makro_name?: MakroResult;
   throwOnMakroBarcode?: boolean;
+  throwOnMakroFuzzy?: boolean;
+  throwOnScExact?: boolean;
 }
 
 export function makeStubProvider(cfg: StubConfig): PackInfoDataProvider {
   const empty: MakroResult = { found: false, name: null, unit: null, brand: null };
   return {
-    async getSupplierCatalogExact() { return cfg.sc_exact ?? []; },
+    async getSupplierCatalogExact() {
+      if (cfg.throwOnScExact) throw new Error('sc_exact db down');
+      return cfg.sc_exact ?? [];
+    },
     async getSupplierCatalogFuzzy() { return cfg.sc_fuzzy ?? []; },
-    async getGs1Item() { return cfg.gs1 ?? null; },
     async fetchMakroByBarcode() {
       if (cfg.throwOnMakroBarcode) throw new Error('makro 5xx');
       return cfg.makro_barcode ?? empty;
     },
-    async fetchMakroByName() { return cfg.makro_name ?? empty; },
+    async fetchMakroByName() {
+      if (cfg.throwOnMakroFuzzy) throw new Error('makro fuzzy 5xx');
+      return cfg.makro_name ?? empty;
+    },
   };
 }
 
