@@ -30,7 +30,7 @@ describe('fetchSweepCandidates', () => {
   it('passes p_limit to the RPC call', async () => {
     const sb = makeSb({ data: [], error: null });
     await fetchSweepCandidates(sb, 25);
-    expect((sb as { rpc: ReturnType<typeof vi.fn> }).rpc).toHaveBeenCalledWith('pack_info_sweep_candidates', { p_limit: 25 });
+    expect((sb as unknown as { rpc: ReturnType<typeof vi.fn> }).rpc).toHaveBeenCalledWith('pack_info_sweep_candidates', { p_limit: 25 });
   });
 
   it('returns an error result when the RPC fails', async () => {
