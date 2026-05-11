@@ -20,6 +20,7 @@ import {
   type HealthSeverity,
 } from '../../hooks/useDataHealth'
 import type { NewBusinessTask } from '../../hooks/useBusinessTasks'
+import { PackInfoPendingSection } from './PackInfoPendingSection'
 
 // ── Metric presentation metadata ──
 
@@ -484,6 +485,9 @@ export function DataHealthTab({ addTask }: DataHealthTabProps) {
           </section>
         )
       })}
+
+      {/* Pack-Info Resolver pending decisions (owner-only) */}
+      <PackInfoPendingSection />
     </div>
   )
 }
