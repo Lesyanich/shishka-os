@@ -2,12 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolve, type PackInfoDataProvider, type ResolverResult } from '../pack-info-resolver/index.js';
 import { hasRecentSkipDecision } from './cooldown.js';
 import { writeAutoApply, writePending, writeSkip } from './decisions-writer.js';
-
-const SUSPICIOUS_BASE_UNITS = new Set(['pcs', 'bag', 'bottle', 'pack']);
-const COOLDOWN_DAYS = 7;
-const RULE_CODE = 'NOMENCLATURE_AUTO_PACK_FILL';
-const AUTO_APPLY_CONFIDENCE = 0.9;
-const PENDING_CONFIDENCE_FLOOR = 0.5;
+import {
+  SUSPICIOUS_BASE_UNITS,
+  PACK_INFO_RULE_CODE,
+  AUTO_APPLY_CONFIDENCE,
+  PENDING_CONFIDENCE_FLOOR,
+  SKIP_COOLDOWN_DAYS,
+} from './shared-constants.js';
 
 interface FoodItemInput {
   name?: string;
@@ -31,7 +32,15 @@ export interface CorrectionReport {
 }
 
 export interface ErrorReport {
-  stage: 'fetch-purchase-logs' | 'fetch-nomenclature' | 'fetch-rule' | 'resolve' | 'write' | 'makro' | 'hook-init';
+  stage:
+    | 'fetch-purchase-logs'
+    | 'fetch-nomenclature'
+    | 'fetch-rule'
+    | 'resolve'
+    | 'write'
+    | 'makro'
+    | 'hook-init'
+    | 'sweep-fetch';
   level?: 'barcode' | 'fuzzy';
   nomenclature_id?: string;
   message: string;
@@ -106,11 +115,11 @@ export async function runPackInfoHook(
   const { data: ruleRow, error: ruleErr } = (await sb
     .from('data_health_rules')
     .select('id')
-    .eq('rule_code', RULE_CODE)
+    .eq('rule_code', PACK_INFO_RULE_CODE)
     .single()) as unknown as { data: { id: string } | null; error: { message: string } | null };
 
   if (ruleErr || !ruleRow) {
-    errors.push({ stage: 'fetch-rule', message: ruleErr?.message ?? `rule ${RULE_CODE} not found` });
+    errors.push({ stage: 'fetch-rule', message: ruleErr?.message ?? `rule ${PACK_INFO_RULE_CODE} not found` });
     return { corrections, skipped, errors };
   }
   const rule_id = ruleRow.id;
@@ -122,7 +131,7 @@ export async function runPackInfoHook(
     if (!nom) continue;
     if (!SUSPICIOUS_BASE_UNITS.has(nom.base_unit ?? '')) continue;
 
-    if (await hasRecentSkipDecision(sb, line.nomenclature_id, 'base_unit', COOLDOWN_DAYS)) {
+    if (await hasRecentSkipDecision(sb, line.nomenclature_id, 'base_unit', SKIP_COOLDOWN_DAYS)) {
       skipped.push({ nomenclature_id: line.nomenclature_id, reason: '7d-cooldown' });
       continue;
     }
