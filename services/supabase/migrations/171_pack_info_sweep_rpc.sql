@@ -61,10 +61,17 @@ $$;
 COMMENT ON FUNCTION public.pack_info_sweep_candidates(int) IS
   'Phase 3 sweep candidate fetch. Returns nomenclature rows with suspicious base_unit and >=1 purchase, joined with most-recent purchase line. 7-day cooldown on skip-decisions. SECURITY DEFINER for service role.';
 
--- Service role + authenticated may invoke. Anon must not.
+-- Service role only. SECURITY DEFINER bypasses purchase_logs RLS to surface
+-- recent_price_per_unit (procurement-sensitive); granting authenticated would
+-- expose this to every logged-in user via PostgREST. If a future UI needs
+-- this data interactively, add the grant in a follow-up migration paired
+-- with an explicit role check inside the function or a non-DEFINER wrapper.
 REVOKE ALL ON FUNCTION public.pack_info_sweep_candidates(int) FROM PUBLIC;
+-- Defensive: REVOKE from authenticated in case a previous apply granted it
+-- (this migration shipped with that grant briefly during development). REVOKE
+-- on a role with no grant is a no-op, so this is safe to keep permanently.
+REVOKE EXECUTE ON FUNCTION public.pack_info_sweep_candidates(int) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.pack_info_sweep_candidates(int) TO service_role;
-GRANT EXECUTE ON FUNCTION public.pack_info_sweep_candidates(int) TO authenticated;
 
 -- migration_log self-register
 INSERT INTO public.migration_log (filename, applied_by, notes)
