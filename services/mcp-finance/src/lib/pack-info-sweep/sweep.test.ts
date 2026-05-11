@@ -4,7 +4,6 @@ import { makeStubProvider } from '../pack-info-resolver/fixtures.js';
 import type { SweepCandidate } from './candidates.js';
 
 const NID_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-const NID_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const SUP = '99999999-9999-9999-9999-999999999999';
 const RULE_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
@@ -246,5 +245,3 @@ describe('runPackInfoSweep', () => {
     expect(inserts.some((i) => i.row.run_id === RUN)).toBe(true);
   });
 });
-// NID_B kept for future tests
-void NID_B;

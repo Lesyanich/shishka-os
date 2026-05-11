@@ -74,6 +74,7 @@ export async function runPackInfoSweep(
     }
 
     if (await hasRecentSkipDecision(sb, c.nomenclature_id, 'base_unit', SKIP_COOLDOWN_DAYS)) {
+      // No DB write: a prior skip row is still in its cooldown window. Reported only.
       skipped.push({ nomenclature_id: c.nomenclature_id, reason: '7d-cooldown' });
       continue;
     }
