@@ -1,0 +1,40 @@
+name: Pack-Info Sweep
+
+on:
+  # 03:00 Bangkok = 20:00 UTC previous day (Bangkok is UTC+7, no DST)
+  schedule:
+    - cron: '0 20 * * *'
+  # Manual trigger for ad-hoc runs / smoke tests
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Max nomenclature rows to sweep'
+        required: false
+        default: '100'
+
+concurrency:
+  group: pack-info-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: Run nightly pack-info sweep
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp-finance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/mcp-finance/package-lock.json
+      - run: npm ci
+      - name: Run sweep
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PACK_INFO_SWEEP_LIMIT: ${{ github.event.inputs.limit || '100' }}
+          PACK_INFO_SWEEP_MC_TASK_ID: '25523c4f-a7ce-43fc-96e4-bc2e304b6d11'
+        run: npm run sweep:pack-info
