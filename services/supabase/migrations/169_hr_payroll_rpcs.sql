@@ -162,7 +162,7 @@ CREATE OR REPLACE FUNCTION fn_approve_payroll(
   p_period_id UUID,
   p_approved_by TEXT DEFAULT 'lesia'
 )
-RETURNS payroll_periods
+RETURNS SETOF payroll_periods
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
