@@ -224,6 +224,18 @@ export function FinanceManager() {
   )
   const [jobError, setJobError] = useState<string | null>(null)
 
+  /* Pack-info hook result toast — non-blocking summary after receipt approve */
+  const [packInfoToast, setPackInfoToast] = useState<
+    | { kind: 'ok'; corrections: number; skipped: number; errors: number }
+    | { kind: 'error'; message: string }
+    | null
+  >(null)
+  useEffect(() => {
+    if (!packInfoToast) return
+    const t = setTimeout(() => setPackInfoToast(null), 8000)
+    return () => clearTimeout(t)
+  }, [packInfoToast])
+
   /* ── Staging Area state (Phase 4.4 + 4.6: added imageUrls) ── */
   /* Initialize from sessionStorage to survive HMR remounts */
   const [stagingData, _setStagingData] = useState<{
@@ -543,6 +555,39 @@ export function FinanceManager() {
     if (rpcErr) throw rpcErr
     if (data && !data.ok) throw new Error(data.error || 'RPC returned error')
 
+    // Pack-info hook — best-effort, fire-and-forget (parity with MCP approve-receipt).
+    // Hook resolves base_unit / pack_weight for suspicious nomenclature rows. Errors here
+    // MUST NOT block receipt approval — surface as non-blocking toast.
+    const expenseId: string | undefined = data?.expense_id
+    if (expenseId) {
+      void (async () => {
+        try {
+          const { data: hookResult, error: hookErr } = await supabase.functions.invoke(
+            'pack-info-resolve',
+            { body: { expense_id: expenseId, food_items: payload.food_items } },
+          )
+          if (hookErr) {
+            console.error('[pack-info-resolve] invoke error:', hookErr.message)
+            setPackInfoToast({ kind: 'error', message: hookErr.message })
+            return
+          }
+          const r = hookResult as
+            | { corrections?: unknown[]; skipped?: unknown[]; errors?: unknown[] }
+            | null
+          setPackInfoToast({
+            kind: 'ok',
+            corrections: r?.corrections?.length ?? 0,
+            skipped: r?.skipped?.length ?? 0,
+            errors: r?.errors?.length ?? 0,
+          })
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          console.error('[pack-info-resolve] crashed:', msg)
+          setPackInfoToast({ kind: 'error', message: msg })
+        }
+      })()
+    }
+
     // Success — exit staging, refetch
     setStagingData(null)
     setReceiptUrls({})
@@ -617,6 +662,42 @@ export function FinanceManager() {
           <button
             type="button"
             onClick={() => setJobError(null)}
+            className="ml-auto text-xs text-slate-500 hover:text-slate-300"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Pack-info hook result toast — auto-dismisses after 8s */}
+      {packInfoToast && (
+        <div
+          className={
+            'flex items-start gap-2 rounded-xl border px-4 py-3 shadow-sm ' +
+            (packInfoToast.kind === 'ok'
+              ? 'border-emerald-500/20 bg-emerald-500/[0.06]'
+              : 'border-amber-500/20 bg-amber-500/[0.06]')
+          }
+        >
+          <div
+            className={
+              'mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ' +
+              (packInfoToast.kind === 'ok' ? 'bg-emerald-400' : 'bg-amber-400')
+            }
+          />
+          <p
+            className={
+              'text-xs leading-relaxed ' +
+              (packInfoToast.kind === 'ok' ? 'text-emerald-300/90' : 'text-amber-300/90')
+            }
+          >
+            {packInfoToast.kind === 'ok'
+              ? `Pack-info: ${packInfoToast.corrections} corrections, ${packInfoToast.skipped} skipped, ${packInfoToast.errors} errors`
+              : `Pack-info hook failed: ${packInfoToast.message}`}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPackInfoToast(null)}
             className="ml-auto text-xs text-slate-500 hover:text-slate-300"
           >
             Dismiss
