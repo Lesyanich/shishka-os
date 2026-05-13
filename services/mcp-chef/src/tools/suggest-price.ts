@@ -1,4 +1,4 @@
-import { getBomTree, calculateTreeCost } from "../lib/bom-walker.js";
+import { getBomTree, calculateTreeCost, collectNullCostLeaves } from "../lib/bom-walker.js";
 
 export const suggestPriceSchema = {
   name: "suggest_price",
@@ -30,6 +30,17 @@ export async function suggestPrice(args: {
     if (!tree) return { error: "Product not found" };
 
     const totalCost = calculateTreeCost(tree);
+    const nullCostLeaves = collectNullCostLeaves(tree);
+
+    if (nullCostLeaves.length > 0) {
+      const items = nullCostLeaves
+        .map((i) => `${i.product_code} (${i.name})`)
+        .join(", ");
+      return {
+        error: `Cannot suggest price: ${nullCostLeaves.length} ingredient(s) have no purchase history (WAC = null). Cost is incomplete and margin would be unreliable. Missing: ${items}`,
+      };
+    }
+
     if (totalCost === 0) {
       return {
         error:

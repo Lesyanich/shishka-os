@@ -33,6 +33,7 @@ export interface BomTreeNode {
   yield_loss_pct: number; // loss percentage (0 = no loss, 15 = 15% lost)
   depth: number;
   line_cost: number;
+  has_null_cost: boolean; // true if this leaf or any descendant has cost_per_unit = null
   children: BomTreeNode[];
 }
 
@@ -101,6 +102,7 @@ export async function getBomTree(
 
   // Calculate cost: if has children, sum children costs; otherwise use own cost_per_unit
   let lineCost = 0;
+  const hasNullCost = children.length === 0 && item.cost_per_unit == null;
   if (children.length > 0) {
     lineCost = children.reduce((sum, c) => sum + c.line_cost, 0);
   } else {
@@ -120,8 +122,28 @@ export async function getBomTree(
     yield_loss_pct: yieldLossPct,
     depth,
     line_cost: Math.round(lineCost * 100) / 100,
+    has_null_cost: hasNullCost || children.some((c) => c.has_null_cost),
     children,
   };
+}
+
+/**
+ * Collect leaf ingredients that have null cost_per_unit (WAC missing).
+ */
+export function collectNullCostLeaves(
+  node: BomTreeNode,
+  result: { product_code: string; name: string }[] = []
+): { product_code: string; name: string }[] {
+  if (node.children.length === 0) {
+    if (node.item.cost_per_unit == null) {
+      result.push({ product_code: node.item.product_code, name: node.item.name });
+    }
+  } else {
+    for (const child of node.children) {
+      collectNullCostLeaves(child, result);
+    }
+  }
+  return result;
 }
 
 /**
