@@ -56,7 +56,7 @@ server.tool(
     ),
     domain: z.enum([
       "kitchen", "procurement", "finance", "marketing",
-      "ops", "sales", "strategy", "tech"
+      "ops", "sales", "strategy", "tech", "legal"
     ]).describe("Business domain. See DISPATCH_RULES.md for scope of each domain."),
     status: z.enum(["inbox", "done"]).default("inbox").describe(
       "'inbox' = needs Lesia's triage (default). 'done' = work already completed, just logging."
@@ -108,7 +108,7 @@ server.tool(
   {
     domain: z.enum([
       "kitchen", "procurement", "finance", "marketing",
-      "ops", "sales", "strategy", "tech"
+      "ops", "sales", "strategy", "tech", "legal"
     ]).optional().describe("Filter by domain"),
     status: z.enum([
       "inbox", "backlog", "in_progress", "blocked", "done", "cancelled"
