@@ -1,9 +1,9 @@
 ---
 name: session-diary
-description: "Auto-save session summary to MemPalace before ending. Triggers: session end, end session, завершить сессию, save diary, /session-diary."
+description: "Auto-save session summary to native auto-memory before ending. Triggers: session end, end session, завершить сессию, save diary, /session-diary."
 ---
 
-# Session Diary — AI Summary to MemPalace
+# Session Diary — AI Summary to Auto-Memory
 
 You are writing a session diary entry. This captures the **rich context** that shell hooks cannot: decisions, reasoning, open questions, and what the next session should know.
 
@@ -22,14 +22,11 @@ You are writing a session diary entry. This captures the **rich context** that s
    - Open questions or unfinished work
    - Anything the next session should know immediately
 
-2. **Write the diary entry** using the MemPalace MCP tool:
+2. **Write the diary entry** to native auto-memory using the Write tool:
 
+Save to the auto-memory directory as a session file:
 ```
-mcp__shishka-mempalace__mempalace_diary_write(
-  agent_name: "claude-code",
-  entry: "<your summary>",
-  topic: "session-summary"
-)
+~/.claude/projects/<project-key>/memory/session_<YYYY_MM_DD>_<topic>.md
 ```
 
 3. **Format** the entry as structured text:
@@ -55,7 +52,9 @@ mcp__shishka-mempalace__mempalace_diary_write(
 - Start by checking ...
 ```
 
-4. **Confirm** to the user that the diary was saved.
+4. **Update MEMORY.md** — add a line referencing the new session file in the memory index.
+
+5. **Confirm** to the user that the diary was saved.
 
 ## Rules
 

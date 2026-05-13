@@ -17,14 +17,10 @@
 2. Прочитай `STATUS.md` для глобального состояния (L0).
 3. Прочитай `docs/constitution/operational-rules.md` (протокол отчётности).
 4. Прочитай `docs/constitution/operational-rules.md` (протокол хэндоффа между сессиями).
-5. **MemPalace wake-up:**
-   - `mempalace_status` — проверить доступность Brain
-   - `mempalace_kg_query(wing="wing_finance", limit=10)` — загрузить последние решения: классификация расходов, supplier rulings, CEO preferences по категориям
-   - Если `wing_finance` пуст — нормально, контент накопится с сессиями
-6. `list_tasks(status="in_progress", domain="finance")` → продолжить незавершённое.
-7. `list_tasks(status="inbox", domain="finance")` → есть ли новые задачи (от Dispatcher, Chef, COO)?
-8. `check_inbox(status="pending")` → есть ли чеки для обработки?
-9. Доложи: "{N} чеков в очереди, {M} задач в inbox, {K} in_progress. Начинаю с [X]."
+5. `list_tasks(status="in_progress", domain="finance")` → продолжить незавершённое.
+6. `list_tasks(status="inbox", domain="finance")` → есть ли новые задачи (от Dispatcher, Chef, COO)?
+7. `check_inbox(status="pending")` → есть ли чеки для обработки?
+8. Доложи: "{N} чеков в очереди, {M} задач в inbox, {K} in_progress. Начинаю с [X]."
 
 Если найдена `in_progress` задача — **продолжить её**, а не начинать новую.
 
@@ -339,35 +335,18 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 
 ## Memory
 
-Shishka Brain v2 has three orthogonal layers. Route queries by question shape, not keyword.
+Route by question shape.
 
 | Question shape | Layer | Tool |
 |---|---|---|
-| "How did we classify X last time?" | L1 Conversations | MemPalace (`wing_finance`) |
-| "What did CEO rule on ambiguous item Y?" | L1 Conversations | MemPalace (`wing_finance`) |
-| "Which supplier gave us trouble before?" | L1 Conversations | MemPalace (`wing_finance`) |
-| "What's the pricing history for supplier Z?" | L1 Conversations | MemPalace (`wing_finance`) |
-| "What are our financial category codes?" | L2 Project Knowledge | `docs/domain/financial-codes.md` + LightRAG `:9621` |
-| "What's the FC target for this location?" | L2 Project Knowledge | `docs/bible/targets.md` + LightRAG `:9621` |
-| "Where is function X?" / "What calls Y?" | L3 Code Structure | Graphify (when live) |
+| "How did we classify X last time?" | Native auto-memory files | Read auto-memory |
+| "What are our financial category codes?" | Project docs | Read `docs/domain/financial-codes.md` |
+| "What's the FC target for this location?" | Project docs | Read `docs/bible/targets.md` |
 | "What finance tasks are open?" | Action ledger | MC `shishka-mission-control` |
-
-**Rule:** no layer is a fallback for another. Knowledge gap in one layer → fix IN that layer, not by fishing elsewhere.
-
-**Session start:** MemPalace wake-up for `wing_finance` loads recent classification decisions, supplier rulings, CEO preferences on ambiguous items. See Context Loading step 5.
-
-**LightRAG query (L2):** HTTP POST to `http://localhost:9621/query` with body `{"query": "...", "mode": "mix"}`. Use for cross-document reasoning over bible + domain docs. Fallback: read static files directly (`docs/domain/financial-codes.md`, `docs/bible/targets.md`).
-
-**Finance examples:** "was this item COGS or OpEx last time?", "what did CEO decide about cleaning supplies category?", "did supplier Makro overcharge us before?", "what's the tax invoice rule for small markets?", "which nomenclature mapping did we use for imported items?".
 
 ## Session End
 
-Write one MemPalace drawer in `wing_finance` capturing:
-- **Noticed:** pricing anomalies, new supplier patterns, classification edge cases
-- **Unsaid:** potential savings spotted but not escalated, supplier quality observations
-- **Watch next session:** pending tax invoices, unresolved duplicates, supplier follow-ups
-
-Use `mempalace_diary_write` for session diary, `mempalace_add_drawer` for standalone knowledge (e.g., "Makro membership discount applies only to items marked T").
+No MemPalace. Session diary goes to native auto-memory.
 
 ---
 
