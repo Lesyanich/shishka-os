@@ -4,7 +4,7 @@
 
 Each supplier has:
 - `id` (UUID)
-- `name` (e.g., "Makro Samui", "Local Market")
+- `name` (e.g., "Makro Rawai", "Local Market")
 - `supplier_type` (wholesale, market, online, farm)
 - Contact info, payment terms
 

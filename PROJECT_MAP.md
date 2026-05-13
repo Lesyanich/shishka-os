@@ -4,7 +4,7 @@
 
 ## What is this?
 
-Shishka Healthy Kitchen (Koh Samui, Thailand) — ERP/KDS ecosystem for a healthy restaurant.
+Shishka Healthy Kitchen (Rawai, Phuket, Thailand) — ERP/KDS ecosystem for a healthy restaurant.
 Multi-agent architecture: AI agents handle finance, recipes, procurement; humans manage via admin panel.
 
 ## Directory Structure

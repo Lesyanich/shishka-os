@@ -3,7 +3,7 @@
   "flow_type": "CapEx",
   "category_code": 1100,
   "supplier_name": "Makro",
-  "details": "Makro Samui — fans for kitchen",
+  "details": "Makro Rawai — fans for kitchen",
   "amount_original": 4336,
   "discount_total": -134,
   "vat_amount": 283.55,
@@ -16,7 +16,7 @@
       "name_en": "SIAM MAKRO PUBLIC COMPANY LIMITED",
       "name_th": "บริษัท สยามแม็คโคร จำกัด (มหาชน)",
       "tax_id": "0107536000269",
-      "branch": "048 Samui"
+      "branch": "166 Rawai"
     },
     "header": {
       "invoice_number": "048-2026-04-0012345",

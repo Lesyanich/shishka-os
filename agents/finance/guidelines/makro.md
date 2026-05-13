@@ -55,7 +55,7 @@ vat_amount = amount_original × 7 / 107
 ┌──────────────────────────────────────────────────────────┐
 │  SIAM MAKRO PUBLIC COMPANY LIMITED                       │
 │  TAX ID: 0107536000269                                   │
-│  Branch: 048 — Samui                                     │
+│  Branch: 166 — Rawai                                     │
 │  Date: 02/04/2569    Time: 14:23                         │
 │  Receipt No: 048-2026-04-0012345                         │
 ├──────────────────────────────────────────────────────────┤

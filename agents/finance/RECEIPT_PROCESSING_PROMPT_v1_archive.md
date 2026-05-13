@@ -293,7 +293,7 @@ manage_capex_assets(action: "create", asset_name, vendor, initial_value, purchas
 │  SIAM MAKRO PUBLIC COMPANY LIMITED                       │
 │  สยามแม็คโคร                                              │
 │  TAX ID: 0107536000269                                   │
-│  Branch: 048 — Samui                                     │
+│  Branch: 166 — Rawai                                     │
 │  Date: 02/04/2569    Time: 14:23                         │
 │  Receipt No: 048-2026-04-0012345                         │
 ├──────────────────────────────────────────────────────────┤
@@ -334,7 +334,7 @@ manage_capex_assets(action: "create", asset_name, vendor, initial_value, purchas
     "name_en": "SIAM MAKRO PUBLIC COMPANY LIMITED",
     "name_th": "บริษัท สยามแม็คโคร จำกัด (มหาชน)",
     "tax_id": "0107536000269",
-    "branch": "048 Samui",
+    "branch": "166 Rawai",
     "address": "...",
     "phone": "..."
   },
@@ -519,7 +519,7 @@ manage_capex_assets(action: "create", asset_name, vendor, initial_value, purchas
   "flow_type": "CapEx",
   "category_code": 1100,
   "supplier_name": "Makro",
-  "details": "Makro Samui — fans for kitchen",
+  "details": "Makro Rawai — fans for kitchen",
   "amount_original": 4336,
   "discount_total": -134,
   "vat_amount": 283.55,

@@ -370,7 +370,7 @@ Shishka Brain v2 has three orthogonal layers. Route queries by question shape, n
 
 **L2+L3 Project Knowledge (Graphify):** Use `graphify query "<question>"` CLI for cross-document reasoning over bible, domain docs, agents, and code. Graph: 1,938 nodes, 1,929 edges. Fallback: read static files directly (`docs/bible/*`, `agents/chef/domain/culinary-knowledge.md`). MCP server `shishka-graphify` available when connected.
 
-**Chef examples:** "did we try beetroot with tahini before?", "what yield did we get from PF-BAKED_PUMPKIN last test?", "why did Lesia reject the first hummus recipe?", "what's our CBS framework?", "which RAW items are seasonal on Samui?".
+**Chef examples:** "did we try beetroot with tahini before?", "what yield did we get from PF-BAKED_PUMPKIN last test?", "why did Lesia reject the first hummus recipe?", "what's our CBS framework?", "which RAW items are seasonal on Phuket?".
 
 ## Tracking Protocol (Tier 1 / Tier 2)
 
