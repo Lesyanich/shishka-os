@@ -19,7 +19,7 @@ MODEL="${CHEF_MODEL:-sonnet}"
 #   Initial prompt: triggers context loading (reads memory files, checks DB)
 claude \
   --model "$MODEL" \
-  --append-system-prompt-file agents/chef/cowork-project-instructions.md \
+  --append-system-prompt-file agents/chef/AGENT.md \
   --allowedTools \
     "mcp__shishka-chef__search_products" \
     "mcp__shishka-chef__get_bom_tree" \
@@ -35,19 +35,6 @@ claude \
     "mcp__shishka-mission-control__get_task" \
     "mcp__shishka-mission-control__emit_business_task" \
     "mcp__shishka-mission-control__update_task" \
-    "mcp__shishka-mempalace__mempalace_status" \
-    "mcp__shishka-mempalace__mempalace_search" \
-    "mcp__shishka-mempalace__mempalace_kg_query" \
-    "mcp__shishka-mempalace__mempalace_list_wings" \
-    "mcp__shishka-mempalace__mempalace_list_rooms" \
-    "mcp__shishka-mempalace__mempalace_get_taxonomy" \
-    "mcp__shishka-mempalace__mempalace_traverse" \
-    "mcp__shishka-mempalace__mempalace_diary_read" \
-    "mcp__shishka-mempalace__mempalace_add_drawer" \
-    "mcp__shishka-mempalace__mempalace_diary_write" \
-    "mcp__shishka-mempalace__mempalace_kg_add" \
-    "mcp__shishka-mempalace__mempalace_kg_invalidate" \
-    "mcp__shishka-mempalace__mempalace_check_duplicate" \
     "Read" \
     "Edit" \
     "Glob" \
