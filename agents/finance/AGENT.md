@@ -158,26 +158,37 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
    ├─ read_guideline("arithmetic-check")
    └─ Если не сходится → перечитай чек. НИКОГДА не сохраняй payload с ошибками.
 
-6. КЛАССИФИКАЦИЯ
+6. SELF-LEARNING CHECK (перед классификацией)
+   ├─ search_suppliers(query: "{supplier_name}") → проверить supplier_aliases
+   ├─ Если поставщик известен → использовать learned category_code из category_overrides
+   └─ Если нет learned данных → стандартная классификация ниже
+
+7. КЛАССИФИКАЦИЯ
    ├─ read_guideline("classification")
    ├─ Определи flow_type (COGS / OpEx / CapEx) и category_code
+   ├─ Личные покупки в бизнес-чеке → category_code 2900 (Owner personal)
    └─ Если CapEx → дополнительно read_guideline("capex")
 
-7. ИДЕНТИФИКАЦИЯ ТОВАРОВ (только COGS)
+8. ИДЕНТИФИКАЦИЯ ТОВАРОВ (только COGS)
    ├─ Barcode → search_nomenclature(barcode)
    ├─ Supplier SKU → RPC проверит supplier_catalog
    ├─ Только название → search_nomenclature(name)
    └─ Не найден → nomenclature_id: null (RPC создаст RAW-AUTO-*)
    **ВСЕГДА** передавай: barcode, supplier_sku, original_name, brand, package_weight
 
-8. ПРОВЕРКА ДУБЛЕЙ
+9. ПРОВЕРКА ДУБЛЕЙ
    ├─ check_duplicate(date, supplier_name, amount)
    └─ Если найден дубль → _duplicate_warning: true + детали
 
-9. СОХРАНЕНИЕ
-   └─ update_inbox(inbox_id, status: "parsed", parsed_payload: {JSON})
+10. PHOTO URL — ОБЯЗАТЕЛЬНО
+    ├─ receipt_supplier_url = photo_urls[0] из inbox (ВСЕГДА)
+    ├─ Если 2+ фото и есть tax invoice → tax_invoice_url = photo_urls[1]
+    └─ ⛔ НИКОГДА не сохранять payload без receipt_supplier_url
 
-10. TRACKING (Tier 1)
+11. СОХРАНЕНИЕ
+    └─ update_inbox(inbox_id, status: "parsed", parsed_payload: {JSON})
+
+12. TRACKING (Tier 1)
     └─ emit_business_task (через mcp-mission-control):
        title: "Parsed receipt: {supplier} | {amount} THB | {N} items"
        domain: finance, source: agent_discovery, created_by: finance-agent
@@ -185,7 +196,7 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
        tags: ["receipt", "{supplier_type}"]
        related_ids: { inbox_id, receipt_date, batch_total_thb }
 
-11. ОТЧЁТ И СТОП
+13. ОТЧЁТ И СТОП
     ├─ "✅ Чек распарсен: {supplier} | {date} | {amount} THB | {N} позиций"
     └─ СТОП. Не жди подтверждения. Не вызывай approve_receipt.
 ```
