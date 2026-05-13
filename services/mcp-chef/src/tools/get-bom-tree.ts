@@ -3,6 +3,7 @@ import {
   calculateTreeCost,
   calculateTreeNutrition,
   formatBomTree,
+  collectNullCostLeaves,
 } from "../lib/bom-walker.js";
 
 export const getBomTreeSchema = {
@@ -33,6 +34,17 @@ export async function getBomTreeTool(args: { product_id: string }) {
     const nutrition = calculateTreeNutrition(tree);
     const formatted = formatBomTree(tree);
 
+    const nullCostLeaves = collectNullCostLeaves(tree);
+    const warnings: string[] = [];
+    if (nullCostLeaves.length > 0) {
+      const items = nullCostLeaves
+        .map((i) => `${i.product_code} (${i.name})`)
+        .join(", ");
+      warnings.push(
+        `WAC_NULL: ${nullCostLeaves.length} ingredient(s) have no purchase history — cost treated as 0. Margin is UNRELIABLE. Missing: ${items}`
+      );
+    }
+
     return {
       product: {
         code: tree.item.product_code,
@@ -43,6 +55,7 @@ export async function getBomTreeTool(args: { product_id: string }) {
       },
       bom_tree: formatted,
       total_cost: totalCost,
+      cost_complete: nullCostLeaves.length === 0,
       margin:
         tree.item.price && totalCost > 0
           ? Math.round(((tree.item.price - totalCost) / tree.item.price) * 100)
@@ -50,6 +63,7 @@ export async function getBomTreeTool(args: { product_id: string }) {
       nutrition,
       has_children: tree.children.length > 0,
       ingredient_count: countLeaves(tree),
+      warnings,
     };
   } catch (err: any) {
     return { error: err.message };
