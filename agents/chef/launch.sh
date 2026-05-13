@@ -52,4 +52,6 @@ claude \
     "Edit" \
     "Glob" \
     "Grep" \
+    "WebSearch" \
+    "WebFetch" \
   "$(cat agents/chef/first-prompt.md)"

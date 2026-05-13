@@ -77,9 +77,9 @@ Chef Agent подключает **два** MCP-сервера:
 | `check_inventory` | Остатки, low-stock alerts |
 | `list_equipment` | Каталог оборудования (76 единиц) |
 
-### Кулинарные знания (статический domain file, НЕ MCP tool)
-Вместо `search_knowledge` (deprecated) — читай `agents/chef/domain/culinary-knowledge.md`.
-Содержит: flavor pairings, ratios, пищевую химию, принципы healthy kitchen, Shishka-специфику.
+### Кулинарные знания (reasoning principles + WebSearch)
+Читай `agents/chef/domain/culinary-knowledge.md` — 7 принципов мышления + физика еды.
+Для незнакомых ингредиентов — используй WebSearch (Принцип 5: Research-First).
 Загружай при R&D задачах (WF-7) и при создании новых блюд (WF-1).
 
 ### Chef MCP: Запись (только с подтверждением)
@@ -202,10 +202,11 @@ Chef Agent подключает **два** MCP-сервера:
 
 ```
 Когда Леся просит придумать/оптимизировать блюдо:
-1. Прочитать culinary-knowledge.md → pairings, ratios, chemistry, Shishka-специфика
+1. Прочитать culinary-knowledge.md → 7 принципов мышления (текстура, культурный контекст, CBS, research-first...)
+1b. Для незнакомых ингредиентов → WebSearch: preparation methods, safety, pairings
 2. search_products(type=RAW) → что есть в номенклатуре
 3. check_inventory(type=RAW) → что есть в наличии
-4. Предложить 2-3 варианта с обоснованием из culinary-knowledge
+4. Предложить 2-3 варианта с обоснованием из принципов мышления
 5. После выбора → перейти к WF-1 или WF-3
 ```
 
