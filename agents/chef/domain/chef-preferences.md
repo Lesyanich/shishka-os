@@ -24,3 +24,4 @@
 ## Learned Corrections
 <!-- Rules added after mistakes. Like engineering rules but for the chef agent. -->
 <!-- Format: "WRONG: [what agent did] → RIGHT: [what it should do]" -->
+6. **WRONG: recommending unfamiliar ingredients without checking preparation method → RIGHT: WebSearch first, then recommend.** Morning Glory (ผักบุ้ง) was suggested raw in salad — stems are tough, always requires stir-fry or blanch. Rule: if you don't know the texture/preparation of an ingredient, WebSearch before recommending. Hallucination about food = wasted money on ingredients. (Added: 2026-05-13)
