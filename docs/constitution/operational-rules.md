@@ -567,6 +567,7 @@ Specs: project-specific → `docs/projects/{project}/plans/spec-*.md`, shared �
 | `/strategy` | Strategic COO | `agents/strategy/AGENT.md` + this file + `docs/business/DISPATCH_RULES.md` |
 | `/techlead` | Technical Tech-Lead | `agents/tech-lead/AGENT.md` + this file + `technical-rules.md` + `docs/operations/skills-services-policy.md` |
 | `/procurement` | Procurement Analyst | `agents/procurement/AGENT.md` + MC tasks (domain=procurement) + finance/chef read-only |
+| `/lawyer` | Legal Advisor (Saul; alias `/saul`) | `agents/lawyer/AGENT.md` + `CONTEXT/` + `TEMPLATES/` + `docs/operations/company-documents-register.md` + MC tasks (domain=legal) |
 | `/health` | Observability snapshot | `scripts/health.sh` — terminal/slash command, no agent role |
 
 ## Free Text Routing (model inference)
@@ -579,6 +580,7 @@ Guidelines:
 - PR, bug, deploy, commit, migration, CI, code → **tech** → load `/techlead`
 - Roadmap, priority, strategy, initiative, business idea → **strategy** → load `/strategy`
 - Equipment, supplier, purchase, buy, price comparison, sourcing → **procurement** → load `/procurement`
+- Visa, work permit, FDA, лицензия, контракт, аренда, налог, AGM, юрист, право, закон, штраф, нотариус, lease, tax, labour, immigration, court, legal, ใบอนุญาต, สัญญา, ภาษี → **legal** → load `/lawyer`
 - Inbox triage, sprint, task coordination → **tech** (hygiene is Tech-Lead's job); priority re-ranking → **strategy**
 
 **When unsure:** ask the user: "This sounds like [domain]. Should I load [agent]?"
