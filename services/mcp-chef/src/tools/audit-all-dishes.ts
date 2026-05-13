@@ -101,6 +101,18 @@ export async function auditAllDishes(args: {
         issues.push(`Low margin: ${margin}%`);
       if (!dish.is_available) issues.push("Marked unavailable");
 
+      // Production flow check
+      if (tree && tree.children.length > 0) {
+        const { data: flowRows } = await sb
+          .from("recipes_flow")
+          .select("id")
+          .eq("nomenclature_id", dish.id)
+          .limit(1);
+        if (!flowRows || flowRows.length === 0) {
+          issues.push("Missing production flow");
+        }
+      }
+
       // Nutrition completeness
       let nutritionComplete = true;
       let hasNutrition = false;
