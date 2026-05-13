@@ -6,13 +6,23 @@ import {
   X,
   Check,
   AlertTriangle,
+  Mail,
+  KeyRound,
+  RotateCcw,
+  Lock,
+  CheckCircle2,
+  Hash,
 } from 'lucide-react'
 import {
   useStaffCards,
+  deriveAuthStatus,
   type StaffCard,
   type LeaveBalance,
   type StaffPatch,
+  type AuthStatus,
+  type AuthMutationResult,
 } from '../../hooks/use-staff-cards'
+import { useAppRole } from '../../contexts/AppRoleContext'
 
 const ROLE_BADGE: Record<string, string> = {
   owner: 'bg-amber-500/15 text-amber-300',
@@ -22,6 +32,12 @@ const ROLE_BADGE: Record<string, string> = {
 const ROLE_ICON: Record<string, typeof Shield> = {
   owner: Shield,
   cook: ChefHat,
+}
+
+const AUTH_STATUS_BADGE: Record<AuthStatus, { label: string; cls: string; Icon: typeof Lock }> = {
+  no_login: { label: 'No login', cls: 'bg-slate-700/40 text-slate-300', Icon: Lock },
+  linked:   { label: 'Linked',   cls: 'bg-emerald-500/15 text-emerald-300', Icon: CheckCircle2 },
+  pin_only: { label: 'PIN only', cls: 'bg-sky-500/15 text-sky-300', Icon: Hash },
 }
 
 function tenure(hireDate: string | null): string {
@@ -53,21 +69,44 @@ function wpExpiryLabel(expiry: string | null): string {
   return `${days}d left`
 }
 
+function rotationLabel(pinSetAt: string | null): string {
+  if (!pinSetAt) return ''
+  const days = Math.floor((Date.now() - new Date(pinSetAt).getTime()) / 86400000)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  return `${days}d ago`
+}
+
 const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract', 'probation']
+
+interface StaffActions {
+  invite: (id: string, email: string) => Promise<AuthMutationResult>
+  setPin: (id: string, pin: string) => Promise<AuthMutationResult>
+  reset:  (id: string) => Promise<AuthMutationResult>
+}
+
+interface ActionModalState {
+  kind: 'invite' | 'set_pin' | 'rotate_pin' | 'reset_password'
+  card: StaffCard
+}
 
 function StaffCardView({
   card,
   leaves,
   onUpdate,
+  onOpenModal,
 }: {
   card: StaffCard
   leaves: LeaveBalance[]
   onUpdate: (id: string, patch: StaffPatch) => Promise<void>
+  onOpenModal: (s: ActionModalState) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<StaffPatch>({})
-
   const RoleIcon = ROLE_ICON[card.app_role] ?? Shield
+  const authStatus = deriveAuthStatus(card)
+  const statusMeta = AUTH_STATUS_BADGE[authStatus]
+  const StatusIcon = statusMeta.Icon
 
   function startEdit() {
     setDraft({
@@ -141,6 +180,61 @@ function StaffCardView({
           </div>
         )}
       </div>
+
+      {/* Access row */}
+      {card.is_active && (
+        <div className="space-y-1.5 rounded-lg bg-slate-950/50 p-2.5 ring-1 ring-slate-800/60">
+          <div className="flex items-center justify-between">
+            <span
+              className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${statusMeta.cls}`}
+            >
+              <StatusIcon className="h-3 w-3" /> {statusMeta.label}
+            </span>
+            {card.app_role === 'cook' && card.pin_set_at && (
+              <span className="text-[10px] text-slate-500">
+                Rotated {rotationLabel(card.pin_set_at)}
+              </span>
+            )}
+          </div>
+          {card.app_role === 'owner' && card.email && (
+            <p className="truncate text-[11px] text-slate-400">{card.email}</p>
+          )}
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {card.app_role === 'owner' && authStatus === 'no_login' && (
+              <ActionPill
+                Icon={Mail}
+                label="Invite"
+                tone="emerald"
+                onClick={() => onOpenModal({ kind: 'invite', card })}
+              />
+            )}
+            {card.app_role === 'owner' && authStatus === 'linked' && (
+              <ActionPill
+                Icon={RotateCcw}
+                label="Reset password"
+                tone="amber"
+                onClick={() => onOpenModal({ kind: 'reset_password', card })}
+              />
+            )}
+            {card.app_role === 'cook' && authStatus === 'no_login' && (
+              <ActionPill
+                Icon={KeyRound}
+                label="Set PIN"
+                tone="emerald"
+                onClick={() => onOpenModal({ kind: 'set_pin', card })}
+              />
+            )}
+            {card.app_role === 'cook' && authStatus === 'pin_only' && (
+              <ActionPill
+                Icon={RotateCcw}
+                label="Rotate PIN"
+                tone="amber"
+                onClick={() => onOpenModal({ kind: 'rotate_pin', card })}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Details */}
       {!editing ? (
@@ -256,8 +350,210 @@ function EditField({
   )
 }
 
+const TONE_BUTTON: Record<'emerald' | 'amber', string> = {
+  emerald: 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30 hover:bg-emerald-500/20',
+  amber:   'bg-amber-500/10 text-amber-300 ring-amber-500/30 hover:bg-amber-500/20',
+}
+
+function ActionPill({
+  Icon,
+  label,
+  tone,
+  onClick,
+}: {
+  Icon: typeof Mail
+  label: string
+  tone: 'emerald' | 'amber'
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium ring-1 transition ${TONE_BUTTON[tone]}`}
+    >
+      <Icon className="h-3 w-3" /> {label}
+    </button>
+  )
+}
+
+function ActionModal({
+  state,
+  onClose,
+  actions,
+}: {
+  state: ActionModalState
+  onClose: () => void
+  actions: StaffActions
+}) {
+  const [email, setEmail] = useState(state.card.email ?? '')
+  const [pin, setPin] = useState('')
+  const [pinConfirm, setPinConfirm] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const title = {
+    invite:         `Invite ${state.card.name}`,
+    set_pin:        `Set PIN for ${state.card.name}`,
+    rotate_pin:     `Rotate PIN for ${state.card.name}`,
+    reset_password: `Reset password for ${state.card.name}`,
+  }[state.kind]
+
+  const irreversibleNote = {
+    invite:         null,
+    set_pin:        'PIN cannot be retrieved later — write it down for the cook.',
+    rotate_pin:     'The current PIN will stop working immediately. Tell the cook the new PIN before saving.',
+    reset_password: 'A password-reset email will be sent to the linked address.',
+  }[state.kind]
+
+  async function submit() {
+    setSubmitting(true)
+    setError(null)
+    let res: AuthMutationResult
+
+    if (state.kind === 'invite') {
+      if (!email.trim()) {
+        setError('Email required')
+        setSubmitting(false)
+        return
+      }
+      res = await actions.invite(state.card.id, email.trim())
+    } else if (state.kind === 'set_pin' || state.kind === 'rotate_pin') {
+      if (pin.length < 6) {
+        setError('PIN must be at least 6 digits')
+        setSubmitting(false)
+        return
+      }
+      if (!/^\d+$/.test(pin)) {
+        setError('PIN must be digits only')
+        setSubmitting(false)
+        return
+      }
+      if (pin !== pinConfirm) {
+        setError('PINs do not match')
+        setSubmitting(false)
+        return
+      }
+      res = await actions.setPin(state.card.id, pin)
+    } else {
+      res = await actions.reset(state.card.id)
+    }
+
+    setSubmitting(false)
+    if (res.ok) {
+      onClose()
+    } else {
+      setError(res.error ?? 'request failed')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-8 backdrop-blur">
+      <div className="w-full max-w-sm space-y-4 rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-100">{title}</h2>
+          <button
+            onClick={onClose}
+            className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {irreversibleNote && (
+          <p className="rounded bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300 ring-1 ring-amber-500/30">
+            <AlertTriangle className="mr-1 inline h-3 w-3" /> {irreversibleNote}
+          </p>
+        )}
+
+        {state.kind === 'invite' && (
+          <div>
+            <label className="text-[11px] text-slate-400">Email</label>
+            <input
+              type="email"
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@shishka.health"
+              className="mt-1 w-full rounded bg-slate-800 px-2.5 py-1.5 text-xs text-slate-100 ring-1 ring-slate-700 focus:outline-none focus:ring-emerald-500/50"
+            />
+          </div>
+        )}
+
+        {(state.kind === 'set_pin' || state.kind === 'rotate_pin') && (
+          <div className="space-y-2">
+            <div>
+              <label className="text-[11px] text-slate-400">New PIN (≥6 digits)</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                autoFocus
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                maxLength={12}
+                className="mt-1 w-full rounded bg-slate-800 px-2.5 py-1.5 font-mono text-sm text-slate-100 ring-1 ring-slate-700 focus:outline-none focus:ring-emerald-500/50"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400">Confirm PIN</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                value={pinConfirm}
+                onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))}
+                maxLength={12}
+                className="mt-1 w-full rounded bg-slate-800 px-2.5 py-1.5 font-mono text-sm text-slate-100 ring-1 ring-slate-700 focus:outline-none focus:ring-emerald-500/50"
+              />
+            </div>
+          </div>
+        )}
+
+        {state.kind === 'reset_password' && state.card.email && (
+          <p className="rounded bg-slate-950/60 px-3 py-2 text-[11px] text-slate-400 ring-1 ring-slate-800">
+            Reset link will be sent to <span className="text-slate-200">{state.card.email}</span>.
+          </p>
+        )}
+
+        {error && (
+          <p className="text-[11px] text-red-400">{error}</p>
+        )}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="rounded px-3 py-1.5 text-[11px] text-slate-400 hover:bg-slate-800"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-[11px] font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {submitting ? (
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <Check className="h-3 w-3" />
+            )}
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function StaffPage() {
-  const { staff, leaveBalances, isLoading, updateStaff } = useStaffCards()
+  const {
+    staff,
+    leaveBalances,
+    isLoading,
+    updateStaff,
+    inviteStaff,
+    setStaffPin,
+    resetStaffPassword,
+  } = useStaffCards()
+  const { role } = useAppRole()
+  const [modal, setModal] = useState<ActionModalState | null>(null)
 
   if (isLoading) {
     return (
@@ -267,17 +563,43 @@ export function StaffPage() {
     )
   }
 
+  // Defense-in-depth: route guard already blocks cooks, but if anyone slips
+  // past it, hide salary visibility instead of leaking data.
+  if (role !== 'owner') {
+    return (
+      <div className="rounded-lg bg-slate-900/60 p-6 text-center text-sm text-slate-400 ring-1 ring-slate-800">
+        Staff management is restricted to owners.
+      </div>
+    )
+  }
+
+  const actions: StaffActions = {
+    invite: inviteStaff,
+    setPin: setStaffPin,
+    reset:  resetStaffPassword,
+  }
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {staff.map((s) => (
-        <StaffCardView
-          key={s.id}
-          card={s}
-          leaves={leaveBalances.filter((l) => l.staff_id === s.id)}
-          onUpdate={updateStaff}
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {staff.map((s) => (
+          <StaffCardView
+            key={s.id}
+            card={s}
+            leaves={leaveBalances.filter((l) => l.staff_id === s.id)}
+            onUpdate={updateStaff}
+            onOpenModal={setModal}
+          />
+        ))}
+      </div>
+      {modal && (
+        <ActionModal
+          state={modal}
+          onClose={() => setModal(null)}
+          actions={actions}
         />
-      ))}
-    </div>
+      )}
+    </>
   )
 }
 
