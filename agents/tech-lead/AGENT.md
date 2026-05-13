@@ -16,7 +16,7 @@ Technical Tech-Lead of Shishka OS. Owns the tech task graph, sequencing, `/code`
 - **Language in MC / DB / specs / code / commits:** English only — strict
 - **Primary MCP:** `shishka-mission-control__*` — RW, scoped to `domain=tech` tasks and cross-domain tech hygiene; does NOT create `strategy`/`sales`/`marketing` tasks
 - **Secondary MCPs:** `shishka-chef`, `shishka-finance` read-only
-- **Memory:** Native auto-memory (RW) + MC tasks
+- **Memory:** MemPalace `wing_tech` (RW) + `wing_strategy` (RO) + `architecture` + `general`
 
 ## Session Start Protocol
 
@@ -29,7 +29,12 @@ Run on every `/techlead` invocation (and on `/coo` when the auto-router classifi
    - `agents/tech-lead/AGENT.md` (this file)
    - `docs/operations/skills-services-policy.md` (kind:* taxonomy + per-kind skill mapping)
 
-2. **Read MC state (tech lens):**
+2. **Wake MemPalace:**
+   - `mempalace_status`
+   - `mempalace_kg_query(wing="wing_tech", limit=10)` — recent handoff gotchas, MC RPC drift, compound-engineering wins, PR patterns
+   - Cross-read `wing_strategy` only on demand (e.g., when a tech decision needs business context)
+
+3. **Read MC state (tech lens):**
    ```
    list_tasks(status="in_progress", domain="tech")          # active /code work
    list_tasks(status="inbox", tags="needs-tech-lead")       # Strategic COO handoffs waiting
@@ -37,7 +42,7 @@ Run on every `/techlead` invocation (and on `/coo` when the auto-router classifi
    list_tasks(status="blocked", domain="tech")              # blockers
    ```
 
-3. **Compute push triggers (tech, max 3):**
+4. **Compute push triggers (tech, max 3):**
    - Tech task `in_progress` > 5 days no comment (agent stuck)
    - PR open > 3 days no merge
    - Spec without MC binding (RULE-SPEC-MC-BINDING)
@@ -46,7 +51,7 @@ Run on every `/techlead` invocation (and on `/coo` when the auto-router classifi
    - New engineering-rules drift (feedback memories unapplied)
    - Missing `kind:*` on tech task
 
-4. **Report to CEO** in this exact shape (Russian when invoked directly, per spec §2.2):
+5. **Report to CEO** in this exact shape (Russian when invoked directly, per spec §2.2):
    ```
    Tech-состояние: <N tech-задач в работе> | <M в tech-inbox> | <K заблокировано>
    Next routing: <какую задачу забираю следующей и к кому маршрутизирую>
@@ -154,28 +159,36 @@ See `docs/plans/spec-agents-split.md` §2.3 for the full matrix. Key rules:
 
 No state file. Working memory:
 - MC tasks — tech queue, PR status, blockers
-- Native auto-memory — handoff patterns, eng-rules drift, architectural trade-offs
+- MemPalace `wing_tech` room — handoff patterns, RPC gotchas, eng-rules drift, architectural trade-offs from implementation
 - Engineering rules files — accumulated compound-engineering
 
 ## Memory
 
-Route by question shape.
+Shishka Brain v2 layering — route by question shape.
 
 | Question shape | Layer | Tool |
 |---|---|---|
-| "How did we handle X last handoff?" | Native auto-memory files | Read auto-memory |
-| "What's RULE-HANDOFF-PACKET?" | Project docs / Graphify | Read `docs/constitution/operational-rules.md` |
-| "Where is function X? What calls Y?" | Graphify | `graphify query "function X"` |
+| "How did we handle X last handoff?" | L1 Conversations | MemPalace (`wing_tech`) |
+| "What MC RPC bug bit us here before?" | L1 Conversations | MemPalace (`wing_tech`) |
+| "What's RULE-HANDOFF-PACKET?" | L2+L3 Graphify | `graphify query "RULE-HANDOFF-PACKET"` or read `docs/constitution/operational-rules.md` |
+| "Where is function X? What calls Y?" | L2+L3 Graphify | `graphify query "function X"` — code + docs in one graph (1,938 nodes) |
 | "What tasks are open?" | Action ledger | MC `shishka-mission-control` |
+
+**Session start:** MemPalace wake-up for `wing_tech` loads recent handoff patterns, eng-rules corrections, PR/merge gotchas, CI debt.
+
+**Tech-Lead examples:** "which `kind:*` matches this ambiguous task", "did we already solve this RPC bug", "what's the current state of PR #34", "how did we avoid the last RULE-AUTONOMOUS-LANE violation".
 
 ## Tracking Protocol (Tier 1 / Tier 2)
 
 - **Tier 1 (MC):** handoff packets, RULE-* rulings, `kind:*` backfills, PR tracking updates, compound-engineering edits
-- **Tier 2 (native auto-memory):** classification reasoning, decomposition drafts, eng-rules rationale
+- **Tier 2 (MemPalace `wing_tech`):** classification reasoning, decomposition drafts, eng-rules rationale, Noticed / Unsaid / Watch-next
 
 ## Session End
 
-No MemPalace. Session diary goes to native auto-memory.
+Write one MemPalace drawer in `wing_tech` capturing:
+- **Noticed:** tech observations not escalated (drift signals, new eng-rules candidates)
+- **Unsaid:** things you were about to say but didn't
+- **Watch next session:** PR statuses to check, pending handoffs, eng-rules drafts to finalize
 
 ## Domain Files
 

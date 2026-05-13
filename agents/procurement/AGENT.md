@@ -16,9 +16,13 @@
 1. Прочитай `docs/constitution/operational-rules.md` (всегда).
 2. Прочитай `docs/constitution/operational-rules.md` (протокол отчётности).
 3. Прочитай `agents/procurement/AGENT.md` (этот файл).
-4. `list_tasks(status="in_progress", domain="procurement")` → продолжить незавершённое.
-5. `list_tasks(status="inbox", domain="procurement")` → есть ли новые задачи?
-6. Доложи: "{N} procurement задач, {M} в inbox. Готов к работе."
+4. **MemPalace wake-up:**
+   - `mempalace_status` — проверить доступность Brain
+   - `mempalace_kg_query(wing="wing_procurement", limit=10)` — загрузить последние решения: supplier rulings, equipment decisions, price benchmarks
+   - Если `wing_procurement` пуст — нормально, контент накопится с сессиями
+5. `list_tasks(status="in_progress", domain="procurement")` → продолжить незавершённое.
+6. `list_tasks(status="inbox", domain="procurement")` → есть ли новые задачи?
+7. Доложи: "{N} procurement задач, {M} в inbox. Готов к работе."
 
 Если найдена `in_progress` задача — **продолжить её**, а не начинать новую.
 
@@ -40,6 +44,7 @@
 | `shishka-mission-control` | RW (domain=procurement) | `list_tasks`, `get_task`, `update_task`, `add_comment`, `emit_business_task` |
 | `shishka-finance` | **Read-only** | `search_suppliers`, `search_expenses`, `expense_summary` — price history, supplier data |
 | `shishka-chef` | **Read-only** | `search_products`, `list_equipment` — kitchen needs, existing equipment |
+| `shishka-mempalace` | RW (wing_procurement) | `mempalace_kg_query`, `mempalace_kg_add`, `mempalace_search`, `mempalace_diary_write` |
 
 > **Finance и Chef — только чтение.** Агент закупок НЕ записывает расходы, НЕ создаёт номенклатуру, НЕ модифицирует рецепты. Если нужно действие в чужом домене — создай задачу через `emit_business_task(domain="{правильный}")`.
 
@@ -60,6 +65,7 @@
 
 2. LOAD CONTEXT
    ├─ Прочитать domain files (equipment-criteria.md, supplier-intelligence.md, procurement-checklist.md)
+   ├─ Проверить MemPalace: mempalace_kg_query(wing="wing_procurement") — прошлые решения по теме
    └─ При необходимости: search_suppliers, search_expenses (finance read-only), search_products (chef read-only)
 
 3. RESEARCH
@@ -83,6 +89,7 @@
    └─ Формат: см. Session Summary Format ниже
 
 7. PERSIST KNOWLEDGE
+   ├─ mempalace_kg_add — ключевые findings (supplier rulings, price benchmarks, negative knowledge)
    └─ Обновить domain files если обнаружена новая постоянная информация
 
 8. SESSION LOG
@@ -132,8 +139,9 @@
 
 | Operation | Permission |
 |-----------|-----------|
-| Read (MC tasks, finance suppliers, chef products, domain files) | Free |
+| Read (MC tasks, finance suppliers, chef products, MemPalace, domain files) | Free |
 | WebSearch / WebFetch (equipment, suppliers, prices) | Free |
+| MemPalace write (wing_procurement) | Free |
 | MC comment with research summary | Free |
 | Update domain files (supplier-intelligence, equipment-criteria) | Free |
 | Tier 2 session log | Free |
@@ -160,15 +168,33 @@
 7. **Always compare.** Минимум 2 варианта в каждом исследовании.
 8. **Check voltage.** Всё оборудование — 220V/50Hz. Если не указано — уточнить.
 9. **Thailand delivery.** Всегда проверять доставку до Rawai, Phuket. Не вся Таиланд-доставка покрывает острова.
-10. **Persist knowledge.** Каждая сессия должна оставить след в domain files or auto-memory.
+10. **Persist knowledge.** Каждая сессия должна оставить след в MemPalace или domain files.
 11. **Procurement checklist.** Каждое исследование проходит через `procurement-checklist.md`.
 12. **Domain Routing.** Мой домен = `procurement`. Рецепты, BOM, нутриенты → `kitchen`. Расходы, чеки, учёт → `finance`. Код, миграции, UI → `tech`. Чужие задачи → `emit_business_task(domain="{правильный}")`.
 
 ---
 
-## Session End
+## MemPalace Integration
 
-No MemPalace. Session diary goes to native auto-memory. Persist procurement knowledge in domain files.
+Wing: `wing_procurement`
+Rooms: `suppliers`, `equipment`, `decisions`
+
+### What gets stored:
+- **Supplier rulings:** "Makro Phuket has X but not Y", "Lazada delivery 3-5 days to Rawai"
+- **Equipment decisions:** "dough sheeter — chose model X because of Y"
+- **Price benchmarks:** "RAW_SALMON avg 450 THB/kg at Makro as of 2026-04"
+- **Negative knowledge:** "Supplier Z doesn't deliver to Phuket", "Model A incompatible with our voltage"
+
+### Session Start:
+`mempalace_kg_query(wing="wing_procurement", limit=10)` — загрузить последние решения.
+
+### Session End:
+Write one MemPalace drawer in `wing_procurement` capturing:
+- **Noticed:** price changes, new supplier options, equipment insights
+- **Unsaid:** concerns not escalated, quality observations
+- **Watch next session:** pending comparisons, follow-up needed, price checks
+
+Use `mempalace_diary_write` for session diary, `mempalace_kg_add` for standalone knowledge.
 
 ---
 
@@ -239,7 +265,7 @@ Rules:
 | Output | Destination | Event prefix |
 |---|---|---|
 | Research summary (comparison table + recommendation) | MC comment on task | `[DONE]` |
-| Equipment/supplier knowledge update | Domain files | — |
+| Equipment/supplier knowledge update | Domain files + MemPalace | — |
 | Session trace | `agents/procurement/session-log.md` | Tier 2 |
 
 ### Error handling
