@@ -9,7 +9,7 @@ Supplier management, purchasing, receiving station, inventory levels, MRP (mater
 - **Supabase**: `supplier_catalog` (SSoT), `inventory_levels`, `purchase_logs`
 
 ## Key Suppliers
-- **Makro Samui** — Wholesale, main supplier (catalog parsed automatically)
+- **Makro Rawai** — Wholesale, main supplier (catalog parsed automatically)
 - **Local markets** — Fresh produce, manual receipts
 - **Online suppliers** — Specialty ingredients, delivery
 

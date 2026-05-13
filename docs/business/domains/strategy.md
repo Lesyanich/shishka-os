@@ -4,7 +4,7 @@
 Business vision, new locations, partnerships, competitive analysis, seasonal planning, OKRs, long-term roadmap.
 
 ## Current State
-- **Location**: Koh Samui, Thailand (single location)
+- **Location**: Rawai, Phuket, Thailand (single location)
 - **Stage**: Operational, building tech infrastructure (Shishka OS)
 - **Differentiator**: Healthy, fermented, bioactive food with full ERP traceability
 
@@ -22,7 +22,7 @@ Business vision, new locations, partnerships, competitive analysis, seasonal pla
 - Plan catering/event strategy
 - Assess delivery-only (cloud kitchen) viability
 
-## Samui Market Context
+## Phuket Market Context
 - Peak season: December — March (European tourists)
 - Low season: May — October (monsoon, fewer tourists)
 - Competitor landscape: wellness cafes, Thai restaurants, hotel dining

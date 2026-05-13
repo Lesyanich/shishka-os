@@ -5,7 +5,7 @@ Social media content, promotions, brand identity, food photography, website, cus
 
 ## Brand Identity
 - **Name**: Shishka Healthy Kitchen
-- **Location**: Koh Samui, Thailand
+- **Location**: Rawai, Phuket, Thailand
 - **Positioning**: Healthy, fermented, bioactive food. Not "diet food" — real flavor with health benefits.
 - **Brand Bible**: `01_Business/Branding/SHISHKA BIBLE/`
 - **Logo assets**: `01_Business/Branding/Logo iCone/`, `01_Business/Branding/Main Logo/`
