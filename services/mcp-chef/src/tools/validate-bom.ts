@@ -155,6 +155,23 @@ export async function validateBom(args: { product_id: string }) {
 
     walkValidate(tree, product.product_code);
 
+    // Production flow check for PF/SALE with BOM
+    if (["PF", "SALE"].includes(prefix) && bomLines && bomLines.length > 0) {
+      const { data: flowRows } = await sb
+        .from("recipes_flow")
+        .select("id")
+        .eq("nomenclature_id", args.product_id)
+        .limit(1);
+
+      if (!flowRows || flowRows.length === 0) {
+        issues.push({
+          severity: "warning",
+          code: "MISSING_FLOW",
+          message: `${prefix} has BOM but no production flow steps. Add via manage_recipe_flow.`,
+        });
+      }
+    }
+
     // Price check for SALE items
     if (prefix === "SALE") {
       if (!product.price || product.price === 0) {
