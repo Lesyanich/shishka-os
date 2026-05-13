@@ -30,6 +30,11 @@ def parse_args():
         help="Scrape and insert directly to Supabase",
     )
     parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Scrape, check store inventory, and output markdown report with barcodes (no DB)",
+    )
+    parser.add_argument(
         "--category",
         type=str,
         default="dairy-eggs",
@@ -49,8 +54,8 @@ def parse_args():
     )
 
     args = parser.parse_args()
-    if not any([args.dry_run, args.preview, args.execute]):
-        parser.error("Must specify one of: --dry-run, --preview, --execute")
+    if not any([args.dry_run, args.preview, args.execute, args.report]):
+        parser.error("Must specify one of: --dry-run, --preview, --execute, --report")
     return args
 
 
@@ -251,17 +256,86 @@ def _check_and_apply_store_inventory(
     return parsed_products
 
 
+def _generate_report(
+    products: List[Dict[str, Any]],
+    store_code: str,
+    category: str,
+) -> str:
+    """Generate markdown report with barcodes, prices, and store inventory."""
+    lines: List[str] = []
+    today = datetime.now().strftime("%Y-%m-%d")
+    lines.append(f"## Makro Scan — ST{store_code} ({today})")
+    lines.append(f"Category: `{category}` | {len(products)} products")
+    lines.append("")
+
+    in_stock = [p for p in products if p.get("store_in_stock") is True]
+    oos = [p for p in products if p.get("store_in_stock") is False]
+    unknown = [p for p in products if p.get("store_in_stock") is None]
+
+    # Sort by price
+    products_sorted = sorted(products, key=lambda x: x.get("price", 0))
+
+    lines.append("| Product | Barcode | Makro ID | Price | Pack | Stock | Qty |")
+    lines.append("|---------|---------|----------|-------|------|-------|-----|")
+    for p in products_sorted:
+        name = (p.get("english_name") or p.get("original_name") or "?")[:50]
+        barcode = p.get("barcode", "")
+        makro_code = p.get("makro_code", "")
+        price = p.get("price", 0)
+        weight = p.get("package_weight_raw", "")
+        inv = p.get("store_inventory")
+        if inv is None:
+            stock, qty = "?", "?"
+        elif inv > 0:
+            stock, qty = "IN", str(inv)
+        else:
+            stock, qty = "**OOS**", "0"
+            name = f"**{name}**"
+        lines.append(
+            f"| {name} | `{barcode}` | {makro_code} | {price} | {weight} | {stock} | {qty} |"
+        )
+
+    lines.append("")
+    lines.append(
+        f"**Summary:** {len(in_stock)} in stock, {len(oos)} OOS, {len(unknown)} unknown"
+    )
+
+    if in_stock:
+        lines.append("")
+        lines.append("### In Stock — Quick Reference")
+        lines.append("")
+        lines.append("| Product | Barcode | Price | Qty |")
+        lines.append("|---------|---------|-------|-----|")
+        for p in sorted(in_stock, key=lambda x: x.get("price", 0)):
+            lines.append(
+                f"| {(p.get('english_name') or '')[:50]} "
+                f"| `{p.get('barcode', '')}` "
+                f"| {p.get('price', 0)} "
+                f"| {p.get('store_inventory', '?')} |"
+            )
+
+    return "\n".join(lines)
+
+
 def main():
     args = parse_args()
-    mode = "EXECUTE" if args.execute else ("PREVIEW" if args.preview else "DRY-RUN")
+    mode = (
+        "REPORT" if args.report
+        else "EXECUTE" if args.execute
+        else "PREVIEW" if args.preview
+        else "DRY-RUN"
+    )
     logging.info("Starting Makro Parser in mode: %s (store: ST%s)", mode, args.store)
 
-    # Load reference data once per run
-    reference_data = load_reference_data()
-    supplier_id = find_makro_supplier_id(reference_data)
-    if not supplier_id:
-        logging.error("Cannot proceed without Makro supplier_id.")
-        return
+    # Load reference data (not needed for --report mode)
+    reference_data = {}
+    supplier_id = None
+    if not args.report:
+        reference_data = load_reference_data()
+        supplier_id = find_makro_supplier_id(reference_data)
+        if not supplier_id:
+            logging.error("Cannot proceed without Makro supplier_id.")
+            return
 
     scraper = MakroScraper(store_code=args.store)
 
@@ -288,6 +362,15 @@ def main():
 
     # Cross-check inventory at the target store via GraphQL
     raw_parsed = _check_and_apply_store_inventory(scraper, raw_parsed, args.store)
+
+    if args.report:
+        report = _generate_report(raw_parsed, args.store, args.category)
+        print(report)
+        report_path = f"report_{args.category}_{args.store}.md"
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(report)
+        logging.info("Report saved to %s (%d chars)", report_path, len(report))
+        return
 
     enriched_products = _enrich_products(raw_parsed, reference_data)
 
