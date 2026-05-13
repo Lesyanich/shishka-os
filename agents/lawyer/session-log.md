@@ -13,3 +13,8 @@ Technical / agent-side steps. Business outcomes go to `business_tasks` via MC, n
 - Created `docs/operations/company-documents-register.md` with LEG-001 (registration) + LEG-002 (work permit)
 - Created GDrive `00_Legal/` tree under `~/Library/CloudStorage/GoogleDrive-lesia@shishka.health/Общие диски/Shishka healthy kitchen/00_Legal/` with 10 type subfolders + `_inbox/` + `_drafts/` + `_unsorted/` + `Lesia_Kostiukova/` under work permits; uploaded 2 PDFs from `~/Downloads/` (byte sizes verified)
 - Created memory pointers: `reference_lawyer_agent.md` + `reference_company_documents.md`; indexed in MEMORY.md
+- Applied migration `173_add_legal_domain.sql` (DB CHECK now accepts `domain='legal'`); also added `'legal'` to MCP Zod enum in `services/mcp-mission-control/src/index.ts` for both `emit_business_task` and `list_tasks`. Build + lint green.
+- Bootstrapped 3 legal MC tasks via SQL (current session's cached MCP schema still has old enum — direct INSERT was needed; future sessions will use `emit_business_task` once MCP restarts pick up enum update):
+  - `8e08e2f0-605f-4e51-a253-d53da7ab4878` — FS 2025 (critical, 2026-05-31)
+  - `5422d6cb-16a2-4d51-b69a-07be35069215` — AGM 2026 (high, 2026-06-12)
+  - `af2b6166-a841-44b6-977f-c36b36264e48` — WP renewal (medium, 2027-02-24)
