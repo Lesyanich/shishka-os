@@ -1,5 +1,5 @@
 """
-Makro Pro scraper — search-based approach.
+Makro Pro scraper — search-based approach with per-store inventory.
 
 Makro Pro uses Typesense for search, results are embedded in SSR
 via __NEXT_DATA__.props.pageProps.initialSearchResult.hits[].document.
@@ -8,6 +8,11 @@ Strategy:
   - Use /en/c/search?q=KEYWORD to get first 20 products per keyword.
   - Use /en/c/CATEGORY_SLUG for category browsing (products come via SSR too).
   - No authentication required — public SSR data.
+
+IMPORTANT — stock accuracy:
+  Typesense SSR always returns Bangkok (store 01) inventory.
+  For accurate per-store stock, use the GraphQL product API with storeCodes.
+  Default store for Shishka: ST166 (Makro Rawai, Phuket, zip 83130).
 """
 
 import json
@@ -56,10 +61,19 @@ FOOD_SEARCH_QUERIES: Dict[str, List[str]] = {
 }
 
 
+GRAPHQL_PRODUCT_URL = (
+    "https://marketplace.mango-prod.siammakro.cloud/product/api/v1/graphql"
+)
+
+# Default store for Shishka Healthy Kitchen (Rawai, Phuket)
+DEFAULT_STORE_CODE = "166"
+
+
 class MakroScraper:
     BASE_URL = "https://www.makro.pro"
 
-    def __init__(self):
+    def __init__(self, store_code: str = DEFAULT_STORE_CODE):
+        self.store_code = store_code
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -69,6 +83,15 @@ class MakroScraper:
                     "Chrome/120.0.0.0 Safari/537.36"
                 ),
                 "Accept-Language": "en-US,en;q=0.9",
+            }
+        )
+        self._gql_session = requests.Session()
+        self._gql_session.headers.update(
+            {
+                "User-Agent": self.session.headers["User-Agent"],
+                "Content-Type": "application/json",
+                "apollographql-client-name": "makro-pro-web",
+                "apollographql-client-version": "1.0",
             }
         )
         self.last_request_time = 0.0
@@ -183,6 +206,61 @@ class MakroScraper:
         """
         return self.scrape_category(category_slug)
 
+    def check_store_inventory(
+        self,
+        product_ids: List[str],
+        store_code: Optional[str] = None,
+    ) -> Dict[str, int]:
+        """
+        Query Makro GraphQL API for per-store inventory.
+
+        Args:
+            product_ids: List of Makro product IDs (from Typesense 'productId' field).
+            store_code: Makro store code (default: self.store_code, i.e. ST166 Rawai).
+
+        Returns:
+            Dict mapping product_id -> totalInventory (0 = out of stock).
+        """
+        sc = store_code or self.store_code
+        result: Dict[str, int] = {}
+        batch_size = 20
+
+        query = """
+        query Products($ids: [String!]!, $storeCodes: [String!]) {
+            products(ids: $ids, storeCodes: $storeCodes) {
+                id
+                totalInventory
+            }
+        }
+        """
+
+        for i in range(0, len(product_ids), batch_size):
+            batch = product_ids[i : i + batch_size]
+            self._throttle(0.5)
+            try:
+                resp = self._gql_session.post(
+                    GRAPHQL_PRODUCT_URL,
+                    json={
+                        "query": query,
+                        "variables": {"ids": batch, "storeCodes": [sc]},
+                    },
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                for p in data.get("data", {}).get("products", []):
+                    result[p["id"]] = p.get("totalInventory", 0)
+            except Exception as exc:  # noqa: BLE001
+                logging.warning("GraphQL inventory batch %d failed: %s", i, exc)
+
+        logging.info(
+            "Store inventory check (ST%s): %d/%d products resolved",
+            sc,
+            len(result),
+            len(product_ids),
+        )
+        return result
+
     @staticmethod
     def doc_to_parsed(doc: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -224,6 +302,7 @@ class MakroScraper:
             "price": price,
             "makro_code": str(makro_code),
             "barcode": barcode,
+            "product_id": str(doc.get("productId") or doc.get("id") or ""),
             "package_weight_raw": packaging_weight or (f"{pkg_qty} {pkg_unit}" if pkg_qty else ""),
             "package_qty": pkg_qty,
             "package_unit": pkg_unit or "pcs",
@@ -231,4 +310,5 @@ class MakroScraper:
             "purchase_unit": "pc",
             "category_path": categories,
             "deepest_category": deepest,
+            "in_stock_global": bool(doc.get("inStock")),
         }

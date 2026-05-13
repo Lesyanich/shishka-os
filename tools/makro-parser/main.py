@@ -41,6 +41,12 @@ def parse_args():
         default=50,
         help="Max number of products to process",
     )
+    parser.add_argument(
+        "--store",
+        type=str,
+        default="166",
+        help="Makro store code for inventory check (default: 166 = Rawai Phuket)",
+    )
 
     args = parser.parse_args()
     if not any([args.dry_run, args.preview, args.execute]):
@@ -194,10 +200,61 @@ def update_progress_file(
         f.writelines(lines)
 
 
+def _check_and_apply_store_inventory(
+    scraper: MakroScraper,
+    parsed_products: List[Dict[str, Any]],
+    store_code: str,
+) -> List[Dict[str, Any]]:
+    """
+    Cross-check inventory via Makro GraphQL API for the given store.
+
+    Adds 'store_in_stock' (bool) and 'store_inventory' (int) to each product.
+    Products without a product_id are marked as unknown (store_in_stock=None).
+    """
+    product_ids = [
+        p["product_id"] for p in parsed_products if p.get("product_id")
+    ]
+    if not product_ids:
+        logging.warning("No product_ids found — skipping store inventory check.")
+        return parsed_products
+
+    logging.info(
+        "Checking inventory at store ST%s for %d products...",
+        store_code,
+        len(product_ids),
+    )
+    inventory = scraper.check_store_inventory(product_ids, store_code)
+
+    in_stock_count = 0
+    oos_count = 0
+    for p in parsed_products:
+        pid = p.get("product_id")
+        if pid and pid in inventory:
+            qty = inventory[pid]
+            p["store_inventory"] = qty
+            p["store_in_stock"] = qty > 0
+            if qty > 0:
+                in_stock_count += 1
+            else:
+                oos_count += 1
+        else:
+            p["store_inventory"] = None
+            p["store_in_stock"] = None
+
+    logging.info(
+        "Store ST%s inventory: %d in stock, %d OOS, %d unknown",
+        store_code,
+        in_stock_count,
+        oos_count,
+        len(parsed_products) - in_stock_count - oos_count,
+    )
+    return parsed_products
+
+
 def main():
     args = parse_args()
     mode = "EXECUTE" if args.execute else ("PREVIEW" if args.preview else "DRY-RUN")
-    logging.info("Starting Makro Parser in mode: %s", mode)
+    logging.info("Starting Makro Parser in mode: %s (store: ST%s)", mode, args.store)
 
     # Load reference data once per run
     reference_data = load_reference_data()
@@ -206,7 +263,7 @@ def main():
         logging.error("Cannot proceed without Makro supplier_id.")
         return
 
-    scraper = MakroScraper()
+    scraper = MakroScraper(store_code=args.store)
 
     logging.info("Scraping category: %s (limit: %d)", args.category, args.limit)
     raw_docs = scraper.scrape_category(args.category, limit=args.limit)
@@ -229,6 +286,9 @@ def main():
         logging.info("Preview mode finished. %d products shown.", len(raw_docs))
         return
 
+    # Cross-check inventory at the target store via GraphQL
+    raw_parsed = _check_and_apply_store_inventory(scraper, raw_parsed, args.store)
+
     enriched_products = _enrich_products(raw_parsed, reference_data)
 
     sql, counts = build_batch_sql(enriched_products, supplier_id)
@@ -238,7 +298,7 @@ def main():
         return
 
     if args.dry_run:
-        logging.info("DRY RUN SUMMARY:")
+        logging.info("DRY RUN SUMMARY (store ST%s):", args.store)
         print(sql)
         with open("batch_output.sql", "w", encoding="utf-8") as f:
             f.write(sql)
@@ -249,6 +309,17 @@ def main():
             counts["supplier_catalog"],
             counts["nomenclature"],
         )
+        # Print stock summary
+        in_stock = [p for p in enriched_products if p.get("store_in_stock") is True]
+        oos = [p for p in enriched_products if p.get("store_in_stock") is False]
+        logging.info(
+            "Store ST%s stock: %d in stock, %d out of stock",
+            args.store,
+            len(in_stock),
+            len(oos),
+        )
+        if oos:
+            logging.info("OOS items: %s", ", ".join(p.get("english_name", "?") for p in oos))
         update_progress_file(args.category, counts, "IN_PROGRESS")
         return
 
