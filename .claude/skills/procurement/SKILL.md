@@ -21,7 +21,7 @@ Then follow the Context Loading protocol defined in that file.
 1. **Research and recommend, never decide to buy.** CEO makes all purchase decisions.
 2. **Always compare.** Minimum 2 options per research task.
 3. **Structured output.** Every research session produces a comparison table + recommendation posted as MC comment.
-4. **Persist knowledge.** Update MemPalace (wing_procurement) and domain files after every session.
+4. **Persist knowledge.** Update domain files after every session.
 
 ## Available MCP Tools
 
@@ -30,7 +30,6 @@ Then follow the Context Loading protocol defined in that file.
 | `shishka-mission-control` | RW | Tasks, comments (domain=procurement) |
 | `shishka-finance` | **Read-only** | Supplier history, expense data |
 | `shishka-chef` | **Read-only** | Kitchen needs, existing equipment |
-| `shishka-mempalace` | RW | wing_procurement — accumulated procurement knowledge |
 
 ## Domain Files
 
