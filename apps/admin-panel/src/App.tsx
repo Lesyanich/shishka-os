@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react'
 
 // Static — always in main bundle (login + first screen)
 import { LoginPage } from './pages/LoginPage'
+import { KitchenLogin } from './pages/KitchenLogin'
 import { OpeningRoadmap } from './pages/OpeningRoadmap'
 
 // Lazy — loaded on-demand per route
@@ -88,9 +89,10 @@ function App() {
         <Sentry.ErrorBoundary fallback={FallbackError}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/kitchen-login" element={<KitchenLogin />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
-                {/* ── Owner-only routes ── */}
+                {/* ── Owner-only routes (cook → redirected to /kitchen/tasks) ── */}
                 <Route element={<RoleGuard minRole="owner" />}>
                   <Route path="/" element={<OpeningRoadmap />} />
                   <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
@@ -120,20 +122,22 @@ function App() {
                   </Route>
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                   <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
+                  {/* Owner-only operations: planning, procurement, settings (per spec D3). */}
+                  <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
+                  <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
+                  <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
+                  <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
+                  <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
+                  <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
                 </Route>
 
-                {/* ── Kitchen + Production — accessible to all authenticated ── */}
+                {/* ── Cook-allowed routes (also accessible to owners) ── */}
+                {/* Mapped from spec D3: /kds, /cook-station, /waste, /receiving, /schedule */}
                 <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
                 <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
                 <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
                 <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
-                <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
-                <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
-                <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
-                <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
-                <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
-                <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
               </Route>
             </Route>
             {/* Fallback: redirect unknown routes to Control Center */}
