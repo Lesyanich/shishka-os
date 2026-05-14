@@ -23,6 +23,7 @@ const MasterPlanner = lazy(() => import('./pages/MasterPlanner').then(m => ({ de
 const FinanceLayout = lazy(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
 const FinanceLedger = lazy(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
 const FinanceAnalytics = lazy(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
+const FinanceDashboard = lazy(() => import('./pages/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })))
 const ReceivingStation = lazy(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
 const ScheduleManager = lazy(() => import('./pages/ScheduleManager').then(m => ({ default: m.ScheduleManager })))
@@ -108,7 +109,8 @@ function App() {
                   <Route path="/bom" element={<Suspense fallback={<PageLoader />}><BOMHub /></Suspense>} />
                   <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
                   <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
-                    <Route index element={<Navigate to="ledger" replace />} />
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<FinanceDashboard />} />
                     <Route path="ledger" element={<FinanceLedger />} />
                     <Route path="analytics" element={<FinanceAnalytics />} />
                   </Route>

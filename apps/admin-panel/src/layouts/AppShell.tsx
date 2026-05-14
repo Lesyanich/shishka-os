@@ -96,6 +96,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Finance',
     minRole: 'owner',
     items: [
+      { path: '/finance/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
       { path: '/finance/ledger', icon: Table2, label: 'Ledger' },
       { path: '/finance/analytics', icon: BarChart3, label: 'Analytics' },
       { path: '/receipts', icon: Inbox, label: 'Receipt Inbox' },
