@@ -54,33 +54,33 @@ ALTER TABLE financial_obligations ENABLE ROW LEVEL SECURITY;
 -- cash_snapshots: owner can SELECT, INSERT, UPDATE
 CREATE POLICY "owner_select_cash" ON cash_snapshots FOR SELECT
   USING (EXISTS (
-    SELECT 1 FROM app_roles WHERE user_id = auth.uid() AND role = 'owner'
+    SELECT 1 FROM staff WHERE auth_user_id = auth.uid() AND app_role = 'owner'
   ));
 
 CREATE POLICY "owner_insert_cash" ON cash_snapshots FOR INSERT
   WITH CHECK (EXISTS (
-    SELECT 1 FROM app_roles WHERE user_id = auth.uid() AND role = 'owner'
+    SELECT 1 FROM staff WHERE auth_user_id = auth.uid() AND app_role = 'owner'
   ));
 
 CREATE POLICY "owner_update_cash" ON cash_snapshots FOR UPDATE
   USING (EXISTS (
-    SELECT 1 FROM app_roles WHERE user_id = auth.uid() AND role = 'owner'
+    SELECT 1 FROM staff WHERE auth_user_id = auth.uid() AND app_role = 'owner'
   ));
 
 -- financial_obligations: owner can SELECT, INSERT, UPDATE
 CREATE POLICY "owner_select_obligations" ON financial_obligations FOR SELECT
   USING (EXISTS (
-    SELECT 1 FROM app_roles WHERE user_id = auth.uid() AND role = 'owner'
+    SELECT 1 FROM staff WHERE auth_user_id = auth.uid() AND app_role = 'owner'
   ));
 
 CREATE POLICY "owner_insert_obligations" ON financial_obligations FOR INSERT
   WITH CHECK (EXISTS (
-    SELECT 1 FROM app_roles WHERE user_id = auth.uid() AND role = 'owner'
+    SELECT 1 FROM staff WHERE auth_user_id = auth.uid() AND app_role = 'owner'
   ));
 
 CREATE POLICY "owner_update_obligations" ON financial_obligations FOR UPDATE
   USING (EXISTS (
-    SELECT 1 FROM app_roles WHERE user_id = auth.uid() AND role = 'owner'
+    SELECT 1 FROM staff WHERE auth_user_id = auth.uid() AND app_role = 'owner'
   ));
 
 -- ══════════════════════════════════════════════════════════
