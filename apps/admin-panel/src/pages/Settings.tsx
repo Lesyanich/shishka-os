@@ -1,13 +1,17 @@
 import { useEffect } from 'react'
 import { SyrveConfigPanel } from '../components/settings/SyrveConfigPanel'
 import { SyrvePocReport } from '../components/settings/SyrvePocReport'
+import { LoyverseConfigPanel } from '../components/settings/LoyverseConfigPanel'
 import { useSyrveIntegration } from '../hooks/useSyrveIntegration'
+import { useLoyverseIntegration } from '../hooks/useLoyverseIntegration'
 
 export function Settings() {
-  const integration = useSyrveIntegration()
+  const syrve = useSyrveIntegration()
+  const loyverse = useLoyverseIntegration()
 
   useEffect(() => {
-    integration.loadConfig()
+    syrve.loadConfig()
+    loyverse.loadStatus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -20,23 +24,34 @@ export function Settings() {
         </p>
       </div>
 
+      {/* Loyverse POS */}
+      <LoyverseConfigPanel
+        isLoading={loyverse.isLoading}
+        syncLogs={loyverse.syncLogs}
+        lastResult={loyverse.lastResult}
+        error={loyverse.error}
+        onSyncCategories={loyverse.syncCategories}
+        onSyncItems={loyverse.syncItems}
+        onFullSync={loyverse.fullSync}
+      />
+
       {/* Syrve Integration */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)]">
         <SyrveConfigPanel
-          config={integration.config}
-          setConfig={integration.setConfig}
-          isLoading={integration.isLoadingConfig}
-          isSaving={integration.isSaving}
-          isRunningPoc={integration.isRunningPoc}
-          error={integration.error}
-          success={integration.success}
-          onSave={integration.saveAllConfig}
-          onRunPoc={integration.runPoc}
+          config={syrve.config}
+          setConfig={syrve.setConfig}
+          isLoading={syrve.isLoadingConfig}
+          isSaving={syrve.isSaving}
+          isRunningPoc={syrve.isRunningPoc}
+          error={syrve.error}
+          success={syrve.success}
+          onSave={syrve.saveAllConfig}
+          onRunPoc={syrve.runPoc}
         />
         <SyrvePocReport
-          report={integration.pocReport}
-          isLoading={integration.isRunningPoc}
-          onApplyMapping={integration.applyMapping}
+          report={syrve.pocReport}
+          isLoading={syrve.isRunningPoc}
+          onApplyMapping={syrve.applyMapping}
         />
       </div>
     </div>
