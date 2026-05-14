@@ -396,6 +396,47 @@ Pure conversation ("how are you", "what do you think of X") is exempt — but wh
 
 > Origin: 2026-04-07.
 
+## RULE-OPEN-QUESTION-TRIAGE
+
+At session end, every agent must scan the conversation for unresolved questions that meet **all three** criteria:
+
+1. **Requires CEO decision** — not a technical question the agent can resolve alone
+2. **Not closed this session** — CEO did not give a final answer during the conversation
+3. **Not derivable from existing data** — cannot be answered by reading docs, DB, or auto-memory
+
+If all three are true → create an MC task:
+
+| Field | Value |
+|---|---|
+| `title` | `"Discussion: <topic in English>"` |
+| `domain` | Agent's own domain (`kitchen`, `finance`, `ops`, etc.) |
+| `status` | `inbox` |
+| `priority` | `medium` |
+| `source` | `agent_discovery` |
+| `created_by` | `<name>-agent` |
+| `tags` | `["needs-ceo-input", "agent:<name>"]` |
+| `description` | 1–3 sentences: what was discussed, what CEO needs to decide, constraints or options surfaced |
+
+### Idempotency check (mandatory before emit)
+
+Before creating the task, query:
+
+    list_tasks(domain=<domain>, status="inbox")
+
+Scan results for a task with similar title **and** tag `needs-ceo-input` created within the last 14 days. If found → `add_comment` on the existing task with new context instead of creating a duplicate.
+
+### What this rule does NOT cover
+
+- **Decided facts** → native auto-memory (decisions / preferences), not MC
+- **Technical sub-steps** → session-log.md (Tier 2)
+- **Completed work** → normal Tier 1 per RULE-TASK-CLOSURE
+
+### Relationship to auto-memory
+
+Native auto-memory remains the store for facts, decisions, and preferences. MC tasks are for open action items requiring CEO input. One topic may produce **both**: an auto-memory note (what was discussed so far) **and** an MC task (what still needs a CEO decision).
+
+> Origin: 2026-05-04. Chef agent discussed 10 salad bar topics with CEO across a full session, saved nothing until CEO caught the gap at session end. Open questions were trapped in the chat buffer — invisible to the next session. Systemic fix: observable MC queue with idempotency, not agent-local memory alone.
+
 ## RULE-EPIC-ON-CREATE
 
 Every MC task ends up in one of two valid states: `initiative_id` set (linked to a `business_initiatives` row), or `kind:standalone` tag with reason in `description`. No third state.

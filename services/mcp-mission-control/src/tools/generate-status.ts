@@ -32,6 +32,7 @@ interface McSnapshot {
     status: string;
     priority: string;
     assigned_to: string | null;
+    tags?: string[] | null;
     [k: string]: unknown;
   }>;
   latestMigration: { version: string; name: string; status: string; applied_at: string | null } | null;
@@ -66,7 +67,7 @@ async function fetchMcSnapshot(sb: SupabaseClient | null, allowOffline: boolean)
     .select("id, title, domain, status, priority, assigned_to, executor_type, due_date, tags, related_ids, updated_at")
     .not("status", "in", '("cancelled")')
     .order("updated_at", { ascending: false })
-    .limit(100);
+    .limit(200);
 
   if (error) {
     if (!allowOffline) {
@@ -106,7 +107,7 @@ function renderTaskSection(heading: string, group: TaskSummary): string[] {
 function renderStatusMarkdown(
   mc: McSnapshot,
   git: GitState,
-): { markdown: string; summary: Record<string, number> & { total: number } } {
+): { markdown: string; summary: Record<string, number> & { total: number; open_questions: number } } {
   const statusOrder = ["in_progress", "blocked", "inbox", "backlog", "done"];
   const statusGroups: Record<string, TaskSummary> = {};
 
@@ -124,6 +125,11 @@ function renderStatusMarkdown(
       })),
     };
   }
+
+  // RULE-OPEN-QUESTION-TRIAGE — inbox tasks tagged needs-ceo-input
+  const openQuestions = mc.allTasks.filter(
+    (t) => t.status === "inbox" && Array.isArray(t.tags) && (t.tags as string[]).includes("needs-ceo-input"),
+  );
 
   const now = new Date().toISOString().split("T")[0];
   const inProgress = statusGroups["in_progress"];
@@ -170,10 +176,22 @@ function renderStatusMarkdown(
     lines.push("");
     lines.push(...renderTaskSection("Blocked", blocked));
     lines.push(...renderTaskSection(`Inbox (${inbox.count} tasks awaiting triage)`, inbox));
+
+    // RULE-OPEN-QUESTION-TRIAGE — surface unresolved CEO questions
+    lines.push(`## Open questions awaiting CEO: ${openQuestions.length}`, "");
+    if (openQuestions.length > 0) {
+      lines.push("| Question | Domain | Priority |", "|----------|--------|----------|");
+      for (const t of openQuestions.slice(0, 10)) {
+        lines.push(`| ${t.title} | ${t.domain} | ${t.priority} |`);
+      }
+      lines.push("");
+    }
+
     lines.push("## Summary", "", "| Status | Count |", "|--------|-------|");
     for (const status of statusOrder) {
       lines.push(`| ${status} | ${statusGroups[status].count} |`);
     }
+    lines.push(`| open_questions | ${openQuestions.length} |`);
     lines.push("");
   }
 
@@ -187,6 +205,7 @@ function renderStatusMarkdown(
       inbox: inbox.count,
       backlog: statusGroups["backlog"].count,
       done: statusGroups["done"].count,
+      open_questions: openQuestions.length,
       total: mc.allTasks.length,
     },
   };

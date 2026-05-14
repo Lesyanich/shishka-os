@@ -170,6 +170,8 @@
 
 No MemPalace. Session diary goes to native auto-memory. Persist procurement knowledge in domain files.
 
+1. **Open questions → MC** — per RULE-OPEN-QUESTION-TRIAGE (`docs/constitution/operational-rules.md`). Scan conversation for unresolved CEO questions, emit to MC inbox if all 3 criteria met.
+
 ---
 
 ## Tracking Protocol

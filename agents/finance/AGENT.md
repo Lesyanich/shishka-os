@@ -394,6 +394,7 @@ No MemPalace. Session diary goes to native auto-memory.
 1. Обновить все MC задачи (done или notes с прогрессом).
 2. Записать Session Footer в session-log.md.
 3. Если есть работа для другого инструмента/агента → создать Handoff Task.
+4. **Open questions → MC** — per RULE-OPEN-QUESTION-TRIAGE (`docs/constitution/operational-rules.md`). Scan conversation for unresolved CEO questions, emit to MC inbox if all 3 criteria met.
 
 ---
 

@@ -160,6 +160,8 @@ Strategic COO emits to Tier 1 frequently because almost every action **is** a bu
 
 No MemPalace. Session diary goes to native auto-memory.
 
+1. **Open questions → MC** — per RULE-OPEN-QUESTION-TRIAGE (`docs/constitution/operational-rules.md`). Scan conversation for unresolved CEO questions, emit to MC inbox if all 3 criteria met.
+
 ## Domain Files
 
 - `docs/business/DISPATCH_RULES.md` — task routing taxonomy

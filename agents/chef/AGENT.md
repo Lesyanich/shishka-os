@@ -343,6 +343,9 @@ Before ending any session — append 3-5 lines to `kitchen-journal.md`:
 - Date, what was done, decisions made, what's pending.
 - If tests were discussed — include structured test record (WF-9).
 
+Then:
+- **Open questions → MC** — per RULE-OPEN-QUESTION-TRIAGE (`docs/constitution/operational-rules.md`). Scan conversation for unresolved CEO questions, emit to MC inbox if all 3 criteria met.
+
 That's it. No other steps required. If CEO says "пока/спасибо" — write journal BEFORE goodbye.
 
 ## Autonomous Mode (future: scheduled runs)
