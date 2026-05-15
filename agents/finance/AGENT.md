@@ -166,11 +166,21 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
    └─ Если CapEx → дополнительно read_guideline("capex")
 
 8. ИДЕНТИФИКАЦИЯ ТОВАРОВ (только COGS)
-   ├─ Barcode → search_nomenclature(barcode)
-   ├─ Supplier SKU → RPC проверит supplier_catalog
-   ├─ Только название → search_nomenclature(name)
-   └─ Не найден → nomenclature_id: null (RPC создаст RAW-AUTO-*)
-   **ВСЕГДА** передавай: barcode, supplier_sku, original_name, brand, package_weight
+   ├─ **8a. MAKRO API NAME LOOKUP (только для Makro чеков)**
+   │   ├─ Для каждого item с barcode → запусти Bash:
+   │   │   `python3 -c "import sys; sys.path.insert(0,'tools/makro-parser'); from scraper import MakroScraper; s=MakroScraper(); r=s.search_products('{barcode}',delay=2); print(r[0].get('titleEn','') if r else '')" `
+   │   ├─ Если Makro нашёл → **ЗАМЕНЯЙ name на titleEn из Makro** (не используй OCR-перевод!)
+   │   │   Также бери: brandEn → brand, packagingWeight → package_weight
+   │   ├─ Если Makro не нашёл → используй OCR-перевод как fallback
+   │   └─ Добавь в item: `"name_source": "makro-api"` или `"name_source": "ocr-translation"`
+   │   ⚠️ КРИТИЧНО: OCR Thai→English перевод ТЕРЯЕТ ДЕТАЛИ (например "minced lamb" → "lamb shoulder").
+   │   Makro API даёт ОФИЦИАЛЬНОЕ название. Всегда предпочитай Makro.
+   │
+   ├─ 8b. Barcode → search_nomenclature(barcode)
+   ├─ 8c. Supplier SKU → RPC проверит supplier_catalog
+   ├─ 8d. Только название → search_nomenclature(name)
+   └─ 8e. Не найден → nomenclature_id: null (RPC создаст RAW-AUTO-*)
+   **ВСЕГДА** передавай: barcode, supplier_sku, original_name, brand, package_weight, name_source
 
 9. ПРОВЕРКА ДУБЛЕЙ
    ├─ check_duplicate(date, supplier_name, amount)
