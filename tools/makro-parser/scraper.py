@@ -146,12 +146,18 @@ class MakroScraper:
             doc = hit.get("document")
             if not doc:
                 continue
+            # itemBarCode (singular) or first of itemBarCodes (plural array)
             barcode = doc.get("itemBarCode") or ""
             if not barcode:
+                barcodes = doc.get("itemBarCodes") or []
+                barcode = barcodes[0] if barcodes else ""
+            # Don't skip products without barcode — they may still be valid matches
+            product_id = str(doc.get("productId") or doc.get("id") or "")
+            dedup_key = barcode or product_id
+            if dedup_key and dedup_key in self._seen_barcodes:
                 continue
-            if barcode in self._seen_barcodes:
-                continue
-            self._seen_barcodes.add(barcode)
+            if dedup_key:
+                self._seen_barcodes.add(dedup_key)
             products.append(doc)
         return products
 
@@ -271,6 +277,9 @@ class MakroScraper:
         title_th = doc.get("title") or ""
         brand_en = doc.get("brandEn") or ""
         barcode = doc.get("itemBarCode") or ""
+        if not barcode:
+            barcodes = doc.get("itemBarCodes") or []
+            barcode = barcodes[0] if barcodes else ""
         makro_code = doc.get("makroId") or ""
         price = doc.get("displayPrice") or doc.get("originalPrice") or 0
         packaging_weight = doc.get("packagingWeight") or ""

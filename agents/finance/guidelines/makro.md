@@ -11,6 +11,21 @@
 Колонка 6: Amount (итого)        → total_price
 ```
 
+## Makro API Name Lookup (ОБЯЗАТЕЛЬНО)
+
+После извлечения баркодов, **ДО перевода Thai→English**, для каждого item:
+
+1. Запусти поиск по баркоду на сайте Makro Pro:
+   ```bash
+   python3 -c "import sys; sys.path.insert(0,'tools/makro-parser'); from scraper import MakroScraper; s=MakroScraper(); r=s.search_products('{barcode}',delay=2); print(r[0].get('titleEn','') + '|' + r[0].get('brandEn','') + '|' + str(r[0].get('packagingWeight','')) if r else 'NOT_FOUND')"
+   ```
+2. Если найдено → используй `titleEn` как **name** (НЕ OCR-перевод Thai)
+3. Если не найдено → fallback на OCR-перевод с пометкой `name_source: "ocr-translation"`
+
+**ПОЧЕМУ:** OCR-перевод с тайского теряет критические детали.
+Пример: `เนื้อแกะปิดแช่แข็ง` → OCR: "AU Frozen Lamb Shoulder" → НЕВЕРНО!
+Makro API по баркоду 831436: "Frozen Australian Minced Lamb 1 kg" → ВЕРНО.
+
 ## Критические правила чтения
 
 1. **Две строки на одну позицию**: Thai название сверху, English снизу — это ОДНА позиция, НЕ две!
