@@ -6,12 +6,15 @@ import {
   X,
   Check,
   AlertTriangle,
+  Plus,
+  Loader2,
 } from 'lucide-react'
 import {
   useStaffCards,
   type StaffCard,
   type LeaveBalance,
   type StaffPatch,
+  type NewStaff,
 } from '../../hooks/use-staff-cards'
 
 const ROLE_BADGE: Record<string, string> = {
@@ -54,6 +57,7 @@ function wpExpiryLabel(expiry: string | null): string {
 }
 
 const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract', 'probation']
+const STAFF_ROLES = ['cook', 'helper', 'prep', 'dishwasher', 'sous_chef', 'admin']
 
 function StaffCardView({
   card,
@@ -256,8 +260,108 @@ function EditField({
   )
 }
 
+function AddStaffForm({
+  onCreate,
+  onCancel,
+}: {
+  onCreate: (data: NewStaff) => Promise<{ ok: boolean }>
+  onCancel: () => void
+}) {
+  const [draft, setDraft] = useState<NewStaff>({
+    name: '',
+    role: 'cook',
+    employment_type: 'full_time',
+  })
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!draft.name.trim()) return
+    setSaving(true)
+    const { ok } = await onCreate(draft)
+    setSaving(false)
+    if (ok) onCancel()
+  }
+
+  return (
+    <div className="rounded-xl ring-1 ring-emerald-500/30 bg-slate-900/50 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-emerald-400">New Staff Member</h3>
+        <div className="flex gap-1">
+          <button
+            onClick={handleSave}
+            disabled={saving || !draft.name.trim()}
+            className="rounded p-1 text-emerald-400 hover:bg-emerald-500/15 transition disabled:opacity-40"
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            onClick={onCancel}
+            className="rounded p-1 text-slate-500 hover:bg-slate-800 transition"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+        <EditField
+          label="Name *"
+          value={draft.name}
+          onChange={(v) => setDraft({ ...draft, name: v })}
+        />
+        <div>
+          <label className="text-slate-500">Role *</label>
+          <select
+            value={draft.role}
+            onChange={(e) => setDraft({ ...draft, role: e.target.value })}
+            className="mt-0.5 w-full rounded bg-slate-800 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-700 focus:ring-emerald-500/50 focus:outline-none"
+          >
+            {STAFF_ROLES.map((r) => (
+              <option key={r} value={r}>{r.replace('_', ' ')}</option>
+            ))}
+          </select>
+        </div>
+        <EditField
+          label="Salary (THB)"
+          type="number"
+          value={draft.monthly_salary ?? ''}
+          onChange={(v) => setDraft({ ...draft, monthly_salary: v ? Number(v) : null })}
+        />
+        <div>
+          <label className="text-slate-500">Employment Type</label>
+          <select
+            value={draft.employment_type ?? 'full_time'}
+            onChange={(e) => setDraft({ ...draft, employment_type: e.target.value })}
+            className="mt-0.5 w-full rounded bg-slate-800 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-700 focus:ring-emerald-500/50 focus:outline-none"
+          >
+            {EMPLOYMENT_TYPES.map((t) => (
+              <option key={t} value={t}>{t.replace('_', ' ')}</option>
+            ))}
+          </select>
+        </div>
+        <EditField
+          label="Nationality"
+          value={draft.nationality ?? ''}
+          onChange={(v) => setDraft({ ...draft, nationality: v || null })}
+        />
+        <EditField
+          label="Hire Date"
+          type="date"
+          value={draft.hire_date ?? ''}
+          onChange={(v) => setDraft({ ...draft, hire_date: v || null })}
+        />
+        <EditField
+          label="Phone"
+          value={draft.phone ?? ''}
+          onChange={(v) => setDraft({ ...draft, phone: v || null })}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function StaffPage() {
-  const { staff, leaveBalances, isLoading, updateStaff } = useStaffCards()
+  const { staff, leaveBalances, isLoading, updateStaff, createStaff } = useStaffCards()
+  const [showAddForm, setShowAddForm] = useState(false)
 
   if (isLoading) {
     return (
@@ -268,15 +372,34 @@ export function StaffPage() {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {staff.map((s) => (
-        <StaffCardView
-          key={s.id}
-          card={s}
-          leaves={leaveBalances.filter((l) => l.staff_id === s.id)}
-          onUpdate={updateStaff}
-        />
-      ))}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-500">{staff.length} staff member(s)</p>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500"
+        >
+          <Plus className="h-3 w-3" />
+          Add Staff
+        </button>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {showAddForm && (
+          <AddStaffForm
+            onCreate={createStaff}
+            onCancel={() => setShowAddForm(false)}
+          />
+        )}
+        {staff.map((s) => (
+          <StaffCardView
+            key={s.id}
+            card={s}
+            leaves={leaveBalances.filter((l) => l.staff_id === s.id)}
+            onUpdate={updateStaff}
+          />
+        ))}
+      </div>
     </div>
   )
 }

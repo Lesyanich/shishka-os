@@ -44,6 +44,17 @@ export interface StaffPatch {
   hire_date?: string | null
 }
 
+export interface NewStaff {
+  name: string
+  role: string
+  app_role?: string
+  monthly_salary?: number | null
+  hire_date?: string | null
+  employment_type?: string | null
+  nationality?: string | null
+  phone?: string | null
+}
+
 export function useStaffCards() {
   const [staff, setStaff] = useState<StaffCard[]>([])
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([])
@@ -95,5 +106,30 @@ export function useStaffCards() {
     [fetchData],
   )
 
-  return { staff, leaveBalances, isLoading, updateStaff }
+  const createStaff = useCallback(
+    async (newStaff: NewStaff) => {
+      const record = {
+        name: newStaff.name,
+        role: newStaff.role,
+        app_role: newStaff.app_role ?? 'cook',
+        monthly_salary: newStaff.monthly_salary ?? null,
+        hire_date: newStaff.hire_date ?? null,
+        employment_type: newStaff.employment_type ?? 'full_time',
+        nationality: newStaff.nationality ?? null,
+        phone: newStaff.phone ?? null,
+        is_active: true,
+      }
+
+      const { error } = await supabase.from('staff').insert(record)
+
+      if (!error) {
+        await fetchData()
+      }
+
+      return { ok: !error, error }
+    },
+    [fetchData],
+  )
+
+  return { staff, leaveBalances, isLoading, updateStaff, createStaff }
 }
