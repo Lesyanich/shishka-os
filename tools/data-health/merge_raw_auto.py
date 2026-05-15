@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-merge_raw_auto.py — RAW-AUTO duplicate merger for Shishka nomenclature.
+merge_raw_auto.py — RAW-AUTO + RAW-{hash} duplicate merger for Shishka nomenclature.
+
+Catches two patterns of auto-generated codes:
+  - RAW-AUTO-{hex8}  (approve_receipt v12-v15 auto-created)
+  - RAW-{hex8}       (8-char hex codes, e.g. RAW-de20f0de, RAW-6b5f5d4f)
 
 Passes:
   1   Exact barcode match (via sku table)             -> auto-merge
@@ -11,7 +15,7 @@ Passes:
 
 Merge operation:
   - Repoints purchase_logs, supplier_catalog, sku, bom_structures to curated id
-  - Sets RAW-AUTO item is_available = false (soft-delete)
+  - Sets hash-coded item is_available = false (soft-delete)
 
 Usage:
   python merge_raw_auto.py --dry-run
@@ -55,10 +59,13 @@ def get_db_url() -> str:
 # SQL helpers  (psycopg3 uses %s positional placeholders)
 # ---------------------------------------------------------------------------
 
-FETCH_AUTO_ITEMS = """
+# Regex: RAW-AUTO-{hex} or RAW-{exactly 8 hex chars} (no further segments)
+HASH_CODE_REGEX = r"^RAW-(AUTO-)?[0-9a-f]{8}$"
+
+FETCH_HASH_ITEMS = """
 SELECT id, product_code, name, cost_per_unit
 FROM   nomenclature
-WHERE  product_code LIKE 'RAW-AUTO-%'
+WHERE  (product_code ~ '^RAW-(AUTO-)?[0-9a-f]{8}$')
   AND  is_available = true
 ORDER  BY name;
 """
@@ -66,43 +73,46 @@ ORDER  BY name;
 FETCH_CURATED_COUNT = """
 SELECT COUNT(*)
 FROM   nomenclature
-WHERE  product_code LIKE 'RAW-%'
-  AND  product_code NOT LIKE 'RAW-AUTO-%'
+WHERE  product_code LIKE 'RAW-%%'
+  AND  product_code !~ '^RAW-(AUTO-)?[0-9a-f]{8}$'
   AND  is_available = true;
 """
 
+# Curated-only filter: RAW-* but NOT hash-coded
+_CURATED_FILTER = """
+  c.product_code LIKE 'RAW-%%'
+  AND  c.product_code !~ '^RAW-(AUTO-)?[0-9a-f]{8}$'
+  AND  c.is_available = true
+""".strip()
+
+_CURATED_FILTER_BARE = _CURATED_FILTER.replace("c.", "")
+
 # Pass 1: exact barcode match via sku table
-BARCODE_MATCH_SQL = """
+BARCODE_MATCH_SQL = f"""
 SELECT c.id, c.product_code, c.name
 FROM   sku sa
 JOIN   sku sc ON sc.barcode = sa.barcode AND sc.barcode IS NOT NULL
 JOIN   nomenclature c ON c.id = sc.nomenclature_id
 WHERE  sa.nomenclature_id = %s
   AND  sc.nomenclature_id != %s
-  AND  c.product_code LIKE 'RAW-%%'
-  AND  c.product_code NOT LIKE 'RAW-AUTO-%%'
-  AND  c.is_available = true
+  AND  {_CURATED_FILTER}
 LIMIT 1;
 """
 
 # Pass 1b: exact name match (case-insensitive)
-NAME_EXACT_SQL = """
+NAME_EXACT_SQL = f"""
 SELECT id, product_code, name
 FROM   nomenclature
 WHERE  lower(name) = lower(%s)
-  AND  product_code LIKE 'RAW-%%'
-  AND  product_code NOT LIKE 'RAW-AUTO-%%'
-  AND  is_available = true
+  AND  {_CURATED_FILTER_BARE}
 LIMIT 1;
 """
 
 # Pass 2+3: pg_trgm fuzzy similarity
-TRGM_SQL = """
+TRGM_SQL = f"""
 SELECT id, product_code, name, similarity(name, %s) AS sim
 FROM   nomenclature
-WHERE  product_code LIKE 'RAW-%%'
-  AND  product_code NOT LIKE 'RAW-AUTO-%%'
-  AND  is_available = true
+WHERE  {_CURATED_FILTER_BARE}
   AND  similarity(name, %s) > 0.4
 ORDER  BY sim DESC
 LIMIT 1;
@@ -148,13 +158,13 @@ def run(dry_run: bool, export_csv: bool) -> None:
 
     with psycopg.connect(db_url, autocommit=False) as conn:
         with conn.cursor() as cur:
-            cur.execute(FETCH_AUTO_ITEMS)
+            cur.execute(FETCH_HASH_ITEMS)
             auto_items = cur.fetchall()
 
             cur.execute(FETCH_CURATED_COUNT)
             curated_count = cur.fetchone()[0]
 
-            print(f"RAW-AUTO items (active)    : {len(auto_items)}")
+            print(f"Hash-coded items (active)  : {len(auto_items)}")
             print(f"Curated RAW items (active) : {curated_count}")
             print()
 
