@@ -3,7 +3,7 @@ import { getSupabase } from "../lib/supabase.js";
 export const searchProductsSchema = {
   name: "search_products",
   description:
-    "Search the product catalog (nomenclature). Returns matching items with nutrition, cost, and availability. Use to find ingredients, semi-finished products, modifiers, or dishes. Supports multilingual search — query in English, Russian, Arabic, or Thai.",
+    "Search the product catalog (nomenclature). Returns matching items with barcodes, nutrition, cost, and availability. Use to find ingredients, semi-finished products, modifiers, or dishes. Supports multilingual search — query in English, Russian, Arabic, or Thai.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -34,13 +34,14 @@ export async function searchProducts(args: {
   const sb = getSupabase();
   const limit = args.limit || 20;
 
+  const selectFields =
+    "id, product_code, name, aliases, type, base_unit, cost_per_unit, price, calories, protein, carbs, fat, allergens, is_available, sku(barcode), supplier_catalog(barcode)";
+
   // Search by product_code, name, and aliases (multilingual)
   // aliases is text[] — use cs (contains) operator for array search
   let q = sb
     .from("nomenclature")
-    .select(
-      "id, product_code, name, aliases, type, base_unit, cost_per_unit, price, calories, protein, carbs, fat, allergens, is_available"
-    )
+    .select(selectFields)
     .or(`product_code.ilike.%${args.query}%,name.ilike.%${args.query}%`)
     .order("product_code")
     .limit(limit);
@@ -57,9 +58,7 @@ export async function searchProducts(args: {
   if ((!data || data.length === 0) && args.query) {
     const aliasQuery = sb
       .from("nomenclature")
-      .select(
-        "id, product_code, name, aliases, type, base_unit, cost_per_unit, price, calories, protein, carbs, fat, allergens, is_available"
-      )
+      .select(selectFields)
       .order("product_code")
       .limit(200);
 
@@ -82,23 +81,33 @@ export async function searchProducts(args: {
 
   return {
     count: results.length,
-    results: results.map((item: any) => ({
-      id: item.id,
-      code: item.product_code,
-      name: item.name,
-      aliases: item.aliases?.length ? item.aliases : undefined,
-      type: item.type,
-      unit: item.base_unit,
-      cost: item.cost_per_unit,
-      price: item.price,
-      available: item.is_available,
-      nutrition: {
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fat: item.fat,
-        allergens: item.allergens,
-      },
-    })),
+    results: results.map((item: any) => {
+      // Collect unique barcodes from sku and supplier_catalog joins
+      const barcodes = [
+        ...((item.sku || []) as any[]).map((s: any) => s.barcode),
+        ...((item.supplier_catalog || []) as any[]).map((s: any) => s.barcode),
+      ].filter((b): b is string => !!b);
+      const uniqueBarcodes = [...new Set(barcodes)];
+
+      return {
+        id: item.id,
+        code: item.product_code,
+        name: item.name,
+        aliases: item.aliases?.length ? item.aliases : undefined,
+        type: item.type,
+        unit: item.base_unit,
+        cost: item.cost_per_unit,
+        price: item.price,
+        available: item.is_available,
+        barcodes: uniqueBarcodes.length ? uniqueBarcodes : undefined,
+        nutrition: {
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fat: item.fat,
+          allergens: item.allergens,
+        },
+      };
+    }),
   };
 }
