@@ -68,6 +68,30 @@ function KindBadge({ kind, dual }: { kind: NomenclatureKind; dual: boolean }) {
   )
 }
 
+/** 4-dot card-completeness indicator. Dots: customer description, cook note,
+ * assembler note, POS status beyond draft. */
+function CompletenessIndicator({ item }: { item: MenuItem }) {
+  const dots = [
+    { label: 'Customer', filled: !!item.customer_description },
+    { label: 'Cook', filled: !!item.kitchen_note },
+    { label: 'Assembler', filled: !!item.assembler_note },
+    { label: 'POS', filled: item.pos_status !== 'draft' },
+  ]
+  return (
+    <div
+      className="flex items-center gap-1"
+      title={dots.map((d) => `${d.label}: ${d.filled ? 'OK' : 'empty'}`).join(', ')}
+    >
+      {dots.map((d) => (
+        <span
+          key={d.label}
+          className={`inline-block h-2 w-2 rounded-full ${d.filled ? 'bg-forest-soft' : 'bg-surface-3'}`}
+        />
+      ))}
+    </div>
+  )
+}
+
 function foodCostColor(pct: number): string {
   if (pct < 30) return 'text-forest-soft bg-royal-green/25'
   if (pct <= 45) return 'text-amber-watch bg-amber-watch/15'
@@ -369,6 +393,9 @@ export function OwnerTable({
             <th role="columnheader" className="px-3 py-2.5 text-center">Available</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Featured</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Phase</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Version</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Verified</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Card</th>
           </tr>
         </thead>
         <tbody>
@@ -376,7 +403,7 @@ export function OwnerTable({
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-surface-1/30">
-                  <td colSpan={15} className="px-3 py-2">
+                  <td colSpan={18} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-cream/50">
                       {item.subcategory.name}
                     </span>
@@ -666,6 +693,29 @@ export function OwnerTable({
                     ))}
                   </select>
                 </td>
+
+                {/* Card version */}
+                <td className="px-3 py-2 text-center">
+                  <span className="font-mono text-[10px] tabular-nums text-cream/50">
+                    v{dish.card_version}
+                  </span>
+                </td>
+
+                {/* Last verified */}
+                <td className="px-3 py-2 text-center">
+                  {dish.last_verified_at ? (
+                    <span className="text-[10px] text-cream/50" title={dish.last_verified_at}>
+                      {new Date(dish.last_verified_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                    </span>
+                  ) : (
+                    <span className="text-cream/30">&mdash;</span>
+                  )}
+                </td>
+
+                {/* Completeness */}
+                <td className="px-3 py-2 text-center">
+                  <CompletenessIndicator item={dish} />
+                </td>
               </tr>
               {isDrilled && bomChildren.length > 0 && (
                 <BomChildRows
@@ -676,7 +726,7 @@ export function OwnerTable({
               )}
               {isExpanded && (
                 <tr className="bg-surface-1/60">
-                  <td colSpan={15} className="p-0">
+                  <td colSpan={18} className="p-0">
                     <DishExpandedCard dish={dish} />
                     {onOpenDrawer && (
                       <div className="flex justify-end border-t border-surface-3/50 bg-surface-1/40 px-4 py-2">
@@ -786,6 +836,9 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
                 </span>
               )}
             </td>
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
