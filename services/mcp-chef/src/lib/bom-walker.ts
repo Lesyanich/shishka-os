@@ -104,7 +104,7 @@ export async function getBomTree(
   let lineCost = 0;
   const hasNullCost = children.length === 0 && item.cost_per_unit == null;
   if (children.length > 0) {
-    lineCost = children.reduce((sum, c) => sum + c.line_cost, 0);
+    lineCost = children.reduce((sum, c) => sum + c.line_cost, 0) * quantity;
   } else {
     lineCost = (item.cost_per_unit || 0) * quantity;
   }
@@ -156,7 +156,7 @@ export function calculateTreeCost(tree: BomTreeNode): number {
   let cost = tree.children.reduce(
     (sum, c) => sum + calculateTreeCost(c),
     0
-  );
+  ) * tree.quantity;
   // yield_loss_pct is LOSS: 15 = 15% lost, effective yield = 85%
   if (tree.yield_loss_pct > 0 && tree.yield_loss_pct < 100) {
     cost = cost / (1 - tree.yield_loss_pct / 100);
@@ -198,6 +198,12 @@ export function calculateTreeNutrition(tree: BomTreeNode): NutritionSummary {
   }
 
   result.allergens = Array.from(allergenSet);
+
+  // Scale by this node's quantity in parent BOM
+  result.calories *= tree.quantity;
+  result.protein *= tree.quantity;
+  result.carbs *= tree.quantity;
+  result.fat *= tree.quantity;
 
   // Round
   result.calories = Math.round(result.calories * 10) / 10;
