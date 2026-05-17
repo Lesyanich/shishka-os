@@ -18,6 +18,16 @@ export interface MenuItem extends MenuDish {
    * dishes. Renders with a compound half-gradient badge. */
   isDualType: boolean
   base_unit: string | null
+  card_version: number
+  last_verified_at: string | null
+  last_verified_by: string | null
+  pos_status: 'draft' | 'approved' | 'synced'
+  customer_description: string | null
+  customer_short_name: string | null
+  assembler_note: string | null
+  kitchen_note: string | null
+  ttc_source_url: string | null
+  merrychef_program: Record<string, unknown> | null
 }
 
 export interface MenuBomChild {
@@ -79,6 +89,16 @@ interface RawNomenclatureRow {
   portion_unit: PortionUnit | null
   launch_phase: number | string | null
   category_id: string | null
+  card_version: number
+  last_verified_at: string | null
+  last_verified_by: string | null
+  pos_status: string
+  customer_description: string | null
+  customer_short_name: string | null
+  assembler_note: string | null
+  kitchen_note: string | null
+  ttc_source_url: string | null
+  merrychef_program: Record<string, unknown> | null
   product_categories: {
     id: string
     code: string
@@ -117,6 +137,9 @@ export function useMenuData(): UseMenuDataResult {
           calories, protein, carbs, fat,
           portion_size, portion_unit, launch_phase,
           category_id,
+          card_version, last_verified_at, last_verified_by, pos_status,
+          customer_description, customer_short_name, assembler_note, kitchen_note,
+          ttc_source_url, merrychef_program,
           product_categories!category_id(id, code, name, sort_order)
         `)
         .or('product_code.like.SALE-%,product_code.like.PF-%,product_code.like.MOD-%')
@@ -200,6 +223,16 @@ export function useMenuData(): UseMenuDataResult {
         tags: tagMap.get(raw.id) ?? [],
         kind,
         isDualType: false,
+        card_version: raw.card_version ?? 1,
+        last_verified_at: raw.last_verified_at,
+        last_verified_by: raw.last_verified_by,
+        pos_status: (raw.pos_status ?? 'draft') as 'draft' | 'approved' | 'synced',
+        customer_description: raw.customer_description,
+        customer_short_name: raw.customer_short_name,
+        assembler_note: raw.assembler_note,
+        kitchen_note: raw.kitchen_note,
+        ttc_source_url: raw.ttc_source_url,
+        merrychef_program: raw.merrychef_program,
       }
       itemsById.set(raw.id, item)
       itemList.push(item)
