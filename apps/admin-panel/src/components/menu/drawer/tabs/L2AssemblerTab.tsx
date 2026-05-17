@@ -1,6 +1,7 @@
 import { Package, Utensils, StickyNote } from 'lucide-react'
 import type { MenuItem } from '../../../../hooks/useMenuData'
 import type { DishCardData, AssemblyComponent } from '../../../../hooks/useDishCard'
+import type { MerrychefProgram } from '../../../../hooks/useDishCardSave'
 import { AssemblyOrderEditor } from '../sections/AssemblyOrderEditor'
 import { MerrychefProgramForm } from '../sections/MerrychefProgramForm'
 import { PhotoUpload } from '../sections/PhotoUpload'
@@ -13,6 +14,9 @@ interface L2AssemblerTabProps {
   /** Controlled form state — changes here are held until Save & Verify. */
   formCard: DishCardData | null
   onFormChange: (patch: Partial<DishCardData>) => void
+  /** Merrychef program lives on nomenclature, not dish_card — passed separately. */
+  merrychefProgram: MerrychefProgram | null
+  onMerrychefChange: (program: MerrychefProgram | null) => void
 }
 
 export function L2AssemblerTab({
@@ -22,6 +26,8 @@ export function L2AssemblerTab({
   isLoading,
   formCard,
   onFormChange,
+  merrychefProgram,
+  onMerrychefChange,
 }: L2AssemblerTabProps) {
   if (isLoading)
     return (
@@ -80,14 +86,8 @@ export function L2AssemblerTab({
           Merrychef Program
         </h4>
         <MerrychefProgramForm
-          program={
-            item.merrychef_program as {
-              temp_c: number
-              time_sec: number
-            } | null
-          }
-          onChange={() => {}}
-          readOnly
+          program={merrychefProgram}
+          onChange={onMerrychefChange}
         />
       </section>
 
