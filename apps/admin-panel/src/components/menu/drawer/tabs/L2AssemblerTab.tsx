@@ -3,6 +3,7 @@ import type { MenuItem } from '../../../../hooks/useMenuData'
 import type { DishCardData, AssemblyComponent } from '../../../../hooks/useDishCard'
 import { AssemblyOrderEditor } from '../sections/AssemblyOrderEditor'
 import { MerrychefProgramForm } from '../sections/MerrychefProgramForm'
+import { PhotoUpload } from '../sections/PhotoUpload'
 
 interface L2AssemblerTabProps {
   item: MenuItem
@@ -163,6 +164,17 @@ export function L2AssemblerTab({
           Lid sticker
         </label>
       </div>
+
+      {/* Assembler reference photo */}
+      <PhotoUpload
+        photoUrl={card?.assembler_photo_url ?? null}
+        role="assembler"
+        nomenclatureId={item.id}
+        onChange={(newUrl) =>
+          onFormChange({ assembler_photo_url: newUrl ?? '' })
+        }
+        label="Assembler Reference Photo"
+      />
 
       {/* L2 Components (read-only, from view) */}
       <section className="space-y-2">

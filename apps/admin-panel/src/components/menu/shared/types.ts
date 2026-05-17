@@ -21,6 +21,13 @@ export interface NutritionSummary {
   fiber?: number | null
 }
 
+export interface DishModifierSummary {
+  slug: string
+  name: string
+  priceDelta: number
+  isDefault: boolean
+}
+
 export interface DishSummary {
   id: string
   name: string
@@ -32,6 +39,12 @@ export interface DishSummary {
   isFeatured: boolean
   nutrition: NutritionSummary
   tags: MenuTagSummary[]
+  /** Allergen slugs (e.g. ['allergen-dairy']). Optional — rendered as a badge row. */
+  allergens?: string[]
+  /** Customer-facing wait estimate. Renders as a small pill on the card. */
+  etaMin?: number | null
+  /** Modifier chips ("+chicken +50฿"). */
+  modifiers?: DishModifierSummary[]
 }
 
 export const FOOD_COST_THRESHOLDS = {

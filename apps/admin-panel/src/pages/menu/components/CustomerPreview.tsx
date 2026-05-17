@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { MenuCategory, MenuDish } from '../../../hooks/useMenuDishes'
+import type { DishCardData } from '../../../hooks/useDishCard'
 import type {
   DishSummary,
   MenuCategorySummary,
@@ -13,6 +14,10 @@ interface CustomerPreviewProps {
   dishes: MenuDish[]
   categories: MenuCategory[]
   selectedCategory: string | null
+  /** Per-dish allergen slugs (from BOM tree walk). */
+  allergensByDishId?: Map<string, string[]>
+  /** Per-dish dish_card row — contributes customer_eta_min. */
+  dishCardById?: Map<string, DishCardData>
   /** Quality score lookup — wires when the scorecard sub-task lands. */
   qualityScoreFor?: (dishId: string) => number | null | undefined
   /** Click a dish → open DetailDrawer (owner-only). Public site leaves this
@@ -29,6 +34,8 @@ export function CustomerPreview({
   dishes,
   categories,
   selectedCategory,
+  allergensByDishId,
+  dishCardById,
   qualityScoreFor,
   onOpenDish,
 }: CustomerPreviewProps) {
@@ -59,29 +66,37 @@ export function CustomerPreview({
 
   const summaries = useMemo<DishSummary[]>(
     () =>
-      filtered.map((d) => ({
-        id: d.id,
-        name: d.name,
-        description: d.description,
-        price: d.price,
-        portionSize: d.portion_size,
-        portionUnit: d.portion_unit,
-        imageUrl: d.image_url,
-        isFeatured: d.is_featured,
-        nutrition: {
-          calories: d.calories,
-          protein: d.protein,
-          carbs: d.carbs,
-          fat: d.fat,
-        },
-        tags: d.tags.map((t) => ({
-          slug: t.slug,
-          name: t.name,
-          group: t.tag_group,
-          color: t.color,
-        })),
-      })),
-    [filtered],
+      filtered.map((d) => {
+        const card = dishCardById?.get(d.id)
+        return {
+          id: d.id,
+          name: d.name,
+          description: d.description,
+          price: d.price,
+          portionSize: d.portion_size,
+          portionUnit: d.portion_unit,
+          imageUrl: d.image_url,
+          isFeatured: d.is_featured,
+          nutrition: {
+            calories: d.calories,
+            protein: d.protein,
+            carbs: d.carbs,
+            fat: d.fat,
+          },
+          tags: d.tags
+            // Strip allergen tags from chip strip — they render as their own row.
+            .filter((t) => t.tag_group !== 'allergen')
+            .map((t) => ({
+              slug: t.slug,
+              name: t.name,
+              group: t.tag_group,
+              color: t.color,
+            })),
+          allergens: allergensByDishId?.get(d.id) ?? [],
+          etaMin: card?.customer_eta_min ?? null,
+        }
+      }),
+    [filtered, allergensByDishId, dishCardById],
   )
 
   const categorySummaries = useMemo<MenuCategorySummary[]>(

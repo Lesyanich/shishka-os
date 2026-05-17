@@ -1,23 +1,43 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Eye, Table2, LayoutGrid, Loader2, ChefHat, Sparkles, Plus } from 'lucide-react'
+import {
+  Eye,
+  Table2,
+  LayoutGrid,
+  Loader2,
+  ChefHat,
+  Sparkles,
+  Plus,
+  Package,
+  Shield,
+} from 'lucide-react'
 import { useMenuData } from '../../hooks/useMenuData'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
+import { useMenuListEnrichment } from '../../hooks/useMenuListEnrichment'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
+import { L1CookView } from './components/L1CookView'
+import { L2AssemblerView } from './components/L2AssemblerView'
 import { NewDishModal } from './components/NewDishModal'
 import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
 import { TypeFilter, type TypeFilterValue } from '../../components/menu/owner/TypeFilter'
 import { DishDrawer } from '../../components/menu/drawer/DishDrawer'
 import { CategoryTabs } from '../../components/menu/shared'
 
-type ViewMode = 'owner' | 'customer'
+type ViewMode = 'owner' | 'l1-cook' | 'l2-assembler' | 'customer'
 type OwnerLayout = 'table' | 'gallery'
 
-const VIEW_MODES: readonly ViewMode[] = ['owner', 'customer']
+const VIEW_MODES: readonly ViewMode[] = ['owner', 'l1-cook', 'l2-assembler', 'customer']
 const OWNER_LAYOUTS: readonly OwnerLayout[] = ['table', 'gallery']
 const TYPE_FILTERS: readonly TypeFilterValue[] = ['all', 'SALE', 'PF', 'MOD']
+
+const VIEW_LABELS: Record<ViewMode, { label: string; icon: typeof Shield }> = {
+  owner: { label: 'Owner', icon: Shield },
+  'l1-cook': { label: 'L1 Cook', icon: ChefHat },
+  'l2-assembler': { label: 'L2 Assembler', icon: Package },
+  customer: { label: 'Customer', icon: Eye },
+}
 
 function pickParam<T extends string>(
   params: URLSearchParams,
@@ -43,6 +63,7 @@ export function MenuPage() {
     refetch,
   } = useMenuData()
   const inlineUpdate = useInlineUpdate(updateItem)
+  const enrichment = useMenuListEnrichment(items, childrenByParent)
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -230,29 +251,28 @@ export function MenuPage() {
             </div>
           )}
 
-          {/* View toggle */}
+          {/* View toggle (4 roles) */}
           <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
-            <button
-              onClick={() => setView('owner')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                view === 'owner'
-                  ? 'bg-surface-3 text-cream'
-                  : 'text-cream/60 hover:text-cream'
-              }`}
-            >
-              Owner
-            </button>
-            <button
-              onClick={() => setView('customer')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                view === 'customer'
-                  ? 'bg-surface-3 text-cream'
-                  : 'text-cream/60 hover:text-cream'
-              }`}
-            >
-              <Eye className="h-3.5 w-3.5" />
-              Customer
-            </button>
+            {VIEW_MODES.map((v) => {
+              const { label, icon: Icon } = VIEW_LABELS[v]
+              const active = view === v
+              return (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                    active
+                      ? 'bg-surface-3 text-cream'
+                      : 'text-cream/60 hover:text-cream'
+                  }`}
+                  title={`${label} view`}
+                  aria-pressed={active}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -273,13 +293,14 @@ export function MenuPage() {
           )}
         </div>
       )}
-      {view === 'customer' && categories.length > 0 && (
-        <CategoryTabs
-          categories={categories}
-          selectedId={selectedCategory}
-          onSelect={setSelectedCategory}
-        />
-      )}
+      {(view === 'customer' || view === 'l1-cook' || view === 'l2-assembler') &&
+        categories.length > 0 && (
+          <CategoryTabs
+            categories={categories}
+            selectedId={selectedCategory}
+            onSelect={setSelectedCategory}
+          />
+        )}
 
       {/* Content */}
       {isLoading ? (
@@ -320,11 +341,28 @@ export function MenuPage() {
           onUpdate={updateItem}
           onOpenDrawer={openDrawer}
         />
+      ) : view === 'l1-cook' ? (
+        <L1CookView
+          items={items}
+          selectedCategory={selectedCategory}
+          pfPackCardById={enrichment.pfPackCardById}
+          recipeStatsById={enrichment.recipeStatsById}
+          onOpenDish={openDrawer}
+        />
+      ) : view === 'l2-assembler' ? (
+        <L2AssemblerView
+          items={items}
+          selectedCategory={selectedCategory}
+          dishCardById={enrichment.dishCardById}
+          onOpenDish={openDrawer}
+        />
       ) : (
         <CustomerPreview
           dishes={dishes}
           categories={categories}
           selectedCategory={selectedCategory}
+          allergensByDishId={enrichment.allergensByDishId}
+          dishCardById={enrichment.dishCardById}
           onOpenDish={openDrawer}
         />
       )}
