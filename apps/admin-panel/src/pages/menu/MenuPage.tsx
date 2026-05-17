@@ -9,7 +9,7 @@ import { CustomerPreview } from './components/CustomerPreview'
 import { NewDishModal } from './components/NewDishModal'
 import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
 import { TypeFilter, type TypeFilterValue } from '../../components/menu/owner/TypeFilter'
-import { DetailDrawer } from '../../components/menu/owner/DetailDrawer'
+import { DishDrawer } from '../../components/menu/drawer/DishDrawer'
 import { CategoryTabs } from '../../components/menu/shared'
 
 type ViewMode = 'owner' | 'customer'
@@ -339,13 +339,11 @@ export function MenuPage() {
       {/* AI Chef slide-out panel */}
       <ChefChatPanel open={chefOpen} onClose={() => setChefOpen(false)} />
 
-      {/* Detail drawer — slide-in right panel */}
-      <DetailDrawer
+      {/* Menu card drawer — slide-in right panel with role tabs */}
+      <DishDrawer
         item={drawerItem}
         onClose={closeDrawer}
-        onToggleAvailable={async (id, next) => {
-          await inlineUpdate.commit(id, { is_available: next })
-        }}
+        onSaved={() => refetch()}
         returnFocusToId={drawerItem?.id ?? null}
       />
     </div>
