@@ -1,13 +1,21 @@
 import { useCallback, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+export interface MerrychefProgram {
+  temp_c: number
+  time_sec: number
+  fan_pct?: number
+  microwave_pct?: number
+  notes?: string
+}
+
 export interface DishCardSavePayload {
   expected_version: number
   customer_description?: string
   customer_short_name?: string
   customer_photo_url?: string
   assembler_note?: string
-  merrychef_program?: { temp_c: number; time_sec: number } | null
+  merrychef_program?: MerrychefProgram | null
   ttc_source_url?: string
   dish_card?: {
     container_l2?: string

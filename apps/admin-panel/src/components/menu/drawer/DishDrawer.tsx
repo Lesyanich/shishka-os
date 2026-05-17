@@ -7,6 +7,7 @@ import { useAllergens } from '../../../hooks/useAllergens'
 import { useModifierOptions } from '../../../hooks/useModifierOptions'
 import { useDishScorecard } from '../../../hooks/useDishScorecard'
 import { useDishCardSave } from '../../../hooks/useDishCardSave'
+import type { MerrychefProgram } from '../../../hooks/useDishCardSave'
 import { useDishRecipeSteps } from '../../../hooks/useDishRecipeSteps'
 import { DrawerHero } from '../owner/DrawerHero'
 import { CustomerTab } from './tabs/CustomerTab'
@@ -60,6 +61,7 @@ export function DishDrawer({
   // so we can pass it to fn_dish_card_save outside the dish_card sub-object.
   const [formNomen, setFormNomen] = useState<{
     customer_photo_url?: string | null
+    merrychef_program?: MerrychefProgram | null
   } | null>(null)
 
   // Reset form when item changes
@@ -75,7 +77,10 @@ export function DishDrawer({
   }, [])
 
   const onNomenChange = useCallback(
-    (patch: { customer_photo_url?: string | null }) => {
+    (patch: {
+      customer_photo_url?: string | null
+      merrychef_program?: MerrychefProgram | null
+    }) => {
       setFormNomen((prev) => ({ ...(prev ?? {}), ...patch }))
     },
     [],
@@ -93,6 +98,10 @@ export function DishDrawer({
       customer_photo_url:
         formNomen != null && 'customer_photo_url' in formNomen
           ? (formNomen.customer_photo_url ?? '')
+          : undefined,
+      merrychef_program:
+        formNomen != null && 'merrychef_program' in formNomen
+          ? formNomen.merrychef_program
           : undefined,
       dish_card: {
         container_l2: mergedCard.container_l2 ?? undefined,
@@ -277,6 +286,14 @@ export function DishDrawer({
                   : null
               }
               onFormChange={onFormChange}
+              merrychefProgram={
+                formNomen != null && 'merrychef_program' in formNomen
+                  ? (formNomen.merrychef_program ?? null)
+                  : ((item.merrychef_program as MerrychefProgram | null) ?? null)
+              }
+              onMerrychefChange={(program) =>
+                onNomenChange({ merrychef_program: program })
+              }
             />
           )}
           {resolvedTab === 'owner' && (
