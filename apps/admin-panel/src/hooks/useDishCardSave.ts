@@ -17,6 +17,7 @@ export interface DishCardSavePayload {
     cold_addons_after_reheat?: string
     has_cutlery?: boolean
     has_lid_sticker?: boolean
+    assembler_photo_url?: string
     customer_eta_min?: number
     composition_override?: string
   }
@@ -39,6 +40,7 @@ export interface PfPackCardSavePayload {
     storage_zone?: string
     storage_temp_min_c?: number
     storage_temp_max_c?: number
+    kitchen_photo_url?: string
   }
 }
 

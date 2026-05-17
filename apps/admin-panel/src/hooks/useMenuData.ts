@@ -24,6 +24,7 @@ export interface MenuItem extends MenuDish {
   pos_status: 'draft' | 'approved' | 'synced'
   customer_description: string | null
   customer_short_name: string | null
+  customer_photo_url: string | null
   assembler_note: string | null
   kitchen_note: string | null
   ttc_source_url: string | null
@@ -95,6 +96,7 @@ interface RawNomenclatureRow {
   pos_status: string
   customer_description: string | null
   customer_short_name: string | null
+  customer_photo_url: string | null
   assembler_note: string | null
   kitchen_note: string | null
   ttc_source_url: string | null
@@ -138,7 +140,8 @@ export function useMenuData(): UseMenuDataResult {
           portion_size, portion_unit, launch_phase,
           category_id,
           card_version, last_verified_at, last_verified_by, pos_status,
-          customer_description, customer_short_name, assembler_note, kitchen_note,
+          customer_description, customer_short_name, customer_photo_url,
+          assembler_note, kitchen_note,
           ttc_source_url, merrychef_program,
           product_categories!category_id(id, code, name, sort_order)
         `)
@@ -229,6 +232,7 @@ export function useMenuData(): UseMenuDataResult {
         pos_status: (raw.pos_status ?? 'draft') as 'draft' | 'approved' | 'synced',
         customer_description: raw.customer_description,
         customer_short_name: raw.customer_short_name,
+        customer_photo_url: raw.customer_photo_url,
         assembler_note: raw.assembler_note,
         kitchen_note: raw.kitchen_note,
         ttc_source_url: raw.ttc_source_url,

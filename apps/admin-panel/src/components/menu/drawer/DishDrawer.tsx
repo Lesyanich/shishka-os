@@ -54,12 +54,18 @@ export function DishDrawer({
   const recipeSteps = useDishRecipeSteps(dishId)
   const { saveDishCard, isSaving } = useDishCardSave()
 
-  // Local form state for L2 Assembler tab edits (held until Save)
+  // Local form state for tab edits (held until Save)
   const [formCard, setFormCard] = useState<Partial<DishCardData> | null>(null)
+  // Nomenclature-level form state (customer photo URL etc.) — keyed at top level
+  // so we can pass it to fn_dish_card_save outside the dish_card sub-object.
+  const [formNomen, setFormNomen] = useState<{
+    customer_photo_url?: string | null
+  } | null>(null)
 
   // Reset form when item changes
   useEffect(() => {
     setFormCard(null)
+    setFormNomen(null)
     setActiveTab('customer')
     setToast(null)
   }, [dishId])
@@ -68,13 +74,26 @@ export function DishDrawer({
     setFormCard((prev) => ({ ...(prev ?? {}), ...patch }))
   }, [])
 
-  const isDirty = formCard != null && Object.keys(formCard).length > 0
+  const onNomenChange = useCallback(
+    (patch: { customer_photo_url?: string | null }) => {
+      setFormNomen((prev) => ({ ...(prev ?? {}), ...patch }))
+    },
+    [],
+  )
+
+  const isDirty =
+    (formCard != null && Object.keys(formCard).length > 0) ||
+    (formNomen != null && Object.keys(formNomen).length > 0)
 
   const handleSave = useCallback(async () => {
     if (!item || !isSale) return
     const mergedCard = { ...(dishCard.card ?? {}), ...formCard }
     const result = await saveDishCard(item.id, {
       expected_version: item.card_version,
+      customer_photo_url:
+        formNomen != null && 'customer_photo_url' in formNomen
+          ? (formNomen.customer_photo_url ?? '')
+          : undefined,
       dish_card: {
         container_l2: mergedCard.container_l2 ?? undefined,
         assembly_order: mergedCard.assembly_order ?? undefined,
@@ -85,6 +104,8 @@ export function DishDrawer({
           mergedCard.cold_addons_after_reheat ?? undefined,
         has_cutlery: mergedCard.has_cutlery,
         has_lid_sticker: mergedCard.has_lid_sticker,
+        assembler_photo_url:
+          mergedCard.assembler_photo_url ?? undefined,
         customer_eta_min: mergedCard.customer_eta_min ?? undefined,
         composition_override:
           mergedCard.composition_override ?? undefined,
@@ -93,6 +114,7 @@ export function DishDrawer({
     if (result.ok) {
       setToast({ type: 'ok', text: `Saved v${result.newVersion}` })
       setFormCard(null)
+      setFormNomen(null)
       dishCard.refetch()
       onSaved?.()
     } else if (result.conflict) {
@@ -104,7 +126,7 @@ export function DishDrawer({
       setToast({ type: 'error', text: result.error ?? 'Save failed' })
     }
     setTimeout(() => setToast(null), 4000)
-  }, [item, isSale, dishCard, formCard, saveDishCard, onSaved])
+  }, [item, isSale, dishCard, formCard, formNomen, saveDishCard, onSaved])
 
   // Focus management
   useEffect(() => {
@@ -221,6 +243,14 @@ export function DishDrawer({
               allergensLoading={allergens.isLoading}
               modifiers={modifiers.modifiers}
               modifiersLoading={modifiers.isLoading}
+              customerPhotoUrl={
+                formNomen?.customer_photo_url !== undefined
+                  ? formNomen.customer_photo_url
+                  : (item.customer_photo_url ?? item.image_url ?? null)
+              }
+              onCustomerPhotoChange={(url) =>
+                onNomenChange({ customer_photo_url: url })
+              }
             />
           )}
           {resolvedTab === 'l1-cook' && (
@@ -255,6 +285,7 @@ export function DishDrawer({
               scorecard={scorecard.scorecard}
               scorecardLoading={scorecard.isLoading}
               scorecardError={scorecard.error}
+              onSynced={() => onSaved?.()}
             />
           )}
         </div>

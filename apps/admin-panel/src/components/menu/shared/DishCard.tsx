@@ -1,9 +1,27 @@
-import { Star } from 'lucide-react'
+import { Star, AlertTriangle, Clock } from 'lucide-react'
 import type { DishSummary, PortionUnit } from './types'
 import { NutritionBadges } from './NutritionBadges'
 import { CBSTags } from './CBSTags'
 import { PriceLabel } from './PriceLabel'
 import { DishPhotoSlot } from './DishPhotoSlot'
+
+const ALLERGEN_PALETTE: Record<string, string> = {
+  'allergen-gluten': 'bg-amber-900/40 text-amber-300',
+  'allergen-dairy': 'bg-sky-900/40 text-sky-300',
+  'allergen-nuts': 'bg-orange-900/40 text-orange-300',
+  'allergen-shellfish': 'bg-rose-900/40 text-rose-300',
+  'allergen-soy': 'bg-lime-900/40 text-lime-300',
+  'allergen-eggs': 'bg-yellow-900/40 text-yellow-300',
+  'allergen-egg': 'bg-yellow-900/40 text-yellow-300',
+  'allergen-fish': 'bg-cyan-900/40 text-cyan-300',
+  'allergen-sesame': 'bg-stone-800/60 text-stone-300',
+}
+const ALLERGEN_DEFAULT = 'bg-slate-800 text-slate-300'
+
+function allergenLabel(slug: string): string {
+  const raw = slug.replace(/^allergen-/, '')
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
+}
 
 interface DishCardProps {
   dish: DishSummary
@@ -113,6 +131,50 @@ export function DishCard({
         )}
 
         <NutritionBadges nutrition={dish.nutrition} mode={nutritionMode} />
+
+        {dish.allergens && dish.allergens.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-amber-400" />
+            {dish.allergens.map((slug) => (
+              <span
+                key={slug}
+                className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-medium ${ALLERGEN_PALETTE[slug] ?? ALLERGEN_DEFAULT}`}
+                title={`Contains ${allergenLabel(slug)}`}
+              >
+                {allergenLabel(slug)}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {dish.modifiers && dish.modifiers.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {dish.modifiers.map((m) => (
+              <span
+                key={m.slug}
+                className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
+                  m.isDefault
+                    ? 'bg-[var(--color-royal-green)]/20 text-[color:var(--color-forest-soft)]'
+                    : 'bg-surface-3 text-cream/70'
+                }`}
+              >
+                +{m.name}
+                {m.priceDelta !== 0 && (
+                  <span className="font-mono tabular-nums opacity-75">
+                    {m.priceDelta > 0 ? `+฿${m.priceDelta}` : `-฿${Math.abs(m.priceDelta)}`}
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {dish.etaMin != null && (
+          <div className="flex items-center gap-1 text-[10px] text-cream/55">
+            <Clock className="h-2.5 w-2.5" />
+            <span>~{dish.etaMin} min</span>
+          </div>
+        )}
 
         {dish.tags.length > 0 && (
           <div className="mt-auto pt-1">

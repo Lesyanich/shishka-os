@@ -3,10 +3,12 @@
 // Push categories + SALE-* menu items to Loyverse POS
 //
 // Actions:
-//   GET  ?action=status     → last 10 sync log entries
-//   POST ?action=categories → push product_categories → Loyverse
-//   POST ?action=items      → push SALE-* nomenclature → Loyverse
-//   POST ?action=full       → categories then items
+//   GET  ?action=status              → last 10 sync log entries
+//   POST ?action=categories          → push product_categories → Loyverse
+//   POST ?action=items               → push SALE-* nomenclature → Loyverse
+//   POST ?action=full                → categories then items
+//   POST ?action=push_dish&dish_id=X → push a single SALE-* dish (gated by
+//                                       fn_loyverse_sync_dish readiness check)
 //
 // Auth: Bearer token from LOYVERSE_API_TOKEN env var
 // ═══════════════════════════════════════════════════════════
@@ -322,6 +324,114 @@ async function handleItems() {
   return json({ ok: true, total: dishes.length, synced, failed, errors: errors.length ? errors : undefined })
 }
 
+// ── Action: push_dish (single SALE-* item) ──
+
+interface SyncDishRpcResponse {
+  ok: boolean
+  error?: string
+  reason?: string
+  pos_status?: string
+  is_available?: boolean
+  payload?: {
+    name: string
+    description: string
+    image_url: string | null
+    default_price: number | null
+  }
+}
+
+async function handlePushDish(dishId: string) {
+  if (!dishId) return json({ ok: false, error: "dish_id required" }, 400)
+
+  const storeId = await getStoreId()
+  if (!storeId) return json({ ok: false, error: "store_id not configured" }, 400)
+
+  // 1. Build validated payload via the DB RPC (pos_status + is_available gate).
+  const { data: rpcRaw, error: rpcErr } = await db.rpc("fn_loyverse_sync_dish", {
+    p_dish_id: dishId,
+  })
+  if (rpcErr) return json({ ok: false, error: `RPC failed: ${rpcErr.message}` }, 500)
+  const rpc = rpcRaw as SyncDishRpcResponse
+  if (!rpc.ok) {
+    return json(
+      {
+        ok: false,
+        error: rpc.error ?? "not_ready",
+        reason: rpc.reason,
+        pos_status: rpc.pos_status,
+        is_available: rpc.is_available,
+      },
+      400,
+    )
+  }
+  if (!rpc.payload) return json({ ok: false, error: "empty_payload" }, 500)
+
+  // 2. Fetch existing loyverse_item_id + linked category.
+  const { data: dishRow, error: dishErr } = await db
+    .from("nomenclature")
+    .select(
+      "id, name, loyverse_item_id, category_id, product_categories!category_id(loyverse_category_id)",
+    )
+    .eq("id", dishId)
+    .single()
+  if (dishErr) return json({ ok: false, error: dishErr.message }, 500)
+  const linkedCategoryId =
+    (dishRow as { product_categories: { loyverse_category_id: string | null } | null })
+      .product_categories?.loyverse_category_id ?? null
+
+  const logId = await logStart("dish_push", 1)
+
+  try {
+    const price = rpc.payload.default_price ?? 0
+    const itemBody: Record<string, unknown> = {
+      item_name: rpc.payload.name,
+      description: rpc.payload.description,
+      variants: [
+        {
+          variant_name: "Regular",
+          default_pricing_type: "FIXED",
+          default_price: price,
+          stores: [
+            {
+              store_id: storeId,
+              pricing_type: "FIXED",
+              price,
+              available_for_sale: true,
+            },
+          ],
+        },
+      ],
+    }
+    if (linkedCategoryId) itemBody.category_id = linkedCategoryId
+    if (rpc.payload.image_url) itemBody.image_url = rpc.payload.image_url
+
+    let loyverseItemId = (dishRow as { loyverse_item_id: string | null })
+      .loyverse_item_id
+
+    if (loyverseItemId) {
+      // UPDATE — Loyverse POST /items with id is an upsert
+      itemBody.id = loyverseItemId
+    }
+
+    const result = await loyversePost("/items", itemBody)
+    loyverseItemId = (result as { id?: string }).id ?? loyverseItemId
+
+    if (loyverseItemId) {
+      await db
+        .from("nomenclature")
+        .update({ loyverse_item_id: loyverseItemId, pos_status: "synced" })
+        .eq("id", dishId)
+    }
+
+    await logFinish(logId, "success", 1, 0)
+    return json({ ok: true, loyverse_item_id: loyverseItemId, payload: rpc.payload })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    await logFinish(logId, "error", 0, 1, message)
+    return json({ ok: false, error: message }, 502)
+  }
+}
+
 // ── Main handler ──
 
 Deno.serve(async (req) => {
@@ -354,9 +464,15 @@ Deno.serve(async (req) => {
         await handleCategories()
         return await handleItems()
 
+      case "push_dish": {
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        const dishId = url.searchParams.get("dish_id") ?? ""
+        return await handlePushDish(dishId)
+      }
+
       default:
         return json(
-          { ok: false, error: "Unknown action. Use: status, categories, items, full" },
+          { ok: false, error: "Unknown action. Use: status, categories, items, full, push_dish" },
           400,
         )
     }

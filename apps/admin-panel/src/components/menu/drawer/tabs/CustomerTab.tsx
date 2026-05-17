@@ -1,6 +1,7 @@
 import { NutritionBadges } from '../../shared/NutritionBadges'
 import { AllergenBadges } from '../sections/AllergenBadges'
 import { ModifierChips } from '../sections/ModifierChips'
+import { PhotoUpload } from '../sections/PhotoUpload'
 import type { MenuItem } from '../../../../hooks/useMenuData'
 import type { DishCardData } from '../../../../hooks/useDishCard'
 import type { ModifierOption } from '../../../../hooks/useModifierOptions'
@@ -12,6 +13,10 @@ interface CustomerTabProps {
   allergensLoading: boolean
   modifiers: ModifierOption[]
   modifiersLoading: boolean
+  /** Current photo URL (merged: form override OR persisted column). */
+  customerPhotoUrl: string | null
+  /** Pass new public URL (or null to clear). Caller saves on Save & Verify. */
+  onCustomerPhotoChange: (url: string | null) => void
 }
 
 export function CustomerTab({
@@ -21,11 +26,22 @@ export function CustomerTab({
   allergensLoading,
   modifiers,
   modifiersLoading,
+  customerPhotoUrl,
+  onCustomerPhotoChange,
 }: CustomerTabProps) {
   const compositionText = dishCard?.composition_override ?? null
 
   return (
     <div className="space-y-6">
+      {/* Customer photo */}
+      <PhotoUpload
+        photoUrl={customerPhotoUrl}
+        role="customer"
+        nomenclatureId={item.id}
+        onChange={onCustomerPhotoChange}
+        label="Customer Photo"
+      />
+
       {/* Customer short name */}
       <section className="space-y-1">
         <h4 className="text-[10px] uppercase tracking-widest text-cream/50">

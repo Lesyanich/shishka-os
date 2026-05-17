@@ -10,6 +10,7 @@ export {
 } from './types'
 export type {
   DishSummary,
+  DishModifierSummary,
   MenuTagSummary,
   MenuCategorySummary,
   NutritionSummary,

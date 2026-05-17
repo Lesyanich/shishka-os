@@ -1,13 +1,17 @@
-import { Shield, ExternalLink, Hash } from 'lucide-react'
+import { useState } from 'react'
+import { Shield, ExternalLink, Hash, Upload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { MenuItem } from '../../../../hooks/useMenuData'
 import type { DishScorecard } from '../../../../hooks/useDishScorecard'
 import { DrawerScorecard } from '../../owner/DrawerScorecard'
+import { useLoyversePushDish } from '../../../../hooks/useLoyversePushDish'
 
 interface OwnerTabProps {
   item: MenuItem
   scorecard: DishScorecard | null
   scorecardLoading: boolean
   scorecardError: string | null
+  /** Notify parent after a successful push so it can refetch. */
+  onSynced?: () => void
 }
 
 function posStatusBadge(status: string) {
@@ -26,7 +30,33 @@ export function OwnerTab({
   scorecard,
   scorecardLoading,
   scorecardError,
+  onSynced,
 }: OwnerTabProps) {
+  const { pushDish, isPushing, lastResult } = useLoyversePushDish()
+  const [pushToast, setPushToast] = useState<{
+    type: 'ok' | 'error'
+    text: string
+  } | null>(null)
+
+  const isSale = item.kind === 'SALE'
+
+  const handlePush = async () => {
+    setPushToast(null)
+    const result = await pushDish(item.id)
+    if (result.ok) {
+      setPushToast({
+        type: 'ok',
+        text: `Pushed to Loyverse${result.loyverse_item_id ? ` (id ${result.loyverse_item_id.slice(0, 8)})` : ''}`,
+      })
+      onSynced?.()
+    } else if (result.reason) {
+      setPushToast({ type: 'error', text: `Blocked: ${result.reason}` })
+    } else {
+      setPushToast({ type: 'error', text: result.error ?? 'Push failed' })
+    }
+    setTimeout(() => setPushToast(null), 5000)
+  }
+
   return (
     <div className="space-y-6">
       {/* Version + Verified */}
@@ -120,6 +150,60 @@ export function OwnerTab({
           <span className="text-xs text-cream/40">Not set</span>
         )}
       </section>
+
+      {/* Loyverse push — SALE-only */}
+      {isSale && (
+        <section className="space-y-2 border-t border-surface-3 pt-4">
+          <h4 className="text-[10px] uppercase tracking-widest text-cream/50">
+            <Upload className="mr-1 inline h-3 w-3" />
+            Loyverse Sync
+          </h4>
+          <p className="text-[10px] text-cream/45">
+            Gated by POS status = approved AND is_available = true. Pushes
+            customer-facing name, description (with allergen suffix), photo,
+            and price.
+          </p>
+          <button
+            type="button"
+            onClick={handlePush}
+            disabled={isPushing || item.pos_status === 'draft' || !item.is_available}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-forest-soft/40 bg-[var(--color-royal-green)]/20 px-3 py-1.5 text-xs font-medium text-[color:var(--color-forest-soft)] transition hover:bg-[var(--color-royal-green)]/30 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isPushing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" />
+            )}
+            Push to Loyverse
+          </button>
+          {pushToast && (
+            <div
+              className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] ${
+                pushToast.type === 'ok'
+                  ? 'bg-[var(--color-royal-green)]/20 text-[color:var(--color-forest-soft)]'
+                  : 'bg-[var(--color-royal-red)]/20 text-[color:var(--color-brick-soft)]'
+              }`}
+            >
+              {pushToast.type === 'ok' ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : (
+                <AlertCircle className="h-3 w-3" />
+              )}
+              {pushToast.text}
+            </div>
+          )}
+          {lastResult?.ok && lastResult.payload && (
+            <details className="rounded border border-surface-3 bg-surface-2/40 p-2 text-[10px]">
+              <summary className="cursor-pointer text-cream/55">
+                Last pushed payload
+              </summary>
+              <pre className="mt-1 overflow-auto text-[10px] text-cream/65">
+                {JSON.stringify(lastResult.payload, null, 2)}
+              </pre>
+            </details>
+          )}
+        </section>
+      )}
     </div>
   )
 }
