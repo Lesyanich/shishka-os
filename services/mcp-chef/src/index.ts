@@ -29,6 +29,7 @@ import { removeBomLine } from "./tools/remove-bom-line.js";
 import { manageRecipeFlow } from "./tools/manage-recipe-flow.js";
 import { updateProduct } from "./tools/update-product.js";
 import { recordProduction } from "./tools/record-production.js";
+import { listSuppliers } from "./tools/list-suppliers.js";
 
 // Resources & Prompts
 import { staticResources, dynamicResources } from "./resources/index.js";
@@ -157,6 +158,17 @@ server.tool(
     type: z.enum(["RAW", "PF"]).optional().describe("Filter by product type"),
   },
   async (args) => jsonResult(await checkInventory(args))
+);
+
+server.tool(
+  "list_suppliers",
+  "List suppliers from the suppliers table. Use to find supplier names, IDs, and how many products are linked. Bridges Finance→Chef visibility gap.",
+  {
+    query: z.string().optional().describe("Search by supplier name (e.g., 'Sangdamrong', 'Makro')"),
+    category_code: z.number().optional().describe("Filter by financial category code"),
+    limit: z.number().optional().describe("Max results (default: 30)"),
+  },
+  async (args) => jsonResult(await listSuppliers(args))
 );
 
 // ─── Write Tools ─────────────────────────────────────────────────
@@ -346,7 +358,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Chef Agent MCP server running on stdio`);
-  console.error(`   Tools: 15 | Resources: 3 | Prompts: 4`);
+  console.error(`   Tools: 16 | Resources: 3 | Prompts: 4`);
 }
 
 main().catch((err) => {
