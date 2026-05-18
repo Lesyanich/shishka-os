@@ -10,8 +10,12 @@
 
 BEGIN;
 
--- Step 1: remap old-vocab rows to new vocab BEFORE flipping the CHECK.
--- Idempotent: re-runs do nothing (rows already in new vocab).
+-- Step 1: drop the OLD CHECK first (otherwise the UPDATE below trips it —
+--         the OLD CHECK doesn't permit the NEW vocab values we're remapping to).
+ALTER TABLE bom_structures
+  DROP CONSTRAINT bom_structures_slot_check;
+
+-- Step 2: remap old-vocab rows to new vocab. Idempotent (CASE preserves new-vocab rows).
 UPDATE bom_structures
 SET slot = CASE slot
   WHEN 'finish'   THEN 'topping'
@@ -21,10 +25,7 @@ SET slot = CASE slot
 END
 WHERE slot IN ('finish','accent','dressing');
 
--- Step 2: swap the CHECK constraint.
-ALTER TABLE bom_structures
-  DROP CONSTRAINT bom_structures_slot_check;
-
+-- Step 3: add the NEW CHECK with lego vocab.
 ALTER TABLE bom_structures
   ADD CONSTRAINT bom_structures_slot_check
   CHECK (slot IS NULL OR slot IN ('base','protein','greens','topping','sauce'));
