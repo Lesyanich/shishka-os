@@ -32,6 +32,7 @@ const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').t
 const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
 const MissionControl = lazy(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
 const MenuPage = lazy(() => import('./pages/menu/MenuPage').then(m => ({ default: m.MenuPage })))
+const ModifiersPage = lazy(() => import('./pages/menu/ModifiersPage').then(m => ({ default: m.ModifiersPage })))
 const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
 const BrainCostPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainCostPage })))
 const BrainWikiPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainWikiPage })))
@@ -103,6 +104,7 @@ function App() {
                     <Route path="cost" element={<Suspense fallback={<PageLoader />}><BrainCostPage /></Suspense>} />
                     <Route path="quality" element={<Suspense fallback={<PageLoader />}><QualityPage /></Suspense>} />
                   </Route>
+                  <Route path="/menu/modifiers" element={<Suspense fallback={<PageLoader />}><ModifiersPage /></Suspense>} />
                   <Route path="/menu/*" element={<Suspense fallback={<PageLoader />}><MenuPage /></Suspense>} />
                   <Route path="/nomenclature/:productCode" element={<NomenclatureRedirect />} />
                   <Route path="/nomenclature" element={<Navigate to="/menu" replace />} />
