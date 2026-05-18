@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('../../lib/supabase', () => ({
+vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: { getSession: () => Promise.resolve({ data: { session: null } }) },
     from: () => ({
@@ -11,9 +11,9 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
-describe('ModifiersPage', () => {
-  it('is exported as a function component', async () => {
-    const mod = await import('./ModifiersPage')
-    expect(typeof mod.ModifiersPage).toBe('function')
+describe('useLoyverseModifierPull', () => {
+  it('is exported as a function (custom hook)', async () => {
+    const mod = await import('./useLoyverseModifierPull')
+    expect(typeof mod.useLoyverseModifierPull).toBe('function')
   })
 })
