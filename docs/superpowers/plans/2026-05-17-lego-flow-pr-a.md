@@ -15,18 +15,18 @@
 
 ---
 
-## Task 1: Migration 192 — slot vocab swap on `bom_structures`
+## Task 1: Migration 193 — slot vocab swap on `bom_structures`
 
 **Files:**
-- Create: `services/supabase/migrations/192_lego_slot_vocab_swap.sql`
+- Create: `services/supabase/migrations/193_lego_slot_vocab_swap.sql`
 - Test (smoke SQL): inline `psql` queries below
 
 - [ ] **Step 1: Create the migration file**
 
-Write `services/supabase/migrations/192_lego_slot_vocab_swap.sql`:
+Write `services/supabase/migrations/193_lego_slot_vocab_swap.sql`:
 
 ```sql
--- Migration 192 — swap bom_structures.slot CHECK to lego vocabulary
+-- Migration 193 — swap bom_structures.slot CHECK to lego vocabulary
 -- Old: base / protein / finish / accent / dressing (set in mig 145)
 -- New: base / protein / greens / topping / sauce  (CEO ratified 2026-05-17)
 -- Safe: zero rows have non-NULL slot today; verified via Explore agent on 2026-05-17.
@@ -41,7 +41,7 @@ ALTER TABLE bom_structures
   CHECK (slot IS NULL OR slot IN ('base','protein','greens','topping','sauce'));
 
 COMMENT ON COLUMN bom_structures.slot IS
-  'Lego/bowl slot grouping for assembly. Vocabulary swapped 2026-05-17 from (finish/accent/dressing) to (greens/topping/sauce). Aligned with nomenclature_modifier_options.slot (mig 193).';
+  'Lego/bowl slot grouping for assembly. Vocabulary swapped 2026-05-17 from (finish/accent/dressing) to (greens/topping/sauce). Aligned with nomenclature_modifier_options.slot (mig 194).';
 
 COMMIT;
 ```
@@ -50,7 +50,7 @@ COMMIT;
 
 Run:
 ```bash
-psql "$DATABASE_URL" -f services/supabase/migrations/192_lego_slot_vocab_swap.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/193_lego_slot_vocab_swap.sql
 ```
 Expected: `BEGIN`, `ALTER TABLE`, `ALTER TABLE`, `COMMENT`, `COMMIT` — no errors.
 
@@ -80,23 +80,23 @@ Expected: query returns without error (likely all rows have `slot=NULL` since se
 
 ```bash
 git checkout -b feature/admin/lego-flow-pr-a
-git add services/supabase/migrations/192_lego_slot_vocab_swap.sql
-git commit -m "feat(menu): mig 192 — swap bom_structures.slot CHECK to lego vocab"
+git add services/supabase/migrations/193_lego_slot_vocab_swap.sql
+git commit -m "feat(menu): mig 193 — swap bom_structures.slot CHECK to lego vocab"
 ```
 
 ---
 
-## Task 2: Migration 193 — extend `nomenclature_modifier_options`
+## Task 2: Migration 194 — extend `nomenclature_modifier_options`
 
 **Files:**
-- Create: `services/supabase/migrations/193_modifier_options_lego_extension.sql`
+- Create: `services/supabase/migrations/194_modifier_options_lego_extension.sql`
 
 - [ ] **Step 1: Create the migration file**
 
-Write `services/supabase/migrations/193_modifier_options_lego_extension.sql`:
+Write `services/supabase/migrations/194_modifier_options_lego_extension.sql`:
 
 ```sql
--- Migration 193 — extend nomenclature_modifier_options for lego flow
+-- Migration 194 — extend nomenclature_modifier_options for lego flow
 -- Adds: slot (groups options in Loyverse modifier_lists + KDS card)
 --       quantity_per_unit (BOM-deduction multiplier)
 --       loyverse_modifier_id / loyverse_modifier_list_id / loyverse_modifier_list_name (Loyverse linkage)
@@ -118,7 +118,7 @@ CREATE UNIQUE INDEX idx_nomod_loyverse_modifier_id
   WHERE loyverse_modifier_id IS NOT NULL;
 
 COMMENT ON COLUMN nomenclature_modifier_options.slot IS
-  'Lego slot grouping (base/protein/greens/topping/sauce). Matches bom_structures.slot vocab (mig 192).';
+  'Lego slot grouping (base/protein/greens/topping/sauce). Matches bom_structures.slot vocab (mig 193).';
 COMMENT ON COLUMN nomenclature_modifier_options.quantity_per_unit IS
   'Quantity of MOD-* consumed per single order unit. Multiplied with receipt qty at BOM-deduction time.';
 COMMENT ON COLUMN nomenclature_modifier_options.loyverse_modifier_id IS
@@ -131,7 +131,7 @@ COMMIT;
 
 Run:
 ```bash
-psql "$DATABASE_URL" -f services/supabase/migrations/193_modifier_options_lego_extension.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/194_modifier_options_lego_extension.sql
 ```
 Expected: BEGIN/ALTER/INDEX/COMMENT/COMMIT chain, no errors.
 
@@ -154,23 +154,23 @@ Expected: contains `CREATE UNIQUE INDEX idx_nomod_loyverse_modifier_id ON ... (l
 - [ ] **Step 5: Commit**
 
 ```bash
-git add services/supabase/migrations/193_modifier_options_lego_extension.sql
-git commit -m "feat(menu): mig 193 — extend nomenclature_modifier_options with slot/qty/loyverse-id"
+git add services/supabase/migrations/194_modifier_options_lego_extension.sql
+git commit -m "feat(menu): mig 194 — extend nomenclature_modifier_options with slot/qty/loyverse-id"
 ```
 
 ---
 
-## Task 3: Migration 194 — raw Loyverse mirror tables
+## Task 3: Migration 195 — raw Loyverse mirror tables
 
 **Files:**
-- Create: `services/supabase/migrations/194_pos_loyverse_modifier_mirror.sql`
+- Create: `services/supabase/migrations/195_pos_loyverse_modifier_mirror.sql`
 
 - [ ] **Step 1: Create the migration file**
 
-Write `services/supabase/migrations/194_pos_loyverse_modifier_mirror.sql`:
+Write `services/supabase/migrations/195_pos_loyverse_modifier_mirror.sql`:
 
 ```sql
--- Migration 194 — raw mirror of Loyverse modifier_lists + options
+-- Migration 195 — raw mirror of Loyverse modifier_lists + options
 -- These tables are read-only mirror; refreshed by Edge Function pull_modifiers action.
 -- Each pull TRUNCATEs both tables and re-INSERTs from Loyverse API response.
 
@@ -210,7 +210,7 @@ COMMIT;
 
 Run:
 ```bash
-psql "$DATABASE_URL" -f services/supabase/migrations/194_pos_loyverse_modifier_mirror.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/195_pos_loyverse_modifier_mirror.sql
 ```
 Expected: no errors.
 
@@ -239,8 +239,8 @@ Expected: first count = 1, second count = 0 (CASCADE worked).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add services/supabase/migrations/194_pos_loyverse_modifier_mirror.sql
-git commit -m "feat(menu): mig 194 — raw Loyverse modifier_list mirror tables"
+git add services/supabase/migrations/195_pos_loyverse_modifier_mirror.sql
+git commit -m "feat(menu): mig 195 — raw Loyverse modifier_list mirror tables"
 ```
 
 ---
@@ -375,7 +375,7 @@ At the top of the file, find the `// Actions:` block comment and add the new lin
 
 - [ ] **Step 5: Create the `fn_refresh_loyverse_modifier_mirror` RPC**
 
-The Edge Function code above calls a Postgres function for atomic mirror refresh. Add a new migration `services/supabase/migrations/194a_fn_refresh_loyverse_modifier_mirror.sql`:
+The Edge Function code above calls a Postgres function for atomic mirror refresh. Add a new migration `services/supabase/migrations/196_fn_refresh_loyverse_modifier_mirror.sql`:
 
 ```sql
 -- RPC: atomic refresh of pos_loyverse_modifier_lists + options from JSONB arrays.
@@ -424,7 +424,7 @@ $$;
 - [ ] **Step 6: Apply the RPC migration**
 
 ```bash
-psql "$DATABASE_URL" -f services/supabase/migrations/194a_fn_refresh_loyverse_modifier_mirror.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/196_fn_refresh_loyverse_modifier_mirror.sql
 ```
 Expected: `CREATE FUNCTION`.
 
@@ -448,8 +448,8 @@ Both ≥ 0; if CEO already configured Loyverse modifier_lists, counts should mat
 - [ ] **Step 8: Commit**
 
 ```bash
-git add services/supabase/functions/loyverse-sync/index.ts services/supabase/migrations/194a_fn_refresh_loyverse_modifier_mirror.sql
-git commit -m "feat(menu): loyverse-sync pull_modifiers action + refresh RPC"
+git add services/supabase/functions/loyverse-sync/index.ts services/supabase/migrations/196_fn_refresh_loyverse_modifier_mirror.sql
+git commit -m "feat(menu): loyverse-sync pull_modifiers action + mig 196 refresh RPC"
 ```
 
 ---
@@ -1661,10 +1661,10 @@ git commit -m "docs(ops): Loyverse Dashboard naming conventions for modifier_lis
 If a staging DB is available, run all 4 migrations end-to-end:
 
 ```bash
-psql "$STAGING_URL" -f services/supabase/migrations/192_lego_slot_vocab_swap.sql
-psql "$STAGING_URL" -f services/supabase/migrations/193_modifier_options_lego_extension.sql
-psql "$STAGING_URL" -f services/supabase/migrations/194_pos_loyverse_modifier_mirror.sql
-psql "$STAGING_URL" -f services/supabase/migrations/194a_fn_refresh_loyverse_modifier_mirror.sql
+psql "$STAGING_URL" -f services/supabase/migrations/193_lego_slot_vocab_swap.sql
+psql "$STAGING_URL" -f services/supabase/migrations/194_modifier_options_lego_extension.sql
+psql "$STAGING_URL" -f services/supabase/migrations/195_pos_loyverse_modifier_mirror.sql
+psql "$STAGING_URL" -f services/supabase/migrations/196_fn_refresh_loyverse_modifier_mirror.sql
 ```
 All 4 must apply with no errors.
 
@@ -1733,7 +1733,7 @@ Mark the MC task `1c1f258d-69df-449e-833b-ac22da79925a` as `in_progress` (when s
 ## Self-Review Notes
 
 - All 11 tasks have exact file paths and complete code blocks. No `// TODO`s.
-- Migration numbers 192, 193, 194, 194a are sequential after 191 (last applied per memory).
+- Migration numbers 193, 194, 195, 196 shipped one higher than planned because 192_fix_cheese_costs_merge_duplicates.sql already existed in the repo when this work started.
 - The Edge Function reuses existing helpers (`loyverseGetAll`, `logStart`, `logFinish`, `db`) — no new dependencies.
 - Types `LoyverseModifierListRow` / `LoyverseModifierOptionRow` defined in `useLoyverseModifierPull.ts` are re-imported by `PulledMirrorSection.tsx` and `AddBindingForm.tsx` — consistent across tasks.
 - `SlotName` type and `BindingPatch` interface defined in `useModifierBindings.ts` are re-imported by `AddBindingForm.tsx` — consistent.

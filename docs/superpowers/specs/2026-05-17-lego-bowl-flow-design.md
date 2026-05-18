@@ -43,9 +43,11 @@ L2 opens ~2026-06-15 with lego dishes day-1, so this lands before launch. CEO ra
 
 ## 4. Module M1 — Data Model (3 migrations)
 
+> Note: migration numbers shipped one higher than planned because `192_fix_cheese_costs_merge_duplicates.sql` already existed in the repo when this work started.
+
 ### 4.1 — Slot vocab swap on `bom_structures`
 
-File: `services/supabase/migrations/192_lego_slot_vocab_swap.sql`
+File: `services/supabase/migrations/193_lego_slot_vocab_swap.sql`
 
 ```sql
 ALTER TABLE bom_structures DROP CONSTRAINT bom_structures_slot_check;
@@ -59,7 +61,7 @@ Plus inline edit to [`2026-05-17-menu-card-full-design.md`](2026-05-17-menu-card
 
 ### 4.2 — Extend `nomenclature_modifier_options`
 
-File: `services/supabase/migrations/193_modifier_options_lego_extension.sql`
+File: `services/supabase/migrations/194_modifier_options_lego_extension.sql`
 
 ```sql
 ALTER TABLE nomenclature_modifier_options
@@ -85,7 +87,7 @@ CREATE UNIQUE INDEX idx_nomod_loyverse_modifier_id
 
 ### 4.3 — Raw Loyverse mirror tables
 
-File: `services/supabase/migrations/194_pos_loyverse_modifier_mirror.sql`
+File: `services/supabase/migrations/195_pos_loyverse_modifier_mirror.sql`
 
 ```sql
 CREATE TABLE pos_loyverse_modifier_lists (
@@ -123,7 +125,7 @@ Add:
 case 'pull_modifiers': {
   // 1. GET https://api.loyverse.com/v1.0/modifier_lists?limit=250
   // 2. Loyverse returns lists with embedded modifiers[] array
-  // 3. TRUNCATE pos_loyverse_modifier_lists CASCADE
+  // 3. TRUNCATE pos_loyverse_modifier_lists CASCADE (via fn_refresh_loyverse_modifier_mirror — mig 196)
   // 4. INSERT all lists, then all options (CASCADE handles re-link)
   // 5. UPDATE nomenclature_modifier_options.loyverse_modifier_list_name
   //    where loyverse_modifier_id matches (refresh snapshots)
@@ -171,7 +173,7 @@ Documents the contract: CEO names modifier_lists in Loyverse exactly one of `Bas
 
 ### 6.1+6.2 — Schema
 
-File: `services/supabase/migrations/195_order_modifiers_persistence.sql`
+File: `services/supabase/migrations/197_order_modifiers_persistence.sql`
 
 ```sql
 ALTER TABLE orders
@@ -206,7 +208,7 @@ CREATE INDEX idx_oim_slot ON order_item_modifiers(slot) WHERE slot IS NOT NULL;
 
 ### 6.3 — Ingest RPC
 
-File: `services/supabase/migrations/196_fn_ingest_loyverse_receipt.sql`
+File: `services/supabase/migrations/198_fn_ingest_loyverse_receipt.sql`
 
 ```sql
 CREATE OR REPLACE FUNCTION fn_ingest_loyverse_receipt(p_receipt JSONB)
@@ -295,11 +297,12 @@ T5 webhook handler calls this RPC with the full Loyverse payload. Idempotent on 
 
 **Level 1 — migrations (M1, M4):**
 ```bash
-psql "$DATABASE_URL" -f services/supabase/migrations/192_lego_slot_vocab_swap.sql
-psql "$DATABASE_URL" -f services/supabase/migrations/193_modifier_options_lego_extension.sql
-psql "$DATABASE_URL" -f services/supabase/migrations/194_pos_loyverse_modifier_mirror.sql
-psql "$DATABASE_URL" -f services/supabase/migrations/195_order_modifiers_persistence.sql
-psql "$DATABASE_URL" -f services/supabase/migrations/196_fn_ingest_loyverse_receipt.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/193_lego_slot_vocab_swap.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/194_modifier_options_lego_extension.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/195_pos_loyverse_modifier_mirror.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/196_fn_refresh_loyverse_modifier_mirror.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/197_order_modifiers_persistence.sql
+psql "$DATABASE_URL" -f services/supabase/migrations/198_fn_ingest_loyverse_receipt.sql
 ```
 Accept: zero errors; `v_dish_assembly_components` still compiles; existing seed (mig 124) untouched.
 
@@ -349,11 +352,12 @@ Roughly 1–2 plans in a Phase 2 sprint.
 ## 10. Deliverable File List
 
 ```
-services/supabase/migrations/192_lego_slot_vocab_swap.sql              [new]
-services/supabase/migrations/193_modifier_options_lego_extension.sql   [new]
-services/supabase/migrations/194_pos_loyverse_modifier_mirror.sql      [new]
-services/supabase/migrations/195_order_modifiers_persistence.sql       [new]
-services/supabase/migrations/196_fn_ingest_loyverse_receipt.sql        [new]
+services/supabase/migrations/193_lego_slot_vocab_swap.sql              [new — PR A]
+services/supabase/migrations/194_modifier_options_lego_extension.sql   [new — PR A]
+services/supabase/migrations/195_pos_loyverse_modifier_mirror.sql      [new — PR A]
+services/supabase/migrations/196_fn_refresh_loyverse_modifier_mirror.sql [new — PR A]
+services/supabase/migrations/197_order_modifiers_persistence.sql       [new — PR B]
+services/supabase/migrations/198_fn_ingest_loyverse_receipt.sql        [new — PR B]
 services/supabase/functions/loyverse-sync/index.ts                     [extend — add pull_modifiers]
 apps/admin-panel/src/pages/menu/ModifiersPage.tsx                      [new]
 apps/admin-panel/src/hooks/useModifierBindings.ts                      [new]
@@ -368,8 +372,8 @@ docs/superpowers/specs/2026-05-17-menu-card-full-design.md             [edit §4
 5 migrations + 1 Edge Function extension + 4 frontend files + 1 frontend wire-up edit + 1 sidebar edit + 1 drawer extension + 1 new doc + 1 doc edit. Realistic in 2–3 PRs.
 
 **Proposed PR split:**
-- **PR A** (foundation): migrations 192–194 + `loyverse-sync` `pull_modifiers` action + `/menu/modifiers` page (M1 + M2).
-- **PR B** (persistence): migrations 195–196 + RPC tests + DishDrawer summary line (M4).
+- **PR A** (foundation): migrations 193–196 + `loyverse-sync` `pull_modifiers` action + `/menu/modifiers` page (M1 + M2).
+- **PR B** (persistence): migrations 197–198 + RPC tests + DishDrawer summary line (M4). Numbers assigned at implementation time.
 - **PR C** (docs only): `loyverse-dashboard-conventions.md` + menu-card spec edits. Optional bundle into PR A.
 
 ## 11. Critical Files Reference
@@ -378,7 +382,7 @@ Existing files relied on, not modified beyond what's listed:
 
 - [183_modifier_options_and_allergens.sql](../../../services/supabase/migrations/183_modifier_options_and_allergens.sql) — base `nomenclature_modifier_options` schema
 - [179_dish_card_table.sql](../../../services/supabase/migrations/179_dish_card_table.sql) — `dish_card` (no changes)
-- [145_bom_composition_slots.sql](../../../services/supabase/migrations/145_bom_composition_slots.sql) — original slot CHECK constraint (target of mig 192)
+- [145_bom_composition_slots.sql](../../../services/supabase/migrations/145_bom_composition_slots.sql) — original slot CHECK constraint (target of mig 193)
 - [184_v_dish_assembly_components.sql](../../../services/supabase/migrations/184_v_dish_assembly_components.sql) — view that joins BOM with slot ordering
 - [022_orders_pipeline.sql](../../../services/supabase/migrations/022_orders_pipeline.sql) — existing `orders` + `order_items`
 - [loyverse-sync/index.ts](../../../services/supabase/functions/loyverse-sync/index.ts) — Edge Function gaining the `pull_modifiers` action
