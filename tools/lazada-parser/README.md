@@ -10,20 +10,29 @@ Built for MC task `e39dcf23` (Lazada food import — za'atar + 1-3 month backfil
 
 ## Why this exists
 
-- CEO buys some ingredients on Lazada; no Gmail MCP is connected.
+- Some ingredients are bought on Lazada through a personal account
+  (`basalsaleem@gmail.com` — Bas's Gmail, not `lesia@shishka.health`). No
+  Gmail MCP is connected.
 - Building Gmail/IMAP integration for what may be a low-volume supplier is
-  speculative. Instead, CEO does a one-time Google Takeout export filtered to
-  the `Lazada` Gmail label, drops the resulting `.mbox` somewhere the agent
-  can read it, and this script does the rest.
+  speculative. Instead, the receipt-owner runs a one-time Google Takeout
+  export filtered to the `Lazada` Gmail label, drops the resulting `.mbox`
+  somewhere the agent can read it, and this script does the rest.
 - For the long term, see "When to upgrade to automation" at the bottom.
 
 ---
 
 ## End-to-end flow
 
-### Step 1 — CEO: tag Lazada emails in Gmail (~3 min, one-time)
+### Step 1 — tag Lazada emails in Gmail (~3 min, one-time)
 
-1. Open Gmail → search bar → paste:
+**Which account?** The Gmail account that *actually receives the Lazada order
+confirmations*. For Shishka today that is `basalsaleem@gmail.com` (Bas's
+personal Gmail — Lazada purchases for the business go through this account),
+**not** `lesia@shishka.health`. If Bas doesn't run Steps 1-2 personally,
+Lesia needs to be signed into Bas's Gmail in a browser for this and the
+Takeout export.
+
+1. Open Gmail (signed in to the *purchase* account) → search bar → paste:
    ```
    from:(noreply@lazada.co.th OR tracking@lazada.co.th OR no-reply@mail.lazada.co.th) newer_than:90d
    ```
