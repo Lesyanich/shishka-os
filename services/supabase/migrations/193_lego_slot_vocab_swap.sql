@@ -1,5 +1,5 @@
 -- Migration 193 — swap bom_structures.slot CHECK to lego vocabulary
--- Old: base / protein / finish / accent / dressing (set in mig 145)
+-- Old: base / protein / finish / accent / dressing (full set from mig 145)
 -- New: base / protein / greens / topping / sauce  (CEO ratified 2026-05-17)
 -- Safe: zero rows have non-NULL slot today; verified via Explore agent on 2026-05-17.
 -- Note: plan referred to this as mig 192; renumbered to 193 because
@@ -22,6 +22,6 @@ VALUES (
   '193_lego_slot_vocab_swap.sql',
   'claude-code',
   'Swap bom_structures.slot CHECK from (finish/accent/dressing) to lego vocab (greens/topping/sauce). CEO ratified 2026-05-17. Zero non-NULL rows affected.'
-);
+) ON CONFLICT (filename) DO NOTHING;
 
 COMMIT;
