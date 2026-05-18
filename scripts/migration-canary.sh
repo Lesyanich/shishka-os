@@ -53,12 +53,13 @@ validate_migration() {
   fi
 
   # 3. Destructive operations
-  if grep -qi 'DROP TABLE' "$file" && ! grep -q '-- INTENTIONAL DROP' "$file"; then
+  if grep -qi 'DROP TABLE' "$file" && ! grep -q -- '-- INTENTIONAL DROP' "$file"; then
     issues+=("DROP TABLE without '-- INTENTIONAL DROP' comment")
   fi
 
   # 4. TRUNCATE check
-  if grep -qi 'TRUNCATE' "$file" && ! grep -q '-- INTENTIONAL TRUNCATE' "$file"; then
+  # Note: grep -q -- is required on macOS BSD grep because the pattern starts with '--'
+  if grep -qi 'TRUNCATE' "$file" && ! grep -q -- '-- INTENTIONAL TRUNCATE' "$file"; then
     issues+=("TRUNCATE without '-- INTENTIONAL TRUNCATE' comment")
   fi
 

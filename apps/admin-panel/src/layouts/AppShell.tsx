@@ -24,6 +24,7 @@ import {
   UtensilsCrossed,
   Brain,
   Settings,
+  SlidersHorizontal,
   Target,
   CalendarCheck,
   Banknote,
@@ -65,6 +66,7 @@ const NAV_SECTIONS: NavSection[] = [
     minRole: 'owner',
     items: [
       { path: '/menu', icon: LayoutGrid, label: 'Menu' },
+      { path: '/menu/modifiers', icon: SlidersHorizontal, label: 'Modifiers' },
       { path: '/bom', icon: GitBranch, label: 'BOM Hub' },
       { path: '/sku', icon: Package, label: 'SKU Manager' },
     ],
