@@ -23,52 +23,94 @@ Built for MC task `e39dcf23` (Lazada food import — za'atar + 1-3 month backfil
 
 ## End-to-end flow
 
-### Step 1 — tag Lazada emails in Gmail (~3 min, one-time)
+**Two export paths, pick one.** Option A is recommended — no Takeout, tight
+filter that excludes Alibaba/promo noise, and it extracts product photos.
+Option B (Takeout) is a fallback for the rare case where Apps Script is
+blocked on the account.
 
-**Which account?** The Gmail account that *actually receives the Lazada order
-confirmations*. For Shishka today that is `basalsaleem@gmail.com` (Bas's
-personal Gmail — Lazada purchases for the business go through this account),
-**not** `lesia@shishka.health`. If Bas doesn't run Steps 1-2 personally,
-Lesia needs to be signed into Bas's Gmail in a browser for this and the
-Takeout export.
+**Account, either path**: log in as the Gmail account that *actually receives
+Lazada order emails*. For Shishka today that is **`basalsaleem@gmail.com`**
+(Bas's personal Gmail), NOT `lesia@shishka.health`.
 
-1. Open Gmail (signed in to the *purchase* account) → search bar → paste:
-   ```
-   from:(noreply@lazada.co.th OR tracking@lazada.co.th OR no-reply@mail.lazada.co.th) newer_than:90d
-   ```
-2. Click the "Show search options" arrow → **Create filter**.
-3. Tick **Apply the label** → choose/create a label called `Lazada` → tick
-   **Also apply filter to matching conversations** → **Create filter**.
+---
 
-Every historic Lazada order in the last 90 days is now under the `Lazada` label,
-and any new Lazada email will be auto-labelled.
+### Option A — Google Apps Script (recommended)
 
-### Step 2 — CEO: export the label via Google Takeout (~5-15 min)
+**One-time setup (~5 min):**
 
-1. Go to https://takeout.google.com.
-2. Click **Deselect all** → scroll down → tick **Mail** only.
-3. Click **All Mail data included** → switch to **Include selected labels only**
-   → tick `Lazada` → **OK**.
-4. **Next step** → delivery method **Add to Drive** → frequency **Export once**
-   → file type **.zip** (Google still returns a `.mbox` inside).
-5. **Create export**. Google emails a Drive link in 5-20 min depending on volume.
-6. Move the resulting archive into a GDrive folder like `Inbox/Lazada-export-<YYYY-MM-DD>/`
-   and paste the folder URL into the MC task `e39dcf23` as a comment.
+1. Open https://script.google.com (signed into Bas's account) → **New project**.
+2. Replace the default `Code.gs` contents with [`gmail-export.gs`](gmail-export.gs)
+   from this folder. Save (⌘-S). Name the project "Lazada Exporter".
+3. Click **Run** → `exportLazadaOrders`. First run prompts for permission to
+   read Gmail + write to Drive — accept.
+4. When the run finishes (1-3 min for 100s of orders), the **Execution log**
+   (View → Logs) prints a Drive folder URL like
+   `https://drive.google.com/drive/folders/<id>`.
+5. Open that folder in Drive → right-click → **Share** → add
+   `lesia@shishka.health` (and `agent@…` if applicable). Paste the folder URL
+   as a comment on MC task `e39dcf23`.
 
-### Step 3 — Agent: run extract.py
+**Why this is better than Takeout:**
+- Tight filter: only emails from `@lazada.co.th` / `@my.lazada.co.th` etc.
+  that contain a 16+ digit order ID in subject or body. Skips Alibaba (different
+  domain), shipping pings, review nags, and promos automatically.
+- Extracts inline product photos (`images/<order_id>_<n>.jpg`) for later
+  linking to `nomenclature.image_url` (parked as separate task).
+- No permission to your full mailbox — only Gmail readonly + Drive write.
+- Re-runnable: each invocation creates a fresh timestamped folder.
 
-```sh
-cd tools/lazada-parser
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-python extract.py /path/to/All\ mail\ Including\ Spam\ and\ Trash.mbox
-# → extracted/<order_id>.json + extracted/<order_id>.html
+**Folder layout produced:**
+```
+Lazada-export-<YYYY-MM-DD_HHMM>/
+  orders/<order_id>_<msgIdPrefix>.html   -- full email HTML per order
+  images/<order_id>_<n>.<ext>            -- every inline product image
+  index.json                             -- metadata: order_id, slug, images, date
 ```
 
-The script filters to Lazada `From:` addresses and dumps each message's plain
-body + HTML body + metadata. Order ID is auto-discovered (16+ digit number);
-falls back to a hash-derived UID when missing.
+**Agent picks up from there.** Once you paste the folder URL on the MC task,
+the agent reads it through the Drive MCP and continues with the parsing
+pipeline below — no further action needed from you for the import itself.
+
+---
+
+### Option B — Google Takeout (fallback, when Apps Script doesn't work)
+
+Only use this path if you can't run Apps Script (e.g. domain admin disabled
+it). Slower, captures everything matching a label, and misses inline images.
+
+1. In Gmail (signed into Bas's account), search:
+   ```
+   from:(@lazada.co.th OR @my.lazada.co.th OR @mail.lazada.co.th) newer_than:120d
+   ```
+2. "Show search options" → **Create filter** → **Apply the label** `Lazada` →
+   tick **Also apply filter to matching conversations** → **Create filter**.
+3. Go to https://takeout.google.com.
+4. **Deselect all** → tick **Mail** only.
+5. **All Mail data included** → **Include selected labels only** → tick
+   `Lazada` → **OK**.
+6. Delivery: **Add to Drive**, **Export once**, **.zip** format.
+7. **Create export**. Google emails a Drive link in 5-20 min.
+8. Move the resulting archive into a GDrive folder named
+   `Inbox/Lazada-export-<YYYY-MM-DD>/` and paste the URL on MC task `e39dcf23`.
+
+---
+
+### Step 3 — Agent: convert export to the parser's input format
+
+For **Option A** (GAS folder, locally downloaded):
+```sh
+python from_gas.py /path/to/Lazada-export-2026-05-18_1430
+# → extracted/<order_id>.{json,html}
+```
+
+For **Option B** (Takeout `.mbox`):
+```sh
+python extract.py /path/to/All\ mail\ Including\ Spam\ and\ Trash.mbox
+# → extracted/<order_id>.{json,html}
+```
+
+Both scripts produce the same `extracted/` layout. Order ID is auto-discovered
+(16+ digit number); falls back to a hash-derived UID when missing.
 
 ### Step 4 — Agent: run parse.py
 
@@ -157,14 +199,27 @@ discount, VAT, payload shape) is already in place and tested against the
 
 ---
 
-## When to upgrade to automation
+## Product photos — current state
+
+The Apps Script saves every inline product image from each order email into
+`images/<order_id>_<n>.<ext>` inside the export folder, plus the filenames
+into `index.json`. That solves the export side.
+
+The *import* side — uploading each photo to Supabase Storage and writing the
+URL onto a `nomenclature` row — is parked as a separate MC task (search
+MC for `Lazada product photos → nomenclature`). The wiring depends on which
+photo column nomenclature uses (verify against the post-merge schema) and
+how the admin-panel MagicDropzone photo upload Edge Function is structured.
+
+---
+
+## When to upgrade further
 
 This manual flow is right for: ≤ 1 Lazada order / week, one-off historic backfill.
 
-Upgrade to a Google Apps Script + GDrive watcher (or a proper Gmail OAuth
-integration) when:
+Upgrade to a Gmail OAuth daemon or Gmail MCP (if one ships) when:
 - ≥ 1 Lazada order / week sustained for 4 weeks, AND
-- CEO complains about the Takeout step.
+- The Apps Script "re-run + share folder" step starts feeling like friction.
 
 There is a parked MC task for this — search MC for `Lazada email auto-ingest`.
 
@@ -172,7 +227,9 @@ There is a parked MC task for this — search MC for `Lazada email auto-ingest`.
 
 ## Files
 
-- `extract.py` — `.mbox` → `extracted/<uid>.{json,html}`
+- `gmail-export.gs` — Google Apps Script, runs in Bas's Gmail account, writes a Drive folder
+- `from_gas.py` — GAS folder → `extracted/<uid>.{json,html}` (bridge to parse.py)
+- `extract.py` — `.mbox` → `extracted/<uid>.{json,html}` (Takeout fallback path)
 - `parse.py` — `extracted/` → `payloads/` + `unmatched.csv` + `summary.md`
 - `requirements.txt` — `beautifulsoup4`, `psycopg`
 - `.gitignore` — keeps export artefacts out of git

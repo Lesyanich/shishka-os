@@ -128,8 +128,13 @@ def parse_money(s: str) -> float:
 
 
 def to_iso_date(raw: str) -> str:
+    """Accept ISO 8601 (from GAS export) or RFC 2822 (from .mbox). Fall back to today."""
     if not raw:
         return date.today().isoformat()
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).date().isoformat()
+    except (TypeError, ValueError):
+        pass
     try:
         return parsedate_to_datetime(raw).date().isoformat()
     except (TypeError, ValueError):
