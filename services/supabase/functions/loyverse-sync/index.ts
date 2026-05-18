@@ -9,6 +9,7 @@
 //   POST ?action=full                → categories then items
 //   POST ?action=push_dish&dish_id=X → push a single SALE-* dish (gated by
 //                                       fn_loyverse_sync_dish readiness check)
+//   POST ?action=pull_modifiers      → pull Loyverse modifier_lists into raw mirror
 //
 // Auth: Bearer token from LOYVERSE_API_TOKEN env var
 // ═══════════════════════════════════════════════════════════
@@ -432,6 +433,95 @@ async function handlePushDish(dishId: string) {
   }
 }
 
+// ── Action: pull_modifiers ──
+//
+// Loyverse API shape (verified 2026-05-18):
+//   GET /v1.0/modifiers                 → { modifiers: [...] }
+//   modifier fields: id, name, min_select, max_select, modifier_options
+//   option fields:   id, name, price
+//   NOTE: field names are min_select/max_select and modifier_options
+//         (NOT min_select_modifier/max_select_modifier/modifiers as in older docs)
+
+interface LoyverseModifierOption {
+  id: string
+  name: string
+  price?: number
+}
+
+interface LoyverseModifierList {
+  id: string
+  name: string
+  min_select?: number
+  max_select?: number
+  modifier_options?: LoyverseModifierOption[]
+}
+
+const KNOWN_SLOTS = ['base', 'protein', 'greens', 'topping', 'sauce']
+
+async function handlePullModifiers() {
+  const logId = await logStart('modifiers_pull', 0)
+
+  let lists: LoyverseModifierList[]
+  try {
+    lists = await loyverseGetAll<LoyverseModifierList>('/modifiers', 'modifiers')
+  } catch (e) {
+    await logFinish(logId, 'error', 0, 0, e instanceof Error ? e.message : String(e))
+    return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
+  }
+
+  const optionRows: Array<{
+    id: string
+    list_id: string
+    name: string
+    price: number | null
+    raw: LoyverseModifierOption
+  }> = []
+
+  const listRows = lists.map((l) => {
+    for (const m of l.modifier_options ?? []) {
+      optionRows.push({
+        id: m.id,
+        list_id: l.id,
+        name: m.name,
+        price: m.price ?? null,
+        raw: m,
+      })
+    }
+    return {
+      id: l.id,
+      name: l.name,
+      min_select: l.min_select ?? null,
+      max_select: l.max_select ?? null,
+      raw: l,
+    }
+  })
+
+  const warnings: string[] = []
+  for (const l of listRows) {
+    if (!KNOWN_SLOTS.includes(l.name.toLowerCase())) {
+      warnings.push(`List "${l.name}" does not match slot vocabulary (base/protein/greens/topping/sauce)`)
+    }
+  }
+
+  const { error: txErr } = await db.rpc('fn_refresh_loyverse_modifier_mirror', {
+    p_lists: listRows,
+    p_options: optionRows,
+  })
+  if (txErr) {
+    await logFinish(logId, 'error', 0, 0, `Mirror refresh failed: ${txErr.message}`)
+    return json({ ok: false, error: txErr.message }, 500)
+  }
+
+  await logFinish(logId, 'success', listRows.length, 0)
+
+  return json({
+    ok: true,
+    lists: listRows.length,
+    options: optionRows.length,
+    warnings: warnings.length ? warnings : undefined,
+  })
+}
+
 // ── Main handler ──
 
 Deno.serve(async (req) => {
@@ -470,9 +560,13 @@ Deno.serve(async (req) => {
         return await handlePushDish(dishId)
       }
 
+      case "pull_modifiers":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handlePullModifiers()
+
       default:
         return json(
-          { ok: false, error: "Unknown action. Use: status, categories, items, full, push_dish" },
+          { ok: false, error: "Unknown action. Use: status, categories, items, full, push_dish, pull_modifiers" },
           400,
         )
     }
