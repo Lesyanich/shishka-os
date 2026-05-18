@@ -1,6 +1,10 @@
-import { RefreshCw, AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { RefreshCw, AlertTriangle, Plus } from 'lucide-react'
 import { useLoyverseModifierPull } from '../../hooks/useLoyverseModifierPull'
+import { useModifierBindings } from '../../hooks/useModifierBindings'
 import { PulledMirrorSection } from '../../components/menu/modifiers/PulledMirrorSection'
+import { BindingsTable } from '../../components/menu/modifiers/BindingsTable'
+import { AddBindingForm } from '../../components/menu/modifiers/AddBindingForm'
 
 function formatPulledAt(iso: string | null): string {
   if (!iso) return 'never'
@@ -14,8 +18,9 @@ function formatPulledAt(iso: string | null): string {
 }
 
 export function ModifiersPage() {
-  const { lists, options, lastPulledAt, lastWarnings, isPulling, error, pull } =
-    useLoyverseModifierPull()
+  const { lists, options, lastPulledAt, lastWarnings, isPulling, error: pullError, pull } = useLoyverseModifierPull()
+  const { rows, error: bindingsError, create, remove } = useModifierBindings()
+  const [addOpen, setAddOpen] = useState(false)
 
   return (
     <div className="space-y-6">
@@ -23,8 +28,7 @@ export function ModifiersPage() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-100">Modifiers</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Last pull: {formatPulledAt(lastPulledAt)} · {lists.length} lists · {options.length}{' '}
-            options
+            Last pull: {formatPulledAt(lastPulledAt)} · {lists.length} lists · {options.length} options · {rows.length} bindings
           </p>
         </div>
         <button
@@ -38,10 +42,10 @@ export function ModifiersPage() {
         </button>
       </header>
 
-      {error && (
+      {(pullError || bindingsError) && (
         <div className="flex items-start gap-2 rounded-lg border border-rose-900/40 bg-rose-950/30 p-3 text-xs text-rose-300">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{error}</span>
+          <span>{pullError ?? bindingsError}</span>
         </div>
       )}
 
@@ -49,17 +53,40 @@ export function ModifiersPage() {
         <div className="rounded-lg border border-amber-900/40 bg-amber-950/30 p-3 text-xs text-amber-300">
           <strong className="block pb-1">Pull warnings:</strong>
           <ul className="list-disc pl-4">
-            {lastWarnings.map((w, i) => (
-              <li key={i}>{w}</li>
-            ))}
+            {lastWarnings.map((w, i) => (<li key={i}>{w}</li>))}
           </ul>
         </div>
       )}
 
       <PulledMirrorSection lists={lists} options={options} />
 
-      <section className="rounded-lg border border-slate-800 bg-slate-900/40 p-6 text-sm text-slate-500">
-        Bindings CRUD — Tasks 8 + 9.
+      <section className="rounded-lg border border-slate-800 bg-slate-900/40">
+        <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-200">Bindings</h2>
+          <button
+            type="button"
+            onClick={() => setAddOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300 hover:bg-emerald-500/20"
+          >
+            <Plus className="h-3 w-3" />
+            {addOpen ? 'Close' : 'Add binding'}
+          </button>
+        </header>
+        {addOpen && (
+          <div className="border-b border-slate-800 p-4">
+            <AddBindingForm
+              loyverseOptions={options}
+              loyverseLists={lists}
+              onSubmit={async (patch) => {
+                const res = await create(patch)
+                if (res.ok) setAddOpen(false)
+                return res
+              }}
+              onCancel={() => setAddOpen(false)}
+            />
+          </div>
+        )}
+        <BindingsTable rows={rows} onDelete={(id) => remove(id)} />
       </section>
     </div>
   )
