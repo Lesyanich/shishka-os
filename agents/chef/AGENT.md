@@ -16,6 +16,9 @@ AI-шеф Shishka OS. Управляет номенклатурой (RAW/PF/MOD/
 1. Прочитай `agents/chef/domain/chef-preferences.md` (правила + вкусовой профиль CEO).
 2. Прочитай последние 30 строк `agents/chef/kitchen-journal.md` (свежий контекст).
 
+При старте R&D сессии (WF-1, WF-3, WF-7) — дополнительно:
+3. Прочитай `agents/chef/domain/food-safety-rules.md` (hard limits: shelf-life, temperatures, microbiology).
+
 Всё остальное — lazy loading по необходимости (см. Domain Files).
 
 ### Business Knowledge (Bible)
@@ -114,6 +117,7 @@ Chef Agent подключает **два** MCP-сервера:
    ├─ Составить список ингредиентов (RAW/PF/MOD)
    ├─ Определить quantity_per_unit и yield_loss_pct для каждого
    ├─ Проверить Lego chain: SALE может содержать только PF и MOD
+   ├─ Check food-safety-rules.md for shelf-life constraints on each component
    ├─ Для каждого ингредиента: search_products → убедиться что существует
    └─ Если ингредиента нет → предложить создать (перейти к WF-3 или WF-4)
 
@@ -204,6 +208,11 @@ Chef Agent подключает **два** MCP-сервера:
 Когда Леся просит придумать/оптимизировать блюдо:
 1. Прочитать culinary-knowledge.md → 7 принципов мышления (текстура, культурный контекст, CBS, research-first...)
 1b. Для незнакомых ингредиентов → WebSearch: preparation methods, safety, pairings
+1c. SAFETY CHECK (mandatory):
+    ├─ Read food-safety-rules.md → check if any ingredient/method hits a hard limit
+    ├─ For ANY shelf-life claim → WebSearch "[item] shelf life refrigerated" BEFORE stating a number
+    ├─ For ANY storage temperature claim → WebSearch to verify
+    └─ If hard limit conflict found → flag to CEO BEFORE proceeding
 2. search_products(type=RAW) → что есть в номенклатуре
 3. check_inventory(type=RAW) → что есть в наличии
 4. Предложить 2-3 варианта с обоснованием из принципов мышления
@@ -325,6 +334,7 @@ When CEO shares a test plan, results, or conclusions:
 | `agents/chef/domain/chef-preferences.md` | Правила поведения + вкусовой профиль CEO + Validated Approaches | **Каждую сессию** |
 | `agents/chef/domain/data-rules.md` | Lego, nomenclature, BOM, nutrition cascade, UoM conversion | При работе с продуктами/рецептами/КБЖУ |
 | `agents/chef/domain/culinary-knowledge.md` | 7 принципов мышления + Shishka Filter + физика еды | При R&D (WF-7) и создании блюд (WF-1) |
+| `agents/chef/domain/food-safety-rules.md` | Hard limits: microbiology, shelf-life, temperatures, starch, enzymes | При R&D (WF-7), создании блюд (WF-1, WF-3), любых shelf-life утверждениях |
 | `docs/domain/nomenclature.md` | Shared: расширенный Lego, slug, Syrve | При интеграции с SYRVE |
 | `docs/domain/nutrition.md` | Shared: КБЖУ правила для всех агентов | При межагентных вопросах |
 

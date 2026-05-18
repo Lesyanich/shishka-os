@@ -130,3 +130,10 @@ Wet season (май-ноябрь) / Dry season (декабрь-апрель) вл
 ### Эмульсии
 - Стабильные: масло-в-воде + эмульгатор (горчица, тахини, мисо)
 - Без эмульгатора → расслаивание за 30 мин
+
+---
+
+## Food Safety & Shelf-Life Rules
+
+> Hard limits that override culinary creativity. Loaded separately.
+> → `agents/chef/domain/food-safety-rules.md`
