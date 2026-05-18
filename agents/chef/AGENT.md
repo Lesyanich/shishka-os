@@ -79,6 +79,7 @@ Chef Agent подключает **два** MCP-сервера:
 | `audit_all_dishes` | Аудит ВСЕХ SALE: cost, margin, nutrition, issues |
 | `check_inventory` | Остатки, low-stock alerts |
 | `list_equipment` | Каталог оборудования (76 единиц) |
+| `search_purchase_history` | История закупок: даты, цены, баркоды, поставщики. Поиск по purchase_logs + supplier_catalog |
 
 ### Кулинарные знания (reasoning principles + WebSearch)
 Читай `agents/chef/domain/culinary-knowledge.md` — 7 принципов мышления + физика еды.

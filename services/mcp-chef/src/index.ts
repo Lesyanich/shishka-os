@@ -30,6 +30,7 @@ import { manageRecipeFlow } from "./tools/manage-recipe-flow.js";
 import { updateProduct } from "./tools/update-product.js";
 import { recordProduction } from "./tools/record-production.js";
 import { listSuppliers } from "./tools/list-suppliers.js";
+import { searchPurchaseHistory } from "./tools/search-purchase-history.js";
 
 // Resources & Prompts
 import { staticResources, dynamicResources } from "./resources/index.js";
@@ -169,6 +170,19 @@ server.tool(
     limit: z.number().optional().describe("Max results (default: 30)"),
   },
   async (args) => jsonResult(await listSuppliers(args))
+);
+
+server.tool(
+  "search_purchase_history",
+  "Search purchase history: dates, prices, barcodes, suppliers. Queries purchase_logs joined with nomenclature, suppliers, and supplier_catalog. Use to find what was bought, when, at what price, and from whom.",
+  {
+    query: z.string().describe("Search term (matches product name, product_code, barcode, or supplier catalog name in any language)"),
+    supplier: z.string().optional().describe("Filter by supplier name (e.g., 'Makro')"),
+    date_from: z.string().optional().describe("Start date YYYY-MM-DD"),
+    date_to: z.string().optional().describe("End date YYYY-MM-DD"),
+    limit: z.number().optional().describe("Max results (default: 50)"),
+  },
+  async (args) => jsonResult(await searchPurchaseHistory(args))
 );
 
 // ─── Write Tools ─────────────────────────────────────────────────
@@ -358,7 +372,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Chef Agent MCP server running on stdio`);
-  console.error(`   Tools: 16 | Resources: 3 | Prompts: 4`);
+  console.error(`   Tools: 17 | Resources: 3 | Prompts: 4`);
 }
 
 main().catch((err) => {
