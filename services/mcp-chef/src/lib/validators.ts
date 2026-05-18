@@ -5,7 +5,7 @@ const VALID_UNITS = ["kg", "g", "L", "ml", "pcs"];
 
 // Lego chain: which types can contain which
 const ALLOWED_CHILDREN: Record<string, string[]> = {
-  SALE: ["PF", "MOD"],
+  SALE: ["PF", "MOD", "RAW"],
   PF: ["RAW", "PF"],
   MOD: ["RAW"],
   RAW: [], // RAW items cannot have BOM children
@@ -111,13 +111,14 @@ export function validateNutrition(
 
   // Sanity check: detect likely per-100g values when base_unit is kg or L.
   // Common foods: chicken=1650/kg, rice=3600/kg, oil=8840/L, sugar=3870/kg.
-  // If calories < 1000 and base_unit is kg/L, almost certainly entered per-100g.
+  // Low-calorie foods: shiitake=340/kg, cucumber=150/kg, lettuce=140/kg.
+  // Threshold 50 kcal/kg: nothing edible is below this.
   if (
     baseUnit &&
     (baseUnit === "kg" || baseUnit === "L") &&
     values.calories !== undefined &&
     values.calories > 0 &&
-    values.calories < 500
+    values.calories < 50
   ) {
     return (
       `NUTRITION UNIT ERROR: calories=${values.calories} looks like a per-100g value, ` +
