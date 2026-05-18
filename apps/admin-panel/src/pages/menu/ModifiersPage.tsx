@@ -1,5 +1,6 @@
 import { RefreshCw, AlertTriangle } from 'lucide-react'
 import { useLoyverseModifierPull } from '../../hooks/useLoyverseModifierPull'
+import { PulledMirrorSection } from '../../components/menu/modifiers/PulledMirrorSection'
 
 function formatPulledAt(iso: string | null): string {
   if (!iso) return 'never'
@@ -55,9 +56,7 @@ export function ModifiersPage() {
         </div>
       )}
 
-      <section className="rounded-lg border border-slate-800 bg-slate-900/40 p-6 text-sm text-slate-500">
-        Pulled mirror accordion — Task 7.
-      </section>
+      <PulledMirrorSection lists={lists} options={options} />
 
       <section className="rounded-lg border border-slate-800 bg-slate-900/40 p-6 text-sm text-slate-500">
         Bindings CRUD — Tasks 8 + 9.
