@@ -1,0 +1,8 @@
+extracted/
+payloads/
+unmatched.csv
+summary.md
+*.mbox
+__pycache__/
+*.pyc
+.venv/
