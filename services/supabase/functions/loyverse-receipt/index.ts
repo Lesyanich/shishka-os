@@ -2,29 +2,47 @@
 // Edge Function: loyverse-receipt
 // Inbound webhook from Loyverse POS on closed receipts.
 //
+// Auth model (per real-world Loyverse behavior observed 2026-05-18):
+//   Loyverse does NOT sign webhook deliveries — no Loyverse-Signature header,
+//   no documented HMAC scheme. Their threat model is "URL secrecy" + payload
+//   contains `merchant_id` that the receiver can validate.
+//
+//   We implement defense-in-depth:
+//     • If LOYVERSE_WEBHOOK_SECRET is set AND Loyverse-Signature header
+//       arrives → HMAC-SHA256 verify (future-proofing if they add signing).
+//     • Otherwise → require payload.merchant_id to match LOYVERSE_MERCHANT_ID.
+//     • If neither check applies → reject with 401.
+//
+// Payload shape (confirmed from live delivery):
+//   { merchant_id, type: "receipts.update", created_at,
+//     receipts: [ { receipt_number, total_money, line_items: [...], ... } ] }
+//   — `receipts` is ALWAYS an array, even with one element.
+//
 // Flow:
-//   1. Read raw body bytes (HMAC verifies pre-parse).
-//   2. Verify HMAC-SHA256 signature against LOYVERSE_WEBHOOK_SECRET.
-//   3. Parse JSON. Loyverse may wrap as {type, receipt} or send receipt at top.
-//   4. Call fn_ingest_loyverse_receipt(p_receipt) — idempotent on receipt_number,
-//      chains fn_deduct_order_bom internally on first-insert path.
-//   5. Return 200 {ok, order_id} on success.
+//   1. Read raw body, parse JSON, validate envelope.
+//   2. Auth: HMAC if available, else merchant_id check.
+//   3. Iterate payload.receipts[]; call fn_ingest_loyverse_receipt per receipt.
+//      RPC is idempotent on receipt_number and chains BOM deduction internally.
+//   4. Return 200 with array of order_ids, or 500 if any RPC failed
+//      (Loyverse will retry the whole delivery).
 //
 // Failure semantics (matters for Loyverse retry behavior):
-//   • Bad signature       → 401, log to loyverse_webhook_dead_letter
-//   • Malformed JSON      → 200, log to loyverse_webhook_dead_letter (don't retry junk)
-//   • RPC error           → 500, log to loyverse_sync_log (Loyverse retries)
-//   • Already ingested    → 200 (RPC returns same UUID via idempotency)
+//   • Auth fail        → 401, log to loyverse_webhook_dead_letter
+//   • Malformed JSON   → 200, log to DLQ (don't retry junk)
+//   • Missing envelope → 200, log to DLQ
+//   • Any RPC error    → 500, log to loyverse_sync_log (Loyverse retries)
 //
 // Deploy: `supabase functions deploy loyverse-receipt --no-verify-jwt`
-// (no Supabase JWT on the request — auth is HMAC).
 //
-// Env: LOYVERSE_WEBHOOK_SECRET — set via `supabase secrets set`.
+// Env:
+//   LOYVERSE_WEBHOOK_SECRET  — HMAC key (used only if Loyverse adds signing)
+//   LOYVERSE_MERCHANT_ID     — expected merchant_id (always required)
 // ═══════════════════════════════════════════════════════════
 
 import { db } from "../_shared/supabase.ts"
 
 const SECRET = Deno.env.get("LOYVERSE_WEBHOOK_SECRET") ?? ""
+const EXPECTED_MERCHANT_ID = Deno.env.get("LOYVERSE_MERCHANT_ID") ?? ""
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -39,7 +57,7 @@ function json(data: unknown, status = 200) {
   })
 }
 
-// HMAC-SHA256 → lowercase hex
+// HMAC-SHA256 → lowercase hex. Used only if Loyverse starts signing one day.
 async function hmacSha256Hex(secret: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
@@ -63,8 +81,6 @@ function constantTimeEq(a: string, b: string): boolean {
   return diff === 0
 }
 
-// Loyverse signature header may carry the hex digest plainly or prefixed
-// (e.g. "sha256=abc..."). Strip a known prefix if present.
 function normalizeSignature(raw: string): string {
   const trimmed = raw.trim().toLowerCase()
   if (trimmed.startsWith("sha256=")) return trimmed.slice("sha256=".length)
@@ -85,8 +101,6 @@ async function logDeadLetter(args: {
       error: args.error,
     })
   } catch (e) {
-    // Last-resort visibility — function logs are the only fallback if the DLQ
-    // table is unreachable.
     console.error("loyverse-receipt: dead-letter insert failed:", e)
   }
 }
@@ -105,7 +119,6 @@ async function logSyncError(error: string, payload: unknown) {
 }
 
 Deno.serve(async (req) => {
-  // CORS preflight (Loyverse won't send OPTIONS but Supabase routing may)
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS })
   }
@@ -114,45 +127,14 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "method_not_allowed" }, 405)
   }
 
-  // 1. Read raw body before parsing — HMAC signs the raw bytes
   const rawBody = await req.text()
   const headersObj = Object.fromEntries(req.headers)
-
-  // 2. Verify signature. Header name TBD on first real Loyverse webhook;
-  //    accept the two most likely variants.
   const sigHeader =
     req.headers.get("loyverse-signature") ??
     req.headers.get("x-loyverse-signature") ??
     null
 
-  if (!SECRET) {
-    await logSyncError("missing_webhook_secret", { headers: headersObj })
-    return json({ ok: false, error: "server_missing_secret" }, 500)
-  }
-
-  if (!sigHeader) {
-    await logDeadLetter({
-      rawBody,
-      signature: null,
-      headers: headersObj,
-      error: "missing_signature_header",
-    })
-    return json({ ok: false, error: "missing_signature" }, 401)
-  }
-
-  const expected = await hmacSha256Hex(SECRET, rawBody)
-  const provided = normalizeSignature(sigHeader)
-  if (!constantTimeEq(expected, provided)) {
-    await logDeadLetter({
-      rawBody,
-      signature: sigHeader,
-      headers: headersObj,
-      error: "signature_mismatch",
-    })
-    return json({ ok: false, error: "invalid_signature" }, 401)
-  }
-
-  // 3. Parse. Loyverse delivery may wrap as {type, receipt} or send the receipt at top.
+  // ── 1. Parse envelope ──
   let payload: Record<string, unknown>
   try {
     payload = JSON.parse(rawBody)
@@ -163,33 +145,109 @@ Deno.serve(async (req) => {
       headers: headersObj,
       error: `parse_error: ${(e as Error).message}`,
     })
-    // 200 = don't make Loyverse retry malformed bodies
     return json({ ok: false, error: "parse_error" }, 200)
   }
 
-  const receipt =
-    (payload.receipt as Record<string, unknown> | undefined) ?? payload
+  // ── 2. Authentication ──
+  let authMethod: "hmac" | "merchant_id" | null = null
 
-  if (!receipt || typeof receipt !== "object" || !("receipt_number" in receipt)) {
+  if (sigHeader && SECRET) {
+    // HMAC path (future-proof if Loyverse starts signing)
+    const expected = await hmacSha256Hex(SECRET, rawBody)
+    const provided = normalizeSignature(sigHeader)
+    if (!constantTimeEq(expected, provided)) {
+      await logDeadLetter({
+        rawBody,
+        signature: sigHeader,
+        headers: headersObj,
+        error: "signature_mismatch",
+      })
+      return json({ ok: false, error: "invalid_signature" }, 401)
+    }
+    authMethod = "hmac"
+  } else if (EXPECTED_MERCHANT_ID) {
+    // merchant_id path (current Loyverse reality — no signing)
+    const payloadMerchant =
+      typeof payload.merchant_id === "string" ? payload.merchant_id : null
+    if (payloadMerchant !== EXPECTED_MERCHANT_ID) {
+      await logDeadLetter({
+        rawBody,
+        signature: sigHeader,
+        headers: headersObj,
+        error: `merchant_id_mismatch: got ${payloadMerchant ?? "null"}`,
+      })
+      return json({ ok: false, error: "invalid_merchant" }, 401)
+    }
+    authMethod = "merchant_id"
+  } else {
+    // No auth configured at all — refuse
     await logDeadLetter({
       rawBody,
       signature: sigHeader,
       headers: headersObj,
-      error: "missing_receipt_number",
+      error: "server_no_auth_configured",
     })
-    return json({ ok: false, error: "missing_receipt_number" }, 200)
+    return json({ ok: false, error: "server_misconfigured" }, 500)
   }
 
-  // 4. Call ingest RPC. Idempotent on receipt_number; chains BOM deduction.
-  const { data, error } = await db.rpc("fn_ingest_loyverse_receipt", {
-    p_receipt: receipt,
-  })
-
-  if (error) {
-    await logSyncError(error.message, receipt)
-    // 500 → Loyverse will retry
-    return json({ ok: false, error: error.message }, 500)
+  // ── 3. Extract receipts (always treat as array) ──
+  // Loyverse: {merchant_id, type, created_at, receipts: [...]}
+  // Fallback: {receipt: {...}} or single receipt at top level (smoke tests).
+  let receipts: Array<Record<string, unknown>> = []
+  if (Array.isArray(payload.receipts)) {
+    receipts = payload.receipts as Array<Record<string, unknown>>
+  } else if (
+    payload.receipt && typeof payload.receipt === "object"
+  ) {
+    receipts = [payload.receipt as Record<string, unknown>]
+  } else if ("receipt_number" in payload) {
+    // Bare single-receipt (smoke test / direct CLI delivery)
+    receipts = [payload]
   }
 
-  return json({ ok: true, order_id: data }, 200)
+  if (receipts.length === 0) {
+    await logDeadLetter({
+      rawBody,
+      signature: sigHeader,
+      headers: headersObj,
+      error: "no_receipts_in_payload",
+    })
+    return json({ ok: false, error: "no_receipts" }, 200)
+  }
+
+  // ── 4. Ingest each receipt ──
+  const results: Array<{ receipt_number: string; order_id?: string; error?: string }> = []
+  let anyError = false
+
+  for (const receipt of receipts) {
+    const rn = typeof receipt.receipt_number === "string" ? receipt.receipt_number : "<unknown>"
+    if (!("receipt_number" in receipt)) {
+      await logDeadLetter({
+        rawBody,
+        signature: sigHeader,
+        headers: headersObj,
+        error: "missing_receipt_number_in_element",
+      })
+      results.push({ receipt_number: rn, error: "missing_receipt_number" })
+      continue
+    }
+
+    const { data, error } = await db.rpc("fn_ingest_loyverse_receipt", {
+      p_receipt: receipt,
+    })
+
+    if (error) {
+      await logSyncError(error.message, receipt)
+      results.push({ receipt_number: rn, error: error.message })
+      anyError = true
+    } else {
+      results.push({ receipt_number: rn, order_id: data as string })
+    }
+  }
+
+  if (anyError) {
+    return json({ ok: false, auth: authMethod, results }, 500)
+  }
+
+  return json({ ok: true, auth: authMethod, results }, 200)
 })
