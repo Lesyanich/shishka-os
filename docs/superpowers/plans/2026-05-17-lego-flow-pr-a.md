@@ -251,20 +251,21 @@ git commit -m "feat(menu): mig 195 — raw Loyverse modifier_list mirror tables"
 - Modify: `services/supabase/functions/loyverse-sync/index.ts`
 - The file already contains: `loyverseGet`, `loyversePost`, `loyverseGetAll`, `logStart`, `logFinish`, `handleStatus`, `handleCategories`, `handleItems`, `handleFull`, `handlePushDish`, and a final `switch` dispatching on `?action=`.
 
+> **POST-MORTEM (2026-05-17 implementation)**: this plan originally guessed the Loyverse endpoint as `/v1.0/modifier_lists`. The real endpoint is `/v1.0/modifiers`, response root key `modifiers`, per-list options key `modifier_options`, and select fields `min_select` / `max_select` (NOT `min_select_modifier` / `max_select_modifier`). The implementer's live curl in Step 1 caught the mismatch and adjusted the types in Step 2 accordingly. Recorded in memory `reference_loyverse_api_modifier_endpoints.md`. The Step 1 curl below is left as-is for historical accuracy; future readers should treat `/v1.0/modifiers` as the canonical endpoint.
+
 - [ ] **Step 1: Verify Loyverse modifier_lists endpoint shape**
 
 Locally with the env token in place:
 ```bash
 LOYVERSE_API_TOKEN=$(security find-generic-password -s "shishka-loyverse-api-token" -w 2>/dev/null)
-curl -s "https://api.loyverse.com/v1.0/modifier_lists?limit=5" \
+# NOTE: actual endpoint is /v1.0/modifiers — adjust curl when re-verifying:
+curl -s "https://api.loyverse.com/v1.0/modifiers?limit=5" \
   -H "Authorization: Bearer $LOYVERSE_API_TOKEN" >/tmp/loy-mod.json
-jq '.modifier_lists | length' /tmp/loy-mod.json
-jq '.modifier_lists[0] | keys' /tmp/loy-mod.json
-jq '.modifier_lists[0].modifiers[0] | keys' /tmp/loy-mod.json 2>/dev/null || echo "no embedded modifiers field"
+jq '.modifiers | length' /tmp/loy-mod.json
+jq '.modifiers[0] | keys' /tmp/loy-mod.json
+jq '.modifiers[0].modifier_options[0] | keys' /tmp/loy-mod.json 2>/dev/null || echo "no embedded modifier_options field"
 ```
-Expected: a JSON array `modifier_lists` returned. Inspect the top-level keys and the `modifiers[]` shape. Confirm names: should include `id`, `name`, `modifiers` (or similar — verify), `cursor` for pagination.
-
-If the inner field is not `modifiers` (e.g., it's `options`), update the Step 2 code accordingly.
+Expected: a JSON array `modifiers` returned. Inspect the top-level keys and the `modifier_options[]` shape. Confirmed during implementation: each list has `id`, `name`, `modifier_options[]`, plus pagination `cursor`. Each option has `id`, `name`, `price` (numeric or null).
 
 - [ ] **Step 2: Add `pull_modifiers` handler**
 

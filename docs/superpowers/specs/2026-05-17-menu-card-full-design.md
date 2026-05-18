@@ -296,6 +296,13 @@ INSERT INTO tags (slug, name, name_th, tag_group, sort_order) VALUES
 ON CONFLICT (slug) DO NOTHING;
 ```
 
+> **Extended 2026-05-18 by lego-flow PR A** ([design](2026-05-17-lego-bowl-flow-design.md) §4.2 / mig 194). `nomenclature_modifier_options` gains 5 columns:
+> - `slot TEXT CHECK IN ('base','protein','greens','topping','sauce')` — universal slot grouping
+> - `quantity_per_unit NUMERIC NOT NULL DEFAULT 1` — BOM-deduction multiplier for MOD-* per order unit
+> - `loyverse_modifier_id TEXT` (unique partial) — Loyverse option id, joined against `receipt.line.modifiers[].id`
+> - `loyverse_modifier_list_id TEXT` — Loyverse list this option belongs to
+> - `loyverse_modifier_list_name TEXT` — snapshot of list name at last pull
+
 ### 4.6 Migration `184_v_dish_assembly_components.sql`
 
 ```sql
@@ -319,6 +326,8 @@ ORDER BY bs.parent_id, COALESCE(bs.slot, 'zzz'), c.name;
 
 GRANT SELECT ON v_dish_assembly_components TO anon, authenticated;
 ```
+
+> **Slot vocab swapped 2026-05-18 by lego-flow PR A** ([design](2026-05-17-lego-bowl-flow-design.md) §4.1 / mig 193). `bom_structures.slot` CHECK constraint changed from `(base/protein/finish/accent/dressing)` (set in mig 145) to `(base/protein/greens/topping/sauce)`. Two existing prod rows were remapped: `accent → topping`, `finish → topping`. `dressing → sauce` mapping is included for completeness even though no `dressing` rows existed. The view above (line `bs.slot`) reads whichever vocabulary is current — no view change was needed.
 
 ## 5. RPC Functions
 
