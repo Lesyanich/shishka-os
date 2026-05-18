@@ -1,5 +1,7 @@
 extracted/
 payloads/
+photos/
+review.md
 unmatched.csv
 summary.md
 *.mbox

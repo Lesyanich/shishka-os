@@ -46,7 +46,10 @@ def convert(gas_folder: Path, out_dir: Path) -> int:
             continue
         html_body = html_src.read_text(encoding="utf-8", errors="replace")
 
-        uid = order_id
+        # Use slug (order_id + msgIdPrefix) so multiple messages per order
+        # (placement / shipped / delivered / cancellation) get separate files
+        # instead of overwriting each other. parse.py dedups by order_id later.
+        uid = slug
         meta = {
             "uid": uid,
             "order_id": order_id,

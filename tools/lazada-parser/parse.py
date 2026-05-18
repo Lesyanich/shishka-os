@@ -294,10 +294,15 @@ def parse_message(meta: dict[str, Any], html: str | None) -> ParsedOrder:
 # ─── Nomenclature matching (DB) ───
 
 def load_nomenclature_index(conn) -> list[tuple[str, str, str]]:
-    """Return [(id, product_code, name)] for all type='good' nomenclature."""
+    """Return [(id, product_code, name)] for purchasable nomenclature.
+
+    Lazada food orders map to raw_ingredient rows. We also include
+    semi_finished in case CEO maps to a prepared item.
+    """
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id::text, product_code, name FROM nomenclature WHERE type = 'good'"
+            "SELECT id::text, product_code, name FROM nomenclature "
+            "WHERE type IN ('raw_ingredient', 'semi_finished', 'good')"
         )
         return list(cur.fetchall())
 
@@ -321,6 +326,7 @@ def pipeline(args: argparse.Namespace) -> int:
     payloads_dir.mkdir(parents=True, exist_ok=True)
 
     nom_index: list[tuple[str, str, str]] = []
+    already_imported: set[str] = set()
     if not args.skip_db:
         try:
             import psycopg  # type: ignore
@@ -333,7 +339,17 @@ def pipeline(args: argparse.Namespace) -> int:
             return 2
         with psycopg.connect(db_url) as conn:
             nom_index = load_nomenclature_index(conn)
-        LOG.info("loaded %d nomenclature rows for matching", len(nom_index))
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT invoice_number FROM expense_ledger "
+                    "WHERE supplier_id = %s AND invoice_number IS NOT NULL",
+                    (LAZADA_SUPPLIER_ID,),
+                )
+                already_imported = {r[0] for r in cur.fetchall()}
+        LOG.info(
+            "loaded %d nomenclature rows; %d Lazada invoices already in expense_ledger",
+            len(nom_index), len(already_imported),
+        )
 
     summary_rows: list[dict[str, Any]] = []
     unmatched_rows: list[dict[str, Any]] = []
@@ -341,6 +357,17 @@ def pipeline(args: argparse.Namespace) -> int:
     if not json_files:
         LOG.warning("no extracted/*.json files in %s — run extract.py first", in_dir)
         return 1
+
+    # Pre-pass: detect cancellations across ALL messages (cancellation notices
+    # have a different subject from the original confirmation, so we need to
+    # scan everything before deciding what to keep).
+    cancelled: set[str] = set()
+    for meta_path in json_files:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        if "cancel" in (meta.get("subject") or "").lower() and meta.get("order_id"):
+            cancelled.add(meta["order_id"])
+    if cancelled:
+        LOG.info("detected %d cancelled order(s): %s", len(cancelled), ", ".join(sorted(cancelled)))
 
     # Dedup: 80 messages → 31 unique orders. Each order has multiple emails
     # (placement / shipped / delivered / e-invoice); only the placement
@@ -362,6 +389,13 @@ def pipeline(args: argparse.Namespace) -> int:
         existing = by_order.get(key)
         if existing is None or (not existing.items and order.items):
             by_order[key] = order
+
+    # Annotate cancelled + already-imported on each kept order
+    for oid, order in by_order.items():
+        if order.order_id and order.order_id in cancelled:
+            order.warnings.append("CANCELLED — do not import")
+        if order.order_id and order.order_id in already_imported:
+            order.warnings.append("ALREADY IMPORTED — dedup skip")
 
     LOG.info("processed %d messages, kept %d confirmations, skipped %d non-confirmations",
              len(json_files), len(by_order), skipped)
