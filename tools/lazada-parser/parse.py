@@ -42,12 +42,36 @@ CATEGORY_COGS_FOOD = 4100
 CATEGORY_OPEX_KITCHEN = 2200
 CATEGORY_OPEX_CLEANING = 2300
 
-# Heuristics — tighten with real samples
-PRICE_RE = re.compile(r"฿\s*([\d,]+(?:\.\d{1,2})?)")
-QTY_RE = re.compile(r"(?:Qty|จำนวน|quantity)[:\s]+(\d+)", re.I)
-SHIPPING_RE = re.compile(r"(?:Shipping|Delivery|ค่าจัดส่ง)[^฿]*฿\s*([\d,]+(?:\.\d{1,2})?)", re.I)
-DISCOUNT_RE = re.compile(r"(?:Discount|Voucher|ส่วนลด)[^฿\-]*[-]?\s*฿?\s*([\d,]+(?:\.\d{1,2})?)", re.I)
-TOTAL_RE = re.compile(r"(?:Order Total|Grand Total|รวม)[^฿]*฿\s*([\d,]+(?:\.\d{1,2})?)", re.I)
+# Tuned against real Lazada Thailand 2026 order-confirmation HTML.
+# BeautifulSoup get_text("\n") produces these patterns:
+#   <item name>\n
+#   THB  169.00\n
+#   Quantity: 2\n
+# and totals as three-line blocks:
+#   Subtotal:\n
+#   THB\n
+#   338.00\n
+ITEM_RE = re.compile(
+    r"^([^\n]+?)\n+THB\s+([\d,]+(?:\.\d{1,2})?)\n+Quantity:\s*(\d+)\b",
+    re.MULTILINE,
+)
+MONEY_LINE_RE = re.compile(
+    r"^(Subtotal|Shipping fee|Discount|Service fee|Total\s*\(VAT[^)]*\))\s*:?\s*\n+THB\s*\n+([\d,]+(?:\.\d{1,2})?)",
+    re.MULTILINE | re.IGNORECASE,
+)
+PLACED_DATE_RE = re.compile(
+    r"placed on\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})", re.IGNORECASE
+)
+PARCEL_SPLIT_RE = re.compile(r"\bParcel\s+\d+\b", re.IGNORECASE)
+SUBJECT_CONFIRMATION_RE = re.compile(
+    r"^(We have received your order|Thank you for your)", re.IGNORECASE
+)
+# Subjects that look like Lazada but aren't placement confirmations
+SUBJECT_SKIP_RE = re.compile(
+    r"(shipped|delivered|E-invoice|Cancellation|How was your|What are your thoughts|"
+    r"กำหนดการจัดส่ง)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -153,28 +177,74 @@ def html_to_text(html: str) -> str:
         return re.sub(r"<[^>]+>", "\n", html)
 
 
-def extract_order_fields(body: str) -> dict[str, float]:
-    """Pull totals/shipping/discount from a body blob. Returns 0 for missing."""
-    out: dict[str, float] = {"shipping_total": 0.0, "discount_total": 0.0, "amount_original": 0.0}
-    if m := TOTAL_RE.search(body):
-        out["amount_original"] = parse_money(m.group(1))
-    # Sum every shipping fee occurrence (Lazada bills per shop)
-    out["shipping_total"] = sum(parse_money(g) for g in SHIPPING_RE.findall(body))
-    # Sum every discount line
-    out["discount_total"] = sum(parse_money(g) for g in DISCOUNT_RE.findall(body))
-    return out
+def is_confirmation(subject: str) -> bool:
+    """Only emails that contain item prices — placement confirmations.
+
+    Skips shipping notifications, delivery confirmations, e-invoices, cancellations,
+    review requests, Thai schedule updates.
+    """
+    if SUBJECT_SKIP_RE.search(subject):
+        return False
+    return bool(SUBJECT_CONFIRMATION_RE.match(subject.strip()))
 
 
 def extract_line_items(body: str) -> list[LineItem]:
-    """Skeleton item extractor. Real Lazada emails will need targeted selectors.
+    """Extract (name, quantity, unit_price) triples per the Lazada 2026 format.
 
-    Strategy when real sample lands:
-      - Lazada HTML wraps each item in a table row with the product name in <a>
-        and the price in a <td class="...price...">
-      - Adapt to use BeautifulSoup soup.select() with that pattern
-      - Until then, return an empty list and let humans fill payloads/<order>.json
+    Items appear AFTER 'Sold by:' lines and BEFORE the first 'Subtotal:' block.
+    For multi-parcel orders, items repeat across parcels — we scan globally
+    because items are unambiguous (name / THB <price> / Quantity: <n>).
     """
-    return []
+    items: list[LineItem] = []
+    for m in ITEM_RE.finditer(body):
+        name = m.group(1).strip()
+        # Skip generic boilerplate lines that occasionally match
+        if name.lower() in {"sold by", "delivery details", "your order"}:
+            continue
+        unit_price = parse_money(m.group(2))
+        qty = float(m.group(3))
+        items.append(
+            LineItem(
+                name=name,
+                quantity=qty,
+                unit="pcs",
+                unit_price=unit_price,
+                total_price=round(unit_price * qty, 2),
+            )
+        )
+    return items
+
+
+def extract_order_fields(body: str) -> dict[str, float]:
+    """Sum money lines across parcels.
+
+    Lazada bills shipping per shop, so an order with N parcels yields N
+    'Shipping fee:' lines that must be summed. Same logic for discount/service.
+    `amount_original` uses the LAST 'Total (VAT included)' if present, else the
+    last 'Subtotal' as fallback.
+    """
+    totals: dict[str, list[float]] = {
+        "subtotal": [],
+        "shipping fee": [],
+        "discount": [],
+        "service fee": [],
+        "total (vat included)": [],
+    }
+    for m in MONEY_LINE_RE.finditer(body):
+        key = m.group(1).strip().lower()
+        if key.startswith("total"):
+            key = "total (vat included)"
+        totals.setdefault(key, []).append(parse_money(m.group(2)))
+
+    total_amounts = totals.get("total (vat included)", [])
+    subtotal_amounts = totals.get("subtotal", [])
+    amount = sum(total_amounts) if total_amounts else sum(subtotal_amounts)
+
+    return {
+        "amount_original": amount,
+        "shipping_total": sum(totals.get("shipping fee", [])),
+        "discount_total": sum(totals.get("discount", [])),
+    }
 
 
 def parse_message(meta: dict[str, Any], html: str | None) -> ParsedOrder:
@@ -182,26 +252,39 @@ def parse_message(meta: dict[str, Any], html: str | None) -> ParsedOrder:
     body_html_text = html_to_text(html) if html else ""
     body = (body_plain + "\n" + body_html_text).strip()
 
+    subject = meta.get("subject", "")
     iso = to_iso_date(meta.get("date") or "")
+
+    # Prefer the in-email "placed on May 18, 2026" over the message Date header
+    # because shipping/delivery emails carry a different Date.
+    if m := PLACED_DATE_RE.search(body):
+        try:
+            iso = datetime.strptime(m.group(1), "%B %d, %Y").date().isoformat()
+        except ValueError:
+            pass
+
     order = ParsedOrder(
         uid=meta["uid"],
         order_id=meta.get("order_id"),
-        subject=meta.get("subject", ""),
+        subject=subject,
         date_iso=iso,
     )
+
+    if not is_confirmation(subject):
+        order.warnings.append("skipped — not an order-placement confirmation")
+        return order
 
     fields = extract_order_fields(body)
     order.shipping_total = fields["shipping_total"]
     order.discount_total = fields["discount_total"]
     order.amount_original = fields["amount_original"]
     order.vat_amount = round(order.amount_original * 7 / 107, 2)
-
     order.items = extract_line_items(body)
 
     if order.amount_original == 0:
         order.warnings.append("amount_original=0 — totals regex missed")
     if not order.items:
-        order.warnings.append("no items extracted — fill manually")
+        order.warnings.append("no items extracted — body shape changed?")
     if not order.order_id:
         order.warnings.append("order_id missing — assign before RPC call")
 
@@ -259,12 +342,31 @@ def pipeline(args: argparse.Namespace) -> int:
         LOG.warning("no extracted/*.json files in %s — run extract.py first", in_dir)
         return 1
 
+    # Dedup: 80 messages → 31 unique orders. Each order has multiple emails
+    # (placement / shipped / delivered / e-invoice); only the placement
+    # confirmation has prices, so we keep the parsed result per order_id and
+    # prefer the one with line items.
+    by_order: dict[str, ParsedOrder] = {}
+    skipped = 0
     for meta_path in json_files:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         html_path = meta_path.with_suffix(".html")
         html = html_path.read_text(encoding="utf-8") if html_path.exists() else None
 
         order = parse_message(meta, html)
+        if not is_confirmation(order.subject):
+            skipped += 1
+            continue
+
+        key = order.order_id or order.uid
+        existing = by_order.get(key)
+        if existing is None or (not existing.items and order.items):
+            by_order[key] = order
+
+    LOG.info("processed %d messages, kept %d confirmations, skipped %d non-confirmations",
+             len(json_files), len(by_order), skipped)
+
+    for order in by_order.values():
         for item in order.items:
             if nom_index:
                 match_item(item, nom_index)
@@ -297,6 +399,7 @@ def pipeline(args: argparse.Namespace) -> int:
                 "warnings": "; ".join(order.warnings) or "-",
             }
         )
+    summary_rows.sort(key=lambda r: r["date"])
 
     # summary.md
     md_lines = [
