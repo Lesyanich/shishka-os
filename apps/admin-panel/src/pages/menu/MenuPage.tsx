@@ -14,6 +14,7 @@ import {
 import { useMenuData } from '../../hooks/useMenuData'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
 import { useMenuListEnrichment } from '../../hooks/useMenuListEnrichment'
+import { useChannelMargins } from '../../hooks/useChannelMargins'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
@@ -64,6 +65,7 @@ export function MenuPage() {
   } = useMenuData()
   const inlineUpdate = useInlineUpdate(updateItem)
   const enrichment = useMenuListEnrichment(items, childrenByParent)
+  const { margins: grabMargins } = useChannelMargins('grab')
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -333,6 +335,7 @@ export function MenuPage() {
           errorFor={inlineUpdate.errorFor}
           onOpenDrawer={openDrawer}
           autoExpandId={justCreatedId}
+          grabMargins={grabMargins}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
         <OwnerGallery
