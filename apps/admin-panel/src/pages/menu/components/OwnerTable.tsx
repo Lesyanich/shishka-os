@@ -2,6 +2,7 @@ import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, use
 import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch, PanelRightOpen } from 'lucide-react'
 import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useMenuDishes'
 import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
+import type { ChannelMargin } from '../../../hooks/useChannelMargins'
 import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 import { useExpandedRows } from '../../../hooks/useExpandedRows'
 import { useRowKeyboardNav } from '../../../hooks/useRowKeyboardNav'
@@ -24,6 +25,8 @@ interface OwnerTableProps {
   onOpenDrawer?: (id: string) => void
   /** Imperative trigger: when this id changes, auto-expand that row and scroll to it. */
   autoExpandId?: string | null
+  /** Grab channel margin data keyed by nomenclature_id. */
+  grabMargins?: Map<string, ChannelMargin>
 }
 
 const KIND_BADGE: Record<NomenclatureKind, { label: string; cls: string }> = {
@@ -147,6 +150,7 @@ export function OwnerTable({
   errorFor,
   onOpenDrawer,
   autoExpandId,
+  grabMargins,
 }: OwnerTableProps) {
   const filtered = selectedCategory
     ? items.filter((d) => d.category_id === selectedCategory)
@@ -390,6 +394,8 @@ export function OwnerTable({
             <th role="columnheader" className="px-3 py-2.5 text-right">Cost</th>
             <th role="columnheader" className="px-3 py-2.5 text-right">Food Cost %</th>
             <th role="columnheader" className="px-3 py-2.5 text-right">Margin</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Grab Price</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Grab Margin %</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Available</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Featured</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Phase</th>
@@ -403,7 +409,7 @@ export function OwnerTable({
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-surface-1/30">
-                  <td colSpan={18} className="px-3 py-2">
+                  <td colSpan={20} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-cream/50">
                       {item.subcategory.name}
                     </span>
@@ -646,6 +652,28 @@ export function OwnerTable({
                   )}
                 </td>
 
+                {/* Grab Price */}
+                <td className="px-3 py-2 text-right">
+                  {(() => {
+                    const gm = grabMargins?.get(dish.id)
+                    if (!gm?.channel_price) return <span className="text-cream/30">&mdash;</span>
+                    return <span className="font-mono text-[10px] tabular-nums text-cream/70">{formatThb(gm.channel_price)}</span>
+                  })()}
+                </td>
+
+                {/* Grab Margin % (food cost on net revenue) */}
+                <td className="px-3 py-2 text-right">
+                  {(() => {
+                    const gm = grabMargins?.get(dish.id)
+                    if (!gm?.channel_food_cost_pct) return <span className="text-cream/30">&mdash;</span>
+                    return (
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${foodCostColor(gm.channel_food_cost_pct)}`}>
+                        {gm.channel_food_cost_pct.toFixed(1)}%
+                      </span>
+                    )
+                  })()}
+                </td>
+
                 {/* Available toggle */}
                 <td className="px-3 py-2 text-center">
                   <button
@@ -726,7 +754,7 @@ export function OwnerTable({
               )}
               {isExpanded && (
                 <tr className="bg-surface-1/60">
-                  <td colSpan={18} className="p-0">
+                  <td colSpan={20} className="p-0">
                     <DishExpandedCard dish={dish} />
                     {onOpenDrawer && (
                       <div className="flex justify-end border-t border-surface-3/50 bg-surface-1/40 px-4 py-2">
@@ -836,6 +864,8 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
                 </span>
               )}
             </td>
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
