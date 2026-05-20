@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { CalendarCheck, Banknote, Users } from 'lucide-react'
+import { CalendarCheck, CalendarDays, Banknote, Users } from 'lucide-react'
 
 const TABS = [
   { to: '/hr/attendance', icon: CalendarCheck, label: 'Attendance' },
+  { to: '/hr/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/hr/payroll', icon: Banknote, label: 'Payroll' },
   { to: '/hr/staff', icon: Users, label: 'Staff' },
 ] as const

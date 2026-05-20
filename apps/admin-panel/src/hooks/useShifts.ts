@@ -14,6 +14,7 @@ export interface Shift {
   created_at: string
   updated_at: string
   staff?: { name: string; role: string } | null
+  location?: { name: string } | null
 }
 
 export interface ShiftInsert {
@@ -59,7 +60,7 @@ export function useShifts(dateFilter?: string): UseShiftsResult {
 
     let query = supabase
       .from('shifts')
-      .select('id, staff_id, location_id, shift_date, start_time, end_time, break_minutes, status, notes, created_at, updated_at, staff(name, role)')
+      .select('id, staff_id, location_id, shift_date, start_time, end_time, break_minutes, status, notes, created_at, updated_at, staff(name, role), location:locations(name)')
       .order('shift_date', { ascending: true })
       .order('start_time', { ascending: true })
 
@@ -79,6 +80,7 @@ export function useShifts(dateFilter?: string): UseShiftsResult {
     const mapped = (data ?? []).map((row: Record<string, unknown>) => ({
       ...row,
       staff: row.staff as Shift['staff'],
+      location: row.location as Shift['location'],
     })) as Shift[]
 
     setShifts(mapped)

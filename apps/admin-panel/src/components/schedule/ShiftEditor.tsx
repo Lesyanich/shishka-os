@@ -3,6 +3,7 @@ import { X, Trash2 } from 'lucide-react'
 import type { Staff } from '../../hooks/useStaff'
 import type { Shift, ShiftInsert } from '../../hooks/useShifts'
 import type { Equipment } from '../../hooks/useEquipment'
+import { useLocations } from '../../hooks/useLocations'
 import { ShiftTaskEditor, type ShiftTaskDraft } from './ShiftTaskEditor'
 import { EquipmentAllocation } from './EquipmentAllocation'
 import { supabase } from '../../lib/supabase'
@@ -27,7 +28,9 @@ interface ShiftEditorProps {
 
 export function ShiftEditor({ shift, date, staffList, equipment, onSave, onDelete, onClose }: ShiftEditorProps) {
   const isEdit = !!shift
+  const { locations } = useLocations()
   const [staffId, setStaffId] = useState(shift?.staff_id ?? (staffList[0]?.id ?? ''))
+  const [locationId, setLocationId] = useState(shift?.location_id ?? '')
   const [shiftDate, setShiftDate] = useState(shift?.shift_date ?? date)
   const [startTime, setStartTime] = useState(shift?.start_time?.slice(0, 5) ?? '08:00')
   const [endTime, setEndTime] = useState(shift?.end_time?.slice(0, 5) ?? '16:00')
@@ -69,6 +72,7 @@ export function ShiftEditor({ shift, date, staffList, equipment, onSave, onDelet
     await onSave(
       {
         staff_id: staffId,
+        location_id: locationId || null,
         shift_date: shiftDate,
         start_time: startTime,
         end_time: endTime,
@@ -126,6 +130,23 @@ export function ShiftEditor({ shift, date, staffList, equipment, onSave, onDelet
               {activeStaff.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Location */}
+          <div>
+            <label className="mb-1 block text-xs text-slate-400">Location</label>
+            <select
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none"
+            >
+              <option value="">— no location —</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name}
                 </option>
               ))}
             </select>
