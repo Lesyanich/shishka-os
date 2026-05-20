@@ -5,4 +5,9 @@ describe('L1CookTab', () => {
     const mod = await import('./L1CookTab')
     expect(mod.L1CookTab).toBeDefined()
   })
+
+  it('exports L1CookTabProps type', async () => {
+    const mod = await import('./L1CookTab')
+    expect(typeof mod.L1CookTab).toBe('function')
+  })
 })
