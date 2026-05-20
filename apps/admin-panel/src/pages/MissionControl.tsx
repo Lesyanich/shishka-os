@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Rocket, Plus, Loader2, X, Search, ArrowUpDown } from 'lucide-react'
 import { useBusinessTasks } from '../hooks/useBusinessTasks'
 import type { BusinessTask, TaskStatus, TaskPriority, NewBusinessTask } from '../hooks/useBusinessTasks'
@@ -26,6 +27,7 @@ const PRIORITY_ORDER: Record<TaskPriority, number> = { critical: 0, high: 1, med
 export function MissionControl() {
   const { role } = useAppRole()
   const isCEO = role === 'owner'
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [activeTab, setActiveTab] = useState<TopTab>('planning')
   const [segment, setSegment] = useState<Segment>('team')
@@ -40,6 +42,17 @@ export function MissionControl() {
 
   const { tasks: allTasks, isLoading, error, refetch, addTask, updateTask } = useBusinessTasks('all')
 
+  // ── Deep-link: open task from ?taskId= param ──
+  useEffect(() => {
+    const taskId = searchParams.get('taskId')
+    if (!taskId || allTasks.length === 0) return
+    const found = allTasks.find(t => t.id === taskId)
+    if (found && found.id !== selectedTask?.id) {
+      setSelectedTask(found)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedTask?.id intentionally excluded to prevent loop
+  }, [searchParams, allTasks])
+
   // ── Handlers ──
 
   const handleAddTask = async (task: NewBusinessTask) => {
@@ -53,11 +66,14 @@ export function MissionControl() {
 
   const handleUpdateTask = async (id: string, updates: Partial<BusinessTask>): Promise<boolean> => {
     const ok = await updateTask(id, updates)
-    if (ok) setSelectedTask(null)
+    if (ok) { setSelectedTask(null); setSearchParams({}, { replace: true }) }
     return ok
   }
 
-  const handleOpenDetail = (task: BusinessTask) => setSelectedTask(task)
+  const handleOpenDetail = (task: BusinessTask) => {
+    setSelectedTask(task)
+    setSearchParams({ taskId: task.id }, { replace: true })
+  }
 
   // ── Derived data ──
 
@@ -277,7 +293,7 @@ export function MissionControl() {
       {selectedTask && (
         <TaskDetailPanel
           task={selectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={() => { setSelectedTask(null); setSearchParams({}, { replace: true }) }}
           onUpdate={handleUpdateTask}
         />
       )}

@@ -214,8 +214,8 @@ export function MenuPage() {
     setSelectedCategory(null)
   }
 
-  // Stats — for Owner view use filtered set; for others use full dishes (current behavior)
-  const statsSource = view === 'owner' ? ownerFilteredItems : dishes
+  // Stats — Owner view uses fully-filtered set (FilterBar applied); other views use type-filtered set
+  const statsSource = view === 'owner' ? ownerFilteredItems : typeFilteredItems
   const totalDishes = statsSource.length
   const availableCount = statsSource.filter((d) => d.is_available).length
   const featuredCount = statsSource.filter((d) => d.is_featured).length
@@ -324,8 +324,8 @@ export function MenuPage() {
           />
         </div>
       )}
-      {/* L1/L2/Customer: single-category strip (unchanged) */}
-      {(view === 'customer' || view === 'l1-cook' || view === 'l2-assembler') &&
+      {/* L1/L2: single-category strip (Customer view has its own section nav) */}
+      {(view === 'l1-cook' || view === 'l2-assembler') &&
         categories.length > 0 && (
           <CategoryTabs
             categories={categories}

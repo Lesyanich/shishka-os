@@ -57,7 +57,7 @@ function wpExpiryLabel(expiry: string | null): string {
 }
 
 const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract', 'probation']
-const STAFF_ROLES = ['cook', 'helper', 'prep', 'dishwasher', 'sous_chef', 'admin']
+const STAFF_ROLES = ['cook', 'helper', 'prep', 'dishwasher', 'sous_chef', 'admin', 'cashier']
 
 function StaffCardView({
   card,
