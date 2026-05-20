@@ -55,6 +55,11 @@ export const createProductSchema = {
         items: { type: "string" },
         description: "List of allergens. Only for RAW items.",
       },
+      category_id: {
+        type: "string",
+        description:
+          "UUID of the product_categories row. REQUIRED for SALE items (dishes are invisible on menu without a category). Optional for RAW/PF/MOD.",
+      },
       confirmed: {
         type: "boolean",
         description:
@@ -75,6 +80,7 @@ export async function createProduct(args: {
   carbs?: number;
   fat?: number;
   allergens?: string[];
+  category_id?: string;
   confirmed?: boolean;
 }) {
   try {
@@ -117,12 +123,29 @@ export async function createProduct(args: {
       return { error: `Cannot map prefix "${prefix}" to a database type` };
     }
 
+    if (prefix === "SALE" && !args.category_id) {
+      return { error: `SALE items require category_id — without it the dish is invisible on the menu page. Look up the correct UUID from product_categories (e.g. KP-FIN-MAN for manakish).` };
+    }
+
     if (prefix !== "SALE" && args.price) {
       return { error: `Only SALE items can have a price. ${prefix} items get their cost from purchases.` };
     }
 
     if (prefix !== "RAW" && (args.calories || args.protein || args.carbs || args.fat)) {
       return { error: `Only RAW items should have direct nutrition values. ${prefix} items calculate nutrition from their BOM.` };
+    }
+
+    // Validate category_id exists in product_categories
+    if (args.category_id) {
+      const sb0 = getSupabase();
+      const { data: cat, error: catErr } = await sb0
+        .from("product_categories")
+        .select("id, code, name")
+        .eq("id", args.category_id)
+        .single();
+      if (catErr || !cat) {
+        return { error: `category_id "${args.category_id}" not found in product_categories` };
+      }
     }
 
     // === PRE-CREATION CHECKS (skip if confirmed) ===
@@ -213,6 +236,7 @@ export async function createProduct(args: {
         carbs: args.carbs || null,
         fat: args.fat || null,
         allergens: args.allergens || null,
+        category_id: args.category_id || null,
         is_available: true,
       })
       .select()
