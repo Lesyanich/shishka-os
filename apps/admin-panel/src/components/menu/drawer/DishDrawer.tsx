@@ -26,11 +26,20 @@ const TABS: readonly { key: DrawerTab; label: string }[] = [
   { key: 'owner', label: 'Owner' },
 ]
 
+/** Page-level view that opens the drawer. Drives tab filtering so the
+ * drawer doesn't repeat the role selector that already lives on the page.
+ * `owner` keeps all tabs (power editing); other views collapse to the
+ * matching single tab. */
+export type DrawerPageView = 'owner' | 'l1-cook' | 'l2-assembler' | 'customer'
+
 interface DishDrawerProps {
   item: MenuItem | null
   onClose: () => void
   onSaved?: () => void
   returnFocusToId?: string | null
+  /** Active page view. Drawer tabs are filtered to match this so we don't
+   * nest a second role selector inside the role-specific page view. */
+  pageView: DrawerPageView
 }
 
 export function DishDrawer({
@@ -38,6 +47,7 @@ export function DishDrawer({
   onClose,
   onSaved,
   returnFocusToId,
+  pageView,
 }: DishDrawerProps) {
   const open = item != null
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -69,13 +79,16 @@ export function DishDrawer({
     merrychef_program?: MerrychefProgram | null
   } | null>(null)
 
-  // Reset form when item changes
+  // Reset form when item or page view changes. Default tab follows the
+  // page view so the drawer opens directly on the relevant role's tab
+  // (Owner view keeps the previous behaviour: start on Customer for SALE
+  // since it's the first tab).
   useEffect(() => {
     setFormCard(null)
     setFormNomen(null)
-    setActiveTab('customer')
+    setActiveTab(pageView === 'owner' ? 'customer' : pageView)
     setToast(null)
-  }, [dishId])
+  }, [dishId, pageView])
 
   const onFormChange = useCallback((patch: Partial<DishCardData>) => {
     setFormCard((prev) => ({ ...(prev ?? {}), ...patch }))
@@ -176,10 +189,18 @@ export function DishDrawer({
 
   if (!open) return null
 
-  // Tab visibility: PF items hide Customer + L2 tabs
-  const visibleTabs = isPf
-    ? TABS.filter((t) => t.key === 'l1-cook' || t.key === 'owner')
-    : TABS
+  // Tab visibility:
+  // - Owner page view = full power mode → all tabs available (PF still hides
+  //   Customer + L2 because those don't apply).
+  // - Role-specific page views (L1 Cook, L2 Assembler, Customer) collapse
+  //   the drawer to that single tab — the page-level view already selected
+  //   the role, no need for a matryoshka role selector inside the drawer.
+  const visibleTabs =
+    pageView === 'owner'
+      ? isPf
+        ? TABS.filter((t) => t.key === 'l1-cook' || t.key === 'owner')
+        : TABS
+      : TABS.filter((t) => t.key === pageView)
 
   // Ensure active tab is visible
   const resolvedTab = visibleTabs.find((t) => t.key === activeTab)
@@ -230,7 +251,10 @@ export function DishDrawer({
             <DrawerHero item={item} />
           </div>
 
-          {/* Tab strip — sticky inside scroll */}
+          {/* Tab strip — sticky inside scroll. Hidden when only one tab is
+              visible (e.g. role-specific page view) since a single-button
+              tab bar is just visual noise. */}
+          {visibleTabs.length > 1 && (
           <nav className="sticky top-0 z-10 flex gap-0 border-b border-slate-800/80 bg-[var(--color-surface-1)] px-5">
             {visibleTabs.map((t) => (
               <button
@@ -247,6 +271,7 @@ export function DishDrawer({
               </button>
             ))}
           </nav>
+          )}
 
           {/* Tab content */}
           <div className="px-5 py-5">

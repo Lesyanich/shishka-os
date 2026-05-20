@@ -386,6 +386,7 @@ export function MenuPage() {
         onClose={closeDrawer}
         onSaved={() => refetch()}
         returnFocusToId={drawerItem?.id ?? null}
+        pageView={view}
       />
     </div>
   )
