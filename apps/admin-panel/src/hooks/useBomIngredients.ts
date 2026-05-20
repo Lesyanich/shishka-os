@@ -32,7 +32,10 @@ export function useBomIngredients(parentId: string | null): UseBomIngredientsRes
       .from('bom_structures')
       .select('ingredient_id, quantity_per_unit, nomenclature!bom_structures_ingredient_id_fkey(product_code, name, type, base_unit)')
       .eq('parent_id', parentId)
-      .order('sort_order', { ascending: true })
+      // bom_structures has no `sort_order` column; ordering by `created_at`
+      // matches the pattern used in useDishDetail and gives stable, insertion-
+      // ordered results.
+      .order('created_at', { ascending: true })
     if (err) {
       setError(err.message)
       setIsLoading(false)
