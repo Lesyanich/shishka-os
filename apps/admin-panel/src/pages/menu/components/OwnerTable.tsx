@@ -512,7 +512,7 @@ export function OwnerTable({
                     />
                     {!hasNutrition(dish) && (
                       <span className="inline-flex rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-medium text-cream/60">
-                        No KBJU
+                        No nutrition
                       </span>
                     )}
                   </span>

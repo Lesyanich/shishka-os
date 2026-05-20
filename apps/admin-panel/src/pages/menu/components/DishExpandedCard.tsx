@@ -208,7 +208,7 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
 
       {/* Section: Nutrition */}
       <Section
-        title="Nutrition (KBJU)"
+        title="Nutrition"
         icon={<FileText className="h-3.5 w-3.5" />}
         isOpen={openSections.has('nutrition')}
         onToggle={() => toggle('nutrition')}
