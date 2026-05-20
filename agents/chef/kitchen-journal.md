@@ -111,6 +111,123 @@
 
 ---
 
+## 2026-05-18 — Porridge R&D: Coconut Rice + Overnight Oats
+
+### Scope
+Designed production approach for two porridge bases: PF-PORRIDGE_COCONUT_RICE and PF-PORRIDGE_OVERNIGHT_OATS.
+
+### CEO Corrections (critical — food science gaps)
+1. **Shelf life max 48h, not 5 days** — Bacillus cereus spores survive cooking, germinate at 4-55°C; starch retrogradation causes syneresis (texture collapse) by day 3-4
+2. **Honey ONLY at L2 serving (<40°C)** — heating destroys enzymes, turns expensive honey into cheap invert sugar. Use coconut sugar at L1 (thermostable, low GI)
+3. **Al dente at L1** — microwave reheat finishes cooking; ratio 1:2.06 (rice:liquid), cook 15 min not 20-25
+4. **Raw oats carry wild microflora** — overnight oats without heat treatment = uncontrolled fermentation risk. Solution: 3 min boil → blast chill → add chia cold
+5. **Puffed rice (Murmura)** — add ONLY at L2 serving, absorbs moisture instantly
+
+### Final Recipes (v2)
+- **Rice porridge:** 330g jasmine rice + 580ml coconut milk + 100ml water + 15g coconut sugar + 3g cinnamon + 2ml vanilla. Cook 15 min al dente → blast chill → 250g portions. Cost ~57 ฿/kg, portion 14.3 ฿ base.
+- **Overnight oats:** 300g oats + 550ml coconut milk + 150ml water + 30g chia (post-chill) + 15g coconut sugar + 3g cinnamon + 2ml vanilla. Boil 3 min → blast chill → add chia → mature 6-12h cold. Cost ~99 ฿/kg, portion 24.8 ฿ base.
+
+### Topping combos (L2 assembly)
+- Tropical: mango purée 30g + toasted coconut 10g
+- Crunch: PF-CRUNCH_PUMPKIN 15g + honey drizzle
+- Plain: honey drizzle only
+- NEW: Puffed rice (Murmura) 10-15g — crunch element, last step at serving
+
+### Pricing target
+- Rice porridge + topping: 89 ฿ (FC ~27%)
+- Oats + topping: 119 ฿ (FC ~29%)
+
+### Open decisions
+- ~~Sweetener: coconut sugar vs Mitr Phol white~~ → **DECIDED: cane sugar** (coconut sugar rejected — strong aftertaste, CEO decision 2026-05-18)
+- Puffed rice brand (Murmura from Lazada) — need clean label check on packaging
+- Microwave purchase for L2 (~2,000 ฿)
+- Buckwheat porridge deferred → separate savory dish (truffle + mushroom)
+
+### MC task created
+- 315e14f7: Chef Agent food science knowledge gap — architectural solution needed (tech, high priority)
+
+### Pending
+- ~~Check purchase_logs for sugar line items~~ → DONE (search_purchase_history tool live)
+- First cane sugar purchase → establishes WAC
+- Kitchen test batch before creating PF in Supabase
+
+---
+
+## 2026-05-18 — Manakeesh Recipe Flows + Porridge Pudding Concept
+
+### Manakeesh — full recipe flow buildout
+All 7 active GF manakeesh now have complete 6-step recipe flows:
+1. Pressing (Gas Range) → 2. Pre-baking → 3. Assembly (unique per dish) → 4. Blast Freeze → 5. Storage → 6. Merrychef (260°C, Fan 100%, MW 10-15%, 1:40)
+
+**Created:**
+- PF-CHEESE_MIX_MANAKEESH — 3-cheese mix (Mozz+Cheddar 40%, Gouda 30%, Emmental 30%), ฿392/kg
+- BOM for 5 manakeesh filled from scratch (Cheese, Cheese+Mushroom, Za'atar, Pumpkin+Goat)
+- BOM for Pumpkin Cheese Mix extended (added cheese mix + sesame)
+
+**Assembly details per dish:**
+| Dish | Filling |
+|------|---------|
+| Cheese GF | cream cheese 10g + cheese mix 20g |
+| Cheese & Mushroom GF | cream cheese 7g + shiitake 15g + cheese mix 13g |
+| Za'atar GF | za'atar + olive oil mix |
+| Pumpkin Cheese Mix GF | mashed pumpkin w/ salt + cheese mix 12g |
+| Pumpkin & Goat GF | baked pumpkin 22g + goat cheese 10g |
+| Beef/Lamb GF | unchanged (30g filling) |
+
+**All use 50/50 black & white sesame mix (~3g) on the back.**
+
+**Prices set:**
+| Dish | Price | FC% |
+|------|-------|-----|
+| Cheese GF | ฿59 | 18% |
+| Cheese & Mushroom GF | ฿69 | 22% |
+| Za'atar GF | ฿45 | 16% |
+| Pumpkin & Goat GF | ฿69 | 24% |
+
+**KBJU filled** for 6 RAW ingredients (cream cheese, mozz+cheddar, gouda, emmental, black sesame, ricotta).
+**Goat cheese** identified: Soignon from Villa Market, ฿1,245/kg.
+
+### CEO decision: cane sugar for porridge
+Coconut sugar rejected (strong aftertaste). Cane sugar approved for L1 production (15g per 5 portions = 3g/portion, ~12 kcal). Honey remains L2 drizzle only (<40°C).
+
+### Porridge Pudding Concept (CEO idea — R&D)
+**Pivot:** serve rice + oat porridge COLD as puddings, not hot.
+
+**Health angle:** cooled rice = resistant starch RS3 (lower GI) — marketing writes itself.
+
+**Lego model:**
+- Base: rice pudding OR overnight oats (PF, portioned in bowls at L1)
+- Toppings (L2): fruits, berries, sweet sauces, jams, crunch, honey drizzle
+- New idea: **ricotta in overnight oats** (adds protein + creaminess)
+
+**Two serving models:**
+- **Grab & Go:** pre-assembled bowls in open fridge (L-2-S-OPEN-FRG-120-11), max 12h display
+- **Build Your Own:** base from GN + customer picks toppings at sweet salad bar
+
+**Packaging:** medium bowl + clear plastic lid + sticker (KBJU, price, production date, use-by date)
+
+**Food safety constraints:**
+- Rice base: 48h max at 0-4°C (B. cereus)
+- Cut fruit toppings: 24h max
+- Pre-assembled in open fridge: ~12h display life
+- Fruit added at L2 morning, not at L1
+
+### MC tasks created
+- ba84ff3f: Parse Makro for seasonal fruits (prices + barcodes) — procurement
+- b82c5e65: Add Soignon Goat Cheese (Villa Market) to supplier catalog
+- af185481: Fix nutrition validator <500 kcal/kg threshold (code fix done, awaits MCP restart)
+- 8e7770a4: Merge Bega Cream Cheese auto-products → RAW-CHEESE-CREAM
+- 525bdb94: Fix RAW-ZAATAR unit from "portion" to "kg"
+
+### Open decisions (porridge pudding)
+- Bowl supplier + sticker printer for L2
+- How many pre-assembled combos per day (operational planning needed)
+- Pricing tiers depend on topping costs (awaiting Makro fruit parse)
+- Ricotta source + cost (RAW-CHEESE-RICOTTA WAC=0, KBJU filled: 1740/110/130/30 per kg)
+- Cane sugar brand from Makro (CEO sent link, page didn't load — need barcode)
+
+---
+
 <!-- Шаблон для нового дня:
 
 ## 2026-04-XX — [тема дня]
