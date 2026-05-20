@@ -18,6 +18,11 @@ set -e
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$REPO_ROOT"
 
+# Worktree auto-link: symlink node_modules + .env.local from main checkout
+# when running inside a git worktree. No-op in main. Output suppressed to
+# keep stdout clean for SessionStart JSON contract.
+sh "$REPO_ROOT/scripts/worktree-setup.sh" >/dev/null 2>&1 || true
+
 # --- Read hook payload from stdin (Claude Code SessionStart event) ---
 STDIN_JSON=""
 if [ ! -t 0 ]; then
