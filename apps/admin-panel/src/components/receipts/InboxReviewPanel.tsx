@@ -384,7 +384,11 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
         if (!data) return
         const map: Record<string, { code: string; name: string; category?: string }> = {}
         for (const r of data) {
-          const cat = r.category as { name: string } | null
+          // Supabase generates `category` as { name }[] for the FK relation,
+          // but the runtime payload is the single related row (or null) since
+          // nomenclature.category_id → product_categories.id is to-one.
+          // Cast through unknown to bypass the array-vs-object overlap check.
+          const cat = r.category as unknown as { name: string } | null
           map[r.id] = { code: r.product_code, name: r.name, category: cat?.name ?? undefined }
         }
         setNomMap(map)
