@@ -9,6 +9,8 @@ import { useDishScorecard } from '../../../hooks/useDishScorecard'
 import { useDishCardSave } from '../../../hooks/useDishCardSave'
 import type { MerrychefProgram } from '../../../hooks/useDishCardSave'
 import { useDishRecipeSteps } from '../../../hooks/useDishRecipeSteps'
+import { useBomIngredients } from '../../../hooks/useBomIngredients'
+import { usePfPackCard } from '../../../hooks/usePfPackCard'
 import { DrawerHero } from '../owner/DrawerHero'
 import { CustomerTab } from './tabs/CustomerTab'
 import { L1CookTab } from './tabs/L1CookTab'
@@ -47,12 +49,15 @@ export function DishDrawer({
 
   // Data hooks — all keyed to item.id (null when closed)
   const dishId = open ? item.id : null
+  const isPf = item?.kind === 'PF'
   const isSale = item?.kind === 'SALE'
   const dishCard = useDishCard(isSale ? dishId : null)
   const allergens = useAllergens(isSale ? dishId : null)
   const modifiers = useModifierOptions(isSale ? dishId : null)
   const scorecard = useDishScorecard(dishId)
   const recipeSteps = useDishRecipeSteps(dishId)
+  const bomIngredients = useBomIngredients(dishId)
+  const pfPackCard = usePfPackCard(isPf ? dishId : null)
   const { saveDishCard, isSaving } = useDishCardSave()
 
   // Local form state for tab edits (held until Save)
@@ -172,7 +177,6 @@ export function DishDrawer({
   if (!open) return null
 
   // Tab visibility: PF items hide Customer + L2 tabs
-  const isPf = item.kind === 'PF'
   const visibleTabs = isPf
     ? TABS.filter((t) => t.key === 'l1-cook' || t.key === 'owner')
     : TABS
@@ -265,10 +269,12 @@ export function DishDrawer({
           {resolvedTab === 'l1-cook' && (
             <L1CookTab
               item={item}
-              components={dishCard.components}
-              componentsLoading={dishCard.isLoading}
+              ingredients={bomIngredients.ingredients}
+              ingredientsLoading={bomIngredients.isLoading}
               recipeSteps={recipeSteps.steps}
               recipeStepsLoading={recipeSteps.isLoading}
+              pfPackCard={pfPackCard.card}
+              dishCard={dishCard.card}
             />
           )}
           {resolvedTab === 'l2-assembler' && (
