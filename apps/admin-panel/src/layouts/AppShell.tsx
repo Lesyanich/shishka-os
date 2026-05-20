@@ -110,6 +110,7 @@ const NAV_SECTIONS: NavSection[] = [
     minRole: 'owner',
     items: [
       { path: '/hr/attendance', icon: CalendarCheck, label: 'Attendance' },
+      { path: '/hr/schedule', icon: CalendarDays, label: 'Schedule' },
       { path: '/hr/payroll', icon: Banknote, label: 'Payroll' },
       { path: '/hr/staff', icon: Users, label: 'Staff' },
     ],

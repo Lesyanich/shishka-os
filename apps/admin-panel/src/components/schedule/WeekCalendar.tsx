@@ -44,9 +44,16 @@ const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-amber-500/30 border-amber-500/40 text-amber-200',
   dishwasher: 'bg-slate-500/30 border-slate-500/40 text-slate-300',
   prep: 'bg-violet-500/30 border-violet-500/40 text-violet-200',
+  helper: 'bg-teal-500/30 border-teal-500/40 text-teal-200',
+  cashier: 'bg-pink-500/30 border-pink-500/40 text-pink-200',
 }
 
-export function WeekCalendar() {
+interface WeekCalendarProps {
+  locationFilter?: string | null
+  onWeekChange?: (weekStart: Date) => void
+}
+
+export function WeekCalendar({ locationFilter = null, onWeekChange }: WeekCalendarProps = {}) {
   const isMobile = useIsMobile()
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
   const [mobileDay, setMobileDay] = useState(() => formatDate(new Date()))
@@ -56,9 +63,15 @@ export function WeekCalendar() {
   } | null>(null)
 
   const { staff, isLoading: staffLoading } = useStaff()
-  const { shifts, isLoading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts()
+  const { shifts: allShifts, isLoading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts()
   const { createShiftTask, deleteShiftTask } = useShiftTasks()
   const { equipment } = useEquipment()
+
+  // Filter shifts by location if provided
+  const shifts = useMemo(
+    () => locationFilter ? allShifts.filter((s) => s.location_id === locationFilter) : allShifts,
+    [allShifts, locationFilter],
+  )
 
   const weekDates = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -87,16 +100,20 @@ export function WeekCalendar() {
     const d = new Date(weekStart)
     d.setDate(d.getDate() - 7)
     setWeekStart(d)
+    onWeekChange?.(d)
   }
 
   function nextWeek() {
     const d = new Date(weekStart)
     d.setDate(d.getDate() + 7)
     setWeekStart(d)
+    onWeekChange?.(d)
   }
 
   function goToday() {
-    setWeekStart(getMonday(new Date()))
+    const d = getMonday(new Date())
+    setWeekStart(d)
+    onWeekChange?.(d)
   }
 
   function openCell(staffId: string, date: string) {
@@ -267,6 +284,7 @@ export function WeekCalendar() {
                           className={`rounded px-2 py-0.5 text-xs border ${ROLE_COLORS[s.role] ?? ROLE_COLORS.cook}`}
                         >
                           {sh.start_time.slice(0, 5)}–{sh.end_time.slice(0, 5)}
+                          {sh.location && <span className="ml-1 opacity-70">{sh.location.name}</span>}
                         </span>
                       ))}
                     </div>
@@ -326,7 +344,10 @@ export function WeekCalendar() {
                                 key={sh.id}
                                 className={`rounded px-1.5 py-1 text-[11px] border ${ROLE_COLORS[s.role] ?? ROLE_COLORS.cook}`}
                               >
-                                {sh.start_time.slice(0, 5)}–{sh.end_time.slice(0, 5)}
+                                <div>{sh.start_time.slice(0, 5)}–{sh.end_time.slice(0, 5)}</div>
+                                {sh.location && (
+                                  <div className="text-[9px] opacity-70 truncate">{sh.location.name}</div>
+                                )}
                               </div>
                             ))
                           ) : (

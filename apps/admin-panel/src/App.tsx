@@ -46,6 +46,7 @@ const HRLayout = lazy(() => import('./pages/hr/HRLayout').then(m => ({ default: 
 const AttendancePage = lazy(() => import('./pages/hr/AttendancePage').then(m => ({ default: m.AttendancePage })))
 const PayrollPage = lazy(() => import('./pages/hr/PayrollPage').then(m => ({ default: m.PayrollPage })))
 const StaffPage = lazy(() => import('./pages/hr/StaffPage').then(m => ({ default: m.StaffPage })))
+const SchedulePage = lazy(() => import('./pages/hr/SchedulePage').then(m => ({ default: m.SchedulePage })))
 
 function PageLoader() {
   return (
@@ -121,6 +122,7 @@ function App() {
                     <Route path="attendance" element={<AttendancePage />} />
                     <Route path="payroll" element={<PayrollPage />} />
                     <Route path="staff" element={<StaffPage />} />
+                    <Route path="schedule" element={<Suspense fallback={<PageLoader />}><SchedulePage /></Suspense>} />
                   </Route>
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                   <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
