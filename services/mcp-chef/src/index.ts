@@ -53,10 +53,11 @@ function jsonResult(data: any) {
 
 server.tool(
   "search_products",
-  "Search the product catalog (nomenclature). Returns matching items with nutrition, cost, and availability.",
+  "Search the product catalog (nomenclature). Returns matching items with nutrition, cost, and availability. Can browse by category (e.g. category='F-PRD-MSH' for mushrooms).",
   {
-    query: z.string().describe("Search term (matches product_code or name)"),
+    query: z.string().optional().describe("Search term (matches product_code, name, or aliases)"),
     type: z.enum(["RAW", "PF", "MOD", "SALE"]).optional().describe("Filter by product type"),
+    category: z.string().optional().describe("Filter by category code (L3 exact, L2/L1 prefix). E.g. 'F-PRD-MSH', 'F-PRO', 'NF'"),
     limit: z.number().optional().describe("Max results (default: 20)"),
   },
   async (args) => jsonResult(await searchProducts(args))

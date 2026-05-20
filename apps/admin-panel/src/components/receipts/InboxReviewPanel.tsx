@@ -133,7 +133,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   const [isReopening, setIsReopening] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<string | null>(null)
-  const [nomMap, setNomMap] = useState<Record<string, { code: string; name: string }>>({})
+  const [nomMap, setNomMap] = useState<Record<string, { code: string; name: string; category?: string }>>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -378,13 +378,14 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
     const unique = [...new Set(ids)]
     supabase
       .from('nomenclature')
-      .select('id,product_code,name')
+      .select('id,product_code,name,category:product_categories(name)')
       .in('id', unique)
       .then(({ data }) => {
         if (!data) return
-        const map: Record<string, { code: string; name: string }> = {}
+        const map: Record<string, { code: string; name: string; category?: string }> = {}
         for (const r of data) {
-          map[r.id] = { code: r.product_code, name: r.name }
+          const cat = r.category as { name: string } | null
+          map[r.id] = { code: r.product_code, name: r.name, category: cat?.name ?? undefined }
         }
         setNomMap(map)
       })
@@ -801,6 +802,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 <th className="w-14 px-2 py-1.5 text-left">Unit</th>
                 <th className="w-20 px-2 py-1.5 text-right">Price</th>
                 <th className="w-20 px-2 py-1.5 text-right">Total</th>
+                <th className="px-2 py-1.5 text-left">Category</th>
                 <th className="px-2 py-1.5 text-left">Nomenclature</th>
                 {!isReadOnly && <th className="w-16 px-1 py-1.5" />}
               </tr>
@@ -871,6 +873,13 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                       )}
                     </td>
                     <td className="px-2 py-1.5 text-right text-slate-200">{fmt(item.total_price)}</td>
+                    <td className="px-2 py-1.5">
+                      {nom?.category ? (
+                        <span className="text-[10px] text-slate-400">{nom.category}</span>
+                      ) : (
+                        <span className="text-[10px] text-slate-600">{'\u2014'}</span>
+                      )}
+                    </td>
                     <td className="px-2 py-1.5">
                       {nom ? (
                         <div className="flex items-center gap-1">
