@@ -85,7 +85,7 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 ### Finance MCP: Guideline Loading (1 tool)
 | Tool | Когда использовать |
 |------|-------------------|
-| `read_guideline` | Загрузить guideline: image-reading-protocol, makro, market-small, delivery, tax-invoice, capex, classification, arithmetic-check, payload-cogs, payload-capex |
+| `read_guideline` | Загрузить guideline: image-reading-protocol, makro, market-small, delivery, tax-invoice, capex, bank-transfer, classification, arithmetic-check, payload-cogs, payload-capex |
 
 ### Finance MCP: Verification (2 tools)
 | Tool | Когда использовать |
@@ -276,6 +276,7 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 | "Grab", "LINE MAN", электронный чек | `delivery` | delivery.md |
 | Скриншот Lazada, Order ID 16+ цифр | `lazada` | lazada.md |
 | "TAX INVOICE", "ใบกำกับภาษี" | `tax-invoice` | tax-invoice.md (+ основной) |
+| "Bangkok Bank", "Kasikorn", "K-Bank", "SCB", "Transaction successful", "โอนเงิน" | `bank-transfer` | bank-transfer.md |
 | Оборудование, мебель, >2000 THB | `capex` | capex.md (+ основной) |
 
 **Tax Invoice** — это модификатор. Загрузи В ДОПОЛНЕНИЕ к основному типу поставщика.
