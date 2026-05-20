@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import '@testing-library/jest-dom/vitest'
 import { FilterBar } from './FilterBar'
 import type { MenuFilters } from '../../../pages/menu/hooks/useMenuFilters'
 
