@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
     // ── Read inbox row ──
     const { data: row, error: readErr } = await db
       .from("receipt_inbox")
-      .select("photo_urls, supplier_hint, receipt_date, amount_hint, status")
+      .select("photo_urls, supplier_hint, receipt_date, amount_hint, status, notes")
       .eq("id", inboxId)
       .single()
 
@@ -246,6 +246,26 @@ ${fullOcrText}
       _reconciliation: parsed._reconciliation || null,
       _warnings: parsed._warnings || [],
       _ocr_text: fullOcrText,
+    }
+
+    // ── User notes → details (RULE-LANGUAGE-CONTRACT: translate to English, ≤60 chars) ──
+    if (row.notes?.trim()) {
+      payload._user_notes_original = row.notes.trim()
+      try {
+        const translateResult: ApiResult = await callLLM(
+          modelKey,
+          "You are a translator. Translate the following text to English. Output ONLY the translation, nothing else. Maximum 60 characters.",
+          row.notes.trim(),
+        )
+        const translated = translateResult.text.trim().slice(0, 60)
+        if (translated) {
+          payload.details = translated
+          console.log(`[ocr-receipt] User notes → details: "${translated}" (original: "${row.notes.trim()}")`)
+        }
+      } catch (e) {
+        console.warn(`[ocr-receipt] Notes translation failed, using raw:`, e)
+        payload.details = row.notes.trim().slice(0, 60)
+      }
     }
 
     // ══════════════════════════════════════════
