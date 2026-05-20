@@ -23,8 +23,10 @@ import { L2AssemblerView } from './components/L2AssemblerView'
 import { NewDishModal } from './components/NewDishModal'
 import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
 import { TypeFilter, type TypeFilterValue } from '../../components/menu/owner/TypeFilter'
+import { FilterBar } from '../../components/menu/owner/FilterBar'
 import { DishDrawer } from '../../components/menu/drawer/DishDrawer'
 import { CategoryTabs } from '../../components/menu/shared'
+import { useMenuFilters, applyFilters } from './hooks/useMenuFilters'
 
 type ViewMode = 'owner' | 'l1-cook' | 'l2-assembler' | 'customer'
 type OwnerLayout = 'table' | 'gallery'
@@ -74,7 +76,16 @@ export function MenuPage() {
   const view = pickParam<ViewMode>(searchParams, 'view', VIEW_MODES, 'owner')
   const ownerLayout = pickParam<OwnerLayout>(searchParams, 'layout', OWNER_LAYOUTS, 'table')
   const typeFilter = pickParam<TypeFilterValue>(searchParams, 'type', TYPE_FILTERS, 'SALE')
-  const selectedCategory = searchParams.get('cat')
+
+  // Owner view: full multi-filter state (categories, available, loyverse, flags)
+  const { filters, setFilters } = useMenuFilters()
+  // Back-compat for L1/L2/Customer single-cat strip — derive single string|null
+  const selectedCategory = filters.categoryIds[0] ?? null
+  const setSelectedCategory = useCallback(
+    (id: string | null) =>
+      setFilters({ categoryIds: id ? [id] : [], available: null, loyverse: null, flags: [] }),
+    [setFilters],
+  )
 
   // URL-driven drawer: /menu/dish/:productCode opens DetailDrawer on that dish.
   const drawerProductCode = useMemo(() => {
@@ -116,10 +127,6 @@ export function MenuPage() {
     (t: TypeFilterValue) => updateParam({ type: t === 'SALE' ? null : t }),
     [updateParam],
   )
-  const setSelectedCategory = useCallback(
-    (cat: string | null) => updateParam({ cat }),
-    [updateParam],
-  )
 
   const openDrawer = useCallback(
     (id: string) => {
@@ -147,6 +154,30 @@ export function MenuPage() {
     if (typeFilter === 'all') return items
     return items.filter((i) => i.kind === typeFilter || (i.isDualType && typeFilter === 'PF'))
   }, [items, typeFilter])
+
+  // Pre-compute hasBom per item id (for `no-bom` flag filter)
+  const hasBomById = useMemo(() => {
+    const m = new Map<string, boolean>()
+    for (const item of items) {
+      m.set(item.id, (childrenByParent.get(item.id)?.length ?? 0) > 0)
+    }
+    return m
+  }, [items, childrenByParent])
+
+  // Apply user filters ONLY in Owner view; L1/L2/Customer keep their cat-strip
+  const ownerFilteredItems = useMemo(() => {
+    if (view !== 'owner') return typeFilteredItems
+    return applyFilters(
+      typeFilteredItems.map((i) => ({ ...i, hasBom: hasBomById.get(i.id) ?? false })),
+      filters,
+    )
+  }, [typeFilteredItems, filters, view, hasBomById])
+
+  // Filtered dishes (SALE only) for OwnerGallery
+  const ownerFilteredDishes = useMemo(
+    () => ownerFilteredItems.filter((i) => i.kind === 'SALE'),
+    [ownerFilteredItems],
+  )
 
   // Counts per category (null key = "All") within the active type filter
   const categoryCounts = useMemo(() => {
@@ -183,15 +214,17 @@ export function MenuPage() {
     setSelectedCategory(null)
   }
 
-  // Stats
-  const totalDishes = dishes.length
-  const availableCount = dishes.filter((d) => d.is_available).length
-  const featuredCount = dishes.filter((d) => d.is_featured).length
+  // Stats — for Owner view use filtered set; for others use full dishes (current behavior)
+  const statsSource = view === 'owner' ? ownerFilteredItems : dishes
+  const totalDishes = statsSource.length
+  const availableCount = statsSource.filter((d) => d.is_available).length
+  const featuredCount = statsSource.filter((d) => d.is_featured).length
+  const fcDenom = statsSource.filter((d) => d.price && d.cost_per_unit).length || 1
   const avgFoodCost =
-    dishes.reduce((sum, d) => {
+    statsSource.reduce((sum, d) => {
       if (!d.price || !d.cost_per_unit) return sum
       return sum + (d.cost_per_unit / d.price) * 100
-    }, 0) / (dishes.filter((d) => d.price && d.cost_per_unit).length || 1)
+    }, 0) / fcDenom
 
   return (
     <div className="space-y-5">
@@ -279,22 +312,19 @@ export function MenuPage() {
         </div>
       </div>
 
-      {/* Type filter + Category tabs */}
+      {/* Owner: TypeFilter + FilterBar (replaces old TypeFilter + CategoryTabs) */}
       {view === 'owner' && (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="space-y-2">
           <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
-          {categories.length > 0 && (
-            <div className="flex-1 min-w-0">
-              <CategoryTabs
-                categories={categories}
-                selectedId={selectedCategory}
-                onSelect={setSelectedCategory}
-                counts={categoryCounts}
-              />
-            </div>
-          )}
+          <FilterBar
+            filters={filters}
+            categories={categories}
+            categoryCounts={categoryCounts}
+            onChange={setFilters}
+          />
         </div>
       )}
+      {/* L1/L2/Customer: single-category strip (unchanged) */}
       {(view === 'customer' || view === 'l1-cook' || view === 'l2-assembler') &&
         categories.length > 0 && (
           <CategoryTabs
@@ -324,9 +354,9 @@ export function MenuPage() {
         </div>
       ) : view === 'owner' && ownerLayout === 'table' ? (
         <OwnerTable
-          items={typeFilteredItems}
+          items={ownerFilteredItems}
           typeFilter={typeFilter}
-          selectedCategory={selectedCategory}
+          selectedCategory={null}
           subcategories={subcategories}
           childrenByParent={childrenByParent}
           dualTypeIds={dualTypeIds}
@@ -339,8 +369,8 @@ export function MenuPage() {
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
         <OwnerGallery
-          dishes={dishes}
-          selectedCategory={selectedCategory}
+          dishes={ownerFilteredDishes}
+          selectedCategory={null}
           onUpdate={updateItem}
           onOpenDrawer={openDrawer}
         />

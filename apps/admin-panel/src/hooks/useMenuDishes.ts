@@ -75,7 +75,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         .from('nomenclature')
         .select(`
           id, name, product_code, price, cost_per_unit,
-          is_available, is_featured, image_url,
+          is_available, is_featured, image_url, loyverse_id,
           calories, protein, carbs, fat,
           portion_size, portion_unit, launch_phase,
           category_id,
@@ -145,6 +145,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         is_available: d.is_available,
         is_featured: d.is_featured,
         image_url: d.image_url,
+        loyverse_id: d.loyverse_id ?? null,
         calories: d.calories ? Number(d.calories) : null,
         protein: d.protein ? Number(d.protein) : null,
         carbs: d.carbs ? Number(d.carbs) : null,

@@ -29,6 +29,7 @@ export interface MenuItem extends MenuDish {
   kitchen_note: string | null
   ttc_source_url: string | null
   merrychef_program: Record<string, unknown> | null
+  hasBom?: boolean
 }
 
 export interface MenuBomChild {
