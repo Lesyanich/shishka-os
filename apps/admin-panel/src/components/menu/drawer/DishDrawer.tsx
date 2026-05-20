@@ -223,94 +223,97 @@ export function DishDrawer({
           </button>
         </header>
 
-        {/* Hero */}
-        <div className="shrink-0 px-5 pb-2 pt-4">
-          <DrawerHero item={item} />
-        </div>
+        {/* Scrollable area — hero scrolls away, tabs stick to top */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Hero (scrolls with content) */}
+          <div className="px-5 pb-3 pt-4">
+            <DrawerHero item={item} />
+          </div>
 
-        {/* Tab strip */}
-        <nav className="flex shrink-0 gap-0 border-b border-slate-800/80 px-5">
-          {visibleTabs.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setActiveTab(t.key)}
-              className={`px-3 py-2 text-[11px] font-medium transition ${
-                resolvedTab === t.key
-                  ? 'border-b-2 border-[var(--color-forest-soft)] text-[color:var(--color-forest-soft)]'
-                  : 'text-cream/50 hover:text-cream/80'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
+          {/* Tab strip — sticky inside scroll */}
+          <nav className="sticky top-0 z-10 flex gap-0 border-b border-slate-800/80 bg-[var(--color-surface-1)] px-5">
+            {visibleTabs.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setActiveTab(t.key)}
+                className={`px-3 py-2 text-[11px] font-medium transition ${
+                  resolvedTab === t.key
+                    ? 'border-b-2 border-[var(--color-forest-soft)] text-[color:var(--color-forest-soft)]'
+                    : 'text-cream/50 hover:text-cream/80'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
 
-        {/* Tab content — scrollable */}
-        <div className="flex-1 overflow-y-auto px-5 py-5">
-          {resolvedTab === 'customer' && (
-            <CustomerTab
-              item={item}
-              dishCard={dishCard.card}
-              allergens={allergens.allergens}
-              allergensLoading={allergens.isLoading}
-              modifiers={modifiers.modifiers}
-              modifiersLoading={modifiers.isLoading}
-              customerPhotoUrl={
-                formNomen?.customer_photo_url !== undefined
-                  ? formNomen.customer_photo_url
-                  : (item.customer_photo_url ?? item.image_url ?? null)
-              }
-              onCustomerPhotoChange={(url) =>
-                onNomenChange({ customer_photo_url: url })
-              }
-            />
-          )}
-          {resolvedTab === 'l1-cook' && (
-            <L1CookTab
-              item={item}
-              ingredients={bomIngredients.ingredients}
-              ingredientsLoading={bomIngredients.isLoading}
-              recipeSteps={recipeSteps.steps}
-              recipeStepsLoading={recipeSteps.isLoading}
-              pfPackCard={pfPackCard.card}
-              dishCard={dishCard.card}
-            />
-          )}
-          {resolvedTab === 'l2-assembler' && (
-            <L2AssemblerTab
-              item={item}
-              dishCard={dishCard.card}
-              components={dishCard.components}
-              isLoading={dishCard.isLoading}
-              formCard={
-                formCard
-                  ? ({
-                      ...(dishCard.card ?? {}),
-                      ...formCard,
-                    } as DishCardData)
-                  : null
-              }
-              onFormChange={onFormChange}
-              merrychefProgram={
-                formNomen != null && 'merrychef_program' in formNomen
-                  ? (formNomen.merrychef_program ?? null)
-                  : ((item.merrychef_program as MerrychefProgram | null) ?? null)
-              }
-              onMerrychefChange={(program) =>
-                onNomenChange({ merrychef_program: program })
-              }
-            />
-          )}
-          {resolvedTab === 'owner' && (
-            <OwnerTab
-              item={item}
-              scorecard={scorecard.scorecard}
-              scorecardLoading={scorecard.isLoading}
-              scorecardError={scorecard.error}
-              onSynced={() => onSaved?.()}
-            />
-          )}
+          {/* Tab content */}
+          <div className="px-5 py-5">
+            {resolvedTab === 'customer' && (
+              <CustomerTab
+                item={item}
+                dishCard={dishCard.card}
+                allergens={allergens.allergens}
+                allergensLoading={allergens.isLoading}
+                modifiers={modifiers.modifiers}
+                modifiersLoading={modifiers.isLoading}
+                customerPhotoUrl={
+                  formNomen?.customer_photo_url !== undefined
+                    ? formNomen.customer_photo_url
+                    : (item.customer_photo_url ?? item.image_url ?? null)
+                }
+                onCustomerPhotoChange={(url) =>
+                  onNomenChange({ customer_photo_url: url })
+                }
+              />
+            )}
+            {resolvedTab === 'l1-cook' && (
+              <L1CookTab
+                item={item}
+                ingredients={bomIngredients.ingredients}
+                ingredientsLoading={bomIngredients.isLoading}
+                recipeSteps={recipeSteps.steps}
+                recipeStepsLoading={recipeSteps.isLoading}
+                pfPackCard={pfPackCard.card}
+                dishCard={dishCard.card}
+              />
+            )}
+            {resolvedTab === 'l2-assembler' && (
+              <L2AssemblerTab
+                item={item}
+                dishCard={dishCard.card}
+                components={dishCard.components}
+                isLoading={dishCard.isLoading}
+                formCard={
+                  formCard
+                    ? ({
+                        ...(dishCard.card ?? {}),
+                        ...formCard,
+                      } as DishCardData)
+                    : null
+                }
+                onFormChange={onFormChange}
+                merrychefProgram={
+                  formNomen != null && 'merrychef_program' in formNomen
+                    ? (formNomen.merrychef_program ?? null)
+                    : ((item.merrychef_program as MerrychefProgram | null) ?? null)
+                }
+                onMerrychefChange={(program) =>
+                  onNomenChange({ merrychef_program: program })
+                }
+              />
+            )}
+            {resolvedTab === 'owner' && (
+              <OwnerTab
+                item={item}
+                scorecard={scorecard.scorecard}
+                scorecardLoading={scorecard.isLoading}
+                scorecardError={scorecard.error}
+                onSynced={() => onSaved?.()}
+              />
+            )}
+          </div>
         </div>
 
         {/* Footer: Save & Verify + toast */}
