@@ -13,6 +13,7 @@ export interface MenuDish {
   is_available: boolean
   is_featured: boolean
   image_url: string | null
+  loyverse_id: string | null
   calories: number | null
   protein: number | null
   carbs: number | null
