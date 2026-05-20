@@ -248,6 +248,26 @@ ${fullOcrText}
       _ocr_text: fullOcrText,
     }
 
+    // ── amount_hint vs OCR total validation ──
+    const ocrTotal = Number(footer.grand_total) || 0
+    const hintAmount = Number(row.amount_hint) || 0
+    if (hintAmount > 0 && ocrTotal > 0) {
+      const divergence = Math.abs(hintAmount - ocrTotal) / Math.max(hintAmount, ocrTotal)
+      if (divergence > 0.5) {
+        // ≥50% divergence — trust OCR, warn about hint
+        payload._warnings = [...(payload._warnings as string[]),
+          `amount_hint (฿${hintAmount}) contradicts OCR total (฿${ocrTotal}); using OCR`]
+        payload._hint_mismatch = true
+        console.log(`[ocr-receipt] amount_hint mismatch: hint=${hintAmount}, ocr=${ocrTotal}, divergence=${(divergence*100).toFixed(0)}%`)
+      }
+    } else if (hintAmount > 0 && ocrTotal === 0) {
+      // OCR failed to extract total — fall back to hint
+      payload.amount_original = hintAmount
+      payload._warnings = [...(payload._warnings as string[]),
+        `OCR total missing; using amount_hint (฿${hintAmount})`]
+      console.log(`[ocr-receipt] OCR total=0, falling back to amount_hint=${hintAmount}`)
+    }
+
     // ── User notes → details (RULE-LANGUAGE-CONTRACT: translate to English, ≤60 chars) ──
     if (row.notes?.trim()) {
       payload._user_notes_original = row.notes.trim()
