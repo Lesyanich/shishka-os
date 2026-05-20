@@ -5,7 +5,7 @@ const item = (over: Partial<FilteredItem> = {}): FilteredItem => ({
   id: 'i1',
   category_id: 'c1',
   is_available: true,
-  loyverse_id: 'lv-1',
+  loyverse_item_id: 'lv-1',
   image_url: 'http://x/y.jpg',
   calories: 100,
   price: 89,
@@ -80,8 +80,8 @@ describe('applyFilters', () => {
     expect(out.map((i) => i.id)).toEqual(['a'])
   })
 
-  it('loyverse=unsynced filters to null loyverse_id', () => {
-    const items = [item({ id: 'a', loyverse_id: 'lv-1' }), item({ id: 'b', loyverse_id: null })]
+  it('loyverse=unsynced filters to null loyverse_item_id', () => {
+    const items = [item({ id: 'a', loyverse_item_id: 'lv-1' }), item({ id: 'b', loyverse_item_id: null })]
     const out = applyFilters(items, { categoryIds: [], available: null, loyverse: 'unsynced', flags: [] })
     expect(out.map((i) => i.id)).toEqual(['b'])
   })

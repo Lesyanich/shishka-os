@@ -16,7 +16,7 @@ export interface FilteredItem {
   id: string
   category_id: string | null
   is_available: boolean
-  loyverse_id: string | null
+  loyverse_item_id: string | null
   image_url: string | null
   calories: number | string | null
   price: number | null
@@ -61,8 +61,8 @@ export function applyFilters<T extends FilteredItem>(items: T[], f: MenuFilters)
     }
     if (f.available === 'yes' && !item.is_available) return false
     if (f.available === 'no' && item.is_available) return false
-    if (f.loyverse === 'synced' && !item.loyverse_id) return false
-    if (f.loyverse === 'unsynced' && item.loyverse_id) return false
+    if (f.loyverse === 'synced' && !item.loyverse_item_id) return false
+    if (f.loyverse === 'unsynced' && item.loyverse_item_id) return false
     if (f.flags.length > 0) {
       const matches = f.flags.some((flag) => {
         if (flag === 'no-photo') return !item.image_url

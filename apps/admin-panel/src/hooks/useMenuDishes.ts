@@ -13,7 +13,7 @@ export interface MenuDish {
   is_available: boolean
   is_featured: boolean
   image_url: string | null
-  loyverse_id: string | null
+  loyverse_item_id: string | null
   calories: number | null
   protein: number | null
   carbs: number | null
@@ -75,7 +75,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         .from('nomenclature')
         .select(`
           id, name, product_code, price, cost_per_unit,
-          is_available, is_featured, image_url, loyverse_id,
+          is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
           portion_size, portion_unit, launch_phase,
           category_id,
@@ -145,7 +145,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         is_available: d.is_available,
         is_featured: d.is_featured,
         image_url: d.image_url,
-        loyverse_id: d.loyverse_id ?? null,
+        loyverse_item_id: d.loyverse_item_id ?? null,
         calories: d.calories ? Number(d.calories) : null,
         protein: d.protein ? Number(d.protein) : null,
         carbs: d.carbs ? Number(d.carbs) : null,
