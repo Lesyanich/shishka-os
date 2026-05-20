@@ -29,6 +29,7 @@ export interface MenuItem extends MenuDish {
   kitchen_note: string | null
   ttc_source_url: string | null
   merrychef_program: Record<string, unknown> | null
+  hasBom?: boolean
 }
 
 export interface MenuBomChild {
@@ -82,6 +83,7 @@ interface RawNomenclatureRow {
   is_available: boolean
   is_featured: boolean
   image_url: string | null
+  loyverse_id: string | null
   calories: number | string | null
   protein: number | string | null
   carbs: number | string | null
@@ -135,7 +137,7 @@ export function useMenuData(): UseMenuDataResult {
         .from('nomenclature')
         .select(`
           id, name, product_code, base_unit, price, cost_per_unit,
-          is_available, is_featured, image_url,
+          is_available, is_featured, image_url, loyverse_id,
           calories, protein, carbs, fat,
           portion_size, portion_unit, launch_phase,
           category_id,
@@ -212,6 +214,7 @@ export function useMenuData(): UseMenuDataResult {
         is_available: raw.is_available,
         is_featured: raw.is_featured,
         image_url: raw.image_url,
+        loyverse_id: raw.loyverse_id,
         calories: raw.calories != null ? Number(raw.calories) : null,
         protein: raw.protein != null ? Number(raw.protein) : null,
         carbs: raw.carbs != null ? Number(raw.carbs) : null,
