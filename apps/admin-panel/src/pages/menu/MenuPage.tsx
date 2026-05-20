@@ -183,15 +183,16 @@ export function MenuPage() {
     setSelectedCategory(null)
   }
 
-  // Stats
-  const totalDishes = dishes.length
-  const availableCount = dishes.filter((d) => d.is_available).length
-  const featuredCount = dishes.filter((d) => d.is_featured).length
+  // Stats — scoped to current type filter
+  const statsSource = typeFilteredItems
+  const totalDishes = statsSource.length
+  const availableCount = statsSource.filter((d) => d.is_available).length
+  const featuredCount = statsSource.filter((d) => d.is_featured).length
   const avgFoodCost =
-    dishes.reduce((sum, d) => {
+    statsSource.reduce((sum, d) => {
       if (!d.price || !d.cost_per_unit) return sum
       return sum + (d.cost_per_unit / d.price) * 100
-    }, 0) / (dishes.filter((d) => d.price && d.cost_per_unit).length || 1)
+    }, 0) / (statsSource.filter((d) => d.price && d.cost_per_unit).length || 1)
 
   return (
     <div className="space-y-5">
@@ -295,7 +296,7 @@ export function MenuPage() {
           )}
         </div>
       )}
-      {(view === 'customer' || view === 'l1-cook' || view === 'l2-assembler') &&
+      {(view === 'l1-cook' || view === 'l2-assembler') &&
         categories.length > 0 && (
           <CategoryTabs
             categories={categories}
@@ -339,7 +340,7 @@ export function MenuPage() {
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
         <OwnerGallery
-          dishes={dishes}
+          dishes={typeFilteredItems}
           selectedCategory={selectedCategory}
           onUpdate={updateItem}
           onOpenDrawer={openDrawer}

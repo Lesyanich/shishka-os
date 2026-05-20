@@ -40,7 +40,7 @@ export function CustomerPreview({
   onOpenDish,
 }: CustomerPreviewProps) {
   const visible = useMemo(
-    () => dishes.filter((d) => d.is_available),
+    () => dishes.filter((d) => d.is_available && d.price && d.price > 0),
     [dishes],
   )
 
