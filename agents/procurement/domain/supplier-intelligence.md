@@ -16,6 +16,30 @@
 - **Delivery:** Self-pickup; delivery options may be available for large orders
 - **Payment:** Cash, card, transfer
 - **Notes:** Primary source for bulk dry goods, oils, and basic proteins
+- **MCP Tool:** `search_makro_catalog` — real-time prices, barcodes, ST166 Rawai stock
+
+### Sangdamrong
+
+- **Type:** Kitchenware / packaging / supplies wholesaler
+- **Location:** Thailand (online + physical)
+- **Strengths:** Kitchenware, trays, glassware, porcelain, food display items, Tupperware, Ocean Glass, Superware
+- **Weaknesses:** Limited online catalog (~100 featured items), no search API, Thai-only product names
+- **Delivery:** Verify shipping to Rawai
+- **Payment:** TBD
+- **Supabase ID:** `668b3d36-b3f3-4a6a-81b0-133153bf1311`
+- **MCP Tool:** `search_sangdamrong_catalog` — browse homepage featured products (18 categories)
+- **Notes:** Already an active supplier with purchase history. Website is Remix SSR, no public search — scraper returns homepage products only.
+
+### HomePro
+
+- **Type:** Home improvement retail chain (Thai equivalent of Home Depot)
+- **Location:** Thailand-wide, stores in Phuket
+- **Strengths:** Security cameras, kitchen equipment, tools, hardware, appliances, faucets, lighting. Full search API with English+Thai names.
+- **Weaknesses:** Retail pricing (not wholesale), may be more expensive than online alternatives
+- **Delivery:** Delivery to Rawai available, store pickup option
+- **Payment:** Cash, card, installments
+- **MCP Tool:** `search_homepro_catalog` — full-text search via suggest API, prices, SKUs, stock status
+- **Notes:** Best for equipment, hardware, and security cameras. Compare with Lazada/Shopee for better pricing on same items.
 
 ### Lazada
 
