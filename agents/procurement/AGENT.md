@@ -39,7 +39,7 @@
 |------------|--------|------------|
 | `shishka-mission-control` | RW (domain=procurement) | `list_tasks`, `get_task`, `update_task`, `add_comment`, `emit_business_task` |
 | `shishka-finance` | **Read-only** | `search_suppliers`, `search_expenses`, `expense_summary` — price history, supplier data |
-| `shishka-chef` | **Read-only** | `search_products`, `list_equipment` — kitchen needs, existing equipment |
+| `shishka-chef` | **Read-only** | `search_products`, `list_equipment`, `search_makro_catalog`, `search_sangdamrong_catalog`, `search_homepro_catalog` — kitchen needs, existing equipment, **supplier catalog scrapers** |
 
 > **Finance и Chef — только чтение.** Агент закупок НЕ записывает расходы, НЕ создаёт номенклатуру, НЕ модифицирует рецепты. Если нужно действие в чужом домене — создай задачу через `emit_business_task(domain="{правильный}")`.
 
@@ -63,8 +63,11 @@
    └─ При необходимости: search_suppliers, search_expenses (finance read-only), search_products (chef read-only)
 
 3. RESEARCH
-   ├─ WebSearch — поиск оборудования, спецификаций, цен
-   ├─ WebFetch — страницы товаров (Lazada, Shopee, AliExpress, supplier sites)
+   ├─ search_makro_catalog — Makro Pro prices, barcodes, ST166 stock (ingredients, supplies)
+   ├─ search_homepro_catalog — HomePro prices, specs (equipment, cameras, hardware, tools)
+   ├─ search_sangdamrong_catalog — Sangdamrong catalog (kitchenware, packaging, glassware)
+   ├─ WebSearch — broader search (Lazada, Shopee, AliExpress, other sites)
+   ├─ WebFetch — product detail pages for specs and reviews
    ├─ Сверка с equipment-criteria.md: напряжение, размеры, материал, сертификация
    └─ Сверка с supplier-intelligence.md: прошлый опыт с поставщиком
 

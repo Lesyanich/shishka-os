@@ -31,6 +31,9 @@ import { updateProduct } from "./tools/update-product.js";
 import { recordProduction } from "./tools/record-production.js";
 import { listSuppliers } from "./tools/list-suppliers.js";
 import { searchPurchaseHistory } from "./tools/search-purchase-history.js";
+import { searchMakroCatalog } from "./tools/search-makro-catalog.js";
+import { searchSangdamrongCatalog } from "./tools/search-sangdamrong-catalog.js";
+import { searchHomeProCatalog } from "./tools/search-homepro-catalog.js";
 
 // Resources & Prompts
 import { staticResources, dynamicResources } from "./resources/index.js";
@@ -184,6 +187,37 @@ server.tool(
     limit: z.number().optional().describe("Max results (default: 50)"),
   },
   async (args) => jsonResult(await searchPurchaseHistory(args))
+);
+
+server.tool(
+  "search_makro_catalog",
+  "Search Makro Pro product catalog — real prices, barcodes, brands, and ST166 Rawai stock. Use INSTEAD of WebSearch when looking for ingredients/products available at Makro. Returns up to 20 products per query with Thai/English names.",
+  {
+    query: z.string().describe("Search term in English (e.g., 'frozen avocado', 'mozzarella', 'olive oil')"),
+    check_stock: z.boolean().optional().describe("Check ST166 Rawai inventory (default: true)"),
+    store_code: z.string().optional().describe("Makro store code (default: 166 = Rawai Phuket)"),
+  },
+  async (args) => jsonResult(await searchMakroCatalog(args))
+);
+
+server.tool(
+  "search_sangdamrong_catalog",
+  "Search Sangdamrong catalog — kitchenware, packaging, supplies, glassware, trays, electrical appliances. ~100 featured products across 18 categories. Use for kitchen equipment and packaging sourcing.",
+  {
+    query: z.string().optional().describe("Search term (Thai or English, e.g., 'knife', 'tray', 'glass')"),
+    category: z.string().optional().describe("Filter by category name (Thai, e.g., 'เครื่องครัว' for kitchenware)"),
+  },
+  async (args) => jsonResult(await searchSangdamrongCatalog(args))
+);
+
+server.tool(
+  "search_homepro_catalog",
+  "Search HomePro product catalog — home improvement, security cameras, kitchen equipment, tools, appliances. Full search with Thai+English names, prices, brands. Use for equipment, hardware, and security sourcing.",
+  {
+    query: z.string().describe("Search term (Thai or English, e.g., 'security camera', 'กล้องวงจรปิด', 'kitchen faucet')"),
+    limit: z.number().optional().describe("Max results (default: 20)"),
+  },
+  async (args) => jsonResult(await searchHomeProCatalog(args))
 );
 
 // ─── Write Tools ─────────────────────────────────────────────────
@@ -373,7 +407,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Chef Agent MCP server running on stdio`);
-  console.error(`   Tools: 17 | Resources: 3 | Prompts: 4`);
+  console.error(`   Tools: 20 | Resources: 3 | Prompts: 4`);
 }
 
 main().catch((err) => {
