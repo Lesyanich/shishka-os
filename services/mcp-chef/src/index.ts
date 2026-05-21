@@ -31,6 +31,7 @@ import { updateProduct } from "./tools/update-product.js";
 import { recordProduction } from "./tools/record-production.js";
 import { listSuppliers } from "./tools/list-suppliers.js";
 import { searchPurchaseHistory } from "./tools/search-purchase-history.js";
+import { searchMakroCatalog } from "./tools/search-makro-catalog.js";
 
 // Resources & Prompts
 import { staticResources, dynamicResources } from "./resources/index.js";
@@ -184,6 +185,17 @@ server.tool(
     limit: z.number().optional().describe("Max results (default: 50)"),
   },
   async (args) => jsonResult(await searchPurchaseHistory(args))
+);
+
+server.tool(
+  "search_makro_catalog",
+  "Search Makro Pro product catalog — real prices, barcodes, brands, and ST166 Rawai stock. Use INSTEAD of WebSearch when looking for ingredients/products available at Makro. Returns up to 20 products per query with Thai/English names.",
+  {
+    query: z.string().describe("Search term in English (e.g., 'frozen avocado', 'mozzarella', 'olive oil')"),
+    check_stock: z.boolean().optional().describe("Check ST166 Rawai inventory (default: true)"),
+    store_code: z.string().optional().describe("Makro store code (default: 166 = Rawai Phuket)"),
+  },
+  async (args) => jsonResult(await searchMakroCatalog(args))
 );
 
 // ─── Write Tools ─────────────────────────────────────────────────
@@ -373,7 +385,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Chef Agent MCP server running on stdio`);
-  console.error(`   Tools: 17 | Resources: 3 | Prompts: 4`);
+  console.error(`   Tools: 18 | Resources: 3 | Prompts: 4`);
 }
 
 main().catch((err) => {

@@ -80,10 +80,12 @@ Chef Agent подключает **два** MCP-сервера:
 | `check_inventory` | Остатки, low-stock alerts |
 | `list_equipment` | Каталог оборудования (76 единиц) |
 | `search_purchase_history` | История закупок: даты, цены, баркоды, поставщики. Поиск по purchase_logs + supplier_catalog |
+| `search_makro_catalog` | **Поиск товаров в каталоге Makro Pro** — реальные цены, баркоды, бренды, наличие на ST166 Rawai. Используй ВМЕСТО WebSearch когда ищешь что есть в Makro и за сколько |
 
 ### Кулинарные знания (reasoning principles + WebSearch)
 Читай `agents/chef/domain/culinary-knowledge.md` — 7 принципов мышления + физика еды.
-Для незнакомых ингредиентов — используй WebSearch (Принцип 5: Research-First).
+Для незнакомых ингредиентов, рецептур, техник — используй WebSearch (Принцип 5: Research-First).
+**Для поиска продуктов в Makro — используй `search_makro_catalog`, НЕ WebSearch.** Парсер даёт точные цены, баркоды и наличие на нашем складе Rawai.
 Загружай при R&D задачах (WF-7) и при создании новых блюд (WF-1).
 
 ### Chef MCP: Запись (только с подтверждением)
