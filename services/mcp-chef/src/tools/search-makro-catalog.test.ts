@@ -26,4 +26,16 @@ describe("searchMakroCatalog", () => {
       expect(first).toHaveProperty("barcode");
     }
   });
+
+  it("returns empty results for gibberish query (fallback detection)", async () => {
+    const { searchMakroCatalog } = await import("./search-makro-catalog.js");
+    const result = await searchMakroCatalog({
+      query: "xyzzy12345nonexistent",
+      check_stock: false,
+    });
+    expect(result).toHaveProperty("results");
+    if ("results" in result) {
+      expect((result as any).results).toEqual([]);
+    }
+  });
 });

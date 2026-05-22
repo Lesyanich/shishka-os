@@ -61,6 +61,19 @@ async function fetchWithRetry(
   return "";
 }
 
+function queryTokens(q: string): string[] {
+  return q
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((t) => t.length >= 3);
+}
+
+function productMatchesAnyToken(p: MakroProduct, tokens: string[]): boolean {
+  if (tokens.length === 0) return true;
+  const hay = `${p.title_en} ${p.title_th} ${p.brand}`.toLowerCase();
+  return tokens.some((t) => hay.includes(t));
+}
+
 function parseSearchHits(html: string): MakroProduct[] {
   if (!html) return [];
 
@@ -179,11 +192,23 @@ export async function searchMakroCatalog(args: {
     };
   }
 
-  const products = parseSearchHits(html);
+  const rawProducts = parseSearchHits(html);
+
+  // Makro SSR returns popular/default products when search has 0 real hits.
+  // Filter by query-relevance: every kept product must share a 3+ char token
+  // with the query. Short queries (<3 chars) bypass the heuristic.
+  const tokens = queryTokens(q);
+  const products =
+    tokens.length === 0
+      ? rawProducts
+      : rawProducts.filter((p) => productMatchesAnyToken(p, tokens));
 
   if (products.length === 0) {
     return {
-      message: `No products found for "${q}" on makro.pro`,
+      message:
+        rawProducts.length > 0
+          ? `No products found for "${q}" on makro.pro (filtered out ${rawProducts.length} unrelated fallback results)`
+          : `No products found for "${q}" on makro.pro`,
       results: [],
     };
   }
