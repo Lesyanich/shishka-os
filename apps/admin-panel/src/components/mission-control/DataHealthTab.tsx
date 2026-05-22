@@ -91,6 +91,11 @@ const METRIC_META: Record<HealthMetricKey, MetricMeta> = {
     description: 'Active equipment using placeholder capacity (slot=1)',
     entityScope: 'equipment',
   },
+  purchase_frozen_fresh_mismatch: {
+    label: 'Frozen/fresh SKU mismatch',
+    description: 'Purchase notes say "frozen" but linked product is a fresh SKU — distorts WAC',
+    entityScope: 'purchase_logs',
+  },
 }
 
 // Defensive fallback for metrics that arrive from the DB but aren't yet
