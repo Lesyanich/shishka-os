@@ -19,6 +19,8 @@ interface L1CookViewProps {
   items: MenuItem[]
   selectedCategory: string | null
   typeFilter: TypeFilterValue
+  /** null = show all, true = available only, false = unavailable only */
+  availableFilter: boolean | null
   pfPackCardById: Map<string, PfPackCardData>
   recipeStatsById: Map<string, RecipeStepStats>
   dishCardById: Map<string, DishCardData>
@@ -304,22 +306,24 @@ export function L1CookView({
   items,
   selectedCategory,
   typeFilter,
+  availableFilter,
   pfPackCardById,
   recipeStatsById,
   dishCardById,
   childrenByParent,
   onOpenDish,
 }: L1CookViewProps) {
-  // Filter: SALE + PF (exclude MOD), respect category and type filter
+  // Filter: SALE + PF (exclude MOD), respect category, type, and availability
   const filtered = useMemo(() => {
     return items.filter((i) => {
       if (i.kind === 'MOD') return false
       if (typeFilter === 'SALE' && i.kind !== 'SALE') return false
       if (typeFilter === 'PF' && i.kind !== 'PF' && !i.isDualType) return false
       if (selectedCategory && i.category_id !== selectedCategory) return false
+      if (availableFilter !== null && i.is_available !== availableFilter) return false
       return true
     })
-  }, [items, selectedCategory, typeFilter])
+  }, [items, selectedCategory, typeFilter, availableFilter])
 
   // Group by category for structured rendering
   const grouped = useMemo(() => {
