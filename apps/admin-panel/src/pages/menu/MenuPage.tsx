@@ -324,8 +324,22 @@ export function MenuPage() {
           />
         </div>
       )}
-      {/* L1/L2: single-category strip (Customer view has its own section nav) */}
-      {(view === 'l1-cook' || view === 'l2-assembler') &&
+      {/* L1 Cook: TypeFilter + CategoryTabs with counts */}
+      {view === 'l1-cook' && (
+        <div className="space-y-2">
+          <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
+          {categories.length > 0 && (
+            <CategoryTabs
+              categories={categories}
+              selectedId={selectedCategory}
+              onSelect={setSelectedCategory}
+              counts={categoryCounts}
+            />
+          )}
+        </div>
+      )}
+      {/* L2: single-category strip (Customer view has its own section nav) */}
+      {view === 'l2-assembler' &&
         categories.length > 0 && (
           <CategoryTabs
             categories={categories}
@@ -378,8 +392,11 @@ export function MenuPage() {
         <L1CookView
           items={items}
           selectedCategory={selectedCategory}
+          typeFilter={typeFilter}
           pfPackCardById={enrichment.pfPackCardById}
           recipeStatsById={enrichment.recipeStatsById}
+          dishCardById={enrichment.dishCardById}
+          childrenByParent={childrenByParent}
           onOpenDish={openDrawer}
         />
       ) : view === 'l2-assembler' ? (
