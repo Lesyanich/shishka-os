@@ -230,6 +230,17 @@ server.tool(
   lazyScraper("./tools/search-homepro-catalog.js", "searchHomeProCatalog")
 );
 
+server.tool(
+  "search_makro_catalog",
+  "Search Makro Pro product catalog — real prices, barcodes, brands, and ST166 Rawai stock. Use INSTEAD of WebSearch when looking for ingredients/products available at Makro.",
+  {
+    query: z.string().describe("Search term (Thai or English, e.g., 'chicken breast', 'น้ำตาล', 'mozzarella')"),
+    check_stock: z.boolean().optional().describe("Check ST166 Rawai inventory levels (default: true)"),
+    store_code: z.string().optional().describe("Makro store code (default: 166 = Rawai Phuket)"),
+  },
+  lazyScraper("./tools/search-makro-catalog.js", "searchMakroCatalog")
+);
+
 // ─── Write Tools ─────────────────────────────────────────────────
 
 server.tool(
