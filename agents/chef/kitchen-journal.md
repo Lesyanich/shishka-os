@@ -1,7 +1,13 @@
-# Kitchen Journal — Shishka Healthy Kitchen
+<!-- DEPRECATED: agent memory now lives in Supabase agent_memory table. This file is archived.
+    Use recall_memories(agent_id='chef') to query past decisions, tests, and ideas.
+    Migration: services/supabase/migrations/215_seed_agent_memory_from_journal.sql -->
 
-> Дневник кухни. Ежедневные записи: тесты, эксперименты, ошибки, улучшения.
-> Формат: дата → что делали → результат → выводы.
+# Kitchen Journal — Shishka Healthy Kitchen (ARCHIVED)
+
+> **⚠️ ARCHIVED** — All entries below have been migrated to Supabase `agent_memory` table.
+> New memories are stored via `store_memory` MCP tool. Do not append to this file.
+>
+> Original format: дата → что делали → результат → выводы.
 > Append-only. Каждый день — новый блок.
 
 ---
