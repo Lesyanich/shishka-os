@@ -31,9 +31,8 @@ import { updateProduct } from "./tools/update-product.js";
 import { recordProduction } from "./tools/record-production.js";
 import { listSuppliers } from "./tools/list-suppliers.js";
 import { searchPurchaseHistory } from "./tools/search-purchase-history.js";
-import { searchMakroCatalog } from "./tools/search-makro-catalog.js";
-import { searchSangdamrongCatalog } from "./tools/search-sangdamrong-catalog.js";
-import { searchHomeProCatalog } from "./tools/search-homepro-catalog.js";
+// Scrapers are loaded lazily — a missing/broken scraper file must NOT crash the entire chef MCP.
+// See lazyScraper() helper below.
 
 // Resources & Prompts
 import { staticResources, dynamicResources } from "./resources/index.js";
@@ -50,6 +49,28 @@ const server = new McpServer({
 
 function jsonResult(data: any) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+}
+
+// Lazy loader for scraper tools — keeps a missing/broken scraper module
+// from killing the entire MCP server at startup. Tool descriptions still
+// register, but the underlying module only loads when the tool is invoked.
+function lazyScraper<A>(modulePath: string, exportName: string) {
+  return async (args: A) => {
+    try {
+      const mod = await import(modulePath) as Record<string, (a: A) => Promise<unknown>>;
+      const fn = mod[exportName];
+      if (typeof fn !== "function") {
+        return jsonResult({ error: `Scraper export '${exportName}' missing in ${modulePath}` });
+      }
+      return jsonResult(await fn(args));
+    } catch (err) {
+      const e = err as { code?: string; message?: string };
+      if (e.code === "ERR_MODULE_NOT_FOUND") {
+        return jsonResult({ error: `Scraper module not available: ${modulePath}. Install or remove this tool.` });
+      }
+      return jsonResult({ error: `Scraper failed: ${e.message ?? String(err)}` });
+    }
+  };
 }
 
 // ─── Read-only Tools ─────────────────────────────────────────────
@@ -190,24 +211,13 @@ server.tool(
 );
 
 server.tool(
-  "search_makro_catalog",
-  "Search Makro Pro product catalog — real prices, barcodes, brands, and ST166 Rawai stock. Use INSTEAD of WebSearch when looking for ingredients/products available at Makro. Returns up to 20 products per query with Thai/English names.",
-  {
-    query: z.string().describe("Search term in English (e.g., 'frozen avocado', 'mozzarella', 'olive oil')"),
-    check_stock: z.boolean().optional().describe("Check ST166 Rawai inventory (default: true)"),
-    store_code: z.string().optional().describe("Makro store code (default: 166 = Rawai Phuket)"),
-  },
-  async (args) => jsonResult(await searchMakroCatalog(args))
-);
-
-server.tool(
   "search_sangdamrong_catalog",
   "Search Sangdamrong catalog — kitchenware, packaging, supplies, glassware, trays, electrical appliances. ~100 featured products across 18 categories. Use for kitchen equipment and packaging sourcing.",
   {
     query: z.string().optional().describe("Search term (Thai or English, e.g., 'knife', 'tray', 'glass')"),
     category: z.string().optional().describe("Filter by category name (Thai, e.g., 'เครื่องครัว' for kitchenware)"),
   },
-  async (args) => jsonResult(await searchSangdamrongCatalog(args))
+  lazyScraper("./tools/search-sangdamrong-catalog.js", "searchSangdamrongCatalog")
 );
 
 server.tool(
@@ -217,7 +227,18 @@ server.tool(
     query: z.string().describe("Search term (Thai or English, e.g., 'security camera', 'กล้องวงจรปิด', 'kitchen faucet')"),
     limit: z.number().optional().describe("Max results (default: 20)"),
   },
-  async (args) => jsonResult(await searchHomeProCatalog(args))
+  lazyScraper("./tools/search-homepro-catalog.js", "searchHomeProCatalog")
+);
+
+server.tool(
+  "search_makro_catalog",
+  "Search Makro Pro product catalog — real prices, barcodes, brands, and ST166 Rawai stock. Use INSTEAD of WebSearch when looking for ingredients/products available at Makro.",
+  {
+    query: z.string().describe("Search term (Thai or English, e.g., 'chicken breast', 'น้ำตาล', 'mozzarella')"),
+    check_stock: z.boolean().optional().describe("Check ST166 Rawai inventory levels (default: true)"),
+    store_code: z.string().optional().describe("Makro store code (default: 166 = Rawai Phuket)"),
+  },
+  lazyScraper("./tools/search-makro-catalog.js", "searchMakroCatalog")
 );
 
 // ─── Write Tools ─────────────────────────────────────────────────

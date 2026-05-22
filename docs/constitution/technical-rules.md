@@ -74,6 +74,27 @@ If no architecture note exists for a module, skip — note creation only at phas
 
 > Origin: Multiple incidents where merged code left docs in a stale state. (Legacy: `Boris Rule #11`.)
 
+## RULE-MCP-INDEX-INTEGRITY
+
+Every file imported in `services/mcp-*/src/index.ts` **must** exist on the same commit that introduces the import. Orphan imports are a P0 break — the MCP server fails to load with `ERR_MODULE_NOT_FOUND` and takes down every tool it exposes.
+
+When a PR adds, removes, or renames a file under `services/mcp-*/src/tools/` (or any directory imported by `index.ts`), the same commit **must**:
+
+1. Add / remove / rename the corresponding `import` line at the top of `index.ts`
+2. Add / remove / rename the corresponding `server.tool(...)` or `lazyScraper(...)` registration
+3. Pass `npm run build` (or `tsc -b`) locally before commit — a failing build is not a "fix later" item, it is a blocker
+
+**Reviewer gate:** Before approving a PR that touches any file under `services/mcp-*/src/`, verify the CI check `MCP <Server> (tsc + lint)` reports SUCCESS on the **final** commit of the branch. A green check on an earlier commit is not sufficient — rebases and last-minute drops can re-break the build.
+
+**Lazy-loader exception (PR #253 pattern):** A scraper file imported via `lazyScraper("./tools/X.js", "exportName")` may legitimately be absent at module-load time — the helper defers the dynamic `import()` to first invocation. But the registered string still needs to resolve at runtime: a missing file will throw on the first tool call and the user-facing error will be opaque. Treat any `lazyScraper` registration whose target file is absent on `main` as a P1 cleanup task, not a normal state.
+
+**When the rule fires hardest:**
+- PR removes a scraper / tool file but leaves its import (the PR #252 failure mode)
+- PR renames a tool file in one commit and updates the import in a separate commit on the same branch — squash-merge can hide the break in the intermediate state
+- PR adds a `server.tool(...)` registration referencing an export that does not exist in the imported module
+
+> Origin: 2026-05-22. PR #252 (commit `aae9053`) merged with `services/mcp-chef/src/tools/search-makro-catalog.ts` deleted but `import { searchMakroCatalog } from "./tools/search-makro-catalog.js"` still in `services/mcp-chef/src/index.ts`. Chef MCP failed to start with `ERR_MODULE_NOT_FOUND` for ~24 hours. PR #253 introduced the `lazyScraper()` resilience pattern; this rule formalizes the merge-gate so resilience is not the only line of defense.
+
 ## RULE-TXN-DATE-INTEGRITY
 
 **Never** overwrite historical `transaction_date` values. Dates come **strictly** from source documents (receipt, invoice).

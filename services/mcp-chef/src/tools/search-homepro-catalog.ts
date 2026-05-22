@@ -85,6 +85,9 @@ function parseSuggestResponse(data: any): HomeProProduct[] {
         item.price_display?.price ||
         item.price ||
         item.salePrice ||
+        item.offerprice ||
+        item.selling_price ||
+        item.display_price ||
         "0"
     );
     const originalPrice = parseFloat(
@@ -92,6 +95,8 @@ function parseSuggestResponse(data: any): HomeProProduct[] {
         item.price_display?.listPrice ||
         item.originalPrice ||
         item.listPrice ||
+        item.list_price ||
+        item.regular_price ||
         "0"
     );
 
@@ -237,12 +242,13 @@ export async function searchHomeProCatalog(args: {
 
   const limit = args.limit || 20;
 
-  // Try suggest API first (fast, structured JSON)
-  let products = await searchViaSuggestApi(q);
+  // Try HTML search first — it exposes prices via JSON-LD Product.offers.price.
+  // The suggest API is faster but historically returned metadata with price=0
+  // for every item. Fall back to suggest only if HTML yields nothing.
+  let products = await searchViaHtml(q, limit);
 
-  // If suggest API returned nothing, fall back to HTML scraping
   if (products.length === 0) {
-    products = await searchViaHtml(q, limit);
+    products = await searchViaSuggestApi(q);
   }
 
   if (products.length === 0) {
