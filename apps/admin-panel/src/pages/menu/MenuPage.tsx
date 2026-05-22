@@ -128,6 +128,16 @@ export function MenuPage() {
     [updateParam],
   )
 
+  // Availability filter for L1 Cook view (URL-driven: ?available=yes|no)
+  const availableParam = searchParams.get('available')
+  const availableFilter: boolean | null =
+    availableParam === 'yes' ? true : availableParam === 'no' ? false : null
+  const setAvailableFilter = useCallback(
+    (v: boolean | null) =>
+      updateParam({ available: v === true ? 'yes' : v === false ? 'no' : null }),
+    [updateParam],
+  )
+
   const openDrawer = useCallback(
     (id: string) => {
       const item = items.find((i) => i.id === id)
@@ -324,10 +334,32 @@ export function MenuPage() {
           />
         </div>
       )}
-      {/* L1 Cook: TypeFilter + CategoryTabs with counts */}
+      {/* L1 Cook: TypeFilter + AvailabilityFilter + CategoryTabs with counts */}
       {view === 'l1-cook' && (
         <div className="space-y-2">
-          <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
+          <div className="flex flex-wrap items-center gap-3">
+            <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
+            <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
+              {([
+                { value: null, label: 'All' },
+                { value: true, label: 'Active' },
+                { value: false, label: 'Inactive' },
+              ] as const).map(({ value, label }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setAvailableFilter(value)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                    availableFilter === value
+                      ? 'bg-surface-3 text-cream'
+                      : 'text-cream/50 hover:text-cream/80'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           {categories.length > 0 && (
             <CategoryTabs
               categories={categories}
@@ -393,6 +425,7 @@ export function MenuPage() {
           items={items}
           selectedCategory={selectedCategory}
           typeFilter={typeFilter}
+          availableFilter={availableFilter}
           pfPackCardById={enrichment.pfPackCardById}
           recipeStatsById={enrichment.recipeStatsById}
           dishCardById={enrichment.dishCardById}
