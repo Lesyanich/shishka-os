@@ -54,7 +54,7 @@ create trigger trg_agent_memory_updated_at
   for each row execute function update_agent_memory_timestamp();
 
 -- Self-register in migration log
-INSERT INTO migration_log (filename, applied_by, description)
+INSERT INTO migration_log (filename, applied_by, notes)
 VALUES (
     '214_agent_memory.sql',
     'claude-code',

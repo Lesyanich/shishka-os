@@ -58,7 +58,7 @@ INSERT INTO agent_memory (agent_id, memory_type, title, content, tags, metadata,
  '2026-05-18T16:00:00+07:00');
 
 -- Self-register in migration log
-INSERT INTO migration_log (filename, applied_by, description)
+INSERT INTO migration_log (filename, applied_by, notes)
 VALUES (
     '215_seed_agent_memory_from_journal.sql',
     'claude-code',
