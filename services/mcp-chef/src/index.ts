@@ -31,6 +31,7 @@ import { updateProduct } from "./tools/update-product.js";
 import { recordProduction } from "./tools/record-production.js";
 import { listSuppliers } from "./tools/list-suppliers.js";
 import { searchPurchaseHistory } from "./tools/search-purchase-history.js";
+import { makroShoppingList } from "./tools/makro-shopping-list.js";
 // Scrapers are loaded lazily — a missing/broken scraper file must NOT crash the entire chef MCP.
 // See lazyScraper() helper below.
 
@@ -344,6 +345,13 @@ server.tool(
     production_date: z.string().optional().describe("Date of production YYYY-MM-DD (default: today)"),
   },
   async (args) => jsonResult(await recordProduction(args))
+);
+
+server.tool(
+  "makro_shopping_list",
+  "Generate Makro shopping list for all active SALE menu dishes. Returns RAW ingredients sourced from Makro with product links, prices, and package info. No parameters needed.",
+  {},
+  async () => jsonResult(await makroShoppingList())
 );
 
 // ─── Resources ───────────────────────────────────────────────────
