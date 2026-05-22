@@ -2,12 +2,16 @@
  * search-sangdamrong-catalog — Search Sangdamrong product catalog via SSR scraping.
  *
  * Sangdamrong is a kitchenware/packaging/supplies supplier in Thailand.
- * Their site (sangdamrong.com) uses Remix SSR — product data is embedded in
- * the homepage HTML as React Router loader state. No public search API exists,
- * so we fetch the homepage and filter products client-side.
+ * Their site (sangdamrong.com) uses React Router 7 SSR — product data is
+ * embedded in the homepage HTML as a double-encoded turbo-stream payload
+ * inside `window.__reactRouterContext.streamController.enqueue("...")`. The
+ * payload is a flat array of values with positional reference objects
+ * (`{"_N": M}` where `_N` is a field-name index and `M` is a value index).
  *
- * ~100 featured products across 18 categories (kitchenware, trays, glassware,
- * porcelain, electrical appliances, display items, etc.).
+ * No public search API exists, so we fetch the homepage, decode the
+ * turbo-stream, walk the resolved category tree, and filter client-side.
+ *
+ * ~200 featured products across nested promotion / top-sold categories.
  *
  * Zero external dependencies — uses native fetch + JSON parsing.
  */
@@ -59,150 +63,201 @@ async function fetchHomepage(): Promise<string> {
   return "";
 }
 
-function parseProducts(html: string): SangdamrongProduct[] {
+// ─── Turbo-stream payload extraction ─────────────────────────────
+
+/**
+ * Find the JS string literal passed to `streamController.enqueue("...")`
+ * and return it WITH surrounding quotes — ready for JSON.parse.
+ * Walks character-by-character respecting JS string escapes.
+ */
+function extractEnqueueLiteral(html: string): string | null {
+  const marker = "streamController.enqueue(";
+  const start = html.indexOf(marker);
+  if (start === -1) return null;
+  const quoteStart = start + marker.length;
+  if (html[quoteStart] !== '"') return null;
+  let i = quoteStart + 1;
+  while (i < html.length) {
+    const c = html[i];
+    if (c === "\\") {
+      i += 2; // skip escape + next char
+      continue;
+    }
+    if (c === '"') {
+      return html.slice(quoteStart, i + 1);
+    }
+    i++;
+  }
+  return null;
+}
+
+/**
+ * Resolve an index into the flat turbo-stream array into a plain JS value.
+ * - Negative indices are sentinels → null
+ * - Object values `{"_N": M}` resolve to `{ [arr[N]]: resolve(M) }`
+ * - Array values `[n, m, ...]` resolve each element via `resolve(n)`
+ * - Strings / booleans / numbers / null pass through as-is
+ */
+type TurboValue =
+  | string
+  | number
+  | boolean
+  | null
+  | TurboValue[]
+  | { [k: string]: TurboValue };
+
+function resolveTurbo(
+  arr: unknown[],
+  idx: number,
+  depth: number = 0
+): TurboValue {
+  if (depth > 60) return null;
+  if (!Number.isInteger(idx) || idx < 0 || idx >= arr.length) return null;
+  const v = arr[idx];
+  if (v === null) return null;
+  if (
+    typeof v === "string" ||
+    typeof v === "boolean" ||
+    typeof v === "number"
+  ) {
+    return v;
+  }
+  if (Array.isArray(v)) {
+    return v.map((x) =>
+      typeof x === "number" ? resolveTurbo(arr, x, depth + 1) : (x as TurboValue)
+    );
+  }
+  if (typeof v === "object") {
+    const out: { [k: string]: TurboValue } = {};
+    for (const [k, valIdx] of Object.entries(v as Record<string, unknown>)) {
+      if (!k.startsWith("_")) continue;
+      const keyIdx = parseInt(k.slice(1), 10);
+      if (!Number.isInteger(keyIdx) || keyIdx < 0 || keyIdx >= arr.length) continue;
+      const keyName = arr[keyIdx];
+      if (typeof keyName !== "string") continue;
+      out[keyName] =
+        typeof valIdx === "number"
+          ? resolveTurbo(arr, valIdx, depth + 1)
+          : (valIdx as TurboValue);
+    }
+    return out;
+  }
+  return null;
+}
+
+/** Heuristic: a resolved object is a product if it has an id + a name field. */
+function isProductRecord(v: TurboValue): v is { [k: string]: TurboValue } {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+  const o = v as Record<string, TurboValue>;
+  if (typeof o.id !== "string" || o.id.length === 0) return false;
+  return typeof o.product_name === "string" || typeof o.name === "string";
+}
+
+function walkForProducts(
+  node: TurboValue,
+  out: SangdamrongProduct[],
+  seen: Set<string>,
+  categoryHint: string
+): void {
+  if (node === null || node === undefined) return;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      if (isProductRecord(item)) {
+        const id = String(item.id);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        out.push(mapProduct(item, categoryHint));
+      } else if (item && typeof item === "object") {
+        walkForProducts(item as TurboValue, out, seen, categoryHint);
+      }
+    }
+    return;
+  }
+  if (typeof node === "object") {
+    for (const [k, v] of Object.entries(node)) {
+      walkForProducts(v, out, seen, k);
+    }
+  }
+}
+
+function mapProduct(
+  item: { [k: string]: TurboValue },
+  categoryHint: string
+): SangdamrongProduct {
+  const get = (k: string): TurboValue => item[k];
+  const asString = (v: TurboValue): string => (typeof v === "string" ? v : "");
+  const asNumber = (v: TurboValue): number => {
+    if (typeof v === "number") return v;
+    if (typeof v === "string") {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
+  const price = asNumber(get("price")) || asNumber(get("original_price"));
+  const discount = asNumber(get("discount")) || asNumber(get("gross_price"));
+  const discountPct = asNumber(get("discount_percentage"));
+  const image = asString(get("image"));
+
+  return {
+    product_id: asString(get("id")),
+    name: asString(get("product_name")) || asString(get("name")),
+    category: asString(get("category_name")) || categoryHint,
+    brand: asString(get("brand_name")),
+    sku_code: asString(get("SKU_CODE")) || asString(get("sku_code")),
+    price_thb: price,
+    discount_price_thb: discount > 0 && discount < price ? discount : null,
+    discount_pct: discountPct > 0 ? discountPct : null,
+    unit: asString(get("unit_name")),
+    stock: asNumber(get("display_stock")) || asNumber(get("stock")),
+    image_url: image
+      ? image.startsWith("http")
+        ? image
+        : `${BASE_URL}${image}`
+      : "",
+  };
+}
+
+function parseTurboStream(html: string): SangdamrongProduct[] {
   if (!html) return [];
 
-  // Sangdamrong uses Remix/React Router SSR. Product data is serialized
-  // in <script> tags as part of the router context or inline JSON.
-  // Look for JSON arrays containing product objects with known fields.
+  const literal = extractEnqueueLiteral(html);
+  if (!literal) return [];
+
+  let arr: unknown[];
+  try {
+    // Outer JS string literal → JSON string → array (two parses).
+    const unescaped = JSON.parse(literal);
+    if (typeof unescaped !== "string") return [];
+    const parsed = JSON.parse(unescaped);
+    if (!Array.isArray(parsed) || parsed.length === 0) return [];
+    arr = parsed;
+  } catch {
+    return [];
+  }
+
+  const root = resolveTurbo(arr, 0);
+  if (!root || typeof root !== "object" || Array.isArray(root)) return [];
+
+  const loaderData = (root as Record<string, TurboValue>).loaderData;
+  if (!loaderData || typeof loaderData !== "object" || Array.isArray(loaderData)) {
+    return [];
+  }
+
   const products: SangdamrongProduct[] = [];
   const seen = new Set<string>();
 
-  // Strategy: find all JSON-like structures that contain product data.
-  // Products have fields: product_name, SKU_CODE, price, category_name
-  const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = scriptRegex.exec(html)) !== null) {
-    const content = match[1];
-    if (!content.includes("product_name") && !content.includes("SKU_CODE")) {
+  for (const routeData of Object.values(loaderData)) {
+    if (!routeData || typeof routeData !== "object" || Array.isArray(routeData)) {
       continue;
     }
-
-    // Try to extract JSON arrays or objects containing product data
-    const jsonCandidates = extractJsonBlobs(content);
-    for (const blob of jsonCandidates) {
-      const extracted = extractProductsFromBlob(blob);
-      for (const p of extracted) {
-        if (!seen.has(p.product_id)) {
-          seen.add(p.product_id);
-          products.push(p);
-        }
-      }
-    }
+    const productTree = (routeData as Record<string, TurboValue>).products;
+    if (!productTree) continue;
+    walkForProducts(productTree, products, seen, "");
   }
 
   return products;
-}
-
-function extractJsonBlobs(script: string): any[] {
-  const results: any[] = [];
-
-  // Try parsing the entire script content as JSON assignment
-  // Pattern: variable = {...} or window.__something = {...}
-  const assignRegex = /=\s*(\{[\s\S]*\})\s*[;\n]/g;
-  let m: RegExpExecArray | null;
-  while ((m = assignRegex.exec(script)) !== null) {
-    try {
-      results.push(JSON.parse(m[1]));
-    } catch {
-      // Not valid JSON, skip
-    }
-  }
-
-  // Also try finding JSON arrays directly
-  const arrayRegex = /(\[[\s\S]*?\])\s*[;,\n]/g;
-  while ((m = arrayRegex.exec(script)) !== null) {
-    if (m[1].includes("product_name") || m[1].includes("SKU_CODE")) {
-      try {
-        results.push(JSON.parse(m[1]));
-      } catch {
-        // Not valid JSON, skip
-      }
-    }
-  }
-
-  // Remix turbo-stream or React Router serialization: look for JSON embedded
-  // in larger data structures. Try to find product arrays by bracket matching.
-  const productArrayStart = script.indexOf('"products"');
-  if (productArrayStart !== -1) {
-    const bracketStart = script.indexOf("[", productArrayStart);
-    if (bracketStart !== -1) {
-      let depth = 0;
-      let end = bracketStart;
-      for (let i = bracketStart; i < script.length; i++) {
-        if (script[i] === "[") depth++;
-        else if (script[i] === "]") {
-          depth--;
-          if (depth === 0) {
-            end = i + 1;
-            break;
-          }
-        }
-      }
-      try {
-        results.push(JSON.parse(script.slice(bracketStart, end)));
-      } catch {
-        // Skip
-      }
-    }
-  }
-
-  return results;
-}
-
-function extractProductsFromBlob(blob: any): SangdamrongProduct[] {
-  const products: SangdamrongProduct[] = [];
-
-  if (Array.isArray(blob)) {
-    for (const item of blob) {
-      const p = tryParseProduct(item);
-      if (p) products.push(p);
-    }
-  } else if (typeof blob === "object" && blob !== null) {
-    // Recurse into object values looking for product arrays
-    for (const key of Object.keys(blob)) {
-      const val = blob[key];
-      if (Array.isArray(val)) {
-        for (const item of val) {
-          const p = tryParseProduct(item);
-          if (p) products.push(p);
-        }
-      }
-    }
-  }
-
-  return products;
-}
-
-function tryParseProduct(item: any): SangdamrongProduct | null {
-  if (!item || typeof item !== "object") return null;
-  if (!item.product_name && !item.name) return null;
-
-  const price = parseFloat(item.price || item.original_price || "0");
-  const discountRaw = item.discount || item.sale_price;
-  const discountPrice = discountRaw ? parseFloat(discountRaw) : null;
-  const discountPct = item.discount_percentage
-    ? parseFloat(item.discount_percentage)
-    : null;
-
-  return {
-    product_id: String(item.id || item.product_id || ""),
-    name: item.product_name || item.name || "",
-    category: item.category_name || item.category || "",
-    brand: item.brand_name || item.brand || "",
-    sku_code: item.SKU_CODE || item.sku_code || item.sku || "",
-    price_thb: price,
-    discount_price_thb: discountPrice && discountPrice < price ? discountPrice : null,
-    discount_pct: discountPct,
-    unit: item.unit_name || item.unit || "",
-    stock: Number(item.display_stock ?? item.stock ?? 0),
-    image_url: item.image
-      ? item.image.startsWith("http")
-        ? item.image
-        : `${BASE_URL}${item.image}`
-      : "",
-  };
 }
 
 async function loadCatalog(): Promise<SangdamrongProduct[]> {
@@ -212,7 +267,7 @@ async function loadCatalog(): Promise<SangdamrongProduct[]> {
   }
 
   const html = await fetchHomepage();
-  const products = parseProducts(html);
+  const products = parseTurboStream(html);
 
   if (products.length > 0) {
     cachedProducts = products;
@@ -275,7 +330,7 @@ export async function searchSangdamrongCatalog(args: {
   return {
     count: filtered.length,
     total_catalog_size: products.length,
-    source: "sangdamrong.com SSR (Remix loader)",
+    source: "sangdamrong.com SSR (React Router 7 turbo-stream)",
     results: filtered.map((p) => ({
       ...p,
       url: `${BASE_URL}`,

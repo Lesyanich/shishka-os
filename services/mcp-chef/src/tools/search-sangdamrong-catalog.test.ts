@@ -28,4 +28,21 @@ describe("searchSangdamrongCatalog", () => {
       expect(first).toHaveProperty("sku_code");
     }
   });
+
+  it("decodes turbo-stream catalog with at least 50 products when site is reachable", async () => {
+    const { searchSangdamrongCatalog } = await import("./search-sangdamrong-catalog.js");
+    const result = await searchSangdamrongCatalog({});
+    if ("results" in result) {
+      // Skip assertion when the network call returned an empty payload — the
+      // earlier shape test already covers that path. When the site IS reachable
+      // and the turbo-stream parser is working, we expect a substantial catalog.
+      const total =
+        "total_catalog_size" in (result as any)
+          ? (result as any).total_catalog_size
+          : (result as any).count;
+      if ((result as any).results.length > 0) {
+        expect(total).toBeGreaterThanOrEqual(50);
+      }
+    }
+  });
 });
