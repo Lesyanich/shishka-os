@@ -28,6 +28,8 @@ interface MakroProduct {
   packaging_weight: string;
   deepest_category: string;
   in_stock: boolean;
+  image_url: string | null;
+  product_url: string;
 }
 
 async function fetchWithRetry(
@@ -113,6 +115,16 @@ function parseSearchHits(html: string): MakroProduct[] {
     if (dedupKey && seen.has(dedupKey)) continue;
     if (dedupKey) seen.add(dedupKey);
 
+    // Extract first image from images array (CDN URLs)
+    const images: string[] = doc.images || [];
+    const imageUrl = images.length > 0 ? images[0] : null;
+
+    // Build product URL: barcode search is most precise, fallback to title
+    const searchTerm = barcode || doc.titleEn || doc.title || "";
+    const productUrl = searchTerm
+      ? `${BASE_URL}/en/c/search?q=${encodeURIComponent(searchTerm)}`
+      : BASE_URL;
+
     products.push({
       product_id: productId,
       title_en: doc.titleEn || "",
@@ -124,6 +136,8 @@ function parseSearchHits(html: string): MakroProduct[] {
       packaging_weight: doc.packagingWeight || "",
       deepest_category: doc.deepestCategory || "",
       in_stock: Boolean(doc.inStock),
+      image_url: imageUrl,
+      product_url: productUrl,
     });
   }
 

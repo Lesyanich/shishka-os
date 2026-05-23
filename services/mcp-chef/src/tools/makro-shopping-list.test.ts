@@ -17,6 +17,7 @@ describe("makroShoppingList", () => {
       expect(item).toHaveProperty("ingredient_id");
       expect(item).toHaveProperty("ingredient_name");
       expect(item).toHaveProperty("makro_url");
+      expect(item).toHaveProperty("image_url");
       expect(item).toHaveProperty("used_in_dishes");
       expect(item.makro_url).toMatch(/^https:\/\/www\.makro\.pro\//);
       expect(Array.isArray(item.used_in_dishes)).toBe(true);

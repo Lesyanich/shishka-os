@@ -20,6 +20,7 @@ interface MakroShoppingItem {
   last_seen_price: number | null;
   package_info: string | null;
   makro_url: string;
+  image_url: string | null;
   used_in_dishes: string[];
 }
 
@@ -202,7 +203,7 @@ export async function makroShoppingList(): Promise<{
   const { data: catalogEntries } = await sb
     .from("supplier_catalog")
     .select(
-      "nomenclature_id, product_name, full_title, barcode, last_seen_price, package_weight, package_unit, external_url"
+      "nomenclature_id, product_name, full_title, barcode, last_seen_price, package_weight, package_unit, external_url, image_url"
     )
     .in("nomenclature_id", rawIds)
     .in("supplier_id", makroSupplierIds);
@@ -260,6 +261,7 @@ export async function makroShoppingList(): Promise<{
       last_seen_price: catalog.last_seen_price || null,
       package_info: packageInfo,
       makro_url: makroUrl,
+      image_url: (catalog as any).image_url || null,
       used_in_dishes: Array.from(dishes).sort(),
     });
   }
