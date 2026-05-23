@@ -273,7 +273,7 @@ When CEO shares a test plan, results, or conclusions:
 1. **SSoT = Supabase.** Не кэшировать данные, всегда запрашивать свежие.
 2. **Lego chain неизменна:** SALE→PF/MOD, PF→RAW/PF, MOD→RAW, RAW→∅.
 3. **NEVER write cost_per_unit.** Это WAC, обновляется триггером `fn_update_cost_on_purchase`.
-4. **WAC Null Guard.** If any BOM ingredient has `cost_per_unit = null` (no purchase history) — **STOP**. Show WARNING listing all missing-cost ingredients. Do NOT compute margin or suggest price. Reason: null WAC → cost treated as 0 → ingredient appears free → CEO prices dish at a loss. MCP tools (`calculate_cost`, `get_bom_tree`, `suggest_price`) now return `cost_complete: false` and `warnings` when this happens — trust the warning and surface it to CEO.
+4. **WAC Null Guard.** BOM walker uses a fallback chain: WAC (`cost_per_unit`) → `supplier_catalog.last_seen_price` (marked `est.`) → 0. If an ingredient uses estimated price, MCP tools return `cost_estimated: true` and an `ESTIMATED` warning — surface it to CEO but proceed with cost/margin calculation. **STOP** only when ingredients have NO price source at all (`has_null_cost: true`, `NO_PRICE` warning) — do NOT compute margin or suggest price in that case.
 5. **Nutrition per 1 base_unit.** НЕ per 100g. Для кг/л: справочное × 10.
 6. **UUID everywhere.** Все связи через UUID.
 7. **No Direct DB Edits.** Все изменения схемы — через SQL-миграции в `services/supabase/migrations/`.

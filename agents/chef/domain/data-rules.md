@@ -29,10 +29,17 @@ SSoT for ALL products. Key columns:
 **CRITICAL**: Filter by `product_code` prefix using `.ilike('product_code', 'PREFIX-%')`.
 NEVER use `.or()` with `type` field — types can be ambiguous.
 
+## Cost Fallback Chain (BOM Walker)
+
+When computing BOM cost for a leaf ingredient:
+1. `nomenclature.cost_per_unit` (WAC) — authoritative, trigger-managed
+2. `supplier_catalog.last_seen_price / conversion_factor` — estimated, from scraper/manual entry (marked `est.` in output)
+3. `0` — no price data available (flagged as `has_null_cost`)
+
 ## Table: bom_structures
 
 Dynamic BOM: `parent_id` FK -> `ingredient_id` FK, `quantity_per_unit`, `yield_loss_pct`, `notes`.
-Cost computed by MCP bom-walker: `sum(ingredient.cost_per_unit * qty)` adjusted for yield loss.
+Cost computed by MCP bom-walker: `sum(ingredient.cost_per_unit * qty)` adjusted for yield loss, with supplier_catalog fallback for missing WAC.
 
 ## Nutrition Cascade
 

@@ -4,6 +4,7 @@ import {
   calculateTreeNutrition,
   formatBomTree,
   collectNullCostLeaves,
+  collectEstimatedCostLeaves,
 } from "../lib/bom-walker.js";
 
 export const getBomTreeSchema = {
@@ -35,13 +36,22 @@ export async function getBomTreeTool(args: { product_id: string }) {
     const formatted = formatBomTree(tree);
 
     const nullCostLeaves = collectNullCostLeaves(tree);
+    const estimatedLeaves = collectEstimatedCostLeaves(tree);
     const warnings: string[] = [];
     if (nullCostLeaves.length > 0) {
       const items = nullCostLeaves
         .map((i) => `${i.product_code} (${i.name})`)
         .join(", ");
       warnings.push(
-        `WAC_NULL: ${nullCostLeaves.length} ingredient(s) have no purchase history — cost treated as 0. Margin is UNRELIABLE. Missing: ${items}`
+        `NO_PRICE: ${nullCostLeaves.length} ingredient(s) have no WAC and no supplier catalog price — cost treated as 0. Margin is UNRELIABLE. Missing: ${items}`
+      );
+    }
+    if (estimatedLeaves.length > 0) {
+      const items = estimatedLeaves
+        .map((i) => `${i.product_code} (${i.name})`)
+        .join(", ");
+      warnings.push(
+        `ESTIMATED: ${estimatedLeaves.length} ingredient(s) use supplier catalog price (not WAC from purchases). Cost is approximate: ${items}`
       );
     }
 
@@ -56,6 +66,7 @@ export async function getBomTreeTool(args: { product_id: string }) {
       bom_tree: formatted,
       total_cost: totalCost,
       cost_complete: nullCostLeaves.length === 0,
+      cost_estimated: estimatedLeaves.length > 0,
       margin:
         tree.item.price && totalCost > 0
           ? Math.round(((tree.item.price - totalCost) / tree.item.price) * 100)
