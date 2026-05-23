@@ -34,6 +34,9 @@ import { searchPurchaseHistory } from "./tools/search-purchase-history.js";
 import { makroShoppingList } from "./tools/makro-shopping-list.js";
 // Scrapers are loaded lazily — a missing/broken scraper file must NOT crash the entire chef MCP.
 // See lazyScraper() helper below.
+import { storeMemory } from "./tools/store-memory.js";
+import { recallMemories } from "./tools/recall-memories.js";
+import { updateMemory } from "./tools/update-memory.js";
 
 // Resources & Prompts
 import { staticResources, dynamicResources } from "./resources/index.js";
@@ -355,6 +358,51 @@ server.tool(
   async () => jsonResult(await makroShoppingList())
 );
 
+// ─── Agent Memory Tools ─────────────────────────────────────────
+
+server.tool(
+  "store_memory",
+  "Save a memory to the shared agent memory store (Supabase). Use after decisions, kitchen tests, corrections, or significant discussions. Memories persist across sessions and are visible to all users.",
+  {
+    agent_id: z.string().describe("Agent namespace: 'chef', 'finance', 'procurement', 'lawyer'"),
+    memory_type: z.enum(["decision", "test_result", "conversation_summary", "preference", "idea", "correction"]).describe("Type of memory"),
+    title: z.string().describe("Short searchable title (e.g. 'Frozen avocado for smoothies')"),
+    content: z.string().describe("Full text, markdown ok"),
+    tags: z.array(z.string()).optional().describe("Tags for filtered recall (e.g. ['porridge', 'ingredient'])"),
+    metadata: z.record(z.string(), z.unknown()).optional().describe("Structured data (ingredients, prices, test params)"),
+    source: z.string().optional().describe("Origin: 'ceo_conversation', 'kitchen_test', 'agent_inference' (default: 'agent')"),
+    session_id: z.string().optional().describe("Claude session ID that wrote this"),
+    created_by: z.string().optional().describe("Who created: 'lesya', 'chef_agent', etc. (default: 'agent')"),
+  },
+  async (args) => jsonResult(await storeMemory(args))
+);
+
+server.tool(
+  "recall_memories",
+  "Query the shared agent memory store. Use at session start to load context, or any time you need to recall past decisions, tests, or discussions. Supports topic search (full-text) and tag/type filters.",
+  {
+    agent_id: z.string().describe("Agent namespace: 'chef', 'finance', 'procurement', 'lawyer'"),
+    topic: z.string().optional().describe("Free-text topic search (e.g. 'avocado', 'porridge sweetener')"),
+    memory_type: z.enum(["decision", "test_result", "conversation_summary", "preference", "idea", "correction"]).optional().describe("Filter by memory type"),
+    tags: z.array(z.string()).optional().describe("Filter by tags (returns memories matching ANY tag)"),
+    limit: z.number().optional().describe("Max results (default: 10)"),
+  },
+  async (args) => jsonResult(await recallMemories(args))
+);
+
+server.tool(
+  "update_memory",
+  "Update an existing memory (e.g. when a decision is revised or new info emerges).",
+  {
+    id: z.string().describe("UUID of the memory to update"),
+    title: z.string().optional().describe("New title"),
+    content: z.string().optional().describe("Updated content"),
+    tags: z.array(z.string()).optional().describe("Replace tags"),
+    metadata: z.record(z.string(), z.unknown()).optional().describe("Merge into metadata"),
+  },
+  async (args) => jsonResult(await updateMemory(args))
+);
+
 // ─── Resources ───────────────────────────────────────────────────
 
 // Static resources (hardcoded reference data)
@@ -437,7 +485,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Chef Agent MCP server running on stdio`);
-  console.error(`   Tools: 20 | Resources: 3 | Prompts: 4`);
+  console.error(`   Tools: 23 | Resources: 3 | Prompts: 4`);
 }
 
 main().catch((err) => {
