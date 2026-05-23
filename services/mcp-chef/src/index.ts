@@ -369,7 +369,7 @@ server.tool(
     title: z.string().describe("Short searchable title (e.g. 'Frozen avocado for smoothies')"),
     content: z.string().describe("Full text, markdown ok"),
     tags: z.array(z.string()).optional().describe("Tags for filtered recall (e.g. ['porridge', 'ingredient'])"),
-    metadata: z.record(z.unknown()).optional().describe("Structured data (ingredients, prices, test params)"),
+    metadata: z.record(z.string(), z.unknown()).optional().describe("Structured data (ingredients, prices, test params)"),
     source: z.string().optional().describe("Origin: 'ceo_conversation', 'kitchen_test', 'agent_inference' (default: 'agent')"),
     session_id: z.string().optional().describe("Claude session ID that wrote this"),
     created_by: z.string().optional().describe("Who created: 'lesya', 'chef_agent', etc. (default: 'agent')"),
@@ -398,7 +398,7 @@ server.tool(
     title: z.string().optional().describe("New title"),
     content: z.string().optional().describe("Updated content"),
     tags: z.array(z.string()).optional().describe("Replace tags"),
-    metadata: z.record(z.unknown()).optional().describe("Merge into metadata"),
+    metadata: z.record(z.string(), z.unknown()).optional().describe("Merge into metadata"),
   },
   async (args) => jsonResult(await updateMemory(args))
 );
