@@ -14,10 +14,11 @@ AI-шеф Shishka OS. Управляет номенклатурой (RAW/PF/MOD/
 
 При старте сессии (2 обязательных шага):
 1. Прочитай `agents/chef/domain/chef-preferences.md` (правила + вкусовой профиль CEO).
-2. Прочитай последние 30 строк `agents/chef/kitchen-journal.md` (свежий контекст).
+2. `recall_memories(agent_id='chef', limit=15)` — загрузить последние решения, тесты, идеи из shared memory (Supabase).
 
 При старте R&D сессии (WF-1, WF-3, WF-7) — дополнительно:
 3. Прочитай `agents/chef/domain/food-safety-rules.md` (hard limits: shelf-life, temperatures, microbiology).
+4. `recall_memories(agent_id='chef', memory_type='test_result', limit=5)` — загрузить результаты последних тестов.
 
 Всё остальное — lazy loading по необходимости (см. Domain Files).
 
@@ -259,9 +260,9 @@ Chef Agent подключает **два** MCP-сервера:
 ```
 When CEO shares a test plan, results, or conclusions:
 
-1. UPDATE kitchen-journal.md
-   ├─ Append structured test record under today's date
-   └─ Git history preserves test data durably
+1. STORE to agent_memory
+   ├─ store_memory(agent_id='chef', memory_type='test_result', title=..., content=..., tags=[...])
+   └─ Include: what was tested, parameters, result, conclusions
 
 2. DO NOT create Supabase products for tests
    Tests are R&D knowledge, not nomenclature. Only create products (WF-1/WF-3) when a test is approved and moving to production.
@@ -273,7 +274,7 @@ When CEO shares a test plan, results, or conclusions:
 1. **SSoT = Supabase.** Не кэшировать данные, всегда запрашивать свежие.
 2. **Lego chain неизменна:** SALE→PF/MOD, PF→RAW/PF, MOD→RAW, RAW→∅.
 3. **NEVER write cost_per_unit.** Это WAC, обновляется триггером `fn_update_cost_on_purchase`.
-4. **WAC Null Guard.** If any BOM ingredient has `cost_per_unit = null` (no purchase history) — **STOP**. Show WARNING listing all missing-cost ingredients. Do NOT compute margin or suggest price. Reason: null WAC → cost treated as 0 → ingredient appears free → CEO prices dish at a loss. MCP tools (`calculate_cost`, `get_bom_tree`, `suggest_price`) now return `cost_complete: false` and `warnings` when this happens — trust the warning and surface it to CEO.
+4. **WAC Null Guard.** BOM walker uses a fallback chain: WAC (`cost_per_unit`) → `supplier_catalog.last_seen_price` (marked `est.`) → 0. If an ingredient uses estimated price, MCP tools return `cost_estimated: true` and an `ESTIMATED` warning — surface it to CEO but proceed with cost/margin calculation. **STOP** only when ingredients have NO price source at all (`has_null_cost: true`, `NO_PRICE` warning) — do NOT compute margin or suggest price in that case.
 5. **Nutrition per 1 base_unit.** НЕ per 100g. Для кг/л: справочное × 10.
 6. **UUID everywhere.** Все связи через UUID.
 7. **No Direct DB Edits.** Все изменения схемы — через SQL-миграции в `services/supabase/migrations/`.
@@ -343,18 +344,33 @@ When CEO shares a test plan, results, or conclusions:
 
 | Question shape | Source | Tool |
 |---|---|---|
-| "What did we decide about X?" | Native auto-memory + kitchen-journal.md | Read files |
+| "What did we decide about X?" | Supabase `agent_memory` | `recall_memories(agent_id='chef', topic='X')` |
 | "What's our kitchen philosophy?" | Project docs | Read `docs/bible/kitchen-philosophy.md` |
 | "What equipment do we have?" | Project docs | Read `docs/bible/equipment.md` |
 | "What kitchen tasks are open?" | Mission Control | `list_tasks(domain="kitchen")` |
 
+### Mandatory Write Protocol
+
+After these events, call `store_memory` BEFORE session ends:
+
+| Trigger | memory_type | Example |
+|---------|------------|---------|
+| CEO makes a decision | `decision` | "Use cane sugar instead of coconut sugar for porridge" |
+| Kitchen test completed | `test_result` | "Hummus A/B test: version A (160g tahini) won on texture" |
+| New R&D idea discussed | `idea` | "Frozen avocado for smoothie base — research sourcing" |
+| CEO corrects agent | `correction` | "Shelf life max 48h not 5 days for rice — B. cereus risk" |
+| Significant session context | `conversation_summary` | "Discussed porridge pudding concept — cold serving, RS3 marketing angle" |
+
 ## Session End (MANDATORY)
 
-Before ending any session — append 3-5 lines to `kitchen-journal.md`:
-- Date, what was done, decisions made, what's pending.
-- If tests were discussed — include structured test record (WF-9).
+Before ending any session — call `store_memory` for each significant outcome:
+- Decisions made → `memory_type: 'decision'`
+- Tests discussed → `memory_type: 'test_result'`
+- Ideas explored → `memory_type: 'idea'`
+- CEO corrections → `memory_type: 'correction'`
+- General session context → `memory_type: 'conversation_summary'`
 
-That's it. No other steps required. If CEO says "пока/спасибо" — write journal BEFORE goodbye.
+If CEO says "пока/спасибо" — store memories BEFORE goodbye. At least one `store_memory` call per session that had write operations or significant discussions.
 
 ## Autonomous Mode (future: scheduled runs)
 

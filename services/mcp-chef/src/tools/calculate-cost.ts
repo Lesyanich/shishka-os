@@ -1,4 +1,4 @@
-import { getBomTree, calculateTreeCost, collectNullCostLeaves } from "../lib/bom-walker.js";
+import { getBomTree, calculateTreeCost, collectNullCostLeaves, collectEstimatedCostLeaves } from "../lib/bom-walker.js";
 
 export const calculateCostSchema = {
   name: "calculate_cost",
@@ -26,8 +26,10 @@ export async function calculateCost(args: { product_id: string }) {
     const margin = price > 0 ? ((price - totalCost) / price) * 100 : null;
     const markup = totalCost > 0 ? ((price - totalCost) / totalCost) * 100 : null;
 
-    // Collect ingredients with missing WAC (cost_per_unit = null)
+    // Collect ingredients with no price source at all
     const nullCostLeaves = collectNullCostLeaves(tree);
+    // Collect ingredients using estimated price (supplier_catalog fallback)
+    const estimatedLeaves = collectEstimatedCostLeaves(tree);
 
     // Breakdown by direct children
     const breakdown = tree.children.map((child) => ({
@@ -36,6 +38,7 @@ export async function calculateCost(args: { product_id: string }) {
       quantity: child.quantity,
       unit: child.item.base_unit,
       cost: child.line_cost,
+      is_estimated: child.is_estimated,
       pct_of_total: totalCost > 0
         ? Math.round((child.line_cost / totalCost) * 100)
         : 0,
@@ -47,7 +50,15 @@ export async function calculateCost(args: { product_id: string }) {
         .map((i) => `${i.product_code} (${i.name})`)
         .join(", ");
       warnings.push(
-        `WAC_NULL: ${nullCostLeaves.length} ingredient(s) have no purchase history — cost treated as 0. Margin is UNRELIABLE. Missing: ${items}`
+        `NO_PRICE: ${nullCostLeaves.length} ingredient(s) have no WAC and no supplier catalog price — cost treated as 0. Margin is UNRELIABLE. Missing: ${items}`
+      );
+    }
+    if (estimatedLeaves.length > 0) {
+      const items = estimatedLeaves
+        .map((i) => `${i.product_code} (${i.name})`)
+        .join(", ");
+      warnings.push(
+        `ESTIMATED: ${estimatedLeaves.length} ingredient(s) use supplier catalog price (not WAC from purchases). Cost is approximate: ${items}`
       );
     }
 
@@ -59,6 +70,7 @@ export async function calculateCost(args: { product_id: string }) {
       margin_pct: margin ? Math.round(margin * 10) / 10 : null,
       markup_pct: markup ? Math.round(markup * 10) / 10 : null,
       cost_complete: nullCostLeaves.length === 0,
+      cost_estimated: estimatedLeaves.length > 0,
       warnings,
       breakdown,
     };
