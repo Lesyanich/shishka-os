@@ -24,6 +24,9 @@ describe("searchMakroCatalog", () => {
       expect(first).toHaveProperty("title_en");
       expect(first).toHaveProperty("price_thb");
       expect(first).toHaveProperty("barcode");
+      expect(first).toHaveProperty("image_url");
+      expect(first).toHaveProperty("product_url");
+      expect(first.product_url).toMatch(/^https:\/\/www\.makro\.pro\//);
     }
   });
 
