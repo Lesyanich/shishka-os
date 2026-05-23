@@ -257,6 +257,7 @@ server.tool(
     carbs: z.number().optional().describe("Carbs (g) per 1 base_unit — NOT per 100g! For kg: multiply by 10"),
     fat: z.number().optional().describe("Fat (g) per 1 base_unit — NOT per 100g! For kg: multiply by 10"),
     allergens: z.array(z.string()).optional().describe("List of allergens (only for RAW)"),
+    category_id: z.string().optional().describe("UUID of product_categories row. REQUIRED for SALE items (dish is invisible on menu without it). Optional for RAW/PF/MOD — DB trigger auto-assigns from keyword match on name."),
     confirmed: z.boolean().optional().describe("Set true after user reviews warnings to force creation"),
   },
   async (args) => jsonResult(await createProduct(args))

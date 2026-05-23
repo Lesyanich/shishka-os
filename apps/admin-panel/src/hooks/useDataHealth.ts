@@ -19,6 +19,8 @@ export type HealthMetricKey =
   | 'fuzzy_duplicate_candidates'
   | 'variant_without_yield'
   | 'equipment_missing_specs'
+  // Added by migration 215 — frozen/fresh SKU mismatch in purchase_logs
+  | 'purchase_frozen_fresh_mismatch'
 
 export interface HealthMetric {
   metric: HealthMetricKey
@@ -27,7 +29,7 @@ export interface HealthMetric {
   health_score: number
 }
 
-export type HealthEntityKind = 'nomenclature' | 'unmatched_items' | 'expense'
+export type HealthEntityKind = 'nomenclature' | 'unmatched_items' | 'expense' | 'purchase_logs' | 'equipment' | 'supplier_catalog'
 
 export interface HealthItem {
   metric: HealthMetricKey
