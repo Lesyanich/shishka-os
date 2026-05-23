@@ -33,7 +33,8 @@ export interface BomTreeNode {
   yield_loss_pct: number; // loss percentage (0 = no loss, 15 = 15% lost)
   depth: number;
   line_cost: number;
-  has_null_cost: boolean; // true if this leaf or any descendant has cost_per_unit = null
+  has_null_cost: boolean; // true if this leaf or any descendant has no price source at all
+  is_estimated: boolean; // true if cost comes from supplier_catalog.last_seen_price, not WAC
   children: BomTreeNode[];
 }
 
@@ -101,12 +102,37 @@ export async function getBomTree(
   }
 
   // Calculate cost: if has children, sum children costs; otherwise use own cost_per_unit
+  // Fallback chain for leaves: WAC → supplier_catalog.last_seen_price → 0
   let lineCost = 0;
-  const hasNullCost = children.length === 0 && item.cost_per_unit == null;
+  let hasNullCost = false;
+  let isEstimated = false;
+
   if (children.length > 0) {
     lineCost = children.reduce((sum, c) => sum + c.line_cost, 0) * quantity;
+  } else if (item.cost_per_unit != null) {
+    lineCost = item.cost_per_unit * quantity;
   } else {
-    lineCost = (item.cost_per_unit || 0) * quantity;
+    // WAC missing — try supplier_catalog fallback
+    const { data: catalogEntry } = await sb
+      .from("supplier_catalog")
+      .select("last_seen_price, conversion_factor")
+      .eq("nomenclature_id", productId)
+      .not("last_seen_price", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (catalogEntry?.last_seen_price && catalogEntry.conversion_factor) {
+      const costPerBaseUnit = catalogEntry.last_seen_price / catalogEntry.conversion_factor;
+      lineCost = costPerBaseUnit * quantity;
+      isEstimated = true;
+    } else if (catalogEntry?.last_seen_price) {
+      // No conversion_factor — use price as-is (assume 1:1)
+      lineCost = catalogEntry.last_seen_price * quantity;
+      isEstimated = true;
+    } else {
+      hasNullCost = true;
+    }
   }
 
   // Adjust for yield loss: yield_loss_pct is LOSS percentage
@@ -123,19 +149,20 @@ export async function getBomTree(
     depth,
     line_cost: Math.round(lineCost * 100) / 100,
     has_null_cost: hasNullCost || children.some((c) => c.has_null_cost),
+    is_estimated: isEstimated || children.some((c) => c.is_estimated),
     children,
   };
 }
 
 /**
- * Collect leaf ingredients that have null cost_per_unit (WAC missing).
+ * Collect leaf ingredients that have no price source at all (no WAC, no supplier_catalog).
  */
 export function collectNullCostLeaves(
   node: BomTreeNode,
   result: { product_code: string; name: string }[] = []
 ): { product_code: string; name: string }[] {
   if (node.children.length === 0) {
-    if (node.item.cost_per_unit == null) {
+    if (node.has_null_cost) {
       result.push({ product_code: node.item.product_code, name: node.item.name });
     }
   } else {
@@ -147,21 +174,30 @@ export function collectNullCostLeaves(
 }
 
 /**
+ * Collect leaf ingredients using estimated cost (supplier_catalog fallback, not WAC).
+ */
+export function collectEstimatedCostLeaves(
+  node: BomTreeNode,
+  result: { product_code: string; name: string }[] = []
+): { product_code: string; name: string }[] {
+  if (node.children.length === 0) {
+    if (node.is_estimated) {
+      result.push({ product_code: node.item.product_code, name: node.item.name });
+    }
+  } else {
+    for (const child of node.children) {
+      collectEstimatedCostLeaves(child, result);
+    }
+  }
+  return result;
+}
+
+/**
  * Calculate total cost from BOM tree.
+ * Uses pre-computed line_cost which already includes supplier_catalog fallback.
  */
 export function calculateTreeCost(tree: BomTreeNode): number {
-  if (tree.children.length === 0) {
-    return (tree.item.cost_per_unit || 0) * tree.quantity;
-  }
-  let cost = tree.children.reduce(
-    (sum, c) => sum + calculateTreeCost(c),
-    0
-  ) * tree.quantity;
-  // yield_loss_pct is LOSS: 15 = 15% lost, effective yield = 85%
-  if (tree.yield_loss_pct > 0 && tree.yield_loss_pct < 100) {
-    cost = cost / (1 - tree.yield_loss_pct / 100);
-  }
-  return Math.round(cost * 100) / 100;
+  return tree.line_cost;
 }
 
 /**
@@ -218,7 +254,8 @@ export function calculateTreeNutrition(tree: BomTreeNode): NutritionSummary {
  * Flatten BOM tree to a readable text representation.
  */
 export function formatBomTree(node: BomTreeNode, indent: string = ""): string {
-  const costStr = node.line_cost > 0 ? ` (cost: ${node.line_cost} THB)` : "";
+  const estTag = node.is_estimated ? " (est.)" : "";
+  const costStr = node.line_cost > 0 ? ` (cost: ${node.line_cost} THB${estTag})` : "";
   const yieldStr = node.yield_loss_pct > 0 ? ` [loss: ${node.yield_loss_pct}%]` : "";
   const qtyStr = node.depth > 0 ? `${node.quantity} ${node.item.base_unit} ` : "";
 

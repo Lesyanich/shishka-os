@@ -1,4 +1,4 @@
-import { getBomTree, calculateTreeCost, collectNullCostLeaves } from "../lib/bom-walker.js";
+import { getBomTree, calculateTreeCost, collectNullCostLeaves, collectEstimatedCostLeaves } from "../lib/bom-walker.js";
 
 export const suggestPriceSchema = {
   name: "suggest_price",
@@ -31,13 +31,14 @@ export async function suggestPrice(args: {
 
     const totalCost = calculateTreeCost(tree);
     const nullCostLeaves = collectNullCostLeaves(tree);
+    const estimatedLeaves = collectEstimatedCostLeaves(tree);
 
     if (nullCostLeaves.length > 0) {
       const items = nullCostLeaves
         .map((i) => `${i.product_code} (${i.name})`)
         .join(", ");
       return {
-        error: `Cannot suggest price: ${nullCostLeaves.length} ingredient(s) have no purchase history (WAC = null). Cost is incomplete and margin would be unreliable. Missing: ${items}`,
+        error: `Cannot suggest price: ${nullCostLeaves.length} ingredient(s) have no WAC and no supplier catalog price. Cost is incomplete. Missing: ${items}`,
       };
     }
 
@@ -76,13 +77,25 @@ export async function suggestPrice(args: {
       };
     });
 
+    const warnings: string[] = [];
+    if (estimatedLeaves.length > 0) {
+      const items = estimatedLeaves
+        .map((i) => `${i.product_code} (${i.name})`)
+        .join(", ");
+      warnings.push(
+        `ESTIMATED: ${estimatedLeaves.length} ingredient(s) use supplier catalog price (not WAC). Suggestions are approximate: ${items}`
+      );
+    }
+
     return {
       product: tree.item.product_code,
       name: tree.item.name,
       total_cost_thb: Math.round(totalCost * 100) / 100,
+      cost_estimated: estimatedLeaves.length > 0,
       current_price_thb: currentPrice,
       current_margin_pct: currentMargin,
       suggestions,
+      warnings,
       recommendation:
         currentMargin !== null && currentMargin < 60
           ? `⚠️ Current margin (${currentMargin}%) is below 60%. Consider raising the price.`
