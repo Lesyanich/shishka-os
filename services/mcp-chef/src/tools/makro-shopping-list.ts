@@ -9,6 +9,7 @@
  */
 
 import { getSupabase } from "../lib/supabase.js";
+import { generateMakroPdf, type MakroPdfItem } from "../lib/makro-pdf.js";
 
 interface MakroShoppingItem {
   ingredient_id: string;
@@ -126,12 +127,16 @@ async function collectRawLeaves(
   return rawToDishes;
 }
 
-export async function makroShoppingList(): Promise<{
-  items: MakroShoppingItem[];
+export async function makroShoppingList(args?: {
+  format?: "json" | "pdf";
+}): Promise<{
+  items?: MakroShoppingItem[];
   total_items: number;
   total_estimated_cost: number | null;
   note: string;
+  pdf_path?: string;
 }> {
+  const format = args?.format || "json";
   const sb = getSupabase();
 
   // 1. Get all active SALE dishes
@@ -269,10 +274,31 @@ export async function makroShoppingList(): Promise<{
   // Sort by ingredient name
   items.sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name));
 
+  const note = `Phase 1: ingredient list only (no quantities). ${items.length} Makro items from ${rawToDishes.size} total RAW ingredients across ${saleDishes.length} active SALE dishes.`;
+
+  if (format === "pdf") {
+    const pdfItems: MakroPdfItem[] = items.map((i) => ({
+      title: i.makro_product_name || i.ingredient_name,
+      barcode: i.barcode || "",
+      brand: "",
+      price: i.last_seen_price,
+      weight: i.package_info || i.base_unit,
+      image_url: i.image_url,
+      product_url: i.makro_url,
+    }));
+    const pdfPath = await generateMakroPdf(pdfItems, "Makro Shopping List — Shishka Kitchen");
+    return {
+      total_items: items.length,
+      total_estimated_cost: hasPrices ? Math.round(totalCost * 100) / 100 : null,
+      note,
+      pdf_path: pdfPath,
+    };
+  }
+
   return {
     items,
     total_items: items.length,
     total_estimated_cost: hasPrices ? Math.round(totalCost * 100) / 100 : null,
-    note: `Phase 1: ingredient list only (no quantities). ${items.length} Makro items from ${rawToDishes.size} total RAW ingredients across ${saleDishes.length} active SALE dishes.`,
+    note,
   };
 }

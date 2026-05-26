@@ -82,14 +82,14 @@ src/
 ### validators.ts
 - `validateProductCode(code)` — формат PREFIX-NAME
 - `validateBaseUnit(unit)` — kg/g/L/ml/pcs
-- `validateLegoChain(parent, child)` — SALE→PF/MOD, PF→RAW/PF, MOD→RAW
+- `validateLegoChain(parent, child)` — SALE→RAW/PF/MOD, PF→RAW/PF, MOD→RAW
 - `checkCircularRef(parentId, ingredientId)` — BFS вверх по дереву
 - `validateNutrition(values, baseUnit)` — неотрицательность + защита от per-100g ошибки
 - `checkCodeUnique(code)` — уникальность в БД
 - `findSimilarProducts(name, code)` — fuzzy поиск дубликатов
 - `checkSupplierAvailability(name, id?)` — проверка в supplier_catalog
 
-## Tools (14)
+## Tools (14 + 3 scrapers)
 
 ### Read-only (9)
 | # | Tool | Описание |
@@ -103,6 +103,14 @@ src/
 | 7 | `audit_all_dishes` | Аудит всех SALE позиций с issue summary |
 | 8 | `list_equipment` | Каталог оборудования (76 единиц, enriched schema) |
 | 9 | `check_inventory` | Остатки через v_inventory_by_nomenclature + low_stock alerts |
+
+### Scrapers (3, lazy-loaded)
+| # | Tool | Описание |
+|---|------|----------|
+| 10 | `search_makro_catalog` | Каталог Makro Pro: цены, баркоды, ST166 stock. `format: "pdf"` → PDF с фото |
+| 11 | `makro_shopping_list` | Список закупок Makro из BOM активных SALE. `format: "pdf"` → PDF с фото, ценами |
+| 12 | `search_homepro_catalog` | Каталог HomePro: цены, артикулы, спеки |
+| 13 | `search_sangdamrong_catalog` | Каталог Sangdamrong: посуда, упаковка, стекло |
 
 ### Write (5)
 | # | Tool | Описание |
@@ -145,7 +153,7 @@ src/
 ## Critical Rules
 
 - **NEVER write to `cost_per_unit`** — WAC, рассчитывается триггером `fn_update_cost_on_purchase`
-- **Lego chain is IMMUTABLE** — SALE→PF/MOD, PF→RAW/PF, MOD→RAW, RAW→∅
+- **Lego chain** — SALE→RAW/PF/MOD, PF→RAW/PF, MOD→RAW, RAW→∅
 - **Nutrition per 1 base_unit** — НЕ per 100g! Для кг/л: умножить справочные значения на 10
 - **service_role key required** — обходит RLS для полного доступа к данным
 

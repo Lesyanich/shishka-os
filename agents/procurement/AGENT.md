@@ -39,7 +39,7 @@
 |------------|--------|------------|
 | `shishka-mission-control` | RW (domain=procurement) | `list_tasks`, `get_task`, `update_task`, `add_comment`, `emit_business_task` |
 | `shishka-finance` | **Read-only** | `search_suppliers`, `search_expenses`, `expense_summary` — price history, supplier data |
-| `shishka-chef` | **Read-only** | `search_products`, `list_equipment`, `search_makro_catalog`, `search_sangdamrong_catalog`, `search_homepro_catalog` — kitchen needs, existing equipment, **supplier catalog scrapers** |
+| `shishka-chef` | **Read-only** | `search_products`, `list_equipment`, `search_makro_catalog` (format=pdf for printable list), `makro_shopping_list` (format=pdf), `search_sangdamrong_catalog`, `search_homepro_catalog` — kitchen needs, equipment, **supplier catalog scrapers** |
 
 > **Finance и Chef — только чтение.** Агент закупок НЕ записывает расходы, НЕ создаёт номенклатуру, НЕ модифицирует рецепты. Если нужно действие в чужом домене — создай задачу через `emit_business_task(domain="{правильный}")`.
 

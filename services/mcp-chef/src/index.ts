@@ -236,11 +236,12 @@ server.tool(
 
 server.tool(
   "search_makro_catalog",
-  "Search Makro Pro product catalog — real prices, barcodes, brands, and ST166 Rawai stock. Use INSTEAD of WebSearch when looking for ingredients/products available at Makro.",
+  "Search Makro Pro product catalog — real prices, barcodes, brands, and ST166 Rawai stock. Use INSTEAD of WebSearch when looking for ingredients/products available at Makro. Set format='pdf' to generate a PDF shopping list with photos, barcodes, and prices.",
   {
     query: z.string().describe("Search term (Thai or English, e.g., 'chicken breast', 'น้ำตาล', 'mozzarella')"),
     check_stock: z.boolean().optional().describe("Check ST166 Rawai inventory levels (default: true)"),
     store_code: z.string().optional().describe("Makro store code (default: 166 = Rawai Phuket)"),
+    format: z.enum(["json", "pdf"]).optional().describe("Output format: 'json' (default) or 'pdf' (generates PDF file with photos, barcodes, prices)"),
   },
   lazyScraper("./tools/search-makro-catalog.js", "searchMakroCatalog")
 );
@@ -353,9 +354,11 @@ server.tool(
 
 server.tool(
   "makro_shopping_list",
-  "Generate Makro shopping list for all active SALE menu dishes. Returns RAW ingredients sourced from Makro with product links, prices, and package info. No parameters needed.",
-  {},
-  async () => jsonResult(await makroShoppingList())
+  "Generate Makro shopping list for all active SALE menu dishes. Returns RAW ingredients sourced from Makro with product links, prices, and package info. Set format='pdf' to generate a PDF file with photos, barcodes, and prices.",
+  {
+    format: z.enum(["json", "pdf"]).optional().describe("Output format: 'json' (default) or 'pdf' (generates PDF file with photos, barcodes, prices)"),
+  },
+  async (args) => jsonResult(await makroShoppingList(args))
 );
 
 // ─── Agent Memory Tools ─────────────────────────────────────────
