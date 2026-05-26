@@ -16,7 +16,8 @@
 - **Delivery:** Self-pickup; delivery options may be available for large orders
 - **Payment:** Cash, card, transfer
 - **Notes:** Primary source for bulk dry goods, oils, and basic proteins
-- **MCP Tool:** `search_makro_catalog` — real-time prices, barcodes, ST166 Rawai stock
+- **MCP Tool:** `search_makro_catalog` — real-time prices, barcodes, ST166 Rawai stock. Use `format: "pdf"` to generate a PDF shopping list with product photos, barcodes, and prices
+- **MCP Tool:** `makro_shopping_list` — full ingredient list from active SALE menu BOM trees. Use `format: "pdf"` for a printable PDF
 
 ### Sangdamrong
 

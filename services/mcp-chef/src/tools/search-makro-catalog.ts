@@ -8,6 +8,8 @@
  * Zero external dependencies — uses native fetch + regex parsing.
  */
 
+import { generateMakroPdf, type MakroPdfItem } from "../lib/makro-pdf.js";
+
 const BASE_URL = "https://www.makro.pro";
 const GRAPHQL_URL =
   "https://marketplace.mango-prod.siammakro.cloud/product/api/v1/graphql";
@@ -192,6 +194,7 @@ export async function searchMakroCatalog(args: {
   query: string;
   check_stock?: boolean;
   store_code?: string;
+  format?: "json" | "pdf";
 }) {
   const q = args.query.trim();
   if (!q) return { error: "Query is required" };
@@ -237,16 +240,41 @@ export async function searchMakroCatalog(args: {
     }
   }
 
+  const resultsWithStock = products.map((p) => ({
+    ...p,
+    stock_rawai:
+      inventory && p.product_id in inventory
+        ? inventory[p.product_id]
+        : undefined,
+  }));
+
+  if (args.format === "pdf") {
+    const pdfItems: MakroPdfItem[] = resultsWithStock.map((p) => ({
+      title: p.title_en,
+      barcode: p.barcode || p.makro_code,
+      brand: p.brand,
+      price: p.price_thb,
+      weight: p.packaging_weight ? `${p.packaging_weight} kg` : "",
+      image_url: p.image_url,
+      product_url: p.product_url,
+      stock: p.stock_rawai,
+    }));
+    const pdfPath = await generateMakroPdf(
+      pdfItems,
+      `Makro Search: "${args.query}"`,
+    );
+    return {
+      count: products.length,
+      store: `ST${args.store_code || DEFAULT_STORE}`,
+      source: "makro.pro SSR (Typesense)",
+      pdf_path: pdfPath,
+    };
+  }
+
   return {
     count: products.length,
     store: `ST${args.store_code || DEFAULT_STORE}`,
     source: "makro.pro SSR (Typesense)",
-    results: products.map((p) => ({
-      ...p,
-      stock_rawai:
-        inventory && p.product_id in inventory
-          ? inventory[p.product_id]
-          : undefined,
-    })),
+    results: resultsWithStock,
   };
 }

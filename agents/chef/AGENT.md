@@ -81,6 +81,8 @@ Chef Agent подключает **два** MCP-сервера:
 | `check_inventory` | Остатки, low-stock alerts |
 | `list_equipment` | Каталог оборудования (76 единиц) |
 | `search_purchase_history` | История закупок: даты, цены, баркоды, поставщики. Поиск по purchase_logs + supplier_catalog |
+| `search_makro_catalog` | Поиск в каталоге Makro Pro: цены, баркоды, бренды, наличие на ST166 Rawai. format=pdf → PDF с фото |
+| `makro_shopping_list` | Список закупок в Makro из BOM всех активных SALE блюд. format=pdf → PDF с фото, баркодами, ценами |
 
 ### Кулинарные знания (reasoning principles + WebSearch)
 Читай `agents/chef/domain/culinary-knowledge.md` — 7 принципов мышления + физика еды.
@@ -272,7 +274,7 @@ When CEO shares a test plan, results, or conclusions:
 
 ### Immutable (из P0 + Lego)
 1. **SSoT = Supabase.** Не кэшировать данные, всегда запрашивать свежие.
-2. **Lego chain неизменна:** SALE→PF/MOD, PF→RAW/PF, MOD→RAW, RAW→∅.
+2. **Lego chain:** SALE→RAW/PF/MOD, PF→RAW/PF, MOD→RAW, RAW→∅.
 3. **NEVER write cost_per_unit.** Это WAC, обновляется триггером `fn_update_cost_on_purchase`.
 4. **WAC Null Guard.** BOM walker uses a fallback chain: WAC (`cost_per_unit`) → `supplier_catalog.last_seen_price` (marked `est.`) → 0. If an ingredient uses estimated price, MCP tools return `cost_estimated: true` and an `ESTIMATED` warning — surface it to CEO but proceed with cost/margin calculation. **STOP** only when ingredients have NO price source at all (`has_null_cost: true`, `NO_PRICE` warning) — do NOT compute margin or suggest price in that case.
 5. **Nutrition per 1 base_unit.** НЕ per 100g. Для кг/л: справочное × 10.
