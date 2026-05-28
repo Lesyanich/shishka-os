@@ -101,14 +101,23 @@
    - `court_paper` → `10_Court_Papers/` (ALSO triggers Mr. Ram escalation)
    - `other` → `_unsorted/` + ask CEO for classification hint
 6. Append row to `docs/operations/company-documents-register.md` with next `LEG-NNN` ID.
-7. If `expiry_date` is set: emit 3 MC tasks at T-60, T-30, T-7 days via `mcp__shishka-mission-control__emit_business_task` with `domain="legal"`, `tags=["legal", "kind:legal-deadline", "compliance", "from:lawyer"]`, `context_files=["docs/operations/company-documents-register.md"]`.
-8. Respond to CEO in standard template (Bottom line / Why / What I'd do / Mr. Ram trigger).
+7. **Append row to `vault/Legal/README.md` `assets:` frontmatter** (mandatory — `/brain/drive` reads only this surface):
+   - `label: "<DocType> — LEG-NNN (<Owner>)"` (e.g. `"Work Permit — LEG-002 (Lesia Kostiukova)"`)
+   - `path: "Drive: 00_Legal/<subfolder>/<filename>"`
+   - `url: <webViewLink returned from upload step 5>` (omit only if upload didn't return one)
+   - If this is the FIRST document in its subfolder, also add an `assets:` row for the subfolder itself (label = folder name + purpose blurb, path = `Drive: 00_Legal/<subfolder>/`, url = folder webViewLink from step 5)
+   - Commit `vault/Legal/README.md` in the same commit as the register edit (step 6) — single atomic change.
+8. If `expiry_date` is set: emit 3 MC tasks at T-60, T-30, T-7 days via `mcp__shishka-mission-control__emit_business_task` with `domain="legal"`, `tags=["legal", "kind:legal-deadline", "compliance", "from:lawyer"]`, `context_files=["docs/operations/company-documents-register.md"]`.
+9. Respond to CEO in standard template (Bottom line / Why / What I'd do / Mr. Ram trigger).
+
+> [!warning] Why step 7 is mandatory
+> `BrainDriveMapPage` (`apps/admin-panel/src/pages/brain/BrainDriveMapPage.tsx`) aggregates `assets:` frontmatter from `vault/**/*.md` only. Skipping the vault edit leaves the doc invisible on `/brain/drive` even after the register row exists — defeats the whole custody index purpose.
 
 ### Pull (batch) — CEO drops files in `_inbox/`
 
 On every `/lawyer` session start:
 1. `mcp__155bab52-*__search_files` with query targeting `00_Legal/_inbox/` folder.
-2. For each file → run Push pipeline steps 1-7.
+2. For each file → run Push pipeline steps 1-9 (including step 7 vault update — same rules: register row + matching `vault/Legal/README.md` assets row + new-subfolder row if first-of-kind, all in one commit).
 3. Move processed files from `_inbox/` to target subfolder (copy + delete; no native move in GDrive MCP).
 
 ## Legal Calendar — bootstrap on first run

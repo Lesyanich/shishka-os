@@ -23,6 +23,7 @@ Then follow the Context Loading protocol defined in that file.
 - `agents/lawyer/CONTEXT/02_work_permit_visa.md` — WP Act + Immigration Act reference
 - `agents/lawyer/TEMPLATES/` — letter to gov, employment contract, supplier agreement
 - `docs/operations/company-documents-register.md` — register of all company documents (LEG-NNN)
+- `vault/Legal/README.md` — vault entity page that surfaces `00_Legal/` on `/brain/drive` (must be updated alongside the register — see AGENT.md §Push step 7)
 - `docs/superpowers/specs/2026-05-13-lawyer-agent-design.md` — design spec
 
 ## Session Start
@@ -38,6 +39,8 @@ list_tasks(tags="needs-lawyer", include_done=false)
 If first run (no `agents/lawyer/.bootstrap-done` flag file AND no `domain=legal` tasks) → run Legal Calendar bootstrap per `agents/lawyer/AGENT.md` §"Legal Calendar — bootstrap on first run".
 
 Check `00_Legal/_inbox/` on GDrive for any pending intake documents and process them per the pull pathway.
+
+> After every register edit (Push step 6), you MUST also update `vault/Legal/README.md` `assets:` frontmatter with a matching row (Push step 7 in AGENT.md). Skip this and the doc is invisible on `/brain/drive`.
 
 ## Response Discipline
 
