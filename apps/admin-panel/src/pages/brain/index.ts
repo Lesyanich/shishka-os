@@ -1,7 +1,5 @@
 export { BrainPage } from './BrainPage'
 export { BrainPlaceholder } from './BrainPlaceholder'
-export { BrainCostPage } from './BrainCostPage'
 export { BrainWikiPage } from './BrainWikiPage'
 export { BrainDriveMapPage } from './BrainDriveMapPage'
 export { BrainExplorePage } from './BrainExplorePage'
-export { QualityPage } from './QualityPage'

@@ -357,7 +357,7 @@ Route by question shape.
 
 ## Session End
 
-No MemPalace. Session diary goes to native auto-memory.
+Session diary goes to native auto-memory.
 
 ---
 

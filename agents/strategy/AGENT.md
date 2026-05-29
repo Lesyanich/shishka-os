@@ -158,7 +158,7 @@ Strategic COO emits to Tier 1 frequently because almost every action **is** a bu
 
 ## Session End
 
-No MemPalace. Session diary goes to native auto-memory.
+Session diary goes to native auto-memory.
 
 ## Domain Files
 

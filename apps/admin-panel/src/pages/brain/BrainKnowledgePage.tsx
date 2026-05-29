@@ -38,13 +38,7 @@ import {
   StickyNote,
   GitGraph,
   Trash2,
-  MessagesSquare,
 } from 'lucide-react'
-import {
-  searchDrawers,
-  MemPalaceError,
-  type MemPalaceSearchHit,
-} from '../../api/mempalace'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -396,41 +390,6 @@ export function BrainKnowledgePage() {
 
   // Graph analytics
   const [analytics, setAnalytics] = useState<GraphAnalytics | null>(null)
-
-  // MemPalace semantic search state
-  const [memHits, setMemHits] = useState<MemPalaceSearchHit[] | null>(null)
-  const [memLoading, setMemLoading] = useState(false)
-  const [memError, setMemError] = useState<'offline' | 'error' | null>(null)
-  const memSeq = useRef(0)
-
-  // Debounced MemPalace semantic search (parallel to regex file search)
-  useEffect(() => {
-    if (search.length < 3) {
-      setMemHits(null)
-      setMemError(null)
-      setMemLoading(false)
-      return
-    }
-    const mySeq = ++memSeq.current
-    setMemLoading(true)
-    setMemError(null)
-    const timer = setTimeout(() => {
-      searchDrawers({ query: search, limit: 6 })
-        .then((res) => {
-          if (mySeq !== memSeq.current) return
-          setMemHits(res.results)
-          setMemLoading(false)
-        })
-        .catch((err: unknown) => {
-          if (mySeq !== memSeq.current) return
-          // HTTP error vs network failure (serve.py not running)
-          setMemError(err instanceof MemPalaceError ? 'error' : 'offline')
-          setMemHits(null)
-          setMemLoading(false)
-        })
-    }, 250)
-    return () => clearTimeout(timer)
-  }, [search])
 
   // Load graph.json + analytics
   useEffect(() => {
@@ -960,39 +919,6 @@ export function BrainKnowledgePage() {
                       })}
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* MemPalace semantic results */}
-              {search.length >= 3 && (
-                <div>
-                  <h4 className="mb-2 flex items-center gap-2 text-xs font-medium text-indigo-400">
-                    <MessagesSquare className="h-3.5 w-3.5" />
-                    Из разговоров
-                    <span className="text-[10px] font-normal text-slate-600">MemPalace</span>
-                    {memLoading && <span className="text-[10px] font-normal text-slate-600">ищу...</span>}
-                  </h4>
-                  {memError === 'offline' ? (
-                    <p className="text-xs text-slate-500">MemPalace не запущен.</p>
-                  ) : memError === 'error' ? (
-                    <p className="text-xs text-slate-500">Ошибка запроса к MemPalace.</p>
-                  ) : memHits && memHits.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {memHits.map((h, i) => (
-                        <div key={`${h.source_file}-${i}`} className="rounded-lg border border-slate-800/50 bg-slate-800/30 px-3 py-2">
-                          <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10px]">
-                            <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-indigo-300">{h.wing}</span>
-                            <span className="rounded bg-slate-700 px-1.5 py-0.5 text-slate-400">{h.room}</span>
-                            <span className="text-slate-600">{(h.similarity * 100).toFixed(0)}% match</span>
-                          </div>
-                          <p className="line-clamp-2 text-xs text-slate-300">{h.text}</p>
-                          <p className="mt-1 truncate text-[10px] text-slate-600">{h.source_file}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : memHits && memHits.length === 0 ? (
-                    <p className="text-xs text-slate-600">Ничего не найдено.</p>
-                  ) : null}
                 </div>
               )}
 

@@ -1,15 +1,12 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Brain, Sparkles, MapPin, DollarSign, Activity } from 'lucide-react'
-import { BrainPulseBar } from './components/BrainPulseBar'
+import { Brain, Sparkles, MapPin } from 'lucide-react'
 import { BrainErrorBoundary } from '../../components/brain/BrainErrorBoundary'
 
 const TABS = [
   // Unified explore view = graph + reader side-by-side, default landing
   { to: '/brain', label: 'Brain', icon: Sparkles, end: true },
-  // Other surfaces: Drive Map, Cost, Quality
+  // Drive Map (Cost + Quality tabs removed — dead MemPalace/LightRAG stack, Brain v2 Phase 0)
   { to: '/brain/drive', label: 'Drive Map', icon: MapPin },
-  { to: '/brain/cost', label: 'Cost', icon: DollarSign },
-  { to: '/brain/quality', label: 'Quality', icon: Activity },
 ]
 
 export function BrainPage() {
@@ -27,14 +24,10 @@ export function BrainPage() {
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Brain</h1>
           <p className="text-xs text-slate-500">
-            Map · Pages · Drive · Cost · Quality
+            Map · Pages · Drive
           </p>
         </div>
       </header>
-
-      <div className="mb-3">
-        <BrainPulseBar />
-      </div>
 
       <nav className="mb-4 flex gap-1 border-b border-slate-800">
         {TABS.map(({ to, label, icon: Icon, end }) => (
