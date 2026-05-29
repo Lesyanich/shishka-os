@@ -300,6 +300,13 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 10. **Проверка дублей обязательна.** check_duplicate перед каждым сохранением.
 11. **raw_parse обязателен.** Полный JSON со ВСЕМИ извлечёнными данными — для data mining.
 12. **Tax invoice reminder.** Если нет tax invoice → _tax_reminder в payload.
+13. **Quotation ≠ receipt.** Document с заголовком "Quotation" / "Sale Order" / "LOI" / "Pro-forma Invoice" / "Estimate" — НЕ proof-of-payment. Перед линковкой такого PDF к `expense_ledger` (через `update_expense` receipt_supplier_url или `approve_receipt`) обязательно проверить признаки оплаты:
+    - bank transfer slip / payment confirmation screenshot
+    - "PAID" / "ชำระแล้ว" / "ใบเสร็จรับเงิน" stamp или строка
+    - matching row in `expense_ledger` со status='paid'
+    - CEO явно подтвердил факт оплаты в чате
+    Если ни одно не выполняется → **НЕ** создавать supplier, **НЕ** линковать к expense, **НЕ** uploadить в `01_Business/Receipts/`. Вместо этого: спросить Лесю «оплачено? если да — дата и метод?» и подождать ответ. Quotation без оплаты архивировать в `_legacy_receipts/` или вернуть в `_inbox/` со status='skipped' + комментарий «awaiting payment confirmation».
+    Compound-engineering origin: session 2026-05-29 — tech-lead ошибочно засосал Wongnai QT2026015547 (41562 THB, FoodStory POS) как купленный, создал supplier + emit task; CEO откатила: «мы не покупали, это unpaid счёт».
 
 ### Operational
 13. **Backlog First.** Обнаружил проблему вне scope → Tier 1 задача, НЕ начинать исправлять.
