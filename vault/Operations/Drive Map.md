@@ -2,9 +2,45 @@
 title: Drive Map
 type: page
 tags: [operations, drive, navigation]
-date: 2026-04-29
+date: 2026-05-28
 status: active
 assets:
+  - label: "00_Legal (corporate legal docs root)"
+    path: "Drive: 00_Legal/"
+    url: "https://drive.google.com/drive/folders/1p0kwU95wzTCtIAODGcn_AlGavM_wL_dQ"
+  - label: "00_Legal/01_Company_Registration/"
+    path: "Drive: 00_Legal/01_Company_Registration/"
+    url: "https://drive.google.com/drive/folders/1IE3qYpyuMEo8FlXRDgdAPViQtfhDhoqG"
+  - label: "00_Legal/02_Work_Permits/"
+    path: "Drive: 00_Legal/02_Work_Permits/"
+    url: "https://drive.google.com/drive/folders/1TMlzZKX182JgZMcwRFYKmnydh38Lz4yd"
+  - label: "00_Legal/03_Visas/"
+    path: "Drive: 00_Legal/03_Visas/"
+    url: "https://drive.google.com/drive/folders/10F78O3O6fDZe-FPXk0eilSQWCDcy-XMe"
+  - label: "00_Legal/04_FDA_Licenses/"
+    path: "Drive: 00_Legal/04_FDA_Licenses/"
+    url: "https://drive.google.com/drive/folders/1ghoZ2WWkqQLa98M12eu4whPPO97bMObu"
+  - label: "00_Legal/05_Restaurant_Permits/"
+    path: "Drive: 00_Legal/05_Restaurant_Permits/"
+    url: "https://drive.google.com/drive/folders/1Jbhh0rRQ1tzQjGySpi5JvO8Pb_KtlT_8"
+  - label: "00_Legal/06_Leases/"
+    path: "Drive: 00_Legal/06_Leases/"
+    url: "https://drive.google.com/drive/folders/12GKAX5xAOkY3sCyOM8tR-6UpPZFwD_RV"
+  - label: "00_Legal/07_Tax_VAT/"
+    path: "Drive: 00_Legal/07_Tax_VAT/"
+    url: "https://drive.google.com/drive/folders/10cUjc8GGLeLKKybIpVr-H-ZDwgn5ITBQ"
+  - label: "00_Legal/08_Employment_Contracts/"
+    path: "Drive: 00_Legal/08_Employment_Contracts/"
+    url: "https://drive.google.com/drive/folders/1VYvK6jeU_TxgQty-Hf5C06DQ-wazrddZ"
+  - label: "00_Legal/09_Supplier_Contracts/"
+    path: "Drive: 00_Legal/09_Supplier_Contracts/"
+    url: "https://drive.google.com/drive/folders/15kkzN-ueABMh6bZmSGG56BW7qyd6uCLt"
+  - label: "00_Legal/10_Court_Papers/ (Mr. Ram trigger)"
+    path: "Drive: 00_Legal/10_Court_Papers/"
+    url: "https://drive.google.com/drive/folders/1nY7cOW1Lwm8op0GCyjDYuR8o0YnQ3wAA"
+  - label: "00_Legal/_inbox/ (drop-zone for /lawyer pull pathway)"
+    path: "Drive: 00_Legal/_inbox/"
+    url: "https://drive.google.com/drive/folders/1iXPIrzZBRBpjSriVLfia-UY7yCWCmVhp"
   - label: "01_Business (root of all business knowledge)"
     path: "Drive: 01_Business/"
     url: "https://drive.google.com/drive/folders/1jwlrA0zmLySYjT-mNBe2LxKWLVJCbEkl"
@@ -52,6 +88,34 @@ The Confluence-style index of where every important file lives on Google Drive. 
 > - Every entry below has a **direct Drive URL** (verified via the Drive MCP, not a search guess)
 > - The `assets:` frontmatter above auto-aggregates into the [`/brain/drive`](https://shishka-os.vercel.app/brain/drive) admin tab
 > - When a new top-level folder is created on Drive, search for it with the Drive MCP and add a row here
+
+## Top-level — `00_Legal/`
+
+[Open `00_Legal/` on Drive ↗](https://drive.google.com/drive/folders/1p0kwU95wzTCtIAODGcn_AlGavM_wL_dQ) — corporate legal documents root. Custodian: `/lawyer` agent. Source-of-truth register: [`docs/operations/company-documents-register.md`](../../docs/operations/company-documents-register.md). Entity page: [[Legal/]].
+
+| Folder | Drive | Purpose |
+|---|---|---|
+| **01_Company_Registration** | [Open ↗](https://drive.google.com/drive/folders/1IE3qYpyuMEo8FlXRDgdAPViQtfhDhoqG) | DBD certs (พค.0401), MOA, capital changes |
+| **02_Work_Permits** | [Open ↗](https://drive.google.com/drive/folders/1TMlzZKX182JgZMcwRFYKmnydh38Lz4yd) | Per-person — initial WP, renewals, variations |
+| **02_Work_Permits/Lesia_Kostiukova** | [Open ↗](https://drive.google.com/drive/folders/14zWnLJfwC0zxg2WXzOu61RHXLl-3TAlL) | Lesia's WP file (LEG-002 active) |
+| **03_Visas** | [Open ↗](https://drive.google.com/drive/folders/10F78O3O6fDZe-FPXk0eilSQWCDcy-XMe) | Non-immigrant B, LTR, extensions, re-entry |
+| **04_FDA_Licenses** | [Open ↗](https://drive.google.com/drive/folders/1ghoZ2WWkqQLa98M12eu4whPPO97bMObu) | อย. product + manufacturing site |
+| **05_Restaurant_Permits** | [Open ↗](https://drive.google.com/drive/folders/1Jbhh0rRQ1tzQjGySpi5JvO8Pb_KtlT_8) | Tessaban, fire safety, hygiene |
+| **06_Leases** | [Open ↗](https://drive.google.com/drive/folders/12GKAX5xAOkY3sCyOM8tR-6UpPZFwD_RV) | L1 Rawai, L2 future, property leases |
+| **07_Tax_VAT** | [Open ↗](https://drive.google.com/drive/folders/10cUjc8GGLeLKKybIpVr-H-ZDwgn5ITBQ) | PND 1/3/50/51/53, VAT (PP.30), WHT certs |
+| **08_Employment_Contracts** | [Open ↗](https://drive.google.com/drive/folders/1VYvK6jeU_TxgQty-Hf5C06DQ-wazrddZ) | Per-person staff contracts |
+| **09_Supplier_Contracts** | [Open ↗](https://drive.google.com/drive/folders/15kkzN-ueABMh6bZmSGG56BW7qyd6uCLt) | Per-supplier T&Cs, distribution agreements |
+| **10_Court_Papers** | [Open ↗](https://drive.google.com/drive/folders/1nY7cOW1Lwm8op0GCyjDYuR8o0YnQ3wAA) | Judicial filings — also triggers Mr. Ram |
+| **_inbox** | [Open ↗](https://drive.google.com/drive/folders/1iXPIrzZBRBpjSriVLfia-UY7yCWCmVhp) | Drop-zone — `/lawyer` pull pathway picks up |
+| **_drafts** | [Open ↗](https://drive.google.com/drive/folders/1-vOftY-ZemUcuCebWAaGqWRwB6BAfWZE) | Sol-produced drafts awaiting signature |
+| **_unsorted** | [Open ↗](https://drive.google.com/drive/folders/1FwGqEVM_nPQGyEFd-T4VyvnuXMBLSQJS) | Classification pending CEO confirmation |
+
+### Key files (deep-link)
+
+| Doc | LEG ID | Drive |
+|---|---|---|
+| Work Permit 0769830000874 — Lesia Kostiukova (exp 2027-04-24) | LEG-002 | [Open file ↗](https://drive.google.com/file/d/1XOpM7siD27LF0IPn9vNNHdPvd0WaE5BN/view?usp=drivesdk) |
+| Company Registration 0835568025951 — Shishka Co. | LEG-001 | _(PDF not yet on Drive — register-only; re-upload pending)_ |
 
 ## Top-level — `01_Business/`
 
@@ -106,7 +170,6 @@ These are referenced in the vault but **don't have a corresponding Drive folder 
 - `Finance/Payroll` (payroll records)
 - `Finance/Tax` (VAT / WHT / CIT filings)
 - `Finance/Reports` (annual P&L)
-- `Legal/` (lease, work permits, FDA filings, company registration)
 - `Operations/HACCP` (daily HACCP archive)
 - `Operations/Checklists` (cleaning checklists)
 - `Operations/Training/` (videos + docs)

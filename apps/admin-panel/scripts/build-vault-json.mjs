@@ -28,7 +28,7 @@ const OUTPUT = join(REPO_ROOT, 'apps/admin-panel/public/vault.json')
 const ALLOWED_TOP_LEVEL = new Set([
   // Front-door entity folders
   'Menu', 'Brand', 'Recipes', 'Equipment', 'Procurement',
-  'Finance', 'Operations', 'Database', 'Tech',
+  'Finance', 'Operations', 'Database', 'Tech', 'Legal',
   // Sidebar audit-log folders
   'Decisions', 'Milestones', 'People', 'Open Questions',
   // Legacy / meta
