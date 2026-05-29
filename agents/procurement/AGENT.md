@@ -171,7 +171,7 @@
 
 ## Session End
 
-No MemPalace. Session diary goes to native auto-memory. Persist procurement knowledge in domain files.
+Session diary goes to native auto-memory. Persist procurement knowledge in domain files.
 
 ---
 
