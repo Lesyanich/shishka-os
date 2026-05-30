@@ -1,8 +1,17 @@
 import type { PayslipData } from '../../hooks/use-payroll'
 
-/** Format a THB amount, no decimals: ฿14,032 */
+/** Format a THB amount, no decimals: ฿14,032 (HTML/screen — browser fonts render ฿). */
 export function thb(n: number): string {
   return `฿${Math.round(n).toLocaleString('en-US')}`
+}
+
+/**
+ * PDF-safe THB format: "THB 14,032".
+ * The PDF uses built-in Helvetica (WinAnsi), which has no glyph for ฿ (U+0E3F)
+ * — it renders as "?". Use the ISO code in the generated PDF instead.
+ */
+export function thbPdf(n: number): string {
+  return `THB ${Math.round(n).toLocaleString('en-US')}`
 }
 
 /** "May 2026" from a period_start ISO date. */
@@ -35,6 +44,12 @@ export interface PayslipDerived {
   totalDeductions: number
   net: number
   calendarDays: number
+  /** Employer-paid SSO 5% match (from the stored line). Not deducted from the employee. */
+  employerSso: number
+  /** Employer-paid annual work permit + visa cost. Not deducted from the employee. */
+  workPermitAnnual: number
+  /** True when there is at least one employer-paid benefit to display. */
+  hasEmployerPaid: boolean
 }
 
 /**
@@ -53,7 +68,17 @@ export function derivePayslip(data: PayslipData): PayslipDerived {
   const end = new Date(period.period_end)
   const calendarDays =
     Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
-  return { gross, totalDeductions, net: line.net_pay, calendarDays }
+  const employerSso = line.sso_employer
+  const workPermitAnnual = data.staff.work_permit_annual_thb ?? 0
+  return {
+    gross,
+    totalDeductions,
+    net: line.net_pay,
+    calendarDays,
+    employerSso,
+    workPermitAnnual,
+    hasEmployerPaid: employerSso > 0 || workPermitAnnual > 0,
+  }
 }
 
 export const COMPANY_NAME = 'Shishka Healthy Food Company Limited'

@@ -197,6 +197,30 @@ export function Payslip({
             </div>
           </div>
 
+          {/* Employer-paid (not deducted) */}
+          {d.hasEmployerPaid && (
+            <div>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
+                Employer-paid · not deducted
+              </p>
+              {d.workPermitAnnual > 0 && (
+                <LineRow
+                  label="Work permit & visa (annual)"
+                  value={thb(d.workPermitAnnual)}
+                />
+              )}
+              {d.employerSso > 0 && (
+                <LineRow
+                  label="Social Security — employer 5%"
+                  value={thb(d.employerSso)}
+                />
+              )}
+              <p className="mt-1 text-[10px] text-slate-500">
+                Paid by the employer. Does not reduce your net pay.
+              </p>
+            </div>
+          )}
+
           {/* Net */}
           <div className="flex items-center justify-between rounded-lg border border-emerald-700 bg-emerald-500/10 px-4 py-3">
             <span className="text-sm font-bold uppercase tracking-wide text-emerald-300">

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   thb,
+  thbPdf,
   periodLabel,
   periodSlug,
   formatDate,
@@ -10,7 +11,10 @@ import {
 } from './payslip-helpers'
 import type { PayslipData } from '../../hooks/use-payroll'
 
-function makeData(overrides?: Partial<PayslipData['line']>): PayslipData {
+function makeData(
+  overrides?: Partial<PayslipData['line']>,
+  staffOverrides?: Partial<PayslipData['staff']>,
+): PayslipData {
   return {
     line: {
       id: 'l1',
@@ -41,6 +45,8 @@ function makeData(overrides?: Partial<PayslipData['line']>): PayslipData {
       employment_type: 'full_time',
       sso_number: null,
       monthly_salary: 15000,
+      work_permit_annual_thb: null,
+      ...staffOverrides,
     },
     period: {
       id: 'p1',
@@ -62,6 +68,13 @@ describe('payslip-helpers', () => {
     expect(thb(14032)).toBe('฿14,032')
     expect(thb(0)).toBe('฿0')
     expect(thb(6580.65)).toBe('฿6,581')
+  })
+
+  it('thbPdf formats with THB code (no ฿ glyph) for PDF rendering', () => {
+    expect(thbPdf(14032)).toBe('THB 14,032')
+    expect(thbPdf(0)).toBe('THB 0')
+    expect(thbPdf(6580.65)).toBe('THB 6,581')
+    expect(thbPdf(14032)).not.toContain('฿')
   })
 
   it('periodLabel renders month + year', () => {
@@ -97,6 +110,24 @@ describe('payslip-helpers', () => {
     expect(d.gross).toBe(15500)
     expect(d.totalDeductions).toBe(968 + 750)
     expect(d.net).toBe(14782) // stays the stored value
+  })
+
+  it('derivePayslip surfaces employer-paid benefits without touching net', () => {
+    // Unenrolled, no work permit set → nothing to show.
+    const none = derivePayslip(makeData())
+    expect(none.hasEmployerPaid).toBe(false)
+    expect(none.workPermitAnnual).toBe(0)
+    expect(none.employerSso).toBe(0)
+
+    // Work permit set + enrolled (employer SSO match) → both shown, net unchanged.
+    const d = derivePayslip(
+      makeData({ sso_employer: 750 }, { work_permit_annual_thb: 15000 }),
+    )
+    expect(d.workPermitAnnual).toBe(15000)
+    expect(d.employerSso).toBe(750)
+    expect(d.hasEmployerPaid).toBe(true)
+    expect(d.net).toBe(14032) // employer-paid items never alter net
+    expect(d.totalDeductions).toBe(968) // not counted as a deduction
   })
 
   it('exposes company name', () => {
