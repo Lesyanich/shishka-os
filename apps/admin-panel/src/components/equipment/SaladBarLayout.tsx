@@ -302,8 +302,8 @@ function UnitVisual({
         {/* Full-depth column (GN 1/1) */}
         {fullDepthSlots.length > 0 && (
           <div
-            className="flex flex-col gap-0.5 shrink-0"
-            style={{ flex: `${fullDepthTotalMm} 0 0%` }}
+            className="flex flex-col gap-0.5 min-w-0"
+            style={{ flex: `${fullDepthTotalMm} ${fullDepthTotalMm} 0%` }}
           >
             {fullDepthSlots.map((slot) => (
               <div key={slot.id} style={{ height: `${FRONT_H + BACK_H + 2}px` }}>
