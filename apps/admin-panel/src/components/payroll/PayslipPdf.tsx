@@ -11,7 +11,7 @@ import {
   derivePayslip,
   formatDate,
   periodLabel,
-  thb,
+  thbPdf,
 } from './payslip-helpers'
 
 // A4 payslip. Plain Helvetica (built-in) to avoid font registration.
@@ -113,7 +113,7 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.company}>{COMPANY_NAME}</Text>
-          <Text style={styles.docTitle}>Payslip / Расчётный листок</Text>
+          <Text style={styles.docTitle}>Payslip / Salary Statement</Text>
           <View style={styles.metaRow}>
             <Text style={styles.meta}>
               Pay period: {periodLabel(period.period_start)} (
@@ -128,10 +128,8 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
         <View style={styles.empGrid}>
           <View style={styles.empCell}>
             <Text style={styles.label}>Name</Text>
-            <Text style={styles.value}>
-              {staff.name}
-              {staff.name_th ? ` (${staff.name_th})` : ''}
-            </Text>
+            {/* Latin name only — built-in Helvetica cannot render Thai-script name_th. */}
+            <Text style={styles.value}>{staff.name}</Text>
           </View>
           <View style={styles.empCell}>
             <Text style={styles.label}>Role</Text>
@@ -163,15 +161,15 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
             <Text style={styles.sectionTitle}>Earnings</Text>
             <View style={styles.row}>
               <Text>Base salary</Text>
-              <Text>{thb(line.base_salary)}</Text>
+              <Text>{thbPdf(line.base_salary)}</Text>
             </View>
             <View style={styles.row}>
               <Text>Overtime</Text>
-              <Text>{thb(line.overtime_pay)}</Text>
+              <Text>{thbPdf(line.overtime_pay)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text style={styles.bold}>Gross</Text>
-              <Text style={styles.bold}>{thb(d.gross)}</Text>
+              <Text style={styles.bold}>{thbPdf(d.gross)}</Text>
             </View>
           </View>
 
@@ -179,23 +177,23 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
             <Text style={styles.sectionTitle}>Deductions</Text>
             <View style={styles.row}>
               <Text>Absence</Text>
-              <Text>{thb(line.absence_deduction)}</Text>
+              <Text>{thbPdf(line.absence_deduction)}</Text>
             </View>
             <View style={styles.row}>
               <Text>Social Security (5%)</Text>
-              <Text>{thb(line.sso_employee)}</Text>
+              <Text>{thbPdf(line.sso_employee)}</Text>
             </View>
             <View style={styles.row}>
               <Text>Withholding tax</Text>
-              <Text>{thb(line.withholding_tax)}</Text>
+              <Text>{thbPdf(line.withholding_tax)}</Text>
             </View>
             <View style={styles.row}>
               <Text>Other</Text>
-              <Text>{thb(line.other_deductions)}</Text>
+              <Text>{thbPdf(line.other_deductions)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text style={styles.bold}>Total deductions</Text>
-              <Text style={styles.bold}>{thb(d.totalDeductions)}</Text>
+              <Text style={styles.bold}>{thbPdf(d.totalDeductions)}</Text>
             </View>
           </View>
         </View>
@@ -221,10 +219,32 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
           </View>
         </View>
 
+        {/* Employer-paid (not deducted) */}
+        {d.hasEmployerPaid && (
+          <View>
+            <Text style={styles.sectionTitle}>Employer-paid · not deducted</Text>
+            {d.workPermitAnnual > 0 && (
+              <View style={styles.row}>
+                <Text>Work permit & visa (annual)</Text>
+                <Text>{thbPdf(d.workPermitAnnual)}</Text>
+              </View>
+            )}
+            {d.employerSso > 0 && (
+              <View style={styles.row}>
+                <Text>Social Security — employer 5%</Text>
+                <Text>{thbPdf(d.employerSso)}</Text>
+              </View>
+            )}
+            <Text style={styles.meta}>
+              Paid by the employer. Does not reduce net pay.
+            </Text>
+          </View>
+        )}
+
         {/* Net */}
         <View style={styles.netBox}>
           <Text style={styles.netLabel}>NET PAY</Text>
-          <Text style={styles.netValue}>{thb(d.net)}</Text>
+          <Text style={styles.netValue}>{thbPdf(d.net)}</Text>
         </View>
 
         {/* Signatures */}

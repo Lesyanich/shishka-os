@@ -45,6 +45,8 @@ export interface PayslipStaff {
   employment_type: string | null
   sso_number: string | null
   monthly_salary: number | null
+  /** Employer-paid annual work permit + visa cost (THB). Informational, never deducted. */
+  work_permit_annual_thb: number | null
 }
 
 /** A full payslip = one payroll_lines row + its staff + its period. */
@@ -135,7 +137,7 @@ export function usePayroll() {
         supabase
           .from('staff')
           .select(
-            'id, name, name_th, role, nationality, hire_date, employment_type, sso_number, monthly_salary',
+            'id, name, name_th, role, nationality, hire_date, employment_type, sso_number, monthly_salary, work_permit_annual_thb',
           )
           .eq('id', staffId)
           .maybeSingle(),

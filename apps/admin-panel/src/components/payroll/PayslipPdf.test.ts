@@ -39,6 +39,7 @@ describe('PayslipPdf', () => {
           employment_type: 'full_time',
           sso_number: null,
           monthly_salary: 15000,
+          work_permit_annual_thb: 15000,
         },
         period: {
           id: 'p1',
