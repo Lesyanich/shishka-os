@@ -1,18 +1,18 @@
 import { useState, useRef, useEffect } from 'react'
-import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
+import { Check, Loader2, Search, X } from 'lucide-react'
 import type { SaladBarSlot, NomenclatureOption } from '../../hooks/useSaladBarLayout'
 
 /* ─── Color map ─── */
 
 const COLOR_MAP: Record<string, string> = {
-  base: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50',
-  vegetable: 'bg-orange-900/40 text-orange-300 border-orange-700/50',
-  protein: 'bg-red-900/40 text-red-300 border-red-700/50',
-  topping: 'bg-yellow-900/40 text-yellow-300 border-yellow-700/50',
-  accent: 'bg-violet-900/40 text-violet-300 border-violet-700/50',
+  base: 'bg-emerald-900/50 text-emerald-200 border-emerald-600/40',
+  vegetable: 'bg-orange-900/50 text-orange-200 border-orange-600/40',
+  protein: 'bg-red-900/50 text-red-200 border-red-600/40',
+  topping: 'bg-yellow-900/50 text-yellow-200 border-yellow-600/40',
+  accent: 'bg-violet-900/50 text-violet-200 border-violet-600/40',
 }
 
-const EMPTY_COLOR = 'bg-slate-800/60 text-slate-400 border-slate-700/50'
+const EMPTY_COLOR = 'bg-slate-800/60 text-slate-400 border-slate-700/40'
 
 function slotColor(group: string | null): string {
   if (!group) return EMPTY_COLOR
@@ -21,25 +21,15 @@ function slotColor(group: string | null): string {
 
 /* ─── GN real dimensions (mm) ─── */
 // Well depth = 530mm (one GN 1/1 lengthwise front→back)
-// Back row depth = 325mm, Front row depth = 176mm, divider ~29mm
-
-// Width along the salad bar (left→right) for each GN size.
-// GN 1/1 spans FULL depth (530mm front→back), so its WIDTH (325mm) runs along the bar.
-// Back row pans: depth dimension (325mm) goes front→back.
-// Front row pans: depth dimension (176mm) goes front→back.
+// GN 1/1 spans FULL depth (530mm), width along bar = 325mm
 const GN_WIDTH_MM: Record<string, number> = {
-  '1/1': 325,   // 530×325 — 530 goes front→back (full depth), 325 along bar
-  '1/2': 265,   // 265×325 — 325 goes front→back (back row), 265 along bar
-  '1/3': 176,   // 176×325 — 325 goes front→back (back row), 176 along bar
-  '1/6': 162,   // 176×162 — 176 goes front→back (front row), 162 along bar
-  '1/9': 108,   // 176×108 — 176 goes front→back (front row), 108 along bar
+  '1/1': 325,
+  '1/2': 265,
+  '1/3': 176,
+  '1/6': 162,
+  '1/9': 108,
 }
 
-// Depth front-to-back (mm) — determines row height proportion
-const ROW_DEPTH_MM = { back: 325, front: 176 } as const
-// Well total: 325 + 176 + ~29mm divider = 530mm
-
-// GN 1/1 spans full depth (both rows) — compute its front-row width too
 const GN_FULL_DEPTH_SIZES = new Set(['1/1'])
 
 /* ─── Ingredient Picker ─── */
@@ -88,7 +78,6 @@ function IngredientPicker({
       </div>
 
       <div className="max-h-48 overflow-y-auto">
-        {/* Clear option */}
         <button
           onClick={() => onSelect(null)}
           className={[
@@ -142,7 +131,6 @@ function SlotCard({
   const [pickerOpen, setPickerOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Close picker on outside click
   useEffect(() => {
     if (!pickerOpen) return
     function handleClick(e: MouseEvent) {
@@ -156,43 +144,38 @@ function SlotCard({
 
   const hasIngredient = !!slot.ingredient_id
   const colorClass = hasIngredient ? slotColor(slot.color_group) : EMPTY_COLOR
+  const label = slot.display_name ?? slot.ingredient_name ?? 'Empty'
 
   return (
-    <div
-      ref={containerRef}
-      className="relative h-full"
-    >
+    <div ref={containerRef} className="relative h-full min-w-0">
       <button
         onClick={() => setPickerOpen(!pickerOpen)}
         className={[
-          'flex h-full w-full flex-col items-start gap-0.5 rounded-md border p-2 text-left transition-all',
-          'hover:brightness-110 hover:ring-1 hover:ring-white/10',
+          'flex h-full w-full flex-col overflow-hidden rounded border p-1.5 text-left transition-all',
+          'hover:brightness-125 hover:ring-1 hover:ring-white/20',
           colorClass,
         ].join(' ')}
       >
-        {/* Header: cell number + slot code + GN size */}
-        <div className="flex w-full items-center justify-between">
-          <div className="flex items-center gap-1">
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/15 text-[9px] font-bold">{cellNumber}</span>
-            <span className="text-[10px] font-bold opacity-70">{slot.slot_code}</span>
-          </div>
-          <span className="rounded bg-black/20 px-1 py-0.5 text-[9px] font-mono">
-            GN {slot.gn_size}
+        {/* Header row */}
+        <div className="flex w-full items-center gap-1 min-w-0">
+          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[8px] font-bold leading-none">
+            {cellNumber}
+          </span>
+          <span className="truncate text-[9px] font-semibold opacity-60">{slot.slot_code}</span>
+          <span className="ml-auto shrink-0 text-[8px] font-mono opacity-50">
+            {slot.gn_size}
           </span>
         </div>
 
-        {/* Ingredient display name */}
-        <p className="mt-0.5 text-xs font-medium leading-tight">
-          {slot.display_name ?? slot.ingredient_name ?? 'Empty'}
-        </p>
+        {/* Name */}
+        <p className="mt-0.5 w-full truncate text-[11px] font-semibold leading-tight">{label}</p>
 
-        {/* Prep method */}
+        {/* Prep — only if enough space (back row / full-depth) */}
         {slot.prep_method && (
-          <p className="mt-auto text-[10px] opacity-60 leading-tight">{slot.prep_method}</p>
+          <p className="mt-auto w-full truncate text-[8px] opacity-50 leading-tight">
+            {slot.prep_method}
+          </p>
         )}
-
-        {/* Expand hint */}
-        <ChevronDown className="absolute bottom-1 right-1 h-3 w-3 opacity-30" />
       </button>
 
       {pickerOpen && (
@@ -205,6 +188,56 @@ function SlotCard({
           }}
           onClose={() => setPickerOpen(false)}
         />
+      )}
+    </div>
+  )
+}
+
+/* ─── Slot Row ─── */
+
+function SlotRow({
+  slots,
+  ingredients,
+  onUpdate,
+  numbering,
+  height,
+}: {
+  slots: SaladBarSlot[]
+  ingredients: NomenclatureOption[]
+  onUpdate: (slotId: string, ingredientId: string | null) => void
+  numbering: Map<string, number>
+  height: number
+}) {
+  // Total mm for this row
+  const totalMm = slots.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
+
+  return (
+    <div className="flex gap-0.5" style={{ height: `${height}px` }}>
+      {slots.map((slot) => {
+        const widthMm = GN_WIDTH_MM[slot.gn_size] ?? 108
+        return (
+          <div
+            key={slot.id}
+            className="min-w-0"
+            style={{ flex: `${widthMm} ${widthMm} 0%` }}
+          >
+            <SlotCard
+              slot={slot}
+              ingredients={ingredients}
+              onUpdate={onUpdate}
+              cellNumber={numbering.get(slot.id) ?? 0}
+            />
+          </div>
+        )
+      })}
+      {/* Show unused space as dashed placeholder if row is short */}
+      {totalMm < 1100 && (
+        <div
+          className="rounded border border-dashed border-slate-700/30 flex items-center justify-center"
+          style={{ flex: `${1134 - totalMm} 0 0%`, opacity: 0.3 }}
+        >
+          <span className="text-[8px] text-slate-600">{1134 - totalMm}mm</span>
+        </div>
       )}
     </div>
   )
@@ -225,7 +258,6 @@ function UnitVisual({
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
 }) {
-  // GN 1/1 pans span full depth (530mm front→back); others sit in their row
   const fullDepthSlots = slots
     .filter((s) => GN_FULL_DEPTH_SIZES.has(s.gn_size))
     .sort((a, b) => a.position - b.position)
@@ -236,105 +268,81 @@ function UnitVisual({
     .filter((s) => s.row === 'front')
     .sort((a, b) => a.position - b.position)
 
-  // Compute widths: full-depth pans + row pans share the total bar width (~1134mm)
-  const fullDepthTotalMm = fullDepthSlots.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-  const rowTotalMm = frontRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-  const barTotalMm = fullDepthTotalMm + rowTotalMm
-  const fullDepthPct = barTotalMm > 0 ? (fullDepthTotalMm / barTotalMm) * 100 : 0
-
-  // Sequential cell numbering: back row (incl. full-depth) L→R, then front row L→R
+  // Sequential numbering: back (incl full-depth) L→R, then front L→R
   const numbering = new Map<string, number>()
   let n = 1
   for (const s of [...fullDepthSlots, ...backRow]) numbering.set(s.id, n++)
   for (const s of frontRow) numbering.set(s.id, n++)
 
-  const frontH = 65  // px for front row
-  const backH = Math.round(frontH * (ROW_DEPTH_MM.back / ROW_DEPTH_MM.front)) // ~120px
-  const totalH = frontH + backH + 4 // 4px gap
+  const fullDepthTotalMm = fullDepthSlots.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
+  const frontTotalMm = frontRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
+  const barTotalMm = fullDepthTotalMm + frontTotalMm
+
+  const FRONT_H = 56
+  const BACK_H = 100
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
-        <p className="text-[10px] text-slate-500">{subtitle}</p>
+    <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-3">
+      {/* Header */}
+      <div className="mb-2 flex items-baseline justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
+          <p className="text-[10px] text-slate-500">{subtitle}</p>
+        </div>
+        <span className="text-[9px] font-mono text-slate-600">~{barTotalMm}mm</span>
       </div>
 
-      {/* Work surface indicator */}
-      <div className="mb-2 rounded bg-slate-800/50 px-3 py-1.5 text-center text-[10px] text-slate-500 border border-slate-700/30">
-        WORK SURFACE (150 × 25 cm)
+      {/* Work surface */}
+      <div className="mb-1.5 rounded bg-slate-800/40 px-2 py-1 text-center text-[9px] text-slate-600 border border-slate-700/20">
+        WORK SURFACE · 150 × 25 cm
       </div>
 
-      {/* Layout: full-depth pans on left + front/back rows stacked on right */}
-      <div className="flex gap-1" style={{ height: `${totalH}px` }}>
-        {/* Full-depth pans (GN 1/1 — span both rows) */}
+      {/* Layout */}
+      <div className="flex gap-0.5">
+        {/* Full-depth column (GN 1/1) */}
         {fullDepthSlots.length > 0 && (
           <div
-            className="flex gap-1 shrink-0"
-            style={{ width: `${fullDepthPct}%` }}
+            className="flex flex-col gap-0.5 shrink-0"
+            style={{ flex: `${fullDepthTotalMm} 0 0%` }}
           >
             {fullDepthSlots.map((slot) => (
-              <div key={slot.id} className="relative flex-1">
+              <div key={slot.id} style={{ height: `${FRONT_H + BACK_H + 2}px` }}>
                 <SlotCard
                   slot={slot}
                   ingredients={ingredients}
                   onUpdate={onUpdate}
                   cellNumber={numbering.get(slot.id) ?? 0}
                 />
-                <span className="absolute bottom-1 left-2 text-[8px] text-white/30">530mm depth</span>
               </div>
             ))}
           </div>
         )}
 
         {/* Front + Back rows stacked */}
-        <div className="flex flex-1 flex-col gap-1">
-          {/* Front row */}
-          <div style={{ height: `${frontH}px` }}>
-            <div className="flex h-full gap-1">
-              {frontRow.map((slot) => {
-                const w = GN_WIDTH_MM[slot.gn_size] ?? 108
-                const pct = (w / Math.max(rowTotalMm, 1)) * 100
-                return (
-                  <div key={slot.id} className="relative" style={{ width: `${pct}%`, flexShrink: 0 }}>
-                    <SlotCard
-                      slot={slot}
-                      ingredients={ingredients}
-                      onUpdate={onUpdate}
-                      cellNumber={numbering.get(slot.id) ?? 0}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Back row */}
-          <div style={{ height: `${backH}px` }}>
-            <div className="flex h-full gap-1">
-              {backRow.map((slot) => {
-                const w = GN_WIDTH_MM[slot.gn_size] ?? 108
-                const backTotalMm = backRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-                const pct = (w / Math.max(backTotalMm, 1)) * 100
-                return (
-                  <div key={slot.id} className="relative" style={{ width: `${pct}%`, flexShrink: 0 }}>
-                    <SlotCard
-                      slot={slot}
-                      ingredients={ingredients}
-                      onUpdate={onUpdate}
-                      cellNumber={numbering.get(slot.id) ?? 0}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <SlotRow
+            slots={frontRow}
+            ingredients={ingredients}
+            onUpdate={onUpdate}
+            numbering={numbering}
+            height={FRONT_H}
+          />
+          <SlotRow
+            slots={backRow}
+            ingredients={ingredients}
+            onUpdate={onUpdate}
+            numbering={numbering}
+            height={BACK_H}
+          />
         </div>
       </div>
 
-      {/* Row labels */}
-      <div className="mt-1 flex justify-between text-[8px] text-slate-600">
-        <span>← {fullDepthTotalMm > 0 ? `Full depth (530mm) | ` : ''}Front {ROW_DEPTH_MM.front}mm + Back {ROW_DEPTH_MM.back}mm →</span>
-        <span>Well ~{barTotalMm}mm</span>
+      {/* Dimension labels */}
+      <div className="mt-1 flex items-center gap-2 text-[8px] text-slate-600">
+        {fullDepthTotalMm > 0 && <span>Full depth 530mm</span>}
+        <span>Front {frontRow.length} slots · 176mm</span>
+        <span className="opacity-50">|</span>
+        <span>Back {backRow.length + fullDepthSlots.length} slots · 325mm</span>
       </div>
     </div>
   )
@@ -392,29 +400,29 @@ const SALAD_RECIPES: SaladRecipe[] = [
 
 function CheatSheet() {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-      <h3 className="mb-3 text-sm font-semibold text-slate-100">Assembly Cheat Sheet</h3>
+    <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-3">
+      <h3 className="mb-2 text-sm font-semibold text-slate-100">Assembly Cheat Sheet</h3>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-[11px]">
           <thead>
-            <tr className="border-b border-slate-800 text-left text-[10px] uppercase tracking-wider text-slate-500">
-              <th className="pb-2 pr-3 font-semibold">Salad</th>
-              <th className="pb-2 pr-3 font-semibold">Base (U1)</th>
-              <th className="pb-2 pr-3 font-semibold">Vegetables (U1)</th>
-              <th className="pb-2 pr-3 font-semibold">Proteins (U2)</th>
-              <th className="pb-2 pr-3 font-semibold">Toppings (U2)</th>
-              <th className="pb-2 font-semibold">Dressing</th>
+            <tr className="border-b border-slate-800 text-left text-[9px] uppercase tracking-wider text-slate-500">
+              <th className="pb-1.5 pr-3 font-semibold">Salad</th>
+              <th className="pb-1.5 pr-3 font-semibold">Base</th>
+              <th className="pb-1.5 pr-3 font-semibold">Vegetables</th>
+              <th className="pb-1.5 pr-3 font-semibold">Proteins</th>
+              <th className="pb-1.5 pr-3 font-semibold">Toppings</th>
+              <th className="pb-1.5 font-semibold">Dressing</th>
             </tr>
           </thead>
           <tbody>
             {SALAD_RECIPES.map((r) => (
-              <tr key={r.name} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                <td className="py-2 pr-3 font-medium text-slate-200 whitespace-nowrap">{r.name}</td>
-                <td className="py-2 pr-3 text-slate-400">{r.base}</td>
-                <td className="py-2 pr-3 text-slate-400">{r.vegetables}</td>
-                <td className="py-2 pr-3 text-slate-400">{r.proteins}</td>
-                <td className="py-2 pr-3 text-slate-400">{r.toppings}</td>
-                <td className="py-2 text-slate-400 whitespace-nowrap">{r.dressing}</td>
+              <tr key={r.name} className="border-b border-slate-800/30 hover:bg-slate-800/20">
+                <td className="py-1.5 pr-3 font-medium text-slate-200 whitespace-nowrap">{r.name}</td>
+                <td className="py-1.5 pr-3 text-slate-400">{r.base}</td>
+                <td className="py-1.5 pr-3 text-slate-400">{r.vegetables}</td>
+                <td className="py-1.5 pr-3 text-slate-400">{r.proteins}</td>
+                <td className="py-1.5 pr-3 text-slate-400">{r.toppings}</td>
+                <td className="py-1.5 text-slate-400 whitespace-nowrap">{r.dressing}</td>
               </tr>
             ))}
           </tbody>
@@ -469,25 +477,23 @@ export function SaladBarLayout({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <ColorLegend />
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <UnitVisual
-          title="Unit 1 — Bases + Vegetables"
-          subtitle="Assembly start · 150 x 80 cm"
-          slots={unit1Slots}
-          ingredients={ingredients}
-          onUpdate={onUpdateSlot}
-        />
-        <UnitVisual
-          title="Unit 2 — Proteins + Toppings"
-          subtitle="Accents + dressings · 150 x 80 cm"
-          slots={unit2Slots}
-          ingredients={ingredients}
-          onUpdate={onUpdateSlot}
-        />
-      </div>
+      <UnitVisual
+        title="Unit 1 — Bases + Vegetables"
+        subtitle="Assembly start · 150 × 80 cm"
+        slots={unit1Slots}
+        ingredients={ingredients}
+        onUpdate={onUpdateSlot}
+      />
+      <UnitVisual
+        title="Unit 2 — Proteins + Toppings"
+        subtitle="Accents + dressings · 150 × 80 cm"
+        slots={unit2Slots}
+        ingredients={ingredients}
+        onUpdate={onUpdateSlot}
+      />
 
       <CheatSheet />
     </div>
