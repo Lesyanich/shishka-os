@@ -60,7 +60,6 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
         .from('nomenclature')
         .select('id, name, product_code')
         .in('type', ['raw', 'semi_finished', 'modifier'])
-        .eq('is_active', true)
         .order('product_code'),
     ])
 
