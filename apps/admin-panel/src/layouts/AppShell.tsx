@@ -69,6 +69,7 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/menu/modifiers', icon: SlidersHorizontal, label: 'Modifiers' },
       { path: '/bom', icon: GitBranch, label: 'BOM Hub' },
       { path: '/sku', icon: Package, label: 'SKU Manager' },
+      { path: '/salad-bar', icon: LayoutGrid, label: 'Salad Bar' },
     ],
   },
   {

@@ -33,6 +33,7 @@ const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ defa
 const MissionControl = lazy(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
 const MenuPage = lazy(() => import('./pages/menu/MenuPage').then(m => ({ default: m.MenuPage })))
 const ModifiersPage = lazy(() => import('./pages/menu/ModifiersPage').then(m => ({ default: m.ModifiersPage })))
+const SaladBarPage = lazy(() => import('./pages/SaladBarPage').then(m => ({ default: m.SaladBarPage })))
 const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
 const BrainWikiPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainWikiPage })))
 const BrainDriveMapPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainDriveMapPage })))
@@ -122,6 +123,7 @@ function App() {
                   </Route>
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                   <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
+                  <Route path="/salad-bar" element={<Suspense fallback={<PageLoader />}><SaladBarPage /></Suspense>} />
                 </Route>
 
                 {/* ── Kitchen + Production — accessible to all authenticated ── */}
