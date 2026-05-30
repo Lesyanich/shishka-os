@@ -264,6 +264,59 @@ Receipt inbox, expenses, suppliers, nomenclature search, guidelines, receipt dow
 └─ Domain: finance, status: inbox, source: agent_discovery
 ```
 
+### WF-7: Расчёт ЗП в конце месяца (End-of-Month Payroll)
+
+```
+Триггер: конец месяца / "посчитай ЗП" / "расплатиться с сотрудниками".
+
+1. ИСТОЧНИК ИСТИНЫ = таблица staff (НЕ ledger, НЕ память!)
+   └─ Запросить активных: staff?select=*&is_active=eq.true
+   └─ Поля: name, monthly_salary, hire_date, fire_date, nationality,
+            employment_type, sso_number (SSF enrolled?)
+   ⚠️ НИКОГДА не спрашивай у CEO то, что есть в staff. Сначала прочитай БД.
+
+2. ОПРЕДЕЛИ СОСТАВ за период
+   ├─ Включить: is_active=true И (fire_date IS NULL ИЛИ fire_date > period_start)
+   ├─ Исключить: owners (app_role=owner, monthly_salary=null)
+   ├─ Pro-rate новичков: hire_date внутри периода → дни от hire_date до конца месяца
+   └─ Pro-rate уволенных: fire_date внутри периода → дни до fire_date
+
+3. БАЗОВЫЙ РАСЧЁТ (на сотрудника)
+   ├─ daily_rate = monthly_salary / calendar_days_in_month
+   ├─ base = monthly_salary − (unpaid_absence_days × daily_rate)
+   ├─ partial-month = monthly_salary × worked_days / calendar_days_in_month
+   ├─ overtime = OT_hours × (monthly_salary / (calendar_days × 8)) × 1.5
+   └─ gross = base + overtime
+
+4. УДЕРЖАНИЯ
+   ├─ SSF (если sso_number не пуст): 5% × gross, max 875 THB (2026 cap)
+   ├─ авансы за период (salary_advances, deducted_in_period_id IS NULL)
+   └─ net = gross − SSF − авансы
+
+5. НЕЯВКИ — спросить CEO ТОЛЬКО то, чего нет в БД
+   └─ attendance не ведётся в БД ⇒ спроси: "у кого сколько неявок и какого типа
+      (за свой счёт / больничный)?". Тип решает: удерживаем или нет.
+
+6. ВЕДОМОСТЬ
+   └─ Создать agents/finance/payroll/{YYYY-MM}-payroll.md (шаблон: 2026-05)
+   └─ Таблица: name | salary | days basis | adjustment | net payable + TOTAL
+
+7. ПРОВЕРКА ДАННЫХ (data corrections)
+   ├─ Уволенные, но is_active=true → флаг на исправление (/hr или /tech)
+   └─ work-permit иностранцы без sso_number → флаг lawyer (SSF enrollment)
+
+8. ЗАПИСЬ В LEDGER (Confirm-All — СТОП, ждать OK)
+   ├─ Каждая ЗП = approve_receipt / expense_ledger OpEx, category 2601,
+   │  details "Salary: {name} ({period})", payment_method=cash
+   └─ Overtime отдельной строкой (2604). SSF employer — 2603.
+
+9. TRACKING
+   └─ emit_business_task: "Payroll {month}: {N} staff, {total} THB" — done.
+```
+
+**Правило WF-7:** staff-таблица — единственный источник окладов и состава.
+Память агента и старые ledger-строки могут быть устаревшими — не доверять им.
+
 ---
 
 ## Определение типа поставщика → guideline
