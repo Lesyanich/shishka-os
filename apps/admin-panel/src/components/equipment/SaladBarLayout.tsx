@@ -20,26 +20,27 @@ function slotColor(group: string | null): string {
 }
 
 /* ─── GN real dimensions (mm) ─── */
+// Well depth = 530mm (one GN 1/1 lengthwise front→back)
+// Back row depth = 325mm, Front row depth = 176mm, divider ~29mm
 
-// Width along the salad bar (the dimension that runs left→right)
+// Width along the salad bar (left→right) for each GN size.
+// GN 1/1 spans FULL depth (530mm front→back), so its WIDTH (325mm) runs along the bar.
+// Back row pans: depth dimension (325mm) goes front→back.
+// Front row pans: depth dimension (176mm) goes front→back.
 const GN_WIDTH_MM: Record<string, number> = {
-  '1/1': 530,   // 530 × 325mm
-  '1/2': 265,   // 265 × 325mm
-  '1/3': 176,   // 176 × 325mm
-  '1/6': 162,   // 176 × 162mm (placed with 176mm front-to-back)
-  '1/9': 108,   // 176 × 108mm (placed with 176mm front-to-back)
+  '1/1': 325,   // 530×325 — 530 goes front→back (full depth), 325 along bar
+  '1/2': 265,   // 265×325 — 325 goes front→back (back row), 265 along bar
+  '1/3': 176,   // 176×325 — 325 goes front→back (back row), 176 along bar
+  '1/6': 162,   // 176×162 — 176 goes front→back (front row), 162 along bar
+  '1/9': 108,   // 176×108 — 176 goes front→back (front row), 108 along bar
 }
 
 // Depth front-to-back (mm) — determines row height proportion
 const ROW_DEPTH_MM = { back: 325, front: 176 } as const
+// Well total: 325 + 176 + ~29mm divider = 530mm
 
-function gnWidthPct(size: string, row: 'back' | 'front', slots: SaladBarSlot[]): string {
-  const widthMm = GN_WIDTH_MM[size] ?? 108
-  const rowSlots = slots.filter((s) => s.row === row)
-  const totalMm = rowSlots.reduce((sum, s) => sum + (GN_WIDTH_MM[s.gn_size] ?? 108), 0)
-  // Use actual total of pans in this row as 100% (fills the bar width)
-  return `${(widthMm / Math.max(totalMm, 1)) * 100}%`
-}
+// GN 1/1 spans full depth (both rows) — compute its front-row width too
+const GN_FULL_DEPTH_SIZES = new Set(['1/1'])
 
 /* ─── Ingredient Picker ─── */
 
@@ -131,12 +132,10 @@ function SlotCard({
   slot,
   ingredients,
   onUpdate,
-  allSlots,
 }: {
   slot: SaladBarSlot
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
-  allSlots: SaladBarSlot[]
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -159,8 +158,7 @@ function SlotCard({
   return (
     <div
       ref={containerRef}
-      className="relative"
-      style={{ width: gnWidthPct(slot.gn_size, slot.row, allSlots), flexShrink: 0 }}
+      className="relative h-full"
     >
       <button
         onClick={() => setPickerOpen(!pickerOpen)}
@@ -222,8 +220,26 @@ function UnitVisual({
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
 }) {
-  const backRow = slots.filter((s) => s.row === 'back').sort((a, b) => a.position - b.position)
-  const frontRow = slots.filter((s) => s.row === 'front').sort((a, b) => a.position - b.position)
+  // GN 1/1 pans span full depth (530mm front→back); others sit in their row
+  const fullDepthSlots = slots
+    .filter((s) => GN_FULL_DEPTH_SIZES.has(s.gn_size))
+    .sort((a, b) => a.position - b.position)
+  const backRow = slots
+    .filter((s) => s.row === 'back' && !GN_FULL_DEPTH_SIZES.has(s.gn_size))
+    .sort((a, b) => a.position - b.position)
+  const frontRow = slots
+    .filter((s) => s.row === 'front')
+    .sort((a, b) => a.position - b.position)
+
+  // Compute widths: full-depth pans + row pans share the total bar width (~1134mm)
+  const fullDepthTotalMm = fullDepthSlots.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
+  const rowTotalMm = frontRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
+  const barTotalMm = fullDepthTotalMm + rowTotalMm
+  const fullDepthPct = barTotalMm > 0 ? (fullDepthTotalMm / barTotalMm) * 100 : 0
+
+  const frontH = 65  // px for front row
+  const backH = Math.round(frontH * (ROW_DEPTH_MM.back / ROW_DEPTH_MM.front)) // ~120px
+  const totalH = frontH + backH + 4 // 4px gap
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
@@ -234,43 +250,80 @@ function UnitVisual({
 
       {/* Work surface indicator */}
       <div className="mb-2 rounded bg-slate-800/50 px-3 py-1.5 text-center text-[10px] text-slate-500 border border-slate-700/30">
-        WORK SURFACE (150 x 25 cm)
+        WORK SURFACE (150 × 25 cm)
       </div>
 
-      {/* Front row (shown first — top of salad bar from customer perspective) */}
-      <div className="mb-2">
-        <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-          Front Row · {ROW_DEPTH_MM.front}mm depth
-        </p>
-        <div className="flex gap-1" style={{ minHeight: `${(ROW_DEPTH_MM.front / ROW_DEPTH_MM.back) * 120}px` }}>
-          {frontRow.map((slot) => (
-            <SlotCard
-              key={slot.id}
-              slot={slot}
-              ingredients={ingredients}
-              onUpdate={onUpdate}
-              allSlots={slots}
-            />
-          ))}
+      {/* Layout: full-depth pans on left + front/back rows stacked on right */}
+      <div className="flex gap-1" style={{ height: `${totalH}px` }}>
+        {/* Full-depth pans (GN 1/1 — span both rows) */}
+        {fullDepthSlots.length > 0 && (
+          <div
+            className="flex gap-1 shrink-0"
+            style={{ width: `${fullDepthPct}%` }}
+          >
+            {fullDepthSlots.map((slot) => (
+              <div key={slot.id} className="relative flex-1">
+                <SlotCard
+                  slot={slot}
+                  ingredients={ingredients}
+                  onUpdate={onUpdate}
+
+                />
+                <span className="absolute bottom-1 left-2 text-[8px] text-white/30">530mm depth</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Front + Back rows stacked */}
+        <div className="flex flex-1 flex-col gap-1">
+          {/* Front row */}
+          <div style={{ height: `${frontH}px` }}>
+            <div className="flex h-full gap-1">
+              {frontRow.map((slot) => {
+                const w = GN_WIDTH_MM[slot.gn_size] ?? 108
+                const pct = (w / Math.max(rowTotalMm, 1)) * 100
+                return (
+                  <div key={slot.id} className="relative" style={{ width: `${pct}%`, flexShrink: 0 }}>
+                    <SlotCard
+                      slot={slot}
+                      ingredients={ingredients}
+                      onUpdate={onUpdate}
+    
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Back row */}
+          <div style={{ height: `${backH}px` }}>
+            <div className="flex h-full gap-1">
+              {backRow.map((slot) => {
+                const w = GN_WIDTH_MM[slot.gn_size] ?? 108
+                const backTotalMm = backRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
+                const pct = (w / Math.max(backTotalMm, 1)) * 100
+                return (
+                  <div key={slot.id} className="relative" style={{ width: `${pct}%`, flexShrink: 0 }}>
+                    <SlotCard
+                      slot={slot}
+                      ingredients={ingredients}
+                      onUpdate={onUpdate}
+    
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Back row */}
-      <div>
-        <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-          Back Row · {ROW_DEPTH_MM.back}mm depth
-        </p>
-        <div className="flex gap-1" style={{ minHeight: '120px' }}>
-          {backRow.map((slot) => (
-            <SlotCard
-              key={slot.id}
-              slot={slot}
-              ingredients={ingredients}
-              onUpdate={onUpdate}
-              allSlots={slots}
-            />
-          ))}
-        </div>
+      {/* Row labels */}
+      <div className="mt-1 flex justify-between text-[8px] text-slate-600">
+        <span>← {fullDepthTotalMm > 0 ? `Full depth (530mm) | ` : ''}Front {ROW_DEPTH_MM.front}mm + Back {ROW_DEPTH_MM.back}mm →</span>
+        <span>Well ~{barTotalMm}mm</span>
       </div>
     </div>
   )
