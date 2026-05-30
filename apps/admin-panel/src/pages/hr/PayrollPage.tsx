@@ -5,13 +5,16 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  FileText,
   Loader2,
 } from 'lucide-react'
 import {
   usePayroll,
   type PayrollPeriod,
   type PayrollLine,
+  type PayslipData,
 } from '../../hooks/use-payroll'
+import { Payslip } from '../../components/payroll/Payslip'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-slate-700 text-slate-300',
@@ -82,16 +85,27 @@ function PeriodRow({
   onCalculate,
   onApprove,
   getLines,
+  getPayslip,
 }: {
   period: PayrollPeriod
   onCalculate: (id: string) => Promise<void>
   onApprove: (id: string) => Promise<void>
   getLines: (id: string) => Promise<PayrollLine[]>
+  getPayslip: (periodId: string, staffId: string) => Promise<PayslipData | null>
 }) {
   const [expanded, setExpanded] = useState(false)
   const [lines, setLines] = useState<PayrollLine[]>([])
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [payslip, setPayslip] = useState<PayslipData | null>(null)
+  const [payslipLoadingId, setPayslipLoadingId] = useState<string | null>(null)
+
+  async function openPayslip(staffId: string) {
+    setPayslipLoadingId(staffId)
+    const data = await getPayslip(period.id, staffId)
+    setPayslipLoadingId(null)
+    if (data) setPayslip(data)
+  }
 
   async function toggleExpand() {
     if (!expanded) {
@@ -205,6 +219,7 @@ function PeriodRow({
                     <th className="px-2 py-2 text-right font-medium">Deduct</th>
                     <th className="px-2 py-2 text-right font-medium">SSO</th>
                     <th className="px-3 py-2 text-right font-medium">Net</th>
+                    <th className="px-2 py-2 text-center font-medium">Payslip</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
@@ -219,6 +234,21 @@ function PeriodRow({
                       <td className="px-2 py-2 text-right text-red-400">{l.absence_deduction ? thb(l.absence_deduction) : '—'}</td>
                       <td className="px-2 py-2 text-right text-slate-400">{thb(l.sso_employee)}</td>
                       <td className="px-3 py-2 text-right font-semibold text-emerald-400">{thb(l.net_pay)}</td>
+                      <td className="px-2 py-2 text-center">
+                        <button
+                          onClick={() => openPayslip(l.staff_id)}
+                          disabled={payslipLoadingId === l.staff_id}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-slate-400 transition hover:bg-slate-800 hover:text-emerald-300 disabled:opacity-50"
+                          title="View payslip"
+                        >
+                          {payslipLoadingId === l.staff_id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <FileText className="h-3 w-3" />
+                          )}
+                          View
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -230,6 +260,7 @@ function PeriodRow({
                     <td className="px-3 py-2 text-right text-sm font-bold text-emerald-300">
                       {thb(totalNet)}
                     </td>
+                    <td />
                   </tr>
                 </tfoot>
               </table>
@@ -241,13 +272,24 @@ function PeriodRow({
           )}
         </div>
       )}
+
+      {payslip && (
+        <Payslip data={payslip} onClose={() => setPayslip(null)} />
+      )}
     </div>
   )
 }
 
 export function PayrollPage() {
-  const { periods, isLoading, createPeriod, calculatePayroll, approvePayroll, getLines } =
-    usePayroll()
+  const {
+    periods,
+    isLoading,
+    createPeriod,
+    calculatePayroll,
+    approvePayroll,
+    getLines,
+    getPayslip,
+  } = usePayroll()
   const [showForm, setShowForm] = useState(false)
 
   if (isLoading) {
@@ -290,6 +332,7 @@ export function PayrollPage() {
             onCalculate={async (id) => { await calculatePayroll(id) }}
             onApprove={async (id) => { await approvePayroll(id) }}
             getLines={getLines}
+            getPayslip={getPayslip}
           />
         ))}
       </div>

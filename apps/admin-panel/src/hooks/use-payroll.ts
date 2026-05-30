@@ -34,6 +34,26 @@ export interface PayrollLine {
   notes: string | null
 }
 
+/** Staff detail needed to render a formal payslip header. */
+export interface PayslipStaff {
+  id: string
+  name: string
+  name_th: string | null
+  role: string
+  nationality: string | null
+  hire_date: string | null
+  employment_type: string | null
+  sso_number: string | null
+  monthly_salary: number | null
+}
+
+/** A full payslip = one payroll_lines row + its staff + its period. */
+export interface PayslipData {
+  line: PayrollLine
+  staff: PayslipStaff
+  period: PayrollPeriod
+}
+
 export function usePayroll() {
   const [periods, setPeriods] = useState<PayrollPeriod[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -103,5 +123,47 @@ export function usePayroll() {
     }))
   }, [])
 
-  return { periods, isLoading, createPeriod, calculatePayroll, approvePayroll, getLines }
+  const getPayslip = useCallback(
+    async (periodId: string, staffId: string): Promise<PayslipData | null> => {
+      const [lineRes, staffRes, periodRes] = await Promise.all([
+        supabase
+          .from('payroll_lines')
+          .select('*')
+          .eq('payroll_period_id', periodId)
+          .eq('staff_id', staffId)
+          .maybeSingle(),
+        supabase
+          .from('staff')
+          .select(
+            'id, name, name_th, role, nationality, hire_date, employment_type, sso_number, monthly_salary',
+          )
+          .eq('id', staffId)
+          .maybeSingle(),
+        supabase
+          .from('payroll_periods')
+          .select('*')
+          .eq('id', periodId)
+          .maybeSingle(),
+      ])
+
+      if (!lineRes.data || !staffRes.data || !periodRes.data) return null
+
+      return {
+        line: lineRes.data as unknown as PayrollLine,
+        staff: staffRes.data as unknown as PayslipStaff,
+        period: periodRes.data as unknown as PayrollPeriod,
+      }
+    },
+    [],
+  )
+
+  return {
+    periods,
+    isLoading,
+    createPeriod,
+    calculatePayroll,
+    approvePayroll,
+    getLines,
+    getPayslip,
+  }
 }

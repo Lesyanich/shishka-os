@@ -19,6 +19,7 @@
     "@ai-sdk/react": "^3.0.163",
     "@anthropic-ai/sdk": "^0.89.0",
     "@octokit/rest": "^22.0.1",
+    "@react-pdf/renderer": "^4.5.1",
     "@sentry/react": "^10.43.0",
     "@supabase/supabase-js": "^2.98.0",
     "@tailwindcss/vite": "^4.2.1",
