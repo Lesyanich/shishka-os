@@ -19,18 +19,17 @@ function slotColor(group: string | null): string {
   return COLOR_MAP[group] ?? EMPTY_COLOR
 }
 
-/* ─── GN real dimensions (mm) ─── */
-// Well depth = 530mm (one GN 1/1 lengthwise front→back)
-// GN 1/1 spans FULL depth (530mm), width along bar = 325mm
+/* ─── GN real dimensions (mm along the salad bar, left→right) ─── */
+// From spec: docs/business/equipment/salad-bar-layout.md
+// Back row pans sit in 325mm depth, front row in 176mm depth
+// All pans in their rows, side by side — like a puzzle
 const GN_WIDTH_MM: Record<string, number> = {
-  '1/1': 325,
-  '1/2': 265,
-  '1/3': 176,
-  '1/6': 162,
-  '1/9': 108,
+  '1/1': 530,   // 530×325 — longest pan, fills ~44% of back row
+  '1/2': 325,   // 265×325 — 325mm side along bar
+  '1/3': 176,   // 176×325 — 176mm along bar
+  '1/6': 162,   // 176×162 — 162mm along bar
+  '1/9': 108,   // 176×108 — 108mm along bar
 }
-
-const GN_FULL_DEPTH_SIZES = new Set(['1/1'])
 
 /* ─── Ingredient Picker ─── */
 
@@ -201,15 +200,17 @@ function SlotRow({
   onUpdate,
   numbering,
   height,
+  wellMm,
 }: {
   slots: SaladBarSlot[]
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
   numbering: Map<string, number>
   height: number
+  wellMm: number
 }) {
-  // Total mm for this row
   const totalMm = slots.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
+  const gap = wellMm - totalMm
 
   return (
     <div className="flex gap-0.5" style={{ height: `${height}px` }}>
@@ -230,13 +231,13 @@ function SlotRow({
           </div>
         )
       })}
-      {/* Show unused space as dashed placeholder if row is short */}
-      {totalMm < 1100 && (
+      {/* Unused well space */}
+      {gap > 20 && (
         <div
           className="rounded border border-dashed border-slate-700/30 flex items-center justify-center"
-          style={{ flex: `${1134 - totalMm} 0 0%`, opacity: 0.3 }}
+          style={{ flex: `${gap} 0 0%`, opacity: 0.3 }}
         >
-          <span className="text-[8px] text-slate-600">{1134 - totalMm}mm</span>
+          <span className="text-[8px] text-slate-600">{gap}mm</span>
         </div>
       )}
     </div>
@@ -258,28 +259,19 @@ function UnitVisual({
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
 }) {
-  const fullDepthSlots = slots
-    .filter((s) => GN_FULL_DEPTH_SIZES.has(s.gn_size))
-    .sort((a, b) => a.position - b.position)
-  const backRow = slots
-    .filter((s) => s.row === 'back' && !GN_FULL_DEPTH_SIZES.has(s.gn_size))
-    .sort((a, b) => a.position - b.position)
-  const frontRow = slots
-    .filter((s) => s.row === 'front')
-    .sort((a, b) => a.position - b.position)
+  // Simple 2-row layout: all back row pans side by side, all front row pans side by side
+  const backRow = slots.filter((s) => s.row === 'back').sort((a, b) => a.position - b.position)
+  const frontRow = slots.filter((s) => s.row === 'front').sort((a, b) => a.position - b.position)
 
-  // Sequential numbering: back (incl full-depth) L→R, then front L→R
+  // Sequential numbering: back L→R, then front L→R
   const numbering = new Map<string, number>()
   let n = 1
-  for (const s of [...fullDepthSlots, ...backRow]) numbering.set(s.id, n++)
+  for (const s of backRow) numbering.set(s.id, n++)
   for (const s of frontRow) numbering.set(s.id, n++)
 
-  const fullDepthTotalMm = fullDepthSlots.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
+  const backTotalMm = backRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
   const frontTotalMm = frontRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-  const barTotalMm = fullDepthTotalMm + frontTotalMm
-
-  const FRONT_H = 56
-  const BACK_H = 100
+  const wellMm = Math.max(backTotalMm, frontTotalMm)
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-3">
@@ -289,7 +281,7 @@ function UnitVisual({
           <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
           <p className="text-[10px] text-slate-500">{subtitle}</p>
         </div>
-        <span className="text-[9px] font-mono text-slate-600">~{barTotalMm}mm</span>
+        <span className="text-[9px] font-mono text-slate-600">~{wellMm}mm</span>
       </div>
 
       {/* Work surface */}
@@ -297,55 +289,31 @@ function UnitVisual({
         WORK SURFACE · 150 × 25 cm
       </div>
 
-      {/* Layout */}
-      <div className="flex gap-0.5">
-        {/* Full-depth column (GN 1/1) */}
-        {fullDepthSlots.length > 0 && (
-          <div
-            className="flex flex-col gap-0.5 min-w-0"
-            style={{ flex: `${fullDepthTotalMm} ${fullDepthTotalMm} 0%` }}
-          >
-            {fullDepthSlots.map((slot) => (
-              <div key={slot.id} style={{ height: `${FRONT_H + BACK_H + 2}px` }}>
-                <SlotCard
-                  slot={slot}
-                  ingredients={ingredients}
-                  onUpdate={onUpdate}
-                  cellNumber={numbering.get(slot.id) ?? 0}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Front + Back rows stacked */}
-        <div
-          className="flex min-w-0 flex-col gap-0.5"
-          style={{ flex: `${frontTotalMm} ${frontTotalMm} 0%` }}
-        >
-          <SlotRow
-            slots={frontRow}
-            ingredients={ingredients}
-            onUpdate={onUpdate}
-            numbering={numbering}
-            height={FRONT_H}
-          />
-          <SlotRow
-            slots={backRow}
-            ingredients={ingredients}
-            onUpdate={onUpdate}
-            numbering={numbering}
-            height={BACK_H}
-          />
-        </div>
+      {/* Two rows stacked — front on top, back below */}
+      <div className="flex flex-col gap-0.5">
+        <SlotRow
+          slots={frontRow}
+          ingredients={ingredients}
+          onUpdate={onUpdate}
+          numbering={numbering}
+          height={56}
+          wellMm={wellMm}
+        />
+        <SlotRow
+          slots={backRow}
+          ingredients={ingredients}
+          onUpdate={onUpdate}
+          numbering={numbering}
+          height={100}
+          wellMm={wellMm}
+        />
       </div>
 
       {/* Dimension labels */}
       <div className="mt-1 flex items-center gap-2 text-[8px] text-slate-600">
-        {fullDepthTotalMm > 0 && <span>Full depth 530mm</span>}
-        <span>Front {frontRow.length} slots · 176mm</span>
+        <span>Front {frontRow.length} slots · 176mm depth · {frontTotalMm}mm</span>
         <span className="opacity-50">|</span>
-        <span>Back {backRow.length + fullDepthSlots.length} slots · 325mm</span>
+        <span>Back {backRow.length} slots · 325mm depth · {backTotalMm}mm</span>
       </div>
     </div>
   )
