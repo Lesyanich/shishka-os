@@ -19,18 +19,26 @@ function slotColor(group: string | null): string {
   return COLOR_MAP[group] ?? EMPTY_COLOR
 }
 
-/* ─── GN size → flex proportions ─── */
+/* ─── GN real dimensions (mm) ─── */
 
-const GN_FLEX: Record<string, number> = {
-  '1/1': 6,
-  '1/2': 3,
-  '1/3': 2,
-  '1/6': 1.5,
-  '1/9': 1,
+// Width along the salad bar (the dimension that runs left→right)
+const GN_WIDTH_MM: Record<string, number> = {
+  '1/1': 530,   // 530 × 325mm
+  '1/2': 265,   // 265 × 325mm
+  '1/3': 176,   // 176 × 325mm
+  '1/6': 162,   // 176 × 162mm (placed with 176mm front-to-back)
+  '1/9': 108,   // 176 × 108mm (placed with 176mm front-to-back)
 }
 
-function gnFlex(size: string): number {
-  return GN_FLEX[size] ?? 1
+// Depth front-to-back (mm) — determines row height proportion
+const ROW_DEPTH_MM = { back: 325, front: 176 } as const
+
+function gnWidthPct(size: string, row: 'back' | 'front', slots: SaladBarSlot[]): string {
+  const widthMm = GN_WIDTH_MM[size] ?? 108
+  const rowSlots = slots.filter((s) => s.row === row)
+  const totalMm = rowSlots.reduce((sum, s) => sum + (GN_WIDTH_MM[s.gn_size] ?? 108), 0)
+  // Use actual total of pans in this row as 100% (fills the bar width)
+  return `${(widthMm / Math.max(totalMm, 1)) * 100}%`
 }
 
 /* ─── Ingredient Picker ─── */
@@ -123,10 +131,12 @@ function SlotCard({
   slot,
   ingredients,
   onUpdate,
+  allSlots,
 }: {
   slot: SaladBarSlot
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
+  allSlots: SaladBarSlot[]
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -150,7 +160,7 @@ function SlotCard({
     <div
       ref={containerRef}
       className="relative"
-      style={{ flex: gnFlex(slot.gn_size) }}
+      style={{ width: gnWidthPct(slot.gn_size, slot.row, allSlots), flexShrink: 0 }}
     >
       <button
         onClick={() => setPickerOpen(!pickerOpen)}
@@ -230,15 +240,16 @@ function UnitVisual({
       {/* Front row (shown first — top of salad bar from customer perspective) */}
       <div className="mb-2">
         <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-          Front Row · 176mm depth
+          Front Row · {ROW_DEPTH_MM.front}mm depth
         </p>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1" style={{ minHeight: `${(ROW_DEPTH_MM.front / ROW_DEPTH_MM.back) * 120}px` }}>
           {frontRow.map((slot) => (
             <SlotCard
               key={slot.id}
               slot={slot}
               ingredients={ingredients}
               onUpdate={onUpdate}
+              allSlots={slots}
             />
           ))}
         </div>
@@ -247,15 +258,16 @@ function UnitVisual({
       {/* Back row */}
       <div>
         <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-          Back Row · 325mm depth
+          Back Row · {ROW_DEPTH_MM.back}mm depth
         </p>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1" style={{ minHeight: '120px' }}>
           {backRow.map((slot) => (
             <SlotCard
               key={slot.id}
               slot={slot}
               ingredients={ingredients}
               onUpdate={onUpdate}
+              allSlots={slots}
             />
           ))}
         </div>
