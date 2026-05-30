@@ -14,6 +14,7 @@ export interface SaladBarSlot {
   position: number
   ingredient_id: string | null
   ingredient_name: string | null
+  display_name: string | null
   product_code: string | null
   color_group: string | null
   prep_location: string | null
@@ -90,6 +91,7 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
         position: row.position,
         ingredient_id: row.ingredient_id,
         ingredient_name: nom?.name ?? null,
+        display_name: row.display_name ?? null,
         product_code: nom?.product_code ?? null,
         color_group: row.color_group,
         prep_location: row.prep_location,

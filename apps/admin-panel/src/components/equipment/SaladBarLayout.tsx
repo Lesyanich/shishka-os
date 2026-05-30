@@ -132,10 +132,12 @@ function SlotCard({
   slot,
   ingredients,
   onUpdate,
+  cellNumber,
 }: {
   slot: SaladBarSlot
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
+  cellNumber: number
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -168,17 +170,20 @@ function SlotCard({
           colorClass,
         ].join(' ')}
       >
-        {/* Header: slot code + GN size */}
+        {/* Header: cell number + slot code + GN size */}
         <div className="flex w-full items-center justify-between">
-          <span className="text-[10px] font-bold opacity-70">{slot.slot_code}</span>
+          <div className="flex items-center gap-1">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/15 text-[9px] font-bold">{cellNumber}</span>
+            <span className="text-[10px] font-bold opacity-70">{slot.slot_code}</span>
+          </div>
           <span className="rounded bg-black/20 px-1 py-0.5 text-[9px] font-mono">
             GN {slot.gn_size}
           </span>
         </div>
 
-        {/* Ingredient name */}
+        {/* Ingredient display name */}
         <p className="mt-0.5 text-xs font-medium leading-tight">
-          {slot.ingredient_name ?? 'Empty'}
+          {slot.display_name ?? slot.ingredient_name ?? 'Empty'}
         </p>
 
         {/* Prep method */}
@@ -237,6 +242,12 @@ function UnitVisual({
   const barTotalMm = fullDepthTotalMm + rowTotalMm
   const fullDepthPct = barTotalMm > 0 ? (fullDepthTotalMm / barTotalMm) * 100 : 0
 
+  // Sequential cell numbering: back row (incl. full-depth) L→R, then front row L→R
+  const numbering = new Map<string, number>()
+  let n = 1
+  for (const s of [...fullDepthSlots, ...backRow]) numbering.set(s.id, n++)
+  for (const s of frontRow) numbering.set(s.id, n++)
+
   const frontH = 65  // px for front row
   const backH = Math.round(frontH * (ROW_DEPTH_MM.back / ROW_DEPTH_MM.front)) // ~120px
   const totalH = frontH + backH + 4 // 4px gap
@@ -267,7 +278,7 @@ function UnitVisual({
                   slot={slot}
                   ingredients={ingredients}
                   onUpdate={onUpdate}
-
+                  cellNumber={numbering.get(slot.id) ?? 0}
                 />
                 <span className="absolute bottom-1 left-2 text-[8px] text-white/30">530mm depth</span>
               </div>
@@ -289,7 +300,7 @@ function UnitVisual({
                       slot={slot}
                       ingredients={ingredients}
                       onUpdate={onUpdate}
-    
+                      cellNumber={numbering.get(slot.id) ?? 0}
                     />
                   </div>
                 )
@@ -310,7 +321,7 @@ function UnitVisual({
                       slot={slot}
                       ingredients={ingredients}
                       onUpdate={onUpdate}
-    
+                      cellNumber={numbering.get(slot.id) ?? 0}
                     />
                   </div>
                 )
