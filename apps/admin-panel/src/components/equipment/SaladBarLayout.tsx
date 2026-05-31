@@ -192,6 +192,13 @@ function SlotCard({
   )
 }
 
+/* ─── Scale: mm → px (fixed, no responsive shrink) ─── */
+const PX_PER_MM = 0.52
+
+function mm(v: number): number {
+  return Math.round(v * PX_PER_MM)
+}
+
 /* ─── Slot Row ─── */
 
 function SlotRow({
@@ -199,28 +206,28 @@ function SlotRow({
   ingredients,
   onUpdate,
   numbering,
-  height,
+  depthMm,
   wellMm,
 }: {
   slots: SaladBarSlot[]
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
   numbering: Map<string, number>
-  height: number
+  depthMm: number
   wellMm: number
 }) {
   const totalMm = slots.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
   const gap = wellMm - totalMm
 
   return (
-    <div className="flex gap-0.5" style={{ height: `${height}px` }}>
+    <div className="flex gap-px" style={{ height: `${mm(depthMm)}px` }}>
       {slots.map((slot) => {
         const widthMm = GN_WIDTH_MM[slot.gn_size] ?? 108
         return (
           <div
             key={slot.id}
-            className="min-w-0"
-            style={{ flex: `${widthMm} ${widthMm} 0%` }}
+            className="shrink-0"
+            style={{ width: `${mm(widthMm)}px` }}
           >
             <SlotCard
               slot={slot}
@@ -231,11 +238,10 @@ function SlotRow({
           </div>
         )
       })}
-      {/* Unused well space */}
       {gap > 20 && (
         <div
-          className="rounded border border-dashed border-slate-700/30 flex items-center justify-center"
-          style={{ flex: `${gap} 0 0%`, opacity: 0.3 }}
+          className="shrink-0 rounded border border-dashed border-slate-700/30 flex items-center justify-center"
+          style={{ width: `${mm(gap)}px`, opacity: 0.3 }}
         >
           <span className="text-[8px] text-slate-600">{gap}mm</span>
         </div>
@@ -289,24 +295,26 @@ function UnitVisual({
         WORK SURFACE · 150 × 25 cm
       </div>
 
-      {/* Two rows stacked — front on top, back below */}
-      <div className="flex flex-col gap-0.5">
-        <SlotRow
-          slots={frontRow}
-          ingredients={ingredients}
-          onUpdate={onUpdate}
-          numbering={numbering}
-          height={56}
-          wellMm={wellMm}
-        />
-        <SlotRow
-          slots={backRow}
-          ingredients={ingredients}
-          onUpdate={onUpdate}
-          numbering={numbering}
-          height={100}
-          wellMm={wellMm}
-        />
+      {/* Two rows stacked — front on top, back below. Fixed pixel sizes, scroll if needed */}
+      <div className="overflow-x-auto">
+        <div className="flex flex-col gap-px" style={{ width: `${mm(wellMm)}px` }}>
+          <SlotRow
+            slots={frontRow}
+            ingredients={ingredients}
+            onUpdate={onUpdate}
+            numbering={numbering}
+            depthMm={176}
+            wellMm={wellMm}
+          />
+          <SlotRow
+            slots={backRow}
+            ingredients={ingredients}
+            onUpdate={onUpdate}
+            numbering={numbering}
+            depthMm={325}
+            wellMm={wellMm}
+          />
+        </div>
       </div>
 
       {/* Dimension labels */}
