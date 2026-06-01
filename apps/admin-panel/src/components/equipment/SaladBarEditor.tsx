@@ -437,30 +437,31 @@ export function SaladBarEditorUnit({
               onPointerDown={(e) => startMove(e, slot)}
             >
               <PanFace slot={slot} />
-              {/* rotate */}
-              <button
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  rotatePan(slot)
-                }}
-                className="absolute -left-1.5 -top-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full border border-slate-600 bg-slate-900 text-slate-400 opacity-60 transition hover:text-sky-300 hover:opacity-100"
-                title="Rotate 90°"
-              >
-                <RotateCw className="h-2.5 w-2.5" />
-              </button>
-              {/* delete */}
-              <button
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onRemove(slot.id)
-                }}
-                className="absolute -right-1.5 -top-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full border border-slate-600 bg-slate-900 text-slate-400 opacity-60 transition hover:text-red-300 hover:opacity-100"
-                title="Remove pan"
-              >
-                <X className="h-2.5 w-2.5" />
-              </button>
+              {/* controls — single top-right cluster so they never overlap */}
+              <div className="absolute -right-1.5 -top-1.5 z-20 flex gap-0.5">
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    rotatePan(slot)
+                  }}
+                  className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-600 bg-slate-900 text-slate-400 opacity-70 transition hover:text-sky-300 hover:opacity-100"
+                  title="Rotate 90°"
+                >
+                  <RotateCw className="h-2.5 w-2.5" />
+                </button>
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onRemove(slot.id)
+                  }}
+                  className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-600 bg-slate-900 text-slate-400 opacity-70 transition hover:text-red-300 hover:opacity-100"
+                  title="Remove pan"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
               {pickerSlotId === slot.id && (
                 <IngredientPicker
                   ingredients={ingredients}
