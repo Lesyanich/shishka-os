@@ -79,8 +79,8 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const [slotsRes, ingredientsRes] = await Promise.all([
@@ -169,7 +169,7 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
         console.error('[useSaladBarLayout] update error:', err.message)
         return { ok: false, error: err.message }
       }
-      await fetchData()
+      await fetchData({ silent: true })
       return { ok: true }
     },
     [fetchData],
@@ -223,7 +223,7 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
         console.error('[useSaladBarLayout] addSlot error:', err.message)
         return { ok: false, error: err.message }
       }
-      await fetchData()
+      await fetchData({ silent: true })
       return { ok: true }
     },
     [fetchData],
@@ -231,12 +231,14 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
 
   const removeSlot = useCallback(
     async (slotId: string): Promise<MutResult> => {
+      // Optimistic: drop it locally first so there's no spinner/reload.
+      setSlots((prev) => prev.filter((s) => s.id !== slotId))
       const { error: err } = await supabase.from('salad_bar_slots').delete().eq('id', slotId)
       if (err) {
         console.error('[useSaladBarLayout] removeSlot error:', err.message)
+        await fetchData({ silent: true }) // restore on failure, no spinner
         return { ok: false, error: err.message }
       }
-      await fetchData()
       return { ok: true }
     },
     [fetchData],
@@ -288,10 +290,10 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
       const { error: insErr } = await supabase.from('salad_bar_slots').insert(rows)
       if (insErr) {
         console.error('[useSaladBarLayout] resetToFactory insert error:', insErr.message)
-        await fetchData()
+        await fetchData({ silent: true })
         return { ok: false, error: insErr.message }
       }
-      await fetchData()
+      await fetchData({ silent: true })
       return { ok: true }
     },
     [fetchData],
