@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase'
 import {
   EQUIPMENT_ID,
   FACTORY_LAYOUT,
-  GN_DIMS,
   rowLabel,
   type GnSize,
 } from '../components/equipment/saladBarGrid'
@@ -22,6 +21,9 @@ export interface SaladBarSlot {
   depth_pos: number
   grid_col: number
   grid_row: number
+  x_mm: number
+  y_mm: number
+  rotation: number
   ingredient_id: string | null
   ingredient_name: string | null
   display_name: string | null
@@ -47,16 +49,22 @@ export interface UseSaladBarLayoutResult {
   isLoading: boolean
   error: string | null
   updateSlot: (slotId: string, patch: Partial<Pick<SaladBarSlot, 'ingredient_id' | 'color_group' | 'prep_location' | 'prep_method' | 'notes'>>) => Promise<MutResult>
-  moveSlot: (slotId: string, gridCol: number, gridRow: number) => Promise<MutResult>
-  addSlot: (args: { unitNumber: 1 | 2; gnSize: GnSize; gridCol: number; gridRow: number }) => Promise<MutResult>
+  moveSlot: (slotId: string, xMm: number, yMm: number, rotation: number) => Promise<MutResult>
+  addSlot: (args: { unitNumber: 1 | 2; gnSize: GnSize; xMm: number; yMm: number; rotation: number }) => Promise<MutResult>
   removeSlot: (slotId: string) => Promise<MutResult>
   resetToFactory: (unitNumber: 1 | 2) => Promise<MutResult>
   refetch: () => void
 }
 
-/* ─── Layout field derivation (legacy columns kept valid) ─── */
-function legacyFields(gridCol: number, gridRow: number) {
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi))
+
+/* Legacy grid/back-front fields derived from real mm coords, kept NOT-NULL-valid. */
+function legacyFromXY(xMm: number, yMm: number) {
+  const gridCol = clamp(Math.round(xMm / 88), 0, 15)
+  const gridRow = clamp(Math.round(yMm / 54), 0, 11)
   return {
+    grid_col: gridCol,
+    grid_row: gridRow,
     position: Math.floor(gridCol / 2) + 1,
     row: rowLabel(gridRow),
     depth_pos: gridRow,
@@ -80,8 +88,8 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
         .from('salad_bar_slots')
         .select('*, nomenclature:ingredient_id(id, name, product_code)')
         .order('unit_number')
-        .order('grid_row')
-        .order('grid_col'),
+        .order('y_mm')
+        .order('x_mm'),
       supabase
         .from('nomenclature')
         .select('id, name, product_code')
@@ -105,7 +113,6 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
 
     const mapped: SaladBarSlot[] = (slotsRes.data ?? []).map((row) => {
       const nom = row.nomenclature as { id: string; name: string; product_code: string } | null
-      // grid_* are backfilled by migration 222; fall back defensively if null.
       const gridCol = row.grid_col ?? Math.max((row.position ?? 1) - 1, 0) * 2
       const gridRow = row.grid_row ?? (row.row === 'back' ? 0 : 6)
       return {
@@ -120,6 +127,9 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
         depth_pos: row.depth_pos ?? 0,
         grid_col: gridCol,
         grid_row: gridRow,
+        x_mm: row.x_mm ?? gridCol * 88,
+        y_mm: row.y_mm ?? gridRow * 54,
+        rotation: row.rotation ?? 0,
         ingredient_id: row.ingredient_id,
         ingredient_name: nom?.name ?? null,
         display_name: row.display_name ?? null,
@@ -165,22 +175,16 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
     [fetchData],
   )
 
-  // Move an existing pan to a new grid cell. No refetch on success — the caller
-  // holds optimistic state; this keeps dragging smooth.
+  // Move/rotate a pan. No refetch on success — caller holds optimistic state.
   const moveSlot = useCallback(
-    async (slotId: string, gridCol: number, gridRow: number): Promise<MutResult> => {
-      const patch = { grid_col: gridCol, grid_row: gridRow, ...legacyFields(gridCol, gridRow) }
+    async (slotId: string, xMm: number, yMm: number, rotation: number): Promise<MutResult> => {
+      const patch = { x_mm: Math.round(xMm), y_mm: Math.round(yMm), rotation, ...legacyFromXY(xMm, yMm) }
       const { error: err } = await supabase.from('salad_bar_slots').update(patch).eq('id', slotId)
       if (err) {
         console.error('[useSaladBarLayout] moveSlot error:', err.message)
         return { ok: false, error: err.message }
       }
-      // optimistic UI in caller; sync local truth without a network refetch
-      setSlots((prev) =>
-        prev.map((s) =>
-          s.id === slotId ? { ...s, grid_col: gridCol, grid_row: gridRow, ...legacyFields(gridCol, gridRow) } : s,
-        ),
-      )
+      setSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, ...patch } : s)))
       return { ok: true }
     },
     [],
@@ -190,23 +194,26 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
     async ({
       unitNumber,
       gnSize,
-      gridCol,
-      gridRow,
+      xMm,
+      yMm,
+      rotation,
     }: {
       unitNumber: 1 | 2
       gnSize: GnSize
-      gridCol: number
-      gridRow: number
+      xMm: number
+      yMm: number
+      rotation: number
     }): Promise<MutResult> => {
       const insert = {
         equipment_id: EQUIPMENT_ID[unitNumber],
         unit_number: unitNumber,
-        slot_code: `U${unitNumber}-${gridCol}-${gridRow}-${Date.now().toString(36)}`,
+        slot_code: `U${unitNumber}-${Math.round(xMm)}-${Math.round(yMm)}-${Date.now().toString(36)}`,
         gn_size: gnSize,
         depth_mm: 100,
-        grid_col: gridCol,
-        grid_row: gridRow,
-        ...legacyFields(gridCol, gridRow),
+        x_mm: Math.round(xMm),
+        y_mm: Math.round(yMm),
+        rotation,
+        ...legacyFromXY(xMm, yMm),
         ingredient_id: null,
         display_name: null,
         color_group: null,
@@ -240,7 +247,6 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
       const layout = FACTORY_LAYOUT[unitNumber]
       const equipment_id = EQUIPMENT_ID[unitNumber]
 
-      // Resolve product_code → ingredient_id for the factory pans that carry one.
       const codes = Array.from(new Set(layout.map((p) => p.p).filter(Boolean))) as string[]
       const idByCode = new Map<string, string>()
       if (codes.length > 0) {
@@ -260,19 +266,24 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
         return { ok: false, error: delErr.message }
       }
 
-      const rows = layout.map((p) => ({
-        equipment_id,
-        unit_number: unitNumber,
-        slot_code: `U${unitNumber}-${p.c}-${p.r}`,
-        gn_size: p.s,
-        depth_mm: GN_DIMS[p.s].h >= 6 ? 150 : 100,
-        grid_col: p.c,
-        grid_row: p.r,
-        ...legacyFields(p.c, p.r),
-        ingredient_id: p.p ? idByCode.get(p.p) ?? null : null,
-        display_name: p.n ?? null,
-        color_group: p.g ?? null,
-      }))
+      const rows = layout.map((p) => {
+        const xMm = p.c * 88
+        const yMm = p.r * 54
+        return {
+          equipment_id,
+          unit_number: unitNumber,
+          slot_code: `U${unitNumber}-${p.c}-${p.r}`,
+          gn_size: p.s,
+          depth_mm: p.s === '1/3' || p.s === '1/2' || p.s === '1/1' ? 150 : 100,
+          x_mm: xMm,
+          y_mm: yMm,
+          rotation: 0,
+          ...legacyFromXY(xMm, yMm),
+          ingredient_id: p.p ? idByCode.get(p.p) ?? null : null,
+          display_name: p.n ?? null,
+          color_group: p.g ?? null,
+        }
+      })
 
       const { error: insErr } = await supabase.from('salad_bar_slots').insert(rows)
       if (insErr) {

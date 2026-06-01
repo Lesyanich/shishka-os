@@ -8,7 +8,15 @@ import {
   canPlace,
   dimsOf,
   rowLabel,
+  footprintMM,
+  rectsOverlap,
+  canPlaceFree,
+  snapX,
+  snapY,
+  HOLE_W_MM,
+  HOLE_H_MM,
   type GridPan,
+  type FreePan,
 } from './saladBarGrid'
 
 describe('saladBarGrid geometry', () => {
@@ -55,5 +63,34 @@ describe('saladBarGrid geometry', () => {
       // 6×(2·6) + 16×(2·3) + 6×(2·2) = 72 + 96 + 24 = 192 = full grid, no overlaps
       expect(filled).toBe(GRID_COLS * GRID_ROWS)
     }
+  })
+})
+
+describe('free-form placement + rotation', () => {
+  it('footprintMM swaps w/h on 90° rotation', () => {
+    expect(footprintMM('1/3', 0)).toEqual({ w: 176, h: 324 })
+    expect(footprintMM('1/3', 90)).toEqual({ w: 324, h: 176 })
+    expect(footprintMM('1/1', 90)).toEqual({ w: 324, h: 528 })
+  })
+
+  it('snapX/snapY round to the 44/54 mm lattice', () => {
+    expect(snapX(170)).toBe(176) // 4×44
+    expect(snapX(20)).toBe(0)
+    expect(snapY(160)).toBe(162) // 3×54
+  })
+
+  it('rectsOverlap detects overlap but allows edge-touching', () => {
+    expect(rectsOverlap(0, 0, 100, 100, 50, 50, 100, 100)).toBe(true)
+    expect(rectsOverlap(0, 0, 100, 100, 100, 0, 100, 100)).toBe(false) // touching edge
+    expect(rectsOverlap(0, 0, 100, 100, 200, 0, 100, 100)).toBe(false) // apart
+  })
+
+  it('canPlaceFree rejects out-of-bounds, overlaps; ignores self', () => {
+    const pans: FreePan[] = [{ id: 'a', gn_size: '1/3', x_mm: 0, y_mm: 0, rotation: 0 }] // 176×325
+    expect(canPlaceFree(pans, 0, 0, 176, 325)).toBe(false) // overlaps a
+    expect(canPlaceFree(pans, 176, 0, 176, 325)).toBe(true) // beside a
+    expect(canPlaceFree(pans, HOLE_W_MM - 100, 0, 176, 325)).toBe(false) // off right edge
+    expect(canPlaceFree(pans, 0, HOLE_H_MM - 100, 176, 325)).toBe(false) // off bottom
+    expect(canPlaceFree(pans, 0, 0, 176, 325, 'a')).toBe(true) // ignore self → free
   })
 })

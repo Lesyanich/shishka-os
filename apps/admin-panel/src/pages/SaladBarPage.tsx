@@ -90,7 +90,7 @@ export function SaladBarPage() {
         error={error}
         onUpdateSlot={handleUpdateSlot}
         onMoveSlot={moveSlot}
-        onAddSlot={(unitNumber, gnSize, col, row) => addSlot({ unitNumber, gnSize, gridCol: col, gridRow: row })}
+        onAddSlot={(unitNumber, gnSize, xMm, yMm, rotation) => addSlot({ unitNumber, gnSize, xMm, yMm, rotation })}
         onRemoveSlot={removeSlot}
         onResetUnit={handleResetUnit}
       />
