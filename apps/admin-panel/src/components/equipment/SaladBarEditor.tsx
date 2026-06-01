@@ -1,34 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, RotateCcw, Search, X } from 'lucide-react'
+import { Check, RotateCcw, RotateCw, Search, X } from 'lucide-react'
 import type { SaladBarSlot, NomenclatureOption } from '../../hooks/useSaladBarLayout'
 import {
-  GRID_COLS,
-  GRID_ROWS,
-  GN_DIMS,
+  GN_REAL,
   GN_MM,
   HOLE_W_MM,
   HOLE_H_MM,
   PAN_TYPES,
-  buildOccupancy,
-  canPlace,
-  dimsOf,
+  canPlaceFree,
+  footprintMM,
+  snapX,
+  snapY,
+  type FreePan,
   type GnSize,
 } from './saladBarGrid'
 
 /* ─── Colors ─── */
 
 export const COLOR_MAP: Record<string, string> = {
-  base: 'bg-emerald-900/50 text-emerald-100 border-emerald-500/50',
-  vegetable: 'bg-orange-900/50 text-orange-100 border-orange-500/50',
-  protein: 'bg-red-900/50 text-red-100 border-red-500/50',
-  topping: 'bg-yellow-900/50 text-yellow-100 border-yellow-500/50',
-  accent: 'bg-violet-900/50 text-violet-100 border-violet-500/50',
+  base: 'bg-emerald-900/60 text-emerald-100 border-emerald-500/50',
+  vegetable: 'bg-orange-900/60 text-orange-100 border-orange-500/50',
+  protein: 'bg-red-900/60 text-red-100 border-red-500/50',
+  topping: 'bg-yellow-900/60 text-yellow-100 border-yellow-500/50',
+  accent: 'bg-violet-900/60 text-violet-100 border-violet-500/50',
 }
-const EMPTY_COLOR = 'bg-slate-800/70 text-slate-400 border-slate-600/40'
+const EMPTY_COLOR = 'bg-slate-800/80 text-slate-400 border-slate-600/50'
 
 function slotColor(group: string | null, hasContent: boolean): string {
   if (!hasContent) return EMPTY_COLOR
-  return (group && COLOR_MAP[group]) || 'bg-slate-700/70 text-slate-200 border-slate-500/50'
+  return (group && COLOR_MAP[group]) || 'bg-slate-700/80 text-slate-200 border-slate-500/50'
 }
 
 /* ─── Ingredient Picker ─── */
@@ -106,28 +106,22 @@ function IngredientPicker({
   )
 }
 
-/* ─── Pan face (content shown inside a placed cell or ghost) ─── */
+/* ─── Pan face ─── */
 
-function PanFace({ slot, dragging }: { slot: SaladBarSlot; dragging?: boolean }) {
+function PanFace({ slot }: { slot: SaladBarSlot }) {
   const hasContent = !!slot.ingredient_id || !!slot.display_name
   const label = slot.display_name ?? slot.ingredient_name ?? 'Empty'
-  const tall = GN_DIMS[(slot.gn_size as GnSize)]?.h >= 6
   return (
     <div
       className={[
-        'flex h-full w-full flex-col overflow-hidden rounded-md border p-1.5 text-left',
+        'flex h-full w-full flex-col overflow-hidden rounded-md border p-1 text-left',
         slotColor(slot.color_group, hasContent),
-        dragging ? 'opacity-90 shadow-2xl ring-2 ring-white/40' : '',
       ].join(' ')}
     >
       <div className="flex w-full items-center gap-1">
-        <span className="truncate text-[8px] font-semibold opacity-50">{slot.slot_code}</span>
-        <span className="ml-auto shrink-0 rounded bg-black/20 px-1 text-[8px] font-mono opacity-70">{slot.gn_size}</span>
+        <span className="ml-auto shrink-0 rounded bg-black/25 px-1 text-[8px] font-mono opacity-70">{slot.gn_size}</span>
       </div>
       <p className="mt-0.5 w-full truncate text-[11px] font-semibold leading-tight">{label}</p>
-      {tall && slot.prep_method && (
-        <p className="mt-auto w-full truncate text-[8px] opacity-50 leading-tight">{slot.prep_method}</p>
-      )}
     </div>
   )
 }
@@ -138,21 +132,20 @@ type DragState = {
   kind: 'move' | 'new'
   slotId?: string
   gnSize: GnSize
-  w: number
-  h: number
-  grabDX: number
-  grabDY: number
+  rotation: number
+  grabXmm: number // pointer offset from pan top-left, in mm
+  grabYmm: number
   pointerX: number
   pointerY: number
-  cellW: number
-  cellH: number
+  rectW: number // viewport px size (for ghost)
+  rectH: number
   moved: boolean
   startX: number
   startY: number
-  target: { col: number; row: number; valid: boolean } | null
+  target: { x: number; y: number; valid: boolean } | null
 }
 
-const MOVE_THRESHOLD = 4 // px before a press becomes a drag (vs a click)
+const MOVE_THRESHOLD = 4
 
 /* ─── Editor Unit ─── */
 
@@ -171,8 +164,8 @@ export function SaladBarEditorUnit({
   subtitle: string
   slots: SaladBarSlot[]
   ingredients: NomenclatureOption[]
-  onMove: (slotId: string, col: number, row: number) => Promise<{ ok: boolean; error?: string }>
-  onAdd: (gnSize: GnSize, col: number, row: number) => Promise<{ ok: boolean; error?: string }>
+  onMove: (slotId: string, xMm: number, yMm: number, rotation: number) => Promise<{ ok: boolean; error?: string }>
+  onAdd: (gnSize: GnSize, xMm: number, yMm: number, rotation: number) => Promise<{ ok: boolean; error?: string }>
   onRemove: (slotId: string) => Promise<{ ok: boolean; error?: string }>
   onAssign: (slotId: string, ingredientId: string | null) => void
   onReset: () => void
@@ -180,37 +173,32 @@ export function SaladBarEditorUnit({
   const boardRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null)
-  // Local mirror so moves feel instant and prop refetches don't fight an active drag.
   const [localSlots, setLocalSlots] = useState<SaladBarSlot[]>(slots)
   useEffect(() => {
     if (!drag) setLocalSlots(slots)
   }, [slots, drag])
 
   const filled = localSlots.filter((s) => s.ingredient_id || s.display_name).length
+  const asFree = (sl: SaladBarSlot[]): FreePan[] =>
+    sl.map((s) => ({ id: s.id, gn_size: s.gn_size, x_mm: s.x_mm, y_mm: s.y_mm, rotation: s.rotation }))
 
-  /* Compute the snapped target (col,row,valid) for the current pointer position. */
-  function computeTarget(d: DragState, clientX: number, clientY: number) {
-    const board = boardRef.current
-    if (!board) return null
-    const rect = board.getBoundingClientRect()
-    const cellW = rect.width / GRID_COLS
-    const cellH = rect.height / GRID_ROWS
-    const topLeftX = clientX - d.grabDX - rect.left
-    const topLeftY = clientY - d.grabDY - rect.top
-    let col = Math.round(topLeftX / cellW)
-    let row = Math.round(topLeftY / cellH)
-    col = Math.max(0, Math.min(col, GRID_COLS - d.w))
-    row = Math.max(0, Math.min(row, GRID_ROWS - d.h))
-    const occ = buildOccupancy(localSlots, d.slotId)
-    return { col, row, valid: canPlace(occ, col, row, d.w, d.h) }
+  function rect() {
+    return boardRef.current?.getBoundingClientRect()
   }
 
-  function cellSizes() {
-    const rect = boardRef.current?.getBoundingClientRect()
-    return {
-      cellW: rect ? rect.width / GRID_COLS : 40,
-      cellH: rect ? rect.height / GRID_ROWS : 40,
-    }
+  /* Compute snapped, clamped, validated target for the current pointer. */
+  function computeTarget(d: DragState, clientX: number, clientY: number) {
+    const r = rect()
+    if (!r) return null
+    const mmPerPxX = HOLE_W_MM / r.width
+    const mmPerPxY = HOLE_H_MM / r.height
+    const f = footprintMM(d.gnSize, d.rotation)
+    let x = snapX((clientX - r.left) * mmPerPxX - d.grabXmm)
+    let y = snapY((clientY - r.top) * mmPerPxY - d.grabYmm)
+    x = Math.max(0, Math.min(x, HOLE_W_MM - f.w))
+    y = Math.max(0, Math.min(y, HOLE_H_MM - f.h))
+    const valid = canPlaceFree(asFree(localSlots), x, y, f.w, f.h, d.slotId)
+    return { x, y, valid }
   }
 
   function onPointerMove(e: React.PointerEvent) {
@@ -218,8 +206,16 @@ export function SaladBarEditorUnit({
     e.preventDefault()
     const moved =
       drag.moved || Math.abs(e.clientX - drag.startX) > MOVE_THRESHOLD || Math.abs(e.clientY - drag.startY) > MOVE_THRESHOLD
-    const target = computeTarget(drag, e.clientX, e.clientY)
-    setDrag({ ...drag, pointerX: e.clientX, pointerY: e.clientY, moved, target, ...cellSizes() })
+    const r = rect()
+    setDrag({
+      ...drag,
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      moved,
+      target: computeTarget(drag, e.clientX, e.clientY),
+      rectW: r?.width ?? drag.rectW,
+      rectH: r?.height ?? drag.rectH,
+    })
   }
 
   async function onPointerUp(e: React.PointerEvent) {
@@ -232,42 +228,43 @@ export function SaladBarEditorUnit({
     const d = drag
     setDrag(null)
 
-    // A press with (almost) no movement on an existing pan = click → open picker.
     if (d.kind === 'move' && !d.moved && d.slotId) {
-      setPickerSlotId(d.slotId)
+      setPickerSlotId(d.slotId) // click → assign ingredient
       return
     }
-    if (!d.target || !d.target.valid) return // rejected drop
+    if (!d.target || !d.target.valid) return
 
     if (d.kind === 'move' && d.slotId) {
-      const { col, row } = d.target
+      const { x, y } = d.target
       setLocalSlots((prev) =>
-        prev.map((s) => (s.id === d.slotId ? { ...s, grid_col: col, grid_row: row } : s)),
+        prev.map((s) => (s.id === d.slotId ? { ...s, x_mm: x, y_mm: y, rotation: d.rotation } : s)),
       )
-      const res = await onMove(d.slotId, col, row)
-      if (!res.ok) setLocalSlots(slots) // revert
+      const res = await onMove(d.slotId, x, y, d.rotation)
+      if (!res.ok) setLocalSlots(slots)
     } else if (d.kind === 'new') {
-      await onAdd(d.gnSize, d.target.col, d.target.row)
+      await onAdd(d.gnSize, d.target.x, d.target.y, d.rotation)
     }
   }
 
   function startMove(e: React.PointerEvent, slot: SaladBarSlot) {
     if (pickerSlotId) return
     e.preventDefault()
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const { w, h } = dimsOf(slot.gn_size)
+    const r = rect()
+    const panRect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const mmPerPxX = r ? HOLE_W_MM / r.width : 1
+    const mmPerPxY = r ? HOLE_H_MM / r.height : 1
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     setDrag({
       kind: 'move',
       slotId: slot.id,
       gnSize: slot.gn_size as GnSize,
-      w,
-      h,
-      grabDX: e.clientX - rect.left,
-      grabDY: e.clientY - rect.top,
+      rotation: slot.rotation,
+      grabXmm: (e.clientX - panRect.left) * mmPerPxX,
+      grabYmm: (e.clientY - panRect.top) * mmPerPxY,
       pointerX: e.clientX,
       pointerY: e.clientY,
-      ...cellSizes(),
+      rectW: r?.width ?? 0,
+      rectH: r?.height ?? 0,
       moved: false,
       startX: e.clientX,
       startY: e.clientY,
@@ -277,26 +274,56 @@ export function SaladBarEditorUnit({
 
   function startNew(e: React.PointerEvent, gnSize: GnSize) {
     e.preventDefault()
-    const { w, h } = GN_DIMS[gnSize]
-    const { cellW, cellH } = cellSizes()
+    const r = rect()
+    const f = GN_REAL[gnSize]
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     setDrag({
       kind: 'new',
       gnSize,
-      w,
-      h,
-      grabDX: (w * cellW) / 2,
-      grabDY: (h * cellH) / 2,
+      rotation: 0,
+      grabXmm: f.w / 2, // grab from the pan's center
+      grabYmm: f.h / 2,
       pointerX: e.clientX,
       pointerY: e.clientY,
-      cellW,
-      cellH,
+      rectW: r?.width ?? 0,
+      rectH: r?.height ?? 0,
       moved: true,
       startX: e.clientX,
       startY: e.clientY,
       target: null,
     })
   }
+
+  // 'R' rotates the pan currently being dragged.
+  useEffect(() => {
+    if (!drag) return
+    function onKey(ev: KeyboardEvent) {
+      if (ev.key !== 'r' && ev.key !== 'R') return
+      setDrag((d) => {
+        if (!d) return d
+        const rot = d.rotation === 0 ? 90 : 0
+        const t = d.target ? computeTarget({ ...d, rotation: rot }, d.pointerX, d.pointerY) : null
+        return { ...d, rotation: rot, target: t }
+      })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag])
+
+  // Rotate a placed pan in-place (button). Keeps top-left; rejects if it won't fit.
+  async function rotatePan(slot: SaladBarSlot) {
+    const rot = slot.rotation === 0 ? 90 : 0
+    const f = footprintMM(slot.gn_size, rot)
+    const x = Math.max(0, Math.min(slot.x_mm, HOLE_W_MM - f.w))
+    const y = Math.max(0, Math.min(slot.y_mm, HOLE_H_MM - f.h))
+    if (!canPlaceFree(asFree(localSlots), x, y, f.w, f.h, slot.id)) return // no room to rotate
+    setLocalSlots((prev) => prev.map((s) => (s.id === slot.id ? { ...s, x_mm: x, y_mm: y, rotation: rot } : s)))
+    const res = await onMove(slot.id, x, y, rot)
+    if (!res.ok) setLocalSlots(slots)
+  }
+
+  const pct = (mm: number, total: number) => `${(mm / total) * 100}%`
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-3">
@@ -324,22 +351,22 @@ export function SaladBarEditorUnit({
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="text-[9px] uppercase tracking-wide text-slate-500">Drag in:</span>
         {PAN_TYPES.map((gn) => {
-          const d = GN_DIMS[gn]
+          const f = GN_REAL[gn]
           return (
             <button
               key={gn}
               onPointerDown={(e) => startNew(e, gn)}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
-              style={{ touchAction: 'none', width: d.w * 10, height: d.h * 5 + 14 }}
-              className="flex cursor-grab flex-col items-center justify-center rounded border border-slate-600 bg-slate-800/80 text-[9px] font-mono text-slate-300 transition hover:border-slate-400 hover:bg-slate-700 active:cursor-grabbing"
+              style={{ touchAction: 'none', width: Math.max(f.w * 0.07, 18), height: Math.max(f.h * 0.07, 14) }}
+              className="flex cursor-grab items-center justify-center rounded border border-slate-600 bg-slate-800/80 text-[9px] font-mono text-slate-300 transition hover:border-slate-400 hover:bg-slate-700 active:cursor-grabbing"
               title={`GN ${gn} — ${GN_MM[gn]} mm`}
             >
               {gn}
             </button>
           )
         })}
-        <span className="ml-1 text-[8px] text-slate-600">1/2 &amp; 1/4 leave gaps (don&apos;t tile the 176mm grid)</span>
+        <span className="ml-1 text-[8px] text-slate-600">тащи в дыру · «R» при перетаскивании — поворот · ⟳ на ячейке</span>
       </div>
 
       {/* Board */}
@@ -347,38 +374,49 @@ export function SaladBarEditorUnit({
         ref={boardRef}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        className="relative mx-auto grid w-full select-none"
+        className="relative mx-auto w-full select-none rounded border border-slate-700/60 bg-slate-950/40"
         style={{
           maxWidth: 1040,
           aspectRatio: `${HOLE_W_MM} / ${HOLE_H_MM}`,
-          gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-          gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
           touchAction: 'none',
+          backgroundImage:
+            'linear-gradient(to right, rgba(148,163,184,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.10) 1px, transparent 1px)',
+          backgroundSize: `${(88 / HOLE_W_MM) * 100}% ${(54 / HOLE_H_MM) * 100}%`,
         }}
       >
-        {/* lattice background */}
-        {Array.from({ length: GRID_COLS * GRID_ROWS }).map((_, i) => (
-          <div key={i} className="border border-slate-800/40" />
-        ))}
-
         {/* placed pans */}
         {localSlots.map((slot) => {
-          const { w, h } = dimsOf(slot.gn_size)
+          const f = footprintMM(slot.gn_size, slot.rotation)
           const isDragging = drag?.kind === 'move' && drag.slotId === slot.id && drag.moved
           return (
             <div
               key={slot.id}
-              className="group relative z-10 p-px"
+              className="group absolute p-px"
               style={{
-                gridColumn: `${slot.grid_col + 1} / span ${w}`,
-                gridRow: `${slot.grid_row + 1} / span ${h}`,
+                left: pct(slot.x_mm, HOLE_W_MM),
+                top: pct(slot.y_mm, HOLE_H_MM),
+                width: pct(f.w, HOLE_W_MM),
+                height: pct(f.h, HOLE_H_MM),
                 touchAction: 'none',
                 opacity: isDragging ? 0.3 : 1,
                 cursor: 'grab',
+                zIndex: pickerSlotId === slot.id ? 40 : 10,
               }}
               onPointerDown={(e) => startMove(e, slot)}
             >
               <PanFace slot={slot} />
+              {/* rotate */}
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  rotatePan(slot)
+                }}
+                className="absolute -left-1.5 -top-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full border border-slate-600 bg-slate-900 text-slate-400 opacity-60 transition hover:text-sky-300 hover:opacity-100"
+                title="Rotate 90°"
+              >
+                <RotateCw className="h-2.5 w-2.5" />
+              </button>
               {/* delete */}
               <button
                 onPointerDown={(e) => e.stopPropagation()}
@@ -386,12 +424,11 @@ export function SaladBarEditorUnit({
                   e.stopPropagation()
                   onRemove(slot.id)
                 }}
-                className="absolute -right-1 -top-1 z-20 hidden h-4 w-4 items-center justify-center rounded-full border border-slate-600 bg-slate-900 text-slate-400 hover:text-red-300 group-hover:flex"
+                className="absolute -right-1.5 -top-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full border border-slate-600 bg-slate-900 text-slate-400 opacity-60 transition hover:text-red-300 hover:opacity-100"
                 title="Remove pan"
               >
                 <X className="h-2.5 w-2.5" />
               </button>
-              {/* ingredient picker */}
               {pickerSlotId === slot.id && (
                 <IngredientPicker
                   ingredients={ingredients}
@@ -408,40 +445,48 @@ export function SaladBarEditorUnit({
         })}
 
         {/* snap preview */}
-        {drag?.target && drag.moved && (
-          <div
-            className={[
-              'pointer-events-none absolute z-30 rounded-md border-2',
-              drag.target.valid ? 'border-emerald-400 bg-emerald-400/15' : 'border-red-500 bg-red-500/15',
-            ].join(' ')}
-            style={{
-              left: `${(drag.target.col / GRID_COLS) * 100}%`,
-              top: `${(drag.target.row / GRID_ROWS) * 100}%`,
-              width: `${(drag.w / GRID_COLS) * 100}%`,
-              height: `${(drag.h / GRID_ROWS) * 100}%`,
-            }}
-          />
-        )}
+        {drag?.target && drag.moved && (() => {
+          const f = footprintMM(drag.gnSize, drag.rotation)
+          return (
+            <div
+              className={[
+                'pointer-events-none absolute z-30 rounded-md border-2',
+                drag.target.valid ? 'border-emerald-400 bg-emerald-400/15' : 'border-red-500 bg-red-500/15',
+              ].join(' ')}
+              style={{
+                left: pct(drag.target.x, HOLE_W_MM),
+                top: pct(drag.target.y, HOLE_H_MM),
+                width: pct(f.w, HOLE_W_MM),
+                height: pct(f.h, HOLE_H_MM),
+              }}
+            />
+          )
+        })()}
       </div>
 
       {/* floating ghost */}
-      {drag?.moved && drag.cellW > 0 && (
-        <div
-          className="pointer-events-none fixed z-[60] rounded-md border-2 border-white/50 bg-slate-700/80 text-[9px] font-mono text-slate-100 shadow-2xl"
-          style={{
-            left: drag.pointerX - drag.grabDX,
-            top: drag.pointerY - drag.grabDY,
-            width: drag.w * drag.cellW,
-            height: drag.h * drag.cellH,
-          }}
-        >
-          <div className="flex h-full w-full items-center justify-center">{drag.gnSize}</div>
-        </div>
-      )}
+      {drag?.moved && drag.rectW > 0 && (() => {
+        const f = footprintMM(drag.gnSize, drag.rotation)
+        const wPx = (f.w / HOLE_W_MM) * drag.rectW
+        const hPx = (f.h / HOLE_H_MM) * drag.rectH
+        return (
+          <div
+            className="pointer-events-none fixed z-[60] flex items-center justify-center rounded-md border-2 border-white/50 bg-slate-700/80 text-[9px] font-mono text-slate-100 shadow-2xl"
+            style={{
+              left: drag.pointerX - (drag.grabXmm / HOLE_W_MM) * drag.rectW,
+              top: drag.pointerY - (drag.grabYmm / HOLE_H_MM) * drag.rectH,
+              width: wPx,
+              height: hPx,
+            }}
+          >
+            {drag.gnSize}
+          </div>
+        )
+      })()}
 
-      {/* row legend */}
+      {/* legend */}
       <div className="mt-1.5 flex items-center justify-between text-[8px] text-slate-600">
-        <span>← guest side · drag to arrange · click a pan to assign ingredient</span>
+        <span>← guest side · перетаскивай · клик — ингредиент · ⟳ поворот · ✕ удалить</span>
         <span>back ↑ · front ↓</span>
       </div>
     </div>

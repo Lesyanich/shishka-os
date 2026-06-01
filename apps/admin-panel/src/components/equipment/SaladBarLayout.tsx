@@ -109,8 +109,8 @@ export function SaladBarLayout({
   isLoading: boolean
   error: string | null
   onUpdateSlot: (slotId: string, ingredientId: string | null) => void
-  onMoveSlot: (slotId: string, col: number, row: number) => Promise<MutResult>
-  onAddSlot: (unitNumber: 1 | 2, gnSize: GnSize, col: number, row: number) => Promise<MutResult>
+  onMoveSlot: (slotId: string, xMm: number, yMm: number, rotation: number) => Promise<MutResult>
+  onAddSlot: (unitNumber: 1 | 2, gnSize: GnSize, xMm: number, yMm: number, rotation: number) => Promise<MutResult>
   onRemoveSlot: (slotId: string) => Promise<MutResult>
   onResetUnit: (unitNumber: 1 | 2) => void
 }) {
@@ -151,7 +151,7 @@ export function SaladBarLayout({
         slots={unit1Slots}
         ingredients={ingredients}
         onMove={onMoveSlot}
-        onAdd={(gn, c, r) => onAddSlot(1, gn, c, r)}
+        onAdd={(gn, x, y, rot) => onAddSlot(1, gn, x, y, rot)}
         onRemove={onRemoveSlot}
         onAssign={onUpdateSlot}
         onReset={() => onResetUnit(1)}
@@ -162,7 +162,7 @@ export function SaladBarLayout({
         slots={unit2Slots}
         ingredients={ingredients}
         onMove={onMoveSlot}
-        onAdd={(gn, c, r) => onAddSlot(2, gn, c, r)}
+        onAdd={(gn, x, y, rot) => onAddSlot(2, gn, x, y, rot)}
         onRemove={onRemoveSlot}
         onAssign={onUpdateSlot}
         onReset={() => onResetUnit(2)}

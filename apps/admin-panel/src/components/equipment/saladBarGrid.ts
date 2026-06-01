@@ -151,3 +151,73 @@ export const EQUIPMENT_ID: Record<1 | 2, string> = {
   1: '1c5b1920-e911-4c0f-a0f9-18f58a552f49',
   2: 'd12b2832-07c2-49b6-acd2-9cce09dbd4b3',
 }
+
+/* ─── Free-form placement (real mm + rotation) ─────────────
+ * Pans are positioned by their top-left (x_mm, y_mm) inside the 1408×650 hole
+ * and may be rotated 90°. GN side lengths are incommensurable, so we don't snap
+ * to a single cell grid — positions snap to a light 44×54 mm lattice (aligns the
+ * common 176/265/530 widths and 162/108/325 depths within ~2 mm) and overlaps
+ * are rejected. Gaps are allowed.
+ */
+
+export const SNAP_X_MM = 44
+export const SNAP_Y_MM = 54
+
+/** GN footprint in DEFAULT orientation (w = along the bar, h = depth), snapped to
+ *  the 44×54 mm lattice so default-orientation pans tile with no 1mm gaps
+ *  (real GN ~530/265/325; we use 528/264/324 = exact lattice multiples). */
+export const GN_REAL: Record<GnSize, { w: number; h: number }> = {
+  '1/1': { w: 528, h: 324 },
+  '1/2': { w: 264, h: 324 },
+  '1/3': { w: 176, h: 324 },
+  '1/4': { w: 264, h: 162 },
+  '1/6': { w: 176, h: 162 },
+  '1/9': { w: 176, h: 108 },
+}
+
+/** Footprint in mm given rotation (0 or 90 swaps w/h). Falls back to 1/6. */
+export function footprintMM(gn: string, rotation: number): { w: number; h: number } {
+  const base = GN_REAL[(gn as GnSize)] ?? GN_REAL['1/6']
+  return rotation === 90 ? { w: base.h, h: base.w } : { w: base.w, h: base.h }
+}
+
+export function snapX(x: number): number {
+  return Math.round(x / SNAP_X_MM) * SNAP_X_MM
+}
+export function snapY(y: number): number {
+  return Math.round(y / SNAP_Y_MM) * SNAP_Y_MM
+}
+
+export interface FreePan {
+  id: string
+  gn_size: string
+  x_mm: number
+  y_mm: number
+  rotation: number
+}
+
+/** Axis-aligned overlap of two rectangles (touching edges is allowed). */
+export function rectsOverlap(
+  ax: number, ay: number, aw: number, ah: number,
+  bx: number, by: number, bw: number, bh: number,
+): boolean {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
+}
+
+/** Can a w×h pan sit at (x,y) inside the hole without overlapping others? */
+export function canPlaceFree(
+  pans: FreePan[],
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  ignoreId?: string,
+): boolean {
+  if (x < 0 || y < 0 || x + w > HOLE_W_MM || y + h > HOLE_H_MM) return false
+  for (const p of pans) {
+    if (p.id === ignoreId) continue
+    const f = footprintMM(p.gn_size, p.rotation)
+    if (rectsOverlap(x, y, w, h, p.x_mm, p.y_mm, f.w, f.h)) return false
+  }
+  return true
+}
