@@ -9,8 +9,6 @@ import {
   PAN_TYPES,
   canPlaceFree,
   footprintMM,
-  snapX,
-  snapY,
   type FreePan,
   type GnSize,
 } from './saladBarGrid'
@@ -146,6 +144,27 @@ type DragState = {
 }
 
 const MOVE_THRESHOLD = 4
+const EDGE_SNAP_MM = 16 // magnetic snap to neighbour/wall edges within this distance
+
+/* Snap a span [start, start+size] so its near OR far edge clicks onto the closest
+ * candidate line (neighbour edges + hole walls) within EDGE_SNAP_MM; else free. */
+function snapToEdges(start: number, size: number, lines: number[]): number {
+  let best = start
+  let bestDist = EDGE_SNAP_MM + 0.001
+  for (const c of lines) {
+    const dNear = Math.abs(start - c)
+    if (dNear < bestDist) {
+      bestDist = dNear
+      best = c
+    }
+    const dFar = Math.abs(start + size - c)
+    if (dFar < bestDist) {
+      bestDist = dFar
+      best = c - size
+    }
+  }
+  return best
+}
 
 /* ─── Editor Unit ─── */
 
@@ -186,15 +205,28 @@ export function SaladBarEditorUnit({
     return boardRef.current?.getBoundingClientRect()
   }
 
-  /* Compute snapped, clamped, validated target for the current pointer. */
+  /* Compute the target for the current pointer: free movement that magnetically
+   * snaps flush to neighbour/wall edges (no forced grid voids). */
   function computeTarget(d: DragState, clientX: number, clientY: number) {
     const r = rect()
     if (!r) return null
     const mmPerPxX = HOLE_W_MM / r.width
     const mmPerPxY = HOLE_H_MM / r.height
     const f = footprintMM(d.gnSize, d.rotation)
-    let x = snapX((clientX - r.left) * mmPerPxX - d.grabXmm)
-    let y = snapY((clientY - r.top) * mmPerPxY - d.grabYmm)
+    const others = asFree(localSlots).filter((p) => p.id !== d.slotId)
+
+    const linesX = [0, HOLE_W_MM]
+    const linesY = [0, HOLE_H_MM]
+    for (const p of others) {
+      const pf = footprintMM(p.gn_size, p.rotation)
+      linesX.push(p.x_mm, p.x_mm + pf.w)
+      linesY.push(p.y_mm, p.y_mm + pf.h)
+    }
+
+    const rawX = (clientX - r.left) * mmPerPxX - d.grabXmm
+    const rawY = (clientY - r.top) * mmPerPxY - d.grabYmm
+    let x = Math.round(snapToEdges(rawX, f.w, linesX))
+    let y = Math.round(snapToEdges(rawY, f.h, linesY))
     x = Math.max(0, Math.min(x, HOLE_W_MM - f.w))
     y = Math.max(0, Math.min(y, HOLE_H_MM - f.h))
     const valid = canPlaceFree(asFree(localSlots), x, y, f.w, f.h, d.slotId)
@@ -366,7 +398,7 @@ export function SaladBarEditorUnit({
             </button>
           )
         })}
-        <span className="ml-1 text-[8px] text-slate-600">тащи в дыру · «R» при перетаскивании — поворот · ⟳ на ячейке</span>
+        <span className="ml-1 text-[8px] text-slate-600">тащи в дыру · прилипает к краям соседей · «R» — поворот</span>
       </div>
 
       {/* Board */}
