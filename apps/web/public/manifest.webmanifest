@@ -1,0 +1,10 @@
+{
+  "name": "Shishka Menu",
+  "short_name": "Shishka",
+  "description": "Order from Shishka Healthy Kitchen",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0F0A",
+  "theme_color": "#0B0F0A",
+  "icons": []
+}
