@@ -19,17 +19,19 @@ function slotColor(group: string | null): string {
   return COLOR_MAP[group] ?? EMPTY_COLOR
 }
 
-/* ─── GN real dimensions (mm along the salad bar, left→right) ─── */
-// From spec: docs/business/equipment/salad-bar-layout.md
-// Back row pans sit in 325mm depth, front row in 176mm depth
-// All pans in their rows, side by side — like a puzzle
-const GN_WIDTH_MM: Record<string, number> = {
-  '1/1': 530,   // 530×325 — longest pan, fills ~44% of back row
-  '1/2': 325,   // 265×325 — 325mm side along bar
-  '1/3': 176,   // 176×325 — 176mm along bar
-  '1/6': 162,   // 176×162 — 162mm along bar
-  '1/9': 108,   // 176×108 — 108mm along bar
-}
+/* ─── Salad bar well geometry (factory GN grid) ─── */
+// Spec: docs/business/equipment/salad-bar-layout.md
+// The well of each 150×80cm unit is an 8-column × 2-row grid of GN-1/3 footprints
+// (176mm wide along the bar × 325mm deep). Well = 1408mm × 650mm — fits the unit.
+// Each footprint holds exactly one of:
+//   • 1× GN 1/3  (fills the whole 325mm depth)
+//   • 2× GN 1/6  (split front/back in depth)
+//   • 3× GN 1/9  (split in three in depth)
+// => pans tile the well with ZERO gaps, by construction.
+const COLUMNS_PER_ROW = 8
+const WELL_WIDTH_MM = 1408 // 8 × 176
+const ROW_DEPTH_MM = 325
+const WELL_DEPTH_MM = ROW_DEPTH_MM * 2 // 650 (back + front)
 
 /* ─── Ingredient Picker ─── */
 
@@ -141,8 +143,8 @@ function SlotCard({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [pickerOpen])
 
-  const hasIngredient = !!slot.ingredient_id
-  const colorClass = hasIngredient ? slotColor(slot.color_group) : EMPTY_COLOR
+  const hasContent = !!slot.ingredient_id || !!slot.display_name
+  const colorClass = hasContent ? slotColor(slot.color_group) : EMPTY_COLOR
   const label = slot.display_name ?? slot.ingredient_name ?? 'Empty'
 
   return (
@@ -192,60 +194,64 @@ function SlotCard({
   )
 }
 
-/* ─── Scale: mm → px (fixed, no responsive shrink) ─── */
-const PX_PER_MM = 0.52
-
-function mm(v: number): number {
-  return Math.round(v * PX_PER_MM)
+/* ─── Column packing ─── */
+// Group a row's slots into fixed columns 1..COLUMNS_PER_ROW. Each column holds the
+// pans that share `position`, ordered front→back by `depth_pos`. Missing columns
+// render as a single empty footprint so the grid always fills the full width.
+function packColumns(slots: SaladBarSlot[]): SaladBarSlot[][] {
+  const byCol = new Map<number, SaladBarSlot[]>()
+  for (const s of slots) {
+    const col = byCol.get(s.position) ?? []
+    col.push(s)
+    byCol.set(s.position, col)
+  }
+  const columns: SaladBarSlot[][] = []
+  for (let col = 1; col <= COLUMNS_PER_ROW; col++) {
+    const cells = (byCol.get(col) ?? []).slice().sort((a, b) => a.depth_pos - b.depth_pos)
+    columns.push(cells)
+  }
+  return columns
 }
 
-/* ─── Slot Row ─── */
+/* ─── Slot Row — 8 equal columns, cells stacked by depth ─── */
 
 function SlotRow({
   slots,
   ingredients,
   onUpdate,
   numbering,
-  depthMm,
-  wellMm,
+  emptyLabel,
 }: {
   slots: SaladBarSlot[]
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
   numbering: Map<string, number>
-  depthMm: number
-  wellMm: number
+  emptyLabel: string
 }) {
-  const totalMm = slots.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-  const gap = wellMm - totalMm
+  const columns = packColumns(slots)
 
   return (
-    <div className="flex gap-px" style={{ height: `${mm(depthMm)}px` }}>
-      {slots.map((slot) => {
-        const widthMm = GN_WIDTH_MM[slot.gn_size] ?? 108
-        return (
-          <div
-            key={slot.id}
-            className="shrink-0"
-            style={{ width: `${mm(widthMm)}px` }}
-          >
-            <SlotCard
-              slot={slot}
-              ingredients={ingredients}
-              onUpdate={onUpdate}
-              cellNumber={numbering.get(slot.id) ?? 0}
-            />
-          </div>
-        )
-      })}
-      {gap > 20 && (
-        <div
-          className="shrink-0 rounded border border-dashed border-slate-700/30 flex items-center justify-center"
-          style={{ width: `${mm(gap)}px`, opacity: 0.3 }}
-        >
-          <span className="text-[8px] text-slate-600">{gap}mm</span>
+    <div className="flex flex-1 gap-px">
+      {columns.map((cells, idx) => (
+        <div key={idx} className="flex flex-1 flex-col gap-px">
+          {cells.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center rounded border border-dashed border-slate-700/40 bg-slate-800/30">
+              <span className="text-[8px] text-slate-600">{emptyLabel}</span>
+            </div>
+          ) : (
+            cells.map((slot) => (
+              <div key={slot.id} className="flex flex-1 min-h-0">
+                <SlotCard
+                  slot={slot}
+                  ingredients={ingredients}
+                  onUpdate={onUpdate}
+                  cellNumber={numbering.get(slot.id) ?? 0}
+                />
+              </div>
+            ))
+          )}
         </div>
-      )}
+      ))}
     </div>
   )
 }
@@ -265,19 +271,18 @@ function UnitVisual({
   ingredients: NomenclatureOption[]
   onUpdate: (slotId: string, ingredientId: string | null) => void
 }) {
-  // Simple 2-row layout: all back row pans side by side, all front row pans side by side
-  const backRow = slots.filter((s) => s.row === 'back').sort((a, b) => a.position - b.position)
-  const frontRow = slots.filter((s) => s.row === 'front').sort((a, b) => a.position - b.position)
+  const backRow = slots.filter((s) => s.row === 'back')
+  const frontRow = slots.filter((s) => s.row === 'front')
 
-  // Sequential numbering: back L→R, then front L→R
+  // Sequential numbering: back (col→col, depth order), then front
   const numbering = new Map<string, number>()
   let n = 1
-  for (const s of backRow) numbering.set(s.id, n++)
-  for (const s of frontRow) numbering.set(s.id, n++)
+  const order = (rowSlots: SaladBarSlot[]) =>
+    rowSlots.slice().sort((a, b) => a.position - b.position || a.depth_pos - b.depth_pos)
+  for (const s of order(backRow)) numbering.set(s.id, n++)
+  for (const s of order(frontRow)) numbering.set(s.id, n++)
 
-  const backTotalMm = backRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-  const frontTotalMm = frontRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-  const wellMm = Math.max(backTotalMm, frontTotalMm)
+  const filled = slots.filter((s) => s.ingredient_id || s.display_name).length
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-3">
@@ -287,41 +292,40 @@ function UnitVisual({
           <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
           <p className="text-[10px] text-slate-500">{subtitle}</p>
         </div>
-        <span className="text-[9px] font-mono text-slate-600">~{wellMm}mm</span>
+        <span className="text-[9px] font-mono text-slate-600">
+          {WELL_WIDTH_MM} × {WELL_DEPTH_MM} mm · {filled}/{slots.length} pans filled
+        </span>
       </div>
 
-      {/* Work surface */}
-      <div className="mb-1.5 rounded bg-slate-800/40 px-2 py-1 text-center text-[9px] text-slate-600 border border-slate-700/20">
-        WORK SURFACE · 150 × 25 cm
-      </div>
-
-      {/* Two rows stacked — front on top, back below. Fixed pixel sizes, scroll if needed */}
-      <div className="overflow-x-auto">
-        <div className="flex flex-col gap-px" style={{ width: `${mm(wellMm)}px` }}>
-          <SlotRow
-            slots={frontRow}
-            ingredients={ingredients}
-            onUpdate={onUpdate}
-            numbering={numbering}
-            depthMm={176}
-            wellMm={wellMm}
-          />
+      {/* Well — fixed 1408×650mm proportions, fills the full width, no gaps */}
+      <div
+        className="mx-auto w-full"
+        style={{ maxWidth: 920, aspectRatio: `${WELL_WIDTH_MM} / ${WELL_DEPTH_MM}` }}
+      >
+        <div className="flex h-full flex-col gap-px">
+          {/* Back row (far from guest) on top */}
           <SlotRow
             slots={backRow}
             ingredients={ingredients}
             onUpdate={onUpdate}
             numbering={numbering}
-            depthMm={325}
-            wellMm={wellMm}
+            emptyLabel="spare"
+          />
+          {/* Front row (near guest) below */}
+          <SlotRow
+            slots={frontRow}
+            ingredients={ingredients}
+            onUpdate={onUpdate}
+            numbering={numbering}
+            emptyLabel="spare"
           />
         </div>
       </div>
 
-      {/* Dimension labels */}
-      <div className="mt-1 flex items-center gap-2 text-[8px] text-slate-600">
-        <span>Front {frontRow.length} slots · 176mm depth · {frontTotalMm}mm</span>
-        <span className="opacity-50">|</span>
-        <span>Back {backRow.length} slots · 325mm depth · {backTotalMm}mm</span>
+      {/* Row legend */}
+      <div className="mt-1.5 flex items-center justify-between text-[8px] text-slate-600">
+        <span>← guest side · {COLUMNS_PER_ROW} columns × 176mm</span>
+        <span>back row 325mm · front row 325mm depth →</span>
       </div>
     </div>
   )

@@ -12,6 +12,7 @@ export interface SaladBarSlot {
   depth_mm: number
   row: 'back' | 'front'
   position: number
+  depth_pos: number
   ingredient_id: string | null
   ingredient_name: string | null
   display_name: string | null
@@ -56,7 +57,8 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
         .select('*, nomenclature:ingredient_id(id, name, product_code)')
         .order('unit_number')
         .order('row', { ascending: false }) // back first
-        .order('position'),
+        .order('position')
+        .order('depth_pos'),
       supabase
         .from('nomenclature')
         .select('id, name, product_code')
@@ -89,6 +91,7 @@ export function useSaladBarLayout(): UseSaladBarLayoutResult {
         depth_mm: row.depth_mm,
         row: row.row,
         position: row.position,
+        depth_pos: row.depth_pos ?? 0,
         ingredient_id: row.ingredient_id,
         ingredient_name: nom?.name ?? null,
         display_name: row.display_name ?? null,
