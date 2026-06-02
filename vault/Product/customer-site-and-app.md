@@ -48,9 +48,15 @@ looks complete. Verified against live data at 390px mobile. Preview: [`assets/mv
 
 ## v2 — Customization & accounts
 - **Per-dish modifier UI** ("Required: pick 1" / "Optional: add-on +฿"); order schema already anticipates modifiers.
-- **Guided BYO builder** anchored on the **Culinary Booster System** (`docs/bible/menu-concept.md`):
-  base → protein → vegetables → booster, with **live cost + nutrition rollup via BOM**. Our edge over
-  Easy Health: a "custom" bowl is still consistent and costed, not a free-for-all.
+- **Guided BYO builder** — Easy Health's (login-gated) builder is a 3-step wizard
+  (Select Type → Choose Items → Confirm) over a **grams-explicit, priced modifier tree**; for a Salad Bowl:
+  Carbohydrate (pick 1) → Green (pick 1) → Protein (pick 1, premium +฿) → Topping (pick 1–3) →
+  Add-on (pick 1–2, tiered +฿) → Dressing (pick 1) → extra protein/dressing. See
+  [competitor teardown §4](../Competitors/easyhealth/analysis.md#4-constructor--lego-flow--two-levels).
+  **We get this structure for free** from our **Culinary Booster System** + BOM (`docs/bible/menu-concept.md`):
+  each group = a BOM slot with a pick rule; every ingredient already carries portion grams → **live cost +
+  КБЖУ rollup**. Our edge: a "custom" bowl stays consistent and costed, not a free-for-all. Gamify like
+  their **"Happy Coin"** (reward the first creation, not just orders).
 - Customer accounts, order history, reorder.
 
 ## v3 — Depth (match Easy Health)

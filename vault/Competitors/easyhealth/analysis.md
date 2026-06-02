@@ -44,7 +44,25 @@ Key routes: `/menu`, `/meal-plans`, `/my-meals` (BYO), `/easy-plus` (loyalty), `
 - **"Meal is for a friend? Your energy profile won't be affected by this article"** — modifiers tie into a personal **energy/nutrition profile** when logged in.
 - Quantity stepper + **"Add to bag"** + live price.
 
-**(b) Full BYO meal-builder (`/my-meals`, login-gated).** _"Create your own custom meals by combining your favorite ingredients."_ Requires sign-in. Also shows **"Signature Meals"** — handpicked custom creations from other users (community/social layer). _(Full builder flow unverified — behind login.)_
+**(b) Full BYO meal-builder (`/my-meals`, login-gated — captured logged-in 2026-06-02).**
+Landing ("Your meal, your rules.") offers **3 archetypes**: Breakfast Bowl, Salad Bowl, Wrap. _"Earn 1
+**Happy Coin** for your first creation!"_ (creation-based loyalty). Also: **My Subscriptions** (subscribe
+to other users' meals) + **Signature Meals** (curated user creations) — a real community/social layer.
+
+The builder is a **3-step wizard**: ① Select Type → ② Choose Items → ③ Confirm.
+- **Step 1 — Type + size (sets base price):** Breakfast: Single Base 179฿ / Duo Base 235฿ / Breakfast Egg 189฿. Wraps: Small 145฿ / Regular 255฿. Salads & Bowls: Small 145฿ / Regular 255฿.
+- **Step 2 — Choose Items** (one long form; every ingredient shows **portion grams** + any upcharge; each group has a Required/Pick-N rule — this is what drives the live macro math). For a Salad Bowl (Regular):
+  - **Carbohydrates** — Required, Pick 1: Quinoa / Riceberry / Cauliflower rice / Jasmine rice (100g) · No Carbs
+  - **Green** — Required, Pick 1: Spinach / Green Oak / Red Oak / Baby Kale / Cos lettuce (40g)
+  - **Protein** — Required, Pick 1: Chicken / Minced beef / Dory / Sweet-potato Falafel / Scrambled egg (240g) / Tofu (100g, included); Salmon / Shrimp / Lamb **+29฿** · No Protein
+  - **Topping** — Required, Pick 1–3: ~20 veg/herb/fruit options (included)
+  - **Add-on** — Required, Pick 1–2: veg **+10฿**; nuts/seeds/dried fruit/olives/boiled egg **+15฿**; Avocado/Cheddar/Bacon/Guacamole/Sour Cream **+29฿**
+  - **Dressing** — Required, Pick 1: Salsa/Hummus/BBQ/Yogurt/Olive Oil/Balsamic/Tom Yum/Pesto/Tzatziki/Teriyaki/Tamarind/Caesar (55g)
+  - **Add-on protein** — Required: none / +50g **+39฿** / +100g **+78฿**
+  - **Extra Dressing** — Required: none / +29฿
+- **Step 3 — Confirm:** save the creation (earns Happy Coin). Live КБЖУ rollup not force-verified (would create order/meal data in the owner's account), but is near-certain given every dish card already renders a calorie-centered donut and every ingredient carries an explicit gram weight.
+
+**Takeaway:** this is a guided, grams-explicit, priced modifier tree — structurally identical to what a BOM-backed builder gives us for free. See [our v2 spec](../../Product/customer-site-and-app.md). Screenshots: [type](assets/byo-step1.png), [items](assets/byo-step2-items.png), [landing](assets/byo-signed-in.png).
 
 ## 5. Filters — "Diets and Allergens" panel ([screenshot](assets/filter-diets-allergens.png))
 - **Diets** ("Show only products that match these diets"): **High Protein · Vegan · Vegetarian · Paleo · Keto**
@@ -66,7 +84,8 @@ Key routes: `/menu`, `/meal-plans`, `/my-meals` (BYO), `/easy-plus` (loyalty), `
 - **Points-based rewards store.** Earn points per order, redeem for menu items or discounts, e.g.:
   Space Gym EMS Training = 60 pts; smoothies/bowls/wraps = 80–120 pts; "50 THB Discount" = 50 pts.
   All redemptions flagged **"Order to Table only"**.
-- Personal **"energy profile"** (daily calorie/macro tracking) tied to the account.
+- Loyalty currency is **"Happy Coin"** — also earned for *non-purchase engagement* (e.g. "Earn 1 Happy Coin for your first custom creation"), not just orders. Gamifies the BYO builder.
+- Personal **"energy profile"** (daily calorie/macro tracking) tied to the account (logged-in confirmed: account has role `User`, permission `manage:App`).
 
 ## 9. Mobile app
 Native iOS + Android. Marketed features: easy ordering (delivery/takeaway/order-to-table), personalized
