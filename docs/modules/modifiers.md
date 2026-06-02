@@ -80,11 +80,40 @@ Customer upsell = Loyverse `option.price`. Margin per option = price − cost.
 
 ## Phasing
 
-1. **Schema + sync** — new tables; extend `pull_modifiers` to fill them; capture min/max_select. Migrate the 181 smoothie rows.
+1. **Schema + sync** — new tables (`dish_modifier_groups`, `modifier_option_cost`); extend `pull_modifiers` to fill them; capture min/max_select. Migrate the 181 smoothie rows.
 2. **Read path** — refactor `useModifierOptions` / ModifiersPage / drawer chips to the 2-level model.
-3. **Costing** — surface per-option cost/margin in the owner view.
-4. **Deprecate** `nomenclature_modifier_options`.
+3. **Admin 2-level editor** — `/bom` MOD tab shows groups→options, drill in, add/remove options + price + option→MOD cost link.
+4. **Per-dish attachment editor** — attach/detach modifier groups to a dish in admin.
+5. **Push orchestration** — single admin "Push to Loyverse" that runs the fixed order (groups → items → re-attach) and auto re-attaches; per-dish/group sync-status + "needs push" indicator.
+6. **Costing** — surface per-option cost/margin in the owner view.
+7. **Deprecate** `nomenclature_modifier_options`.
+
+## Admin UX (CEO requirements, 2026-06-02)
+
+The owner manages the whole modifier system **in the admin** and **pushes to Loyverse** — never editing in Loyverse directly. Requirements:
+
+1. **2-level view on `/bom` MOD tab** (today MOD is just a flat filter with category/uncategorized grouping in RecipeBuilder). Show **groups → options** (the real levels), drill into a group, **add/remove options**, edit option price + the option→MOD cost link.
+2. **Per-dish modifier attachment editor.** For a given SALE dish, see + edit which modifier groups apply (e.g. attach "Pick Fruits" to Custom Smoothie, "Extra Fruit"/"Nuts" to others). This is the thing that keeps breaking when edited only in Loyverse.
+3. **Admin-driven sync to Loyverse for BOTH items and modifiers.** One "Push to Loyverse" surface that pushes the admin state (groups, options, prices, stores, dish attachments, item fields). Today only single SALE dishes have a push button (OwnerTab); modifiers + attachments have no push UI.
+
+### Push orchestration (MUST follow this order)
+
+Because **updating a modifier in Loyverse detaches it from all items** (verified quirk — see reference_loyverse_api_quirks), and because item upsert ignores modifier/category changes, the push must run in this fixed order:
+
+1. Sync categories.
+2. Sync modifier groups + options + prices + **`stores`** (create/update). ← detaches items, expected
+3. Sync item fields (name/desc/price/photo).
+4. **LAST: attach modifier groups to items** via `recreate_item` (DELETE+CREATE with `modifier_ids`). Always the final step; re-run for any dish whose groups changed.
+
+The admin push button must encapsulate this — the owner clicks once, the orchestration handles ordering + re-attach. Never expose a path that edits a modifier without re-attaching its dishes.
+
+### Sync status visibility
+
+Admin should show, per dish and per group: is it synced, does Loyverse match admin, when last pushed. Drives a "needs push" indicator so drift (like the 2026-06-02 incident where smoothies silently lost their fruit/booster/nuts groups) is visible, not discovered in the POS.
+
+> POS device note: after a push, the Loyverse POS app caches the menu — the device may need pull-to-refresh / re-sync before new modifiers appear. Not a data bug.
 
 ## Open issues
 - `min/max_select` arrive null from the current pull — confirm Loyverse returns them (field name) or set per-group defaults.
 - Manakish sets (3/6/9/12) ride on this model: a "Box" SALE item + a "Pick Manakish" group with `min_select = max_select = N`. Needs min/max captured (phase 1). See separate feature note.
+- Modifier-edit-detaches-items quirk makes ad-hoc edits dangerous — all the more reason the push must be admin-orchestrated, not manual.
