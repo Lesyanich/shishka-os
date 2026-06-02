@@ -98,14 +98,14 @@ The owner manages the whole modifier system **in the admin** and **pushes to Loy
 
 ### Push orchestration (MUST follow this order)
 
-Because **updating a modifier in Loyverse detaches it from all items** (verified quirk — see reference_loyverse_api_quirks), and because item upsert ignores modifier/category changes, the push must run in this fixed order:
+Because **updating a modifier in Loyverse detaches it from all items** (verified quirk — see reference_loyverse_api_quirks), the push must run in this fixed order:
 
 1. Sync categories.
 2. Sync modifier groups + options + prices + **`stores`** (create/update). ← detaches items, expected
 3. Sync item fields (name/desc/price/photo).
-4. **LAST: attach modifier groups to items** via `recreate_item` (DELETE+CREATE with `modifier_ids`). Always the final step; re-run for any dish whose groups changed.
+4. **LAST: re-attach modifier groups to items** via **`update_item`** (in-place POST /items with `id` + `modifier_ids`, reusing current variants). **Stable id — NO delete/recreate.** Always the final step; re-run for any dish whose groups changed.
 
-The admin push button must encapsulate this — the owner clicks once, the orchestration handles ordering + re-attach. Never expose a path that edits a modifier without re-attaching its dishes.
+Key: re-attach is a non-destructive **update by ID** (verified v18) — a live menu never gets its items deleted/recreated. `recreate_item` is fallback only (e.g. category change, which upsert ignores). The admin push button encapsulates this ordering — the owner clicks once. Never expose a path that edits a modifier without re-attaching its dishes.
 
 ### Sync status visibility
 
