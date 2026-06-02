@@ -15,6 +15,8 @@
 //                                        → add one option to an existing modifier list
 //   POST ?action=remove_modifier_option&list_id=X&name=Y
 //                                        → remove one option (keeps other option ids)
+//   POST ?action=ensure_modifier_stores[&list_id=X]
+//                                        → set store availability so POS shows the modifiers
 //   GET  ?action=item_modifiers         → each Loyverse item + its modifier-list ids
 //
 // Auth: Bearer token from LOYVERSE_API_TOKEN env var
@@ -338,7 +340,17 @@ interface LoyverseModifierList {
   name: string
   min_select?: number
   max_select?: number
+  stores?: string[]
   modifier_options?: LoyverseModifierOption[]
+}
+
+// A modifier shows "Not available in stores" in the POS unless its `stores`
+// array lists the store id. Every POST /modifiers MUST carry stores or Loyverse
+// resets it to empty. This guarantees the configured store is always present.
+function withStore(existing: string[] | undefined, storeId: string): string[] {
+  const set = new Set(existing ?? [])
+  if (storeId) set.add(storeId)
+  return [...set]
 }
 
 async function handlePullModifiers() {
@@ -379,11 +391,13 @@ async function handleCreateModifier(req: Request) {
   if (!body.name || !body.modifier_options?.length) {
     return json({ ok: false, error: "name and modifier_options[] required" }, 400)
   }
+  const storeId = await getStoreId()
   try {
     const created = await loyversePost("/modifiers", {
       name: body.name,
       min_select: body.min_select ?? 0,
       max_select: body.max_select ?? 1,
+      stores: withStore(undefined, storeId),
       // deno-lint-ignore no-explicit-any
       modifier_options: body.modifier_options.map((o: any) => ({ name: o.name, price: o.price ?? 0 })),
     })
@@ -411,11 +425,13 @@ async function handleAddModifierOption(listId: string, optName: string, price: n
     return json({ ok: true, skipped: true, message: `"${optName}" already in "${list.name}"` })
   }
 
+  const storeId = await getStoreId()
   const result = await loyversePost("/modifiers", {
     id: list.id,
     name: list.name,
     min_select: list.min_select ?? 0,
     max_select: list.max_select ?? 0,
+    stores: withStore(list.stores, storeId),
     modifier_options: [
       ...opts.map((o) => ({ id: o.id, name: o.name, price: o.price ?? 0 })),
       { name: optName, price },
@@ -442,15 +458,48 @@ async function handleRemoveModifierOption(listId: string, optName: string) {
     return json({ ok: true, skipped: true, message: `"${optName}" not in "${list.name}"` })
   }
 
+  const storeId = await getStoreId()
   const result = await loyversePost("/modifiers", {
     id: list.id,
     name: list.name,
     min_select: list.min_select ?? 0,
     max_select: list.max_select ?? 0,
+    stores: withStore(list.stores, storeId),
     modifier_options: kept.map((o) => ({ id: o.id, name: o.name, price: o.price ?? 0 })),
   })
   await handlePullModifiers()
   return json({ ok: true, list: list.name, removed: optName, modifier_id: (result as { id?: string }).id })
+}
+
+// ── Action: ensure_modifier_stores ──
+// Re-POST modifier lists with the configured store id in `stores`, so they stop
+// showing "Not available in stores" in the POS. Preserves option ids + prices.
+// Optional ?list_id=X to target one list; otherwise fixes every list.
+
+async function handleEnsureModifierStores(listId: string) {
+  const storeId = await getStoreId()
+  if (!storeId) return json({ ok: false, error: "store_id not configured" }, 400)
+
+  const all = await loyverseGetAll<LoyverseModifierList>("/modifiers", "modifiers")
+  const targets = listId ? all.filter((l) => l.id === listId) : all
+  if (!targets.length) return json({ ok: false, error: "no modifier lists matched" }, 404)
+
+  const fixed: string[] = []
+  for (const list of targets) {
+    const stores = withStore(list.stores, storeId)
+    if ((list.stores ?? []).includes(storeId)) continue // already available
+    await loyversePost("/modifiers", {
+      id: list.id,
+      name: list.name,
+      min_select: list.min_select ?? 0,
+      max_select: list.max_select ?? 0,
+      stores,
+      modifier_options: (list.modifier_options ?? []).map((o) => ({ id: o.id, name: o.name, price: o.price ?? 0 })),
+    })
+    fixed.push(list.name)
+  }
+  await handlePullModifiers()
+  return json({ ok: true, store_id: storeId, fixed_count: fixed.length, fixed })
 }
 
 // ── Action: item_modifiers ──
@@ -521,6 +570,9 @@ Deno.serve(async (req) => {
         const name = url.searchParams.get("name") ?? ""
         return await handleRemoveModifierOption(listId, name)
       }
+      case "ensure_modifier_stores":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handleEnsureModifierStores(url.searchParams.get("list_id") ?? "")
       case "item_modifiers":
         return await handleItemModifiers()
       default:
@@ -528,7 +580,7 @@ Deno.serve(async (req) => {
           {
             ok: false,
             error:
-              "Unknown action. Use: status, categories, push_dish, pull_modifiers, create_modifier, get_item, recreate_item, add_modifier_option, remove_modifier_option, item_modifiers",
+              "Unknown action. Use: status, categories, push_dish, pull_modifiers, create_modifier, get_item, recreate_item, add_modifier_option, remove_modifier_option, ensure_modifier_stores, item_modifiers",
           },
           400,
         )
