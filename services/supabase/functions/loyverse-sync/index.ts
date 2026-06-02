@@ -219,6 +219,56 @@ async function handleRecreateItem(req: Request) {
   }
 }
 
+// ── Action: update_item ──
+// In-place update of an existing Loyverse item (NO delete) — stable id.
+// Re-sends the current variants (preserving ids/prices/stores) plus the desired
+// modifier_ids. Tests whether upsert honors modifier_ids with the correct field.
+//   POST ?action=update_item  body: { dish_id, modifier_ids? }
+
+async function handleUpdateItem(req: Request) {
+  const body = await req.json()
+  if (!body.dish_id) return json({ ok: false, error: "dish_id required" }, 400)
+
+  const { data: dish, error: dishErr } = await db
+    .from("nomenclature")
+    .select("id, name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
+    .eq("id", body.dish_id)
+    .single()
+  if (dishErr || !dish) return json({ ok: false, error: dishErr?.message ?? "dish not found" }, 404)
+  // deno-lint-ignore no-explicit-any
+  const d = dish as any
+  if (!d.loyverse_item_id) return json({ ok: false, error: "dish not synced yet (no loyverse_item_id)" }, 400)
+
+  // Fetch current Loyverse item to preserve variants verbatim.
+  const current = await loyverseGet(`/items/${d.loyverse_item_id}`)
+
+  const itemBody: Record<string, unknown> = {
+    id: d.loyverse_item_id,
+    item_name: d.name,
+    variants: current.variants,
+  }
+  const categoryId = d.product_categories?.loyverse_category_id ?? current.category_id ?? null
+  if (categoryId) itemBody.category_id = categoryId
+  if (d.customer_description) itemBody.description = d.customer_description
+  else if (current.description) itemBody.description = current.description
+  const img = d.image_url ?? d.customer_photo_url ?? current.image_url
+  if (img) itemBody.image_url = img
+  if (Array.isArray(body.modifier_ids)) itemBody.modifier_ids = body.modifier_ids
+  else if (current.modifier_ids) itemBody.modifier_ids = current.modifier_ids
+
+  try {
+    const result = await loyversePost("/items", itemBody)
+    return json({
+      ok: true,
+      loyverse_item_id: result.id,
+      id_unchanged: result.id === d.loyverse_item_id,
+      modifier_ids: result.modifier_ids,
+    })
+  } catch (e) {
+    return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
+  }
+}
+
 // ── Action: categories ──
 
 async function handleCategories() {
@@ -557,6 +607,9 @@ Deno.serve(async (req) => {
       case "recreate_item":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handleRecreateItem(req)
+      case "update_item":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handleUpdateItem(req)
       case "add_modifier_option": {
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         const listId = url.searchParams.get("list_id") ?? ""
