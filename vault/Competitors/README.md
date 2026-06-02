@@ -33,12 +33,15 @@ Each entry's analysis ends with a **Copy / Beat / Skip + Threat** verdict. Quick
 - Full nuances + screenshots: [easyhealth/analysis.md](easyhealth/analysis.md).
 
 ## Why this registry exists & how it connects
-**This folder IS the competitive-analysis database** — the single source of truth. It holds the *knowledge*
-(nuances, screenshots, verdicts); it is versioned in git so nothing is ever lost or scattered across chats.
+The base is **hybrid** — a queryable Supabase spine + this rich git-versioned folder:
 
-- **Knowledge base (here):** `vault/Competitors/` — narrative analysis, screenshots, comparison results.
-- **Work tracking:** Mission Control task `cf0b895e` records that the analysis was done + links here.
+- **Supabase (queryable spine):** tables `competitors` + `competitor_cases` (migration `services/supabase/migrations/229_competitor_intel.sql`). The structured index + a growing log of "interesting cases", surfaced in the admin panel, appendable from any session. EasyHealth + 4 cases seeded.
+- **Knowledge base (this folder):** `vault/Competitors/` — deep narrative, screenshots, full comparison/verdicts. Each `competitors.vault_doc` row points here.
+- **Work tracking:** Mission Control task `cf0b895e` records the analysis + links here.
 - **Product impact:** verdicts feed `vault/Product/customer-site-and-app.md` and MC initiative `52efcf1e`.
+
+> Why hybrid: tables answer "show all High-threat competitors" / power a dashboard; markdown holds the
+> nuance + screenshots a table can't. A row links to its deep doc; nothing is lost on either side.
 
 Easy Health is the first competitor analyzed in depth, but not the last. Every new competitor gets a row
 above + (when analyzed) a `<slug>/analysis.md` ending in a Copy/Beat/Skip verdict, so intel accumulates
