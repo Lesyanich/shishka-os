@@ -13,6 +13,8 @@
 //   POST ?action=recreate_item          → delete+recreate an item with modifiers_ids (body)
 //   POST ?action=add_modifier_option&list_id=X&name=Y&price=N
 //                                        → add one option to an existing modifier list
+//   POST ?action=remove_modifier_option&list_id=X&name=Y
+//                                        → remove one option (keeps other option ids)
 //   GET  ?action=item_modifiers         → each Loyverse item + its modifier-list ids
 //
 // Auth: Bearer token from LOYVERSE_API_TOKEN env var
@@ -163,7 +165,7 @@ async function handleRecreateItem(req: Request) {
 
   const { data: dish, error: dishErr } = await db
     .from("nomenclature")
-    .select("id, name, price, loyverse_item_id, product_categories!category_id(loyverse_category_id)")
+    .select("id, name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
     .eq("id", body.dish_id)
     .single()
   if (dishErr || !dish) return json({ ok: false, error: dishErr?.message ?? "dish not found" }, 404)
@@ -176,11 +178,11 @@ async function handleRecreateItem(req: Request) {
   await db.from("nomenclature").update({ loyverse_item_id: null, pos_status: "approved" }).eq("id", body.dish_id)
 
   // deno-lint-ignore no-explicit-any
-  const categoryId = (dish as any).product_categories?.loyverse_category_id ?? null
-  // deno-lint-ignore no-explicit-any
-  const price = (dish as any).price ?? 0
+  const d = dish as any
+  const categoryId = d.product_categories?.loyverse_category_id ?? null
+  const price = d.price ?? 0
   const itemBody: Record<string, unknown> = {
-    item_name: (dish as { name: string }).name,
+    item_name: d.name,
     variants: [{
       variant_name: "Regular",
       default_pricing_type: "FIXED",
@@ -189,7 +191,14 @@ async function handleRecreateItem(req: Request) {
     }],
   }
   if (categoryId) itemBody.category_id = categoryId
-  if (body.modifier_ids && body.modifier_ids.length > 0) itemBody.modifiers_ids = body.modifier_ids
+  // Preserve customer-facing description + photo so a DELETE+CREATE re-bind
+  // does not strip them from the Loyverse item.
+  if (d.customer_description) itemBody.description = d.customer_description
+  const img = d.image_url ?? d.customer_photo_url
+  if (img) itemBody.image_url = img
+  // Loyverse item field is `modifier_ids` (verified via GET /items). An earlier
+  // note claimed `modifiers_ids` — that is wrong; the API silently ignores it.
+  if (body.modifier_ids && body.modifier_ids.length > 0) itemBody.modifier_ids = body.modifier_ids
 
   try {
     const created = await loyversePost("/items", itemBody)
@@ -200,7 +209,7 @@ async function handleRecreateItem(req: Request) {
       item_name: created.item_name,
       loyverse_item_id: newId,
       category_id: created.category_id,
-      modifiers_ids: created.modifiers_ids,
+      modifier_ids: created.modifier_ids,
       old_id: oldLoyverseId,
     })
   } catch (e) {
@@ -416,6 +425,34 @@ async function handleAddModifierOption(listId: string, optName: string, price: n
   return json({ ok: true, list: list.name, added: optName, price, modifier_id: (result as { id?: string }).id })
 }
 
+// ── Action: remove_modifier_option ──
+// Removes a single option from an existing Loyverse modifier list by name,
+// preserving the ids (and thus existing bindings) of all kept options.
+
+async function handleRemoveModifierOption(listId: string, optName: string) {
+  if (!listId || !optName) return json({ ok: false, error: "list_id and name required" }, 400)
+
+  const all = await loyverseGetAll<LoyverseModifierList>("/modifiers", "modifiers")
+  const list = all.find((l) => l.id === listId)
+  if (!list) return json({ ok: false, error: `modifier list ${listId} not found` }, 404)
+
+  const opts = list.modifier_options ?? []
+  const kept = opts.filter((o) => o.name.trim().toLowerCase() !== optName.trim().toLowerCase())
+  if (kept.length === opts.length) {
+    return json({ ok: true, skipped: true, message: `"${optName}" not in "${list.name}"` })
+  }
+
+  const result = await loyversePost("/modifiers", {
+    id: list.id,
+    name: list.name,
+    min_select: list.min_select ?? 0,
+    max_select: list.max_select ?? 0,
+    modifier_options: kept.map((o) => ({ id: o.id, name: o.name, price: o.price ?? 0 })),
+  })
+  await handlePullModifiers()
+  return json({ ok: true, list: list.name, removed: optName, modifier_id: (result as { id?: string }).id })
+}
+
 // ── Action: item_modifiers ──
 // Returns each Loyverse item with the modifier-list ids attached, to mirror the
 // dish→modifier-list bindings exactly as configured in Loyverse. Loyverse has used
@@ -478,6 +515,12 @@ Deno.serve(async (req) => {
         const price = Number(url.searchParams.get("price") ?? "0")
         return await handleAddModifierOption(listId, name, price)
       }
+      case "remove_modifier_option": {
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        const listId = url.searchParams.get("list_id") ?? ""
+        const name = url.searchParams.get("name") ?? ""
+        return await handleRemoveModifierOption(listId, name)
+      }
       case "item_modifiers":
         return await handleItemModifiers()
       default:
@@ -485,7 +528,7 @@ Deno.serve(async (req) => {
           {
             ok: false,
             error:
-              "Unknown action. Use: status, categories, push_dish, pull_modifiers, create_modifier, get_item, recreate_item, add_modifier_option, item_modifiers",
+              "Unknown action. Use: status, categories, push_dish, pull_modifiers, create_modifier, get_item, recreate_item, add_modifier_option, remove_modifier_option, item_modifiers",
           },
           400,
         )
