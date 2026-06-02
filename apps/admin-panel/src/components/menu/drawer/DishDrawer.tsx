@@ -65,7 +65,7 @@ export function DishDrawer({
   // Nomenclature-level form state (customer photo URL etc.) — keyed at top level
   // so we can pass it to fn_dish_card_save outside the dish_card sub-object.
   const [formNomen, setFormNomen] = useState<{
-    customer_photo_url?: string | null
+    image_url?: string | null
     merrychef_program?: MerrychefProgram | null
   } | null>(null)
 
@@ -83,7 +83,7 @@ export function DishDrawer({
 
   const onNomenChange = useCallback(
     (patch: {
-      customer_photo_url?: string | null
+      image_url?: string | null
       merrychef_program?: MerrychefProgram | null
     }) => {
       setFormNomen((prev) => ({ ...(prev ?? {}), ...patch }))
@@ -100,9 +100,9 @@ export function DishDrawer({
     const mergedCard = { ...(dishCard.card ?? {}), ...formCard }
     const result = await saveDishCard(item.id, {
       expected_version: item.card_version,
-      customer_photo_url:
-        formNomen != null && 'customer_photo_url' in formNomen
-          ? (formNomen.customer_photo_url ?? '')
+      image_url:
+        formNomen != null && 'image_url' in formNomen
+          ? (formNomen.image_url ?? null)
           : undefined,
       merrychef_program:
         formNomen != null && 'merrychef_program' in formNomen
@@ -259,12 +259,12 @@ export function DishDrawer({
                 modifiers={modifiers.modifiers}
                 modifiersLoading={modifiers.isLoading}
                 customerPhotoUrl={
-                  formNomen?.customer_photo_url !== undefined
-                    ? formNomen.customer_photo_url
-                    : (item.customer_photo_url ?? item.image_url ?? null)
+                  formNomen?.image_url !== undefined
+                    ? formNomen.image_url
+                    : (item.image_url ?? null)
                 }
                 onCustomerPhotoChange={(url) =>
-                  onNomenChange({ customer_photo_url: url })
+                  onNomenChange({ image_url: url })
                 }
               />
             )}

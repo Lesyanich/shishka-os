@@ -13,7 +13,9 @@ export interface DishCardSavePayload {
   expected_version: number
   customer_description?: string
   customer_short_name?: string
-  customer_photo_url?: string
+  /** Customer-facing photo. Single source of truth for menu display —
+   * persisted to nomenclature.image_url (not via the RPC). `null` clears it. */
+  image_url?: string | null
   assembler_note?: string
   merrychef_program?: MerrychefProgram | null
   ttc_source_url?: string
@@ -75,8 +77,10 @@ export function useDishCardSave(): UseDishCardSaveResult {
         p_dish_id: dishId,
         p_payload: payload as unknown as Record<string, unknown>,
       })
-      setIsSaving(false)
-      if (error) return { ok: false, error: error.message }
+      if (error) {
+        setIsSaving(false)
+        return { ok: false, error: error.message }
+      }
       const result = data as {
         ok: boolean
         new_version?: number
@@ -84,9 +88,24 @@ export function useDishCardSave(): UseDishCardSaveResult {
         error?: string
       }
       if (!result.ok) {
+        setIsSaving(false)
         if (result.conflict) return { ok: false, conflict: result.conflict }
         return { ok: false, error: result.error ?? 'Save failed' }
       }
+      // Persist the customer photo to nomenclature.image_url directly — the
+      // menu grid + drawer hero read image_url, and the RPC doesn't touch it.
+      // Done after the version-bumped card save succeeds so the two stay in sync.
+      if (payload.image_url !== undefined) {
+        const { error: imgErr } = await supabase
+          .from('nomenclature')
+          .update({ image_url: payload.image_url })
+          .eq('id', dishId)
+        if (imgErr) {
+          setIsSaving(false)
+          return { ok: false, error: imgErr.message }
+        }
+      }
+      setIsSaving(false)
       return { ok: true, newVersion: result.new_version }
     },
     [],
