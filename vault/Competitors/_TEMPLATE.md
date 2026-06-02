@@ -45,7 +45,9 @@ Visual style, theme, polish, languages, currency.
 | Feature | Competitor | Shishka status (HAVE / PARTIAL / MISSING) | Where in our code |
 |---|---|---|---|
 
-## 14. What we should COPY / BEAT / SKIP
+## 14. What we should COPY / BEAT / SKIP (+ verdict)
 - **Copy:**
 - **Beat:**
 - **Skip:**
+- **Their edge we lack today:**
+- **Threat level:** 🟢 Low / 🟠 High / 🔴 Critical — one-line rationale. (Mirror this into the README registry row.)
