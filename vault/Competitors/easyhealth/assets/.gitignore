@@ -1,0 +1,2 @@
+# Re-include analysis evidence screenshots (repo-wide *.png is ignored).
+!*.png

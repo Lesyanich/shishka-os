@@ -1,0 +1,2 @@
+# Re-include product preview screenshots (repo-wide *.png is ignored).
+!*.png
