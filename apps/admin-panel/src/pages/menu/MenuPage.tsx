@@ -63,6 +63,7 @@ export function MenuPage() {
     isLoading,
     error,
     updateItem,
+    reorderItems,
     refetch,
   } = useMenuData()
   const inlineUpdate = useInlineUpdate(updateItem)
@@ -441,6 +442,7 @@ export function MenuPage() {
           recipeStepsByDish={enrichment.recipeStepsByDish}
           modifierOptionsByDish={enrichment.modifierOptionsByDish}
           onOpenDish={openDrawer}
+          onReorder={reorderItems}
         />
       ) : (
         <CustomerPreview
