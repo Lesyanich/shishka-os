@@ -310,6 +310,7 @@ export function DishDrawer({
                 scorecard={scorecard.scorecard}
                 scorecardLoading={scorecard.isLoading}
                 scorecardError={scorecard.error}
+                modifiers={modifiers.modifiers}
                 onSynced={() => onSaved?.()}
               />
             )}
