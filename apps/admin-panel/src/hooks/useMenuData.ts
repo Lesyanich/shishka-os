@@ -87,6 +87,7 @@ interface RawNomenclatureRow {
   base_unit: string | null
   price: number | string | null
   cost_per_unit: number | string | null
+  cost_source: string | null
   is_available: boolean
   is_featured: boolean
   image_url: string | null
@@ -146,7 +147,7 @@ export function useMenuData(): UseMenuDataResult {
       supabase
         .from('nomenclature')
         .select(`
-          id, name, product_code, base_unit, price, cost_per_unit,
+          id, name, product_code, base_unit, price, cost_per_unit, cost_source,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
           portion_size, portion_unit, launch_phase, display_order,
@@ -221,6 +222,7 @@ export function useMenuData(): UseMenuDataResult {
         base_unit: raw.base_unit,
         price: raw.price != null ? Number(raw.price) : null,
         cost_per_unit: raw.cost_per_unit != null ? Number(raw.cost_per_unit) : null,
+        cost_source: (raw.cost_source as MenuItem['cost_source']) ?? 'none',
         is_available: raw.is_available,
         is_featured: raw.is_featured,
         image_url: raw.image_url,
