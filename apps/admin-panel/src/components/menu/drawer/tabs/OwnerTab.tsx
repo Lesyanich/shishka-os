@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Shield, ExternalLink, Hash, Upload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { MenuItem } from '../../../../hooks/useMenuData'
 import type { DishScorecard } from '../../../../hooks/useDishScorecard'
+import type { ModifierOption } from '../../../../hooks/useModifierOptions'
 import { DrawerScorecard } from '../../owner/DrawerScorecard'
 import { useLoyversePushDish } from '../../../../hooks/useLoyversePushDish'
 
@@ -10,6 +11,8 @@ interface OwnerTabProps {
   scorecard: DishScorecard | null
   scorecardLoading: boolean
   scorecardError: string | null
+  /** Dish's modifier options (2-level model) for the cost/margin breakdown. */
+  modifiers?: ModifierOption[]
   /** Notify parent after a successful push so it can refetch. */
   onSynced?: () => void
 }
@@ -30,6 +33,7 @@ export function OwnerTab({
   scorecard,
   scorecardLoading,
   scorecardError,
+  modifiers = [],
   onSynced,
 }: OwnerTabProps) {
   const { pushDish, isPushing, lastResult } = useLoyversePushDish()
@@ -123,6 +127,51 @@ export function OwnerTab({
           </div>
         </div>
       </section>
+
+      {/* Modifier options cost/margin (Phase 6) — owner view of per-option economics */}
+      {modifiers.length > 0 && (
+        <section className="space-y-1">
+          <h4 className="text-[10px] uppercase tracking-widest text-cream/50">
+            Modifier Options — cost &amp; margin
+          </h4>
+          <div className="overflow-hidden rounded-lg border border-surface-3">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-surface-2/40 text-[10px] uppercase tracking-wide text-cream/40">
+                  <th className="px-2 py-1 text-left font-medium">Option</th>
+                  <th className="px-2 py-1 text-right font-medium">Price</th>
+                  <th className="px-2 py-1 text-right font-medium">Cost</th>
+                  <th className="px-2 py-1 text-right font-medium">Margin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {modifiers.map((m) => (
+                  <tr key={m.id} className="border-t border-surface-3/60">
+                    <td className="px-2 py-1 text-cream/80">
+                      {m.modifier_name}
+                      {m.group_name && <span className="text-cream/30"> · {m.group_name}</span>}
+                    </td>
+                    <td className="px-2 py-1 text-right font-mono text-cream/80">{`฿${m.price_delta.toFixed(0)}`}</td>
+                    <td className="px-2 py-1 text-right font-mono text-cream/60">
+                      {m.cost != null ? `฿${m.cost.toFixed(0)}` : '—'}
+                    </td>
+                    <td
+                      className={`px-2 py-1 text-right font-mono ${
+                        m.margin != null && m.margin < 0 ? 'text-[color:var(--color-brick-soft)]' : 'text-[color:var(--color-forest-soft)]'
+                      }`}
+                    >
+                      {m.margin != null ? `฿${m.margin.toFixed(0)}` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-cream/30">
+            Cost = linked ingredient × portion. Link ingredients on /menu/modifiers to fill the blanks.
+          </p>
+        </section>
+      )}
 
       {/* Scorecard */}
       <DrawerScorecard

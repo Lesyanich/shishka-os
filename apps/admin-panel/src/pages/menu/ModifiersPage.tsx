@@ -141,6 +141,7 @@ export function ModifiersPage() {
           attachmentsByDish={attachmentsByDish}
           attach={attach}
           detach={detach}
+          onChanged={() => { reloadPull(); reloadDmg() }}
         />
       ) : (
         <ModifierDishesTab
