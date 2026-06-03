@@ -10,10 +10,14 @@ import {
   Carrot,
   ClipboardList,
   Printer,
+  Sparkles,
 } from 'lucide-react'
 import type { MenuItem } from '../../../hooks/useMenuData'
 import type { DishCardData, AssemblyComponent } from '../../../hooks/useDishCard'
-import type { MenuRecipeStep } from '../../../hooks/useMenuListEnrichment'
+import type {
+  MenuRecipeStep,
+  DishModifierOption,
+} from '../../../hooks/useMenuListEnrichment'
 
 interface L2AssemblerViewProps {
   items: MenuItem[]
@@ -21,6 +25,7 @@ interface L2AssemblerViewProps {
   dishCardById: Map<string, DishCardData>
   componentsByDish: Map<string, AssemblyComponent[]>
   recipeStepsByDish: Map<string, MenuRecipeStep[]>
+  modifierOptionsByDish: Map<string, DishModifierOption[]>
   onOpenDish: (id: string) => void
 }
 
@@ -29,6 +34,7 @@ interface SaleAssemblyCardProps {
   card: DishCardData | undefined
   components: AssemblyComponent[]
   steps: MenuRecipeStep[]
+  options: DishModifierOption[]
   onOpen: () => void
 }
 
@@ -45,6 +51,34 @@ function ingredientLabel(c: AssemblyComponent): string {
   return c.component_emoji ? `${c.component_emoji} ${name}` : name
 }
 
+/** Clean modifier label with emoji prefix. */
+function modifierLabel(o: DishModifierOption): string {
+  const name = o.modifier_short_name ?? o.modifier_name
+  return o.modifier_emoji ? `${o.modifier_emoji} ${name}` : name
+}
+
+function priceDeltaLabel(d: number | null): string {
+  if (d == null || d === 0) return ''
+  return d > 0 ? `+฿${d}` : `−฿${Math.abs(d)}`
+}
+
+/** Group ordered options by group_name, preserving first-seen order. */
+function groupOptions(
+  options: DishModifierOption[],
+): { group: string; items: DishModifierOption[] }[] {
+  const order: string[] = []
+  const map = new Map<string, DishModifierOption[]>()
+  for (const o of options) {
+    const g = o.group_name ?? 'Options'
+    if (!map.has(g)) {
+      map.set(g, [])
+      order.push(g)
+    }
+    map.get(g)!.push(o)
+  }
+  return order.map((g) => ({ group: g, items: map.get(g)! }))
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -57,6 +91,7 @@ function buildCheatSheetHtml(
   items: MenuItem[],
   componentsByDish: Map<string, AssemblyComponent[]>,
   recipeStepsByDish: Map<string, MenuRecipeStep[]>,
+  modifierOptionsByDish: Map<string, DishModifierOption[]>,
 ): string {
   const title = items[0]?.category_name
     ? `${items[0].category_name} — Cheat-Sheet`
@@ -66,35 +101,63 @@ function buildCheatSheetHtml(
     .map((item) => {
       const comps = componentsByDish.get(item.id) ?? []
       const steps = recipeStepsByDish.get(item.id) ?? []
+      const options = modifierOptionsByDish.get(item.id) ?? []
       const price = item.price != null ? `฿${Math.round(Number(item.price))}` : ''
-      const ing = comps.length
-        ? comps
-            .map(
-              (c) =>
-                `<li><span>${escapeHtml(ingredientLabel(c))}</span><b>${escapeHtml(
-                  formatQty(c.qty_per_portion, c.base_unit),
-                )}</b></li>`,
-            )
-            .join('')
-        : '<li class="muted">No ingredients defined</li>'
-      const proc = steps.length
-        ? steps
-            .map(
-              (s) =>
-                `<li><span class="num">${s.step_order}</span><span><b>${escapeHtml(
-                  s.operation_name,
-                )}</b>${
-                  s.instruction_text ? ' — ' + escapeHtml(s.instruction_text) : ''
-                }</span></li>`,
-            )
-            .join('')
-        : '<li class="muted">Process pending</li>'
-      return `<article class="card">
-        <header><h2>${escapeHtml(item.name)}</h2><span class="price">${price}</span></header>
-        <div class="cols">
+      const note = item.assembler_note
+        ? `<p class="note">${escapeHtml(item.assembler_note)}</p>`
+        : ''
+      const isBuildYourOwn = comps.length === 0 && options.length > 0
+
+      let body: string
+      if (isBuildYourOwn) {
+        body = `<div class="custom">${groupOptions(options)
+          .map(
+            (g) =>
+              `<section class="optgroup"><h3>${escapeHtml(
+                g.group,
+              )}</h3><ul class="opts">${g.items
+                .map(
+                  (o) =>
+                    `<li><span>${escapeHtml(modifierLabel(o))}</span><b>${escapeHtml(
+                      priceDeltaLabel(o.price_delta),
+                    )}</b></li>`,
+                )
+                .join('')}</ul></section>`,
+          )
+          .join('')}</div>`
+      } else {
+        const ing = comps.length
+          ? comps
+              .map(
+                (c) =>
+                  `<li><span>${escapeHtml(ingredientLabel(c))}</span><b>${escapeHtml(
+                    formatQty(c.qty_per_portion, c.base_unit),
+                  )}</b></li>`,
+              )
+              .join('')
+          : '<li class="muted">No ingredients defined</li>'
+        const proc = steps.length
+          ? steps
+              .map(
+                (s) =>
+                  `<li><span class="num">${s.step_order}</span><span><b>${escapeHtml(
+                    s.operation_name,
+                  )}</b>${
+                    s.instruction_text ? ' — ' + escapeHtml(s.instruction_text) : ''
+                  }</span></li>`,
+              )
+              .join('')
+          : '<li class="muted">Process pending</li>'
+        body = `<div class="cols">
           <section><h3>Ingredients</h3><ul class="ing">${ing}</ul></section>
           <section><h3>Process</h3><ol class="proc">${proc}</ol></section>
-        </div>
+        </div>`
+      }
+
+      return `<article class="card">
+        <header><h2>${escapeHtml(item.name)}</h2><span class="price">${price}</span></header>
+        ${note}
+        ${body}
       </article>`
     })
     .join('')
@@ -109,11 +172,13 @@ function buildCheatSheetHtml(
     .card header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 8px; }
     .card h2 { font-size: 15px; margin: 0; }
     .price { font-weight: 700; font-size: 14px; }
+    .note { font-size: 11px; color: #555; margin: 0 0 8px; }
     .cols { display: grid; grid-template-columns: 1fr 1.5fr; gap: 18px; }
+    .custom { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
     h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #666; margin: 0 0 5px; }
     ul, ol { margin: 0; padding: 0; list-style: none; font-size: 12px; }
-    ul.ing li { display: flex; justify-content: space-between; gap: 8px; padding: 1.5px 0; }
-    ul.ing b { font-variant-numeric: tabular-nums; color: #333; font-weight: 600; }
+    ul.ing li, ul.opts li { display: flex; justify-content: space-between; gap: 8px; padding: 1.5px 0; }
+    ul.ing b, ul.opts b { font-variant-numeric: tabular-nums; color: #333; font-weight: 600; }
     ol.proc li { display: flex; gap: 6px; padding: 2px 0; line-height: 1.35; }
     ol.proc .num { flex: 0 0 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; background: #eee; border-radius: 50%; font-size: 10px; font-weight: 700; }
     .muted { color: #999; font-style: italic; }
@@ -125,11 +190,53 @@ function buildCheatSheetHtml(
   </body></html>`
 }
 
+/** Customisation menu — grouped option chips with price deltas. */
+function CustomiseSection({
+  options,
+  title,
+}: {
+  options: DishModifierOption[]
+  title: string
+}) {
+  return (
+    <section className="space-y-2">
+      <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
+        <Sparkles className="h-3 w-3" />
+        {title}
+      </h4>
+      {groupOptions(options).map(({ group, items }) => (
+        <div key={group} className="space-y-1">
+          <p className="text-[9px] uppercase tracking-wider text-cream/35">
+            {group}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {items.map((o, i) => {
+              const delta = priceDeltaLabel(o.price_delta)
+              return (
+                <span
+                  key={`${o.modifier_name}-${i}`}
+                  className="inline-flex items-center gap-1 rounded-full bg-surface-3 px-1.5 py-0.5 text-[10px] text-cream/70"
+                >
+                  {modifierLabel(o)}
+                  {delta && (
+                    <span className="font-medium text-forest-soft/90">{delta}</span>
+                  )}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 function SaleAssemblyCard({
   item,
   card,
   components,
   steps,
+  options,
   onOpen,
 }: SaleAssemblyCardProps) {
   // Ingredients + process are shown expanded by default (CEO requirement).
@@ -148,6 +255,8 @@ function SaleAssemblyCard({
     item.price && item.cost_per_unit
       ? Math.round((Number(item.cost_per_unit) / Number(item.price)) * 100)
       : null
+  // Build-your-own: no fixed BOM, value is the customisation menu.
+  const isBuildYourOwn = components.length === 0 && options.length > 0
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-surface-3 bg-surface-2 p-4 transition hover:border-forest-soft/40">
@@ -185,6 +294,7 @@ function SaleAssemblyCard({
         <div className="flex items-center gap-2 text-[11px] text-cream/60">
           <span className="font-semibold text-cream/80">
             ฿{Math.round(Number(item.price))}
+            {isBuildYourOwn && <span className="text-cream/45"> base</span>}
           </span>
           {foodCostPct != null && (
             <span className="text-cream/45">· food cost {foodCostPct}%</span>
@@ -260,7 +370,7 @@ function SaleAssemblyCard({
         </div>
       )}
 
-      {/* Ingredients + process — collapsible, open by default */}
+      {/* Composition — collapsible, open by default */}
       <div className="border-t border-surface-3 pt-2">
         <button
           type="button"
@@ -273,74 +383,87 @@ function SaleAssemblyCard({
           ) : (
             <ChevronRight className="h-3 w-3" />
           )}
-          Ingredients &amp; process
+          {isBuildYourOwn ? 'Build your own' : 'Ingredients & process'}
         </button>
 
         {expanded && (
           <div className="mt-2 space-y-3">
-            {/* Ingredients */}
-            <section className="space-y-1.5">
-              <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
-                <Carrot className="h-3 w-3" />
-                Ingredients
-              </h4>
-              {components.length === 0 ? (
-                <p className="text-[11px] italic text-cream/35">
-                  No ingredients defined
-                </p>
-              ) : (
-                <ul className="space-y-1">
-                  {components.map((c) => (
-                    <li
-                      key={c.component_id}
-                      className="flex items-center justify-between gap-2 text-[11px] text-cream/70"
-                    >
-                      <span className="min-w-0 truncate">{ingredientLabel(c)}</span>
-                      <span className="shrink-0 font-mono text-[10px] text-cream/45">
-                        {formatQty(c.qty_per_portion, c.base_unit)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            {/* Process */}
-            <section className="space-y-1.5">
-              <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
-                <ClipboardList className="h-3 w-3" />
-                Process
-              </h4>
-              {steps.length === 0 ? (
-                <p className="text-[11px] italic text-cream/35">
-                  Process pending — chef to add
-                </p>
-              ) : (
-                <ol className="space-y-1.5">
-                  {steps.map((s) => (
-                    <li
-                      key={s.step_order}
-                      className="flex gap-2 text-[11px] text-cream/70"
-                    >
-                      <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-surface-3 font-mono text-[9px] text-cream/60">
-                        {s.step_order}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="font-medium text-cream/80">
-                          {s.operation_name}
-                        </span>
-                        {s.instruction_text && (
-                          <span className="text-cream/55">
-                            {' — '}
-                            {s.instruction_text}
+            {isBuildYourOwn ? (
+              <CustomiseSection options={options} title="Customise" />
+            ) : (
+              <>
+                {/* Ingredients */}
+                <section className="space-y-1.5">
+                  <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
+                    <Carrot className="h-3 w-3" />
+                    Ingredients
+                  </h4>
+                  {components.length === 0 ? (
+                    <p className="text-[11px] italic text-cream/35">
+                      No ingredients defined
+                    </p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {components.map((c) => (
+                        <li
+                          key={c.component_id}
+                          className="flex items-center justify-between gap-2 text-[11px] text-cream/70"
+                        >
+                          <span className="min-w-0 truncate">
+                            {ingredientLabel(c)}
                           </span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
+                          <span className="shrink-0 font-mono text-[10px] text-cream/45">
+                            {formatQty(c.qty_per_portion, c.base_unit)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+
+                {/* Process */}
+                <section className="space-y-1.5">
+                  <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
+                    <ClipboardList className="h-3 w-3" />
+                    Process
+                  </h4>
+                  {steps.length === 0 ? (
+                    <p className="text-[11px] italic text-cream/35">
+                      Process pending — chef to add
+                    </p>
+                  ) : (
+                    <ol className="space-y-1.5">
+                      {steps.map((s) => (
+                        <li
+                          key={s.step_order}
+                          className="flex gap-2 text-[11px] text-cream/70"
+                        >
+                          <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-surface-3 font-mono text-[9px] text-cream/60">
+                            {s.step_order}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="font-medium text-cream/80">
+                              {s.operation_name}
+                            </span>
+                            {s.instruction_text && (
+                              <span className="text-cream/55">
+                                {' — '}
+                                {s.instruction_text}
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
+
+                {/* Add-ons (optional customisation on a fixed dish) */}
+                {options.length > 0 && (
+                  <CustomiseSection options={options} title="Add-ons" />
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -354,6 +477,7 @@ export function L2AssemblerView({
   dishCardById,
   componentsByDish,
   recipeStepsByDish,
+  modifierOptionsByDish,
   onOpenDish,
 }: L2AssemblerViewProps) {
   const saleItems = useMemo(
@@ -367,7 +491,12 @@ export function L2AssemblerView({
   )
 
   function handlePrint() {
-    const html = buildCheatSheetHtml(saleItems, componentsByDish, recipeStepsByDish)
+    const html = buildCheatSheetHtml(
+      saleItems,
+      componentsByDish,
+      recipeStepsByDish,
+      modifierOptionsByDish,
+    )
     const win = window.open('', '_blank')
     if (!win) return
     win.document.write(html)
@@ -405,6 +534,7 @@ export function L2AssemblerView({
             card={dishCardById.get(item.id)}
             components={componentsByDish.get(item.id) ?? []}
             steps={recipeStepsByDish.get(item.id) ?? []}
+            options={modifierOptionsByDish.get(item.id) ?? []}
             onOpen={() => onOpenDish(item.id)}
           />
         ))}

@@ -439,6 +439,7 @@ export function MenuPage() {
           dishCardById={enrichment.dishCardById}
           componentsByDish={enrichment.componentsByDish}
           recipeStepsByDish={enrichment.recipeStepsByDish}
+          modifierOptionsByDish={enrichment.modifierOptionsByDish}
           onOpenDish={openDrawer}
         />
       ) : (
