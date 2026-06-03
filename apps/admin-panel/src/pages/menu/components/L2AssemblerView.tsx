@@ -433,15 +433,23 @@ export function L2AssemblerView({
   modifierOptionsByDish,
   onOpenDish,
 }: L2AssemblerViewProps) {
-  const saleItems = useMemo(
-    () =>
-      items.filter(
-        (i) =>
-          i.kind === 'SALE' &&
-          (!selectedCategory || i.category_id === selectedCategory),
-      ),
-    [items, selectedCategory],
-  )
+  const saleItems = useMemo(() => {
+    const filtered = items.filter(
+      (i) =>
+        i.kind === 'SALE' &&
+        (!selectedCategory || i.category_id === selectedCategory),
+    )
+    // Build-your-own dishes (no fixed BOM, e.g. the Custom smoothie) sort last;
+    // everything else keeps its original order.
+    return filtered
+      .map((item, idx) => ({ item, idx }))
+      .sort((a, b) => {
+        const aByo = (componentsByDish.get(a.item.id)?.length ?? 0) === 0 ? 1 : 0
+        const bByo = (componentsByDish.get(b.item.id)?.length ?? 0) === 0 ? 1 : 0
+        return aByo - bByo || a.idx - b.idx
+      })
+      .map((x) => x.item)
+  }, [items, selectedCategory, componentsByDish])
 
   function handlePrint() {
     const html = buildCheatSheetHtml(
