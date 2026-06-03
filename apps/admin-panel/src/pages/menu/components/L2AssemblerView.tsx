@@ -10,6 +10,9 @@ import {
   Printer,
   Sparkles,
   GripVertical,
+  RectangleHorizontal,
+  RectangleVertical,
+  X,
 } from 'lucide-react'
 import type { MenuItem } from '../../../hooks/useMenuData'
 import type { DishCardData, AssemblyComponent } from '../../../hooks/useDishCard'
@@ -103,26 +106,26 @@ function buildCheatSheetHtml(
   componentsByDish: Map<string, AssemblyComponent[]>,
   recipeStepsByDish: Map<string, MenuRecipeStep[]>,
   modifierOptionsByDish: Map<string, DishModifierOption[]>,
+  orientation: 'landscape' | 'portrait',
 ): string {
   const title = items[0]?.category_name
     ? `${items[0].category_name} — Cheat-Sheet`
     : 'Menu Cheat-Sheet'
 
-  // Orientation by item count: a small/medium set is wide-and-short, so
-  // landscape fills the sheet and enlarges cards; a large set needs the extra
-  // vertical room of portrait. The fit loop covers any residual overflow.
-  const landscape = items.length <= 12
-  const orientation = landscape ? 'landscape' : 'portrait'
+  // Page geometry follows the chosen orientation; column count adapts to the
+  // available width and item count. The fit loop covers any residual overflow.
+  const landscape = orientation === 'landscape'
   const pageWidthMm = landscape ? 297 : 210
   const pageHeightMm = landscape ? 210 : 297
-  // More items / wider page → more columns.
   const cols = landscape
     ? items.length <= 6
       ? 3
       : 4
-    : items.length <= 12
-      ? 3
-      : 4
+    : items.length <= 4
+      ? 2
+      : items.length <= 12
+        ? 3
+        : 4
 
   const cards = items
     .map((item) => {
@@ -550,6 +553,13 @@ export function L2AssemblerView({
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
 
+  // Print dialog: the owner picks orientation and prints the live on-screen
+  // order. Default to landscape (wider, fills the sheet) for a typical set.
+  const [printOpen, setPrintOpen] = useState(false)
+  const [orientation, setOrientation] = useState<'landscape' | 'portrait'>(
+    'landscape',
+  )
+
   function handleDrop(targetId: string) {
     const source = dragId
     setDragId(null)
@@ -567,16 +577,19 @@ export function L2AssemblerView({
   }
 
   function handlePrint() {
+    // Always print the live on-screen order (`ordered`), in the chosen layout.
     const html = buildCheatSheetHtml(
       ordered,
       componentsByDish,
       recipeStepsByDish,
       modifierOptionsByDish,
+      orientation,
     )
     const win = window.open('', '_blank')
     if (!win) return
     win.document.write(html)
     win.document.close()
+    setPrintOpen(false)
   }
 
   if (ordered.length === 0) {
@@ -597,7 +610,7 @@ export function L2AssemblerView({
         </p>
         <button
           type="button"
-          onClick={handlePrint}
+          onClick={() => setPrintOpen(true)}
           className="flex items-center gap-1.5 rounded-lg border border-surface-3 bg-surface-2 px-3 py-1.5 text-xs font-medium text-cream transition hover:border-forest-soft/40 hover:bg-surface-3"
           title="Print cheat-sheet for the assembler"
         >
@@ -650,6 +663,112 @@ export function L2AssemblerView({
           )
         })}
       </div>
+
+      {printOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPrintOpen(false)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-surface-3 bg-surface-1 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-cream">
+                <Printer className="h-4 w-4" />
+                Print cheat-sheet
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPrintOpen(false)}
+                className="rounded-md p-1 text-cream/50 transition hover:bg-surface-3 hover:text-cream"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto px-4 py-4">
+              <div>
+                <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-cream/45">
+                  Orientation
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      {
+                        value: 'landscape' as const,
+                        label: 'Horizontal',
+                        Icon: RectangleHorizontal,
+                      },
+                      {
+                        value: 'portrait' as const,
+                        label: 'Vertical',
+                        Icon: RectangleVertical,
+                      },
+                    ]
+                  ).map(({ value, label, Icon }) => {
+                    const active = orientation === value
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setOrientation(value)}
+                        aria-pressed={active}
+                        className={`flex flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-xs font-medium transition ${
+                          active
+                            ? 'border-forest-soft/70 bg-forest-soft/10 text-cream'
+                            : 'border-surface-3 bg-surface-2 text-cream/60 hover:border-forest-soft/40 hover:text-cream'
+                        }`}
+                      >
+                        <Icon className="h-6 w-6" />
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-cream/45">
+                  {ordered.length} cards · in your order
+                </p>
+                <ol className="space-y-1 rounded-xl border border-surface-3 bg-surface-2 p-2">
+                  {ordered.map((item, i) => (
+                    <li
+                      key={item.id}
+                      className="flex items-center gap-2 text-xs text-cream/75"
+                    >
+                      <span className="w-5 shrink-0 text-right font-mono text-[10px] text-cream/40">
+                        {i + 1}
+                      </span>
+                      <span className="min-w-0 truncate">{item.name}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-surface-3 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setPrintOpen(false)}
+                className="rounded-lg border border-surface-3 bg-surface-2 px-3 py-1.5 text-xs font-medium text-cream/70 transition hover:bg-surface-3 hover:text-cream"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="flex items-center gap-1.5 rounded-lg bg-forest-soft px-3 py-1.5 text-xs font-semibold text-surface-1 transition hover:bg-forest-soft/90"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Print
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
