@@ -41,7 +41,8 @@ function formatQty(qty: number, baseUnit: string | null): string {
 
 /** Clean culinary label, falling back to the raw supplier name. */
 function ingredientLabel(c: AssemblyComponent): string {
-  return c.component_short_name ?? c.component_name
+  const name = c.component_short_name ?? c.component_name
+  return c.component_emoji ? `${c.component_emoji} ${name}` : name
 }
 
 function escapeHtml(s: string): string {
