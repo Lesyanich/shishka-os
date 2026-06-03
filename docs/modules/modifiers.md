@@ -1,8 +1,17 @@
 # Module: Modifiers — 2-Level Loyverse-Synced Architecture (PLAN)
 
-Status: **PLAN / not yet implemented** (2026-06-02). Current production state is the
-interim per-dish flat-binding model (see "Current state" below). This document is the
-target architecture the CEO approved: a 2-level model, fully synchronized with Loyverse.
+Status: **Phase 1 SHIPPED** (2026-06-03) — schema + sync live in prod (mig 236, edge fn
+v19). Phases 2–7 still pending. Current production state still also carries the interim
+per-dish flat-binding model (see "Current state" below); both run in parallel until the
+Phase 7 deprecation. This document is the target architecture the CEO approved: a 2-level
+model, fully synchronized with Loyverse.
+
+> **Group SSoT decision (2026-06-03, CEO-confirmed, MC 38911fde):** the group is the
+> **Loyverse modifier list** (mirror table), NOT `product_category`. A single MOD-* can be
+> an option in multiple groups (many-to-many), which a 1:1 `product_category` FK cannot
+> hold; also 25/35 MODs are uncategorized. KP-TOP-* stays at most an orthogonal
+> kitchen-station tag (no backfill). Same MOD in different proportions = a different
+> Loyverse option = a different `modifier_option_cost` row (option-centric), not a cloned MOD.
 
 ---
 
@@ -80,7 +89,7 @@ Customer upsell = Loyverse `option.price`. Margin per option = price − cost.
 
 ## Phasing
 
-1. **Schema + sync** — new tables (`dish_modifier_groups`, `modifier_option_cost`); extend `pull_modifiers` to fill them; capture min/max_select. Migrate the 181 smoothie rows.
+1. **Schema + sync** — ✅ **DONE (mig 236, edge fn v19, 2026-06-03).** New tables `dish_modifier_groups` (36 rows backfilled) + `modifier_option_cost` (37 rows, option-centric). `pull_modifiers` now also reconciles `dish_modifier_groups` from Loyverse `item.modifier_ids` (new RPC `fn_refresh_dish_modifier_groups`) and captures `min/max_select` (still null from Loyverse — see Open issues). Soft refs to the mirror so cost links survive the wipe-and-reload pull (verified: 37 survived, 0 orphans). `nomenclature_modifier_options` kept (Phase 7 drops it).
 2. **Read path** — refactor `useModifierOptions` / ModifiersPage / drawer chips to the 2-level model.
 3. **Admin 2-level editor** — `/bom` MOD tab shows groups→options, drill in, add/remove options + price + option→MOD cost link.
 4. **Per-dish attachment editor** — attach/detach modifier groups to a dish in admin.

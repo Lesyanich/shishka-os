@@ -8,6 +8,7 @@
 //   POST ?action=categories             → push product_categories → Loyverse
 //   POST ?action=push_dish&dish_id=X    → push a single SALE-* dish (RPC-gated)
 //   POST ?action=pull_modifiers         → pull Loyverse modifier_lists → raw mirror
+//                                          + reconcile dish_modifier_groups from item.modifier_ids
 //   POST ?action=create_modifier        → create a new modifier list (body)
 //   GET  ?action=get_item&item_id=X     → fetch a single Loyverse item (raw)
 //   POST ?action=recreate_item          → delete+recreate an item with modifiers_ids (body)
@@ -430,8 +431,35 @@ async function handlePullModifiers() {
     await logFinish(logId, "error", 0, 0, txErr.message)
     return json({ ok: false, error: txErr.message }, 500)
   }
+
+  // Phase 1 (MC 38911fde): also reconcile dish->group attachments from Loyverse
+  // item.modifier_ids into dish_modifier_groups, so a single pull keeps the 2-level
+  // structure (groups+options mirror + dish attachments) fully in sync. Runs AFTER
+  // the mirror refresh so the RPC can validate list ids against the fresh mirror.
+  let dishGroups = 0
+  try {
+    const items = await loyverseGetAll<LoyverseItemModifiers>("/items", "items")
+    const payload = items
+      .filter((i) => !i.deleted_at)
+      .map((i) => ({
+        item_id: i.id,
+        modifier_list_ids: i.modifiers_ids ?? i.modifier_ids ?? [],
+      }))
+    const { data: synced, error: dmgErr } = await db.rpc("fn_refresh_dish_modifier_groups", {
+      p_items: payload,
+    })
+    if (dmgErr) {
+      await logFinish(logId, "error", listRows.length, 0, `dish_modifier_groups: ${dmgErr.message}`)
+      return json({ ok: false, error: dmgErr.message }, 500)
+    }
+    dishGroups = typeof synced === "number" ? synced : 0
+  } catch (e) {
+    await logFinish(logId, "error", listRows.length, 0, e instanceof Error ? e.message : String(e))
+    return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
+  }
+
   await logFinish(logId, "success", listRows.length, 0)
-  return json({ ok: true, lists: listRows.length, options: optionRows.length })
+  return json({ ok: true, lists: listRows.length, options: optionRows.length, dish_groups: dishGroups })
 }
 
 // ── Action: create_modifier ──
