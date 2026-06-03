@@ -10,6 +10,7 @@ import {
   type ModOption,
   type OptionCostLink,
 } from '../../../hooks/useModifierOptionEditing'
+import { useModifierListOps } from '../../../hooks/useModifierListOps'
 
 interface Props {
   lists: LoyverseModifierListRow[]
@@ -18,6 +19,8 @@ interface Props {
   attachmentsByDish: Record<string, string[]>
   attach: (dishId: string, listId: string) => Promise<{ ok: boolean; error?: string }>
   detach: (dishId: string, listId: string) => Promise<{ ok: boolean; error?: string }>
+  /** Called after add/remove option (Loyverse mutated) so the page can refresh. */
+  onChanged?: () => void
 }
 
 function money(n: number | null | undefined): string {
@@ -38,6 +41,8 @@ function OptionEditRow({
   onClearPrice,
   onSaveCost,
   onRemoveCost,
+  onRemoveOption,
+  removing,
 }: {
   option: LoyverseModifierOptionRow
   mirrorPrice: number | null
@@ -48,6 +53,8 @@ function OptionEditRow({
   onClearPrice: (optionId: string) => Promise<{ ok: boolean; error?: string }>
   onSaveCost: (optionId: string, modifierId: string, qty: number) => Promise<{ ok: boolean; error?: string }>
   onRemoveCost: (optionId: string) => Promise<{ ok: boolean; error?: string }>
+  onRemoveOption: () => void
+  removing: boolean
 }) {
   const effectivePrice = override ?? mirrorPrice ?? 0
   const [priceDraft, setPriceDraft] = useState<string>(String(effectivePrice))
@@ -60,6 +67,11 @@ function OptionEditRow({
   const needsPush = override != null && override !== (mirrorPrice ?? null)
   const costValue = cost?.modifier_cost_per_unit != null ? cost.modifier_cost_per_unit * cost.quantity_per_unit : null
   const margin = costValue != null ? effectivePrice - costValue : null
+  // Live cost preview while editing weight/ingredient (before saving the link).
+  const draftMod = mods.find((m) => m.id === modifierId)
+  const liveCost =
+    draftMod?.cost_per_unit != null && Number.isFinite(Number(qty)) ? draftMod.cost_per_unit * Number(qty) : null
+  const liveMargin = liveCost != null ? effectivePrice - liveCost : null
 
   const savePrice = async () => {
     const v = Number(priceDraft)
@@ -103,6 +115,15 @@ function OptionEditRow({
               draft
             </span>
           )}
+          <button
+            type="button"
+            onClick={onRemoveOption}
+            disabled={removing}
+            title="Remove this option from the group (Loyverse)"
+            className="ml-1 rounded p-0.5 text-slate-500 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-50"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
@@ -138,12 +159,22 @@ function OptionEditRow({
               <option key={m.id} value={m.id}>{m.product_code} ({money(m.cost_per_unit)}/unit)</option>
             ))}
           </select>
-          <input
-            type="number" min="0.01" step="0.01" value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            placeholder="qty"
-            className="w-20 rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs text-slate-200"
-          />
+          <label className="flex items-center gap-1 text-[11px] text-slate-400">
+            weight
+            <input
+              type="number" min="0.01" step="0.01" value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              placeholder="g"
+              className="w-16 rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs text-slate-200"
+            />
+          </label>
+          {/* Live cost from weight × ingredient unit cost */}
+          <span className="text-[11px] text-slate-400">
+            = cost {money(liveCost)} ·{' '}
+            <span className={liveMargin != null && liveMargin < 0 ? 'text-rose-400' : 'text-emerald-400'}>
+              margin {money(liveMargin)}
+            </span>
+          </span>
           <button type="button" onClick={saveCost} disabled={busy} className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50">
             <Check className="h-3 w-3" /> Save
           </button>
@@ -179,17 +210,39 @@ async function run2(
 // Phase 3 (redesign, MC 38911fde): "by group" master-detail, Loyverse-style.
 // Left: list of modifier groups. Right (selected group): its options (read-only,
 // like Loyverse) + the summary of which dishes it is attached to, with add/remove.
-export function ModifierGroupsTab({ lists, options, dishes, attachmentsByDish, attach, detach }: Props) {
+export function ModifierGroupsTab({ lists, options, dishes, attachmentsByDish, attach, detach, onChanged }: Props) {
   const { costByOptionId, priceByOptionId, mods, upsertCost, removeCost, setPrice, clearPrice } =
     useModifierOptionEditing()
+  const { addOption, removeOption, isBusy: opBusy } = useModifierListOps()
   const [selId, setSelId] = useState<string | null>(lists[0]?.id ?? null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [newOptName, setNewOptName] = useState('')
+  const [newOptPrice, setNewOptPrice] = useState('0')
 
   const sel = lists.find((l) => l.id === selId) ?? null
   const dishesForGroup = (listId: string) =>
     dishes.filter((d) => (attachmentsByDish[d.id] ?? []).includes(listId))
+
+  // Add/remove an option mutates Loyverse (the edge fn re-attaches dishes after);
+  // refresh pull + attachments via onChanged when done.
+  const doAddOption = async () => {
+    if (!sel || !newOptName.trim()) return
+    setErr(null)
+    const res = await addOption(sel.id, newOptName.trim(), Number(newOptPrice) || 0)
+    if (!res.ok) { setErr(res.error ?? 'add failed'); return }
+    setNewOptName(''); setNewOptPrice('0')
+    onChanged?.()
+  }
+  const doRemoveOption = async (optionName: string) => {
+    if (!sel) return
+    if (!window.confirm(`Remove "${optionName}" from "${sel.name}" in Loyverse?`)) return
+    setErr(null)
+    const res = await removeOption(sel.id, optionName)
+    if (!res.ok) { setErr(res.error ?? 'remove failed'); return }
+    onChanged?.()
+  }
 
   const run = async (p: Promise<{ ok: boolean; error?: string }>) => {
     setBusy(true)
@@ -291,10 +344,39 @@ export function ModifierGroupsTab({ lists, options, dishes, attachmentsByDish, a
                       onClearPrice={clearPrice}
                       onSaveCost={upsertCost}
                       onRemoveCost={removeCost}
+                      onRemoveOption={() => doRemoveOption(o.name)}
+                      removing={opBusy}
                     />
                   ))}
                 </ul>
               )}
+
+              {/* Add a new option to this group (Loyverse). */}
+              <div className="mt-2 flex items-center gap-2 border-t border-slate-800/60 pt-2">
+                <input
+                  type="text"
+                  value={newOptName}
+                  onChange={(e) => setNewOptName(e.target.value)}
+                  placeholder="New option name"
+                  className="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200"
+                />
+                <span className="text-[11px] text-slate-500">฿</span>
+                <input
+                  type="number"
+                  value={newOptPrice}
+                  onChange={(e) => setNewOptPrice(e.target.value)}
+                  className="w-16 rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-right text-xs text-slate-200"
+                />
+                <button
+                  type="button"
+                  onClick={doAddOption}
+                  disabled={opBusy || !newOptName.trim()}
+                  className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
+                >
+                  <Plus className="h-3 w-3" /> Add option
+                </button>
+              </div>
+              {opBusy && <p className="pt-1 text-[11px] text-slate-500">Syncing with Loyverse…</p>}
             </section>
 
             {/* Attached dishes (the "pick a group, see its dishes" summary) */}

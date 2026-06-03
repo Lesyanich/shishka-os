@@ -524,8 +524,11 @@ async function handleAddModifierOption(listId: string, optName: string, price: n
       { name: optName, price },
     ],
   })
+  // Adding an option detached this list from its items — re-attach before pulling
+  // (else the pull would reconcile dish_modifier_groups to the detached state).
+  const reattached = await reattachAllDishes()
   await handlePullModifiers()
-  return json({ ok: true, list: list.name, added: optName, price, modifier_id: (result as { id?: string }).id })
+  return json({ ok: true, list: list.name, added: optName, price, reattached, modifier_id: (result as { id?: string }).id })
 }
 
 // ── Action: remove_modifier_option ──
@@ -554,8 +557,10 @@ async function handleRemoveModifierOption(listId: string, optName: string) {
     stores: withStore(list.stores, storeId),
     modifier_options: kept.map((o) => ({ id: o.id, name: o.name, price: o.price ?? 0 })),
   })
+  // Removing an option detached this list from its items — re-attach before pulling.
+  const reattached = await reattachAllDishes()
   await handlePullModifiers()
-  return json({ ok: true, list: list.name, removed: optName, modifier_id: (result as { id?: string }).id })
+  return json({ ok: true, list: list.name, removed: optName, reattached, modifier_id: (result as { id?: string }).id })
 }
 
 // ── Action: ensure_modifier_stores ──
@@ -613,6 +618,45 @@ async function handleItemModifiers() {
     }))
   const withMods = mapping.filter((m) => m.modifier_list_ids.length > 0)
   return json({ ok: true, total: mapping.length, with_modifiers: withMods.length, items: mapping })
+}
+
+// Re-attach every synced dish's groups to its Loyverse item. Editing a modifier
+// (add/remove option, price, stores) detaches the list from all items, so this MUST
+// run after any such edit to restore dish↔group attachments (mirrors our
+// dish_modifier_groups). Returns the number of dishes re-attached.
+async function reattachAllDishes(): Promise<number> {
+  const { data: dmgRows } = await db
+    .from("dish_modifier_groups")
+    .select("dish_id, loyverse_modifier_list_id")
+  const groupsByDish = new Map<string, string[]>()
+  for (const r of (dmgRows ?? []) as { dish_id: string; loyverse_modifier_list_id: string }[]) {
+    const arr = groupsByDish.get(r.dish_id) ?? []
+    arr.push(r.loyverse_modifier_list_id)
+    groupsByDish.set(r.dish_id, arr)
+  }
+  const { data: dishRows } = await db
+    .from("nomenclature")
+    .select("id, loyverse_item_id")
+    .like("product_code", "SALE-%")
+    .not("loyverse_item_id", "is", null)
+  let n = 0
+  for (const d of (dishRows ?? []) as { id: string; loyverse_item_id: string }[]) {
+    const listIds = groupsByDish.get(d.id) ?? []
+    if (listIds.length === 0) continue
+    const current = await loyverseGet(`/items/${d.loyverse_item_id}`)
+    const itemBody: Record<string, unknown> = {
+      id: d.loyverse_item_id,
+      item_name: current.item_name,
+      variants: current.variants,
+      modifier_ids: listIds,
+    }
+    if (current.category_id) itemBody.category_id = current.category_id
+    if (current.description) itemBody.description = current.description
+    if (current.image_url) itemBody.image_url = current.image_url
+    await loyversePost("/items", itemBody)
+    n++
+  }
+  return n
 }
 
 // ── Action: push_modifiers ──
@@ -710,21 +754,7 @@ async function handlePushModifiers(req: Request) {
     }
 
     // 2) LAST: re-attach each dish's groups in place (stable id — no delete/recreate).
-    let reattached = 0
-    for (const { dish, list_ids } of reattach) {
-      const current = await loyverseGet(`/items/${dish.loyverse_item_id}`)
-      const itemBody: Record<string, unknown> = {
-        id: dish.loyverse_item_id,
-        item_name: current.item_name,
-        variants: current.variants,
-        modifier_ids: list_ids,
-      }
-      if (current.category_id) itemBody.category_id = current.category_id
-      if (current.description) itemBody.description = current.description
-      if (current.image_url) itemBody.image_url = current.image_url
-      await loyversePost("/items", itemBody)
-      reattached++
-    }
+    const reattached = await reattachAllDishes()
 
     // 3) Clear applied overrides + stamp sync state.
     if (overrideById.size > 0) {
