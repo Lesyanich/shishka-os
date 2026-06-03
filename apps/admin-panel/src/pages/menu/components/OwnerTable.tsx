@@ -167,6 +167,33 @@ function hasNutrition(dish: MenuDish): boolean {
   return dish.calories != null || dish.protein != null || dish.carbs != null || dish.fat != null
 }
 
+/** Compact KБЖУ chips: calories (amber), protein (sky), carbs (violet),
+ * fat (rose). Per the menu design system. Only renders the values present. */
+function NutritionCell({ dish }: { dish: MenuDish }) {
+  const slots: { v: number | null; label: string; title: string; cls: string }[] = [
+    { v: dish.calories, label: 'kcal', title: 'Calories (kcal)', cls: 'bg-amber-900/40 text-amber-300' },
+    { v: dish.protein, label: 'P', title: 'Protein (g)', cls: 'bg-sky-900/40 text-sky-300' },
+    { v: dish.carbs, label: 'C', title: 'Carbs (g)', cls: 'bg-violet-900/40 text-violet-300' },
+    { v: dish.fat, label: 'F', title: 'Fat (g)', cls: 'bg-rose-900/40 text-rose-300' },
+  ]
+  if (slots.every((s) => s.v == null)) return <span className="text-cream/30">&mdash;</span>
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1">
+      {slots.map((s) =>
+        s.v != null ? (
+          <span
+            key={s.label}
+            title={s.title}
+            className={`inline-flex rounded px-1 py-0.5 text-[9px] font-medium tabular-nums ${s.cls}`}
+          >
+            {s.label === 'kcal' ? Math.round(s.v) : `${s.label}${Math.round(s.v)}`}
+          </span>
+        ) : null,
+      )}
+    </div>
+  )
+}
+
 function formatPortion(dish: MenuDish): string {
   if (dish.portion_size == null || dish.portion_unit == null) return '-'
   return `${dish.portion_size}${dish.portion_unit}`
@@ -463,6 +490,7 @@ export function OwnerTable({
             <th role="columnheader" className="px-3 py-2.5">Description</th>
             <th role="columnheader" className="px-3 py-2.5">Category</th>
             <th role="columnheader" className="px-3 py-2.5 text-right">Portion</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right">Nutrition</th>
             <th role="columnheader" className="px-3 py-2.5 text-right">Price</th>
             <th role="columnheader" className="px-3 py-2.5 text-right">&#x0E3F;/100g</th>
             <th role="columnheader" className="px-3 py-2.5 text-right">Cost</th>
@@ -487,7 +515,7 @@ export function OwnerTable({
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-surface-1/30">
-                  <td colSpan={24} className="px-3 py-2">
+                  <td colSpan={25} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-cream/50">
                       {item.subcategory.name}
                     </span>
@@ -663,6 +691,11 @@ export function OwnerTable({
                       {formatPortion(dish)}
                     </button>
                   )}
+                </td>
+
+                {/* Nutrition (КБЖУ) */}
+                <td className="px-3 py-2 text-right">
+                  <NutritionCell dish={dish} />
                 </td>
 
                 {/* Price */}
@@ -923,7 +956,7 @@ export function OwnerTable({
               )}
               {isExpanded && (
                 <tr className="bg-surface-1/60">
-                  <td colSpan={24} className="p-0">
+                  <td colSpan={25} className="p-0">
                     <DishExpandedCard dish={dish} />
                     {onOpenDrawer && (
                       <div className="flex justify-end border-t border-surface-3/50 bg-surface-1/40 px-4 py-2">
@@ -1023,6 +1056,7 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
                 )}
               </span>
             </td>
+            <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5 text-right">
