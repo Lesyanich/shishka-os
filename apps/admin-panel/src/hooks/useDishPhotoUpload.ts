@@ -9,16 +9,20 @@ export interface PhotoUploadResult {
   error?: string
 }
 
-const BUCKET = 'dish-photos'
+const BUCKET = 'nomenclature-photos'
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
-const MAX_BYTES = 3 * 1024 * 1024 // 3 MB (matches migration 191)
+const MAX_BYTES = 3 * 1024 * 1024 // 3 MB
 
-/** Uploads a dish photo to the dish-photos bucket and returns the public URL.
+/** Uploads a dish photo to the nomenclature-photos bucket and returns the
+ * public URL.
  *
- * Path: `{role}/{nomenclatureId}.{ext}` — upsert overwrites prior photo for
- * that (role, dish) pair. Caller is responsible for writing the returned URL
- * to the appropriate column (nomenclature.customer_photo_url,
- * dish_card.assembler_photo_url, or pf_pack_card.kitchen_photo_url).
+ * Path: `{nomenclatureId}/{role}.{ext}` — lives under the dish's folder
+ * (matching the imported-menu `{dishId}/...` convention) with the role as the
+ * basename so customer/assembler/kitchen photos don't overwrite each other.
+ * Upsert overwrites the prior photo for that (dish, role) pair. Caller is
+ * responsible for writing the returned URL to the appropriate column
+ * (customer → nomenclature.image_url, assembler → dish_card.assembler_photo_url,
+ * kitchen → pf_pack_card.kitchen_photo_url).
  */
 export function useDishPhotoUpload() {
   const [isUploading, setIsUploading] = useState(false)
@@ -43,7 +47,7 @@ export function useDishPhotoUpload() {
       }
 
       const ext = file.name.split('.').pop()?.toLowerCase() ?? 'webp'
-      const path = `${role}/${nomenclatureId}.${ext}`
+      const path = `${nomenclatureId}/${role}.${ext}`
 
       setIsUploading(true)
       const { error: uploadErr } = await supabase.storage
@@ -75,7 +79,7 @@ export function useDishPhotoUpload() {
       nomenclatureId: string,
       ext: string,
     ): Promise<{ ok: boolean; error?: string }> => {
-      const path = `${role}/${nomenclatureId}.${ext}`
+      const path = `${nomenclatureId}/${role}.${ext}`
       const { error: rmErr } = await supabase.storage
         .from(BUCKET)
         .remove([path])

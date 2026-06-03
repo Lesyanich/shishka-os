@@ -32,6 +32,10 @@ export function SaladBarPage() {
     isLoading,
     error,
     updateSlot,
+    moveSlot,
+    addSlot,
+    removeSlot,
+    resetToFactory,
   } = useSaladBarLayout()
 
   const totalSlots = unit1Slots.length + unit2Slots.length
@@ -42,12 +46,18 @@ export function SaladBarPage() {
     await updateSlot(slotId, { ingredient_id: ingredientId })
   }
 
+  const handleResetUnit = (unitNumber: 1 | 2) => {
+    if (window.confirm(`Reset Unit ${unitNumber} to the factory layout? Current arrangement will be replaced.`)) {
+      resetToFactory(unitNumber)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-lg font-bold text-slate-100">Salad Bar Layout</h1>
         <p className="text-xs text-slate-500">
-          GN pan slot assignments for L2 service area — 2 units
+          Перетаскивай ячейки, чтобы разложить как удобно · клик по ячейке — назначить ингредиент · 2 units
         </p>
       </div>
 
@@ -79,6 +89,10 @@ export function SaladBarPage() {
         isLoading={isLoading}
         error={error}
         onUpdateSlot={handleUpdateSlot}
+        onMoveSlot={moveSlot}
+        onAddSlot={(unitNumber, gnSize, xMm, yMm, rotation) => addSlot({ unitNumber, gnSize, xMm, yMm, rotation })}
+        onRemoveSlot={removeSlot}
+        onResetUnit={handleResetUnit}
       />
     </div>
   )

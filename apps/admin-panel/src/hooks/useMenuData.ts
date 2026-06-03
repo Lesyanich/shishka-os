@@ -68,6 +68,8 @@ export interface UseMenuDataResult {
       >
     >,
   ) => Promise<{ ok: boolean; error?: string }>
+  /** Persist a new card order: writes `display_order` = position for each id. */
+  reorderItems: (orderedIds: string[]) => Promise<{ ok: boolean; error?: string }>
   refetch: () => void
 }
 
@@ -96,6 +98,7 @@ interface RawNomenclatureRow {
   portion_size: number | string | null
   portion_unit: PortionUnit | null
   launch_phase: number | string | null
+  display_order: number | string | null
   category_id: string | null
   card_version: number
   last_verified_at: string | null
@@ -146,7 +149,7 @@ export function useMenuData(): UseMenuDataResult {
           id, name, product_code, base_unit, price, cost_per_unit,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
-          portion_size, portion_unit, launch_phase,
+          portion_size, portion_unit, launch_phase, display_order,
           category_id,
           card_version, last_verified_at, last_verified_by, pos_status, loyverse_synced_at, updated_at,
           customer_description, customer_short_name, customer_photo_url,
@@ -231,7 +234,7 @@ export function useMenuData(): UseMenuDataResult {
         category_id: raw.category_id,
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
-        display_order: null,
+        display_order: raw.display_order != null ? Number(raw.display_order) : null,
         launch_phase: raw.launch_phase != null ? Number(raw.launch_phase) : 1,
         tags: tagMap.get(raw.id) ?? [],
         kind,
@@ -331,6 +334,22 @@ export function useMenuData(): UseMenuDataResult {
     [fetchData],
   )
 
+  const reorderItems = useCallback(
+    async (orderedIds: string[]): Promise<{ ok: boolean; error?: string }> => {
+      const results = await Promise.all(
+        orderedIds.map((id, idx) =>
+          supabase.from('nomenclature').update({ display_order: idx }).eq('id', id),
+        ),
+      )
+      const failed = results.find((r) => r.error)
+      if (failed?.error) return { ok: false, error: failed.error.message }
+
+      await fetchData()
+      return { ok: true }
+    },
+    [fetchData],
+  )
+
   const dishes = items.filter((i) => i.kind === 'SALE') as MenuDish[]
 
   return {
@@ -343,6 +362,7 @@ export function useMenuData(): UseMenuDataResult {
     isLoading,
     error,
     updateItem,
+    reorderItems,
     refetch: fetchData,
   }
 }
