@@ -112,90 +112,106 @@ function buildCheatSheetHtml(
     ? `${items[0].category_name} — Cheat-Sheet`
     : 'Menu Cheat-Sheet'
 
-  // Page geometry follows the chosen orientation; column count adapts to the
-  // available width and item count. The fit loop covers any residual overflow.
+  // Page geometry follows the chosen orientation. Per-page margins (not a
+  // single container padding) so multi-page output keeps margins on every page.
   const landscape = orientation === 'landscape'
   const pageWidthMm = landscape ? 297 : 210
   const pageHeightMm = landscape ? 210 : 297
-  // Prefer 3 wide columns (bigger, more readable cards); only go to 4 when
-  // there are too many cards to fit 3-up on one page.
-  const cols = landscape
-    ? items.length <= 12
-      ? 3
-      : 4
-    : items.length <= 2
-      ? 2
-      : items.length <= 15
-        ? 3
-        : 4
+  const marginMm = 9
+  const contentWidthMm = pageWidthMm - marginMm * 2
+  const contentHeightMm = pageHeightMm - marginMm * 2
 
-  const cards = items
-    .map((item) => {
-      const comps = componentsByDish.get(item.id) ?? []
-      const steps = recipeStepsByDish.get(item.id) ?? []
-      const options = modifierOptionsByDish.get(item.id) ?? []
-      const price = item.price != null ? `฿${Math.round(Number(item.price))}` : ''
-      const note = item.assembler_note
-        ? `<p class="note">${escapeHtml(item.assembler_note)}</p>`
-        : ''
-      const isBuildYourOwn = comps.length === 0 && options.length > 0
+  // Build-your-own dishes (no fixed BOM, e.g. the Custom smoothie) go on their
+  // own final page; the fixed-recipe dishes fill page one as large as possible.
+  const isByo = (item: MenuItem): boolean => {
+    const comps = componentsByDish.get(item.id) ?? []
+    const opts = modifierOptionsByDish.get(item.id) ?? []
+    return comps.length === 0 && opts.length > 0
+  }
+  const mainItems = items.filter((i) => !isByo(i))
+  const byoItems = items.filter((i) => isByo(i))
 
-      let body: string
-      if (isBuildYourOwn) {
-        body = `<div class="custom">${groupOptions(options)
-          .map(
-            (g) =>
-              `<section class="optgroup"><h3>${escapeHtml(
-                g.group,
-              )}</h3><ul class="opts">${g.items
-                .map(
-                  (o) =>
-                    `<li><span>${escapeHtml(modifierLabel(o))}</span><b>${escapeHtml(
-                      priceDeltaLabel(o.price_delta),
-                    )}</b></li>`,
-                )
-                .join('')}</ul></section>`,
-          )
-          .join('')}</div>`
-      } else {
-        const ing = comps.length
-          ? comps
+  // Three wide columns (cleaner than narrow 4-up; per-card content area sets
+  // the final type size). The grow-to-fit loop enlarges type to fill page one.
+  const mainCols = Math.min(3, Math.max(1, mainItems.length))
+  const byoCols = Math.max(1, Math.min(3, byoItems.length))
+
+  function cardHtml(item: MenuItem): string {
+    const comps = componentsByDish.get(item.id) ?? []
+    const steps = recipeStepsByDish.get(item.id) ?? []
+    const options = modifierOptionsByDish.get(item.id) ?? []
+    const price = item.price != null ? `฿${Math.round(Number(item.price))}` : ''
+    const note = item.assembler_note
+      ? `<p class="note">${escapeHtml(item.assembler_note)}</p>`
+      : ''
+    const buildYourOwn = comps.length === 0 && options.length > 0
+
+    let body: string
+    if (buildYourOwn) {
+      body = `<div class="custom">${groupOptions(options)
+        .map(
+          (g) =>
+            `<section class="optgroup"><h3>${escapeHtml(
+              g.group,
+            )}</h3><ul class="opts">${g.items
               .map(
-                (c) =>
-                  `<li><span>${escapeHtml(ingredientLabel(c))}</span><b>${escapeHtml(
-                    formatQty(c.qty_per_portion, c.base_unit),
+                (o) =>
+                  `<li><span>${escapeHtml(modifierLabel(o))}</span><b>${escapeHtml(
+                    priceDeltaLabel(o.price_delta),
                   )}</b></li>`,
               )
-              .join('')
-          : '<li class="muted">No ingredients defined</li>'
-        const proc = steps.length
-          ? steps
-              .map(
-                (s) =>
-                  `<li><span class="num">${s.step_order}</span><span>${escapeHtml(
-                    s.instruction_text ?? s.operation_name,
-                  )}</span></li>`,
-              )
-              .join('')
-          : '<li class="muted">Process pending</li>'
-        body = `<div class="cols">
-          <section><h3>Ingredients</h3><ul class="ing">${ing}</ul></section>
-          <section><h3>Process</h3><ol class="proc">${proc}</ol></section>
-        </div>`
-      }
+              .join('')}</ul></section>`,
+        )
+        .join('')}</div>`
+    } else {
+      const ing = comps.length
+        ? comps
+            .map(
+              (c) =>
+                `<li><span>${escapeHtml(ingredientLabel(c))}</span><b>${escapeHtml(
+                  formatQty(c.qty_per_portion, c.base_unit),
+                )}</b></li>`,
+            )
+            .join('')
+        : '<li class="muted">No ingredients defined</li>'
+      const proc = steps.length
+        ? steps
+            .map(
+              (s) =>
+                `<li><span class="num">${s.step_order}</span><span>${escapeHtml(
+                  s.instruction_text ?? s.operation_name,
+                )}</span></li>`,
+            )
+            .join('')
+        : '<li class="muted">Process pending</li>'
+      body = `<div class="cols">
+        <section><h3>Ingredients</h3><ul class="ing">${ing}</ul></section>
+        <section><h3>Process</h3><ol class="proc">${proc}</ol></section>
+      </div>`
+    }
 
-      return `<article class="card">
-        <header><h2>${escapeHtml(item.name)}</h2><span class="price">${price}</span></header>
-        ${note}
-        ${body}
-      </article>`
-    })
-    .join('')
+    return `<article class="card">
+      <header><h2>${escapeHtml(item.name)}</h2><span class="price">${price}</span></header>
+      ${note}
+      ${body}
+    </article>`
+  }
+
+  const mainCards = mainItems.map(cardHtml).join('')
+  const byoTitle = title.replace(/Cheat-Sheet$/, 'Build Your Own')
+  const byoSection = byoItems.length
+    ? `<section class="sheet byo">
+        <div class="head"><h1>${escapeHtml(byoTitle)}</h1></div>
+        <div class="grid" style="grid-template-columns: repeat(${byoCols}, 1fr)">${byoItems
+          .map(cardHtml)
+          .join('')}</div>
+      </section>`
+    : ''
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(
     title,
   )}</title><style>
-    @page { size: A4 ${orientation}; margin: 0; }
+    @page { size: A4 ${orientation}; margin: ${marginMm}mm; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
@@ -204,14 +220,15 @@ function buildCheatSheetHtml(
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     /* font-size on .page is the single knob the fit-to-page loop turns. */
-    .page { font-size: 10px; width: ${pageWidthMm}mm; padding: 8mm 8mm 7mm; }
+    .page { font-size: 12px; width: ${contentWidthMm}mm; }
+    .sheet.byo { break-before: page; page-break-before: always; }
     .head {
       display: flex; justify-content: space-between; align-items: flex-end;
       border-bottom: 2px solid #1a160f; padding-bottom: .45em; margin-bottom: .75em;
     }
     .head h1 { margin: 0; font-size: 1.7em; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
     .head .sub { font-size: .92em; color: #9a8d7b; font-variant-numeric: tabular-nums; letter-spacing: .03em; }
-    .grid { display: grid; grid-template-columns: repeat(${cols}, 1fr); gap: .7em; align-items: start; }
+    .grid { display: grid; gap: .7em; align-items: start; }
     .card {
       border: 1px solid #e3dac9; border-radius: 7px; padding: .6em .7em;
       background: #fdfbf6; break-inside: avoid; page-break-inside: avoid;
@@ -240,37 +257,41 @@ function buildCheatSheetHtml(
     .muted { color: #b3a896; font-style: italic; }
   </style></head><body>
     <div class="page">
-      <div class="head">
-        <h1>${escapeHtml(title)}</h1>
-        <span class="sub">${items.length} items · A4</span>
-      </div>
-      <div class="grid">${cards}</div>
+      <section class="sheet" id="sheet1">
+        <div class="head">
+          <h1>${escapeHtml(title)}</h1>
+          <span class="sub">${mainItems.length} items</span>
+        </div>
+        <div class="grid" style="grid-template-columns: repeat(${mainCols}, 1fr)">${mainCards}</div>
+      </section>
+      ${byoSection}
     </div>
     <script>
       window.onload = function () {
         var page = document.querySelector('.page');
+        var firstPage = document.getElementById('sheet1');
         // Measure real px-per-mm (varies by zoom / DPI) with a throwaway ruler.
         var ruler = document.createElement('div');
         ruler.style.cssText = 'position:absolute;left:-9999px;top:0;width:100mm;height:0';
         document.body.appendChild(ruler);
         var pxPerMm = ruler.getBoundingClientRect().width / 100;
         ruler.parentNode.removeChild(ruler);
-        var maxH = ${pageHeightMm} * pxPerMm; // one A4 page, top to bottom
-        // Grow the single font-size knob to FILL the page (bigger, readable
-        // text), then back off so it never spills onto a second page.
-        var size = 11;
-        var MAX = 26;
+        var maxH = ${contentHeightMm} * pxPerMm; // printable height of one page
+        // Grow the font knob so PAGE ONE fills the sheet (large, readable text);
+        // any build-your-own section already lives on its own following page.
+        var size = 12;
+        var MAX = 40;
         page.style.fontSize = size + 'px';
         while (size < MAX) {
           page.style.fontSize = size + 0.5 + 'px';
-          if (page.scrollHeight > maxH) {
+          if (firstPage.scrollHeight > maxH) {
             page.style.fontSize = size + 'px';
             break;
           }
           size += 0.5;
         }
-        // Safety shrink in case even the base size overflows (very dense sets).
-        while (page.scrollHeight > maxH && size > 6) {
+        // Safety shrink if even the base size overflows (very dense sets).
+        while (firstPage.scrollHeight > maxH && size > 7) {
           size -= 0.5;
           page.style.fontSize = size + 'px';
         }
