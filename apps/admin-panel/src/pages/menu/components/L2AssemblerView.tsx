@@ -7,7 +7,6 @@ import {
   Utensils,
   ChevronDown,
   ChevronRight,
-  ClipboardList,
   Printer,
   Sparkles,
 } from 'lucide-react'
@@ -238,8 +237,8 @@ function SaleAssemblyCard({
   options,
   onOpen,
 }: SaleAssemblyCardProps) {
-  // Compact card: only the composition (ingredients / build-your-own menu) is
-  // shown by default; process + add-ons + meta live in a collapsed "Details".
+  // Compact card: composition + a short process show by default;
+  // add-ons + meta live in a collapsed "Details".
   const [showDetails, setShowDetails] = useState(false)
 
   const program = item.merrychef_program as
@@ -255,8 +254,6 @@ function SaleAssemblyCard({
       : null
   // Build-your-own: no fixed BOM, value is the customisation menu.
   const isBuildYourOwn = components.length === 0 && options.length > 0
-  // Process condensed to operation names — the full steps live in the drawer + print.
-  const shortProcess = steps.map((s) => s.operation_name).join(' → ')
   const hasAddons = !isBuildYourOwn && options.length > 0
   const hasMeta =
     !!card?.container_l2 ||
@@ -267,8 +264,7 @@ function SaleAssemblyCard({
     !!card?.pre_merrychef_prep ||
     !!card?.post_merrychef_check ||
     foodCostPct != null
-  const hasDetails =
-    (!isBuildYourOwn && steps.length > 0) || hasAddons || hasMeta
+  const hasDetails = hasAddons || hasMeta
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-surface-3 bg-surface-2 p-3 transition hover:border-forest-soft/40">
@@ -319,6 +315,25 @@ function SaleAssemblyCard({
         </ul>
       )}
 
+      {/* Process — short instructions, always visible for fixed dishes */}
+      {!isBuildYourOwn && steps.length > 0 && (
+        <ol className="space-y-0.5 border-t border-surface-3 pt-1.5">
+          {steps.map((s) => (
+            <li
+              key={s.step_order}
+              className="flex gap-1.5 text-[11px] leading-snug text-cream/65"
+            >
+              <span className="font-mono text-[10px] text-cream/40">
+                {s.step_order}.
+              </span>
+              <span className="min-w-0">
+                {s.instruction_text ?? s.operation_name}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+
       {/* Details — collapsed by default */}
       {hasDetails && (
         <div className="border-t border-surface-3 pt-1.5">
@@ -338,14 +353,6 @@ function SaleAssemblyCard({
 
           {showDetails && (
             <div className="mt-2 space-y-2.5">
-              {/* Process — condensed to a single line */}
-              {!isBuildYourOwn && steps.length > 0 && (
-                <div className="flex items-start gap-1.5 text-[11px] text-cream/65">
-                  <ClipboardList className="mt-px h-3 w-3 shrink-0 text-cream/40" />
-                  <span>{shortProcess}</span>
-                </div>
-              )}
-
               {/* Add-ons */}
               {hasAddons && <CustomiseSection options={options} title="Add-ons" />}
 
@@ -426,15 +433,23 @@ export function L2AssemblerView({
   modifierOptionsByDish,
   onOpenDish,
 }: L2AssemblerViewProps) {
-  const saleItems = useMemo(
-    () =>
-      items.filter(
-        (i) =>
-          i.kind === 'SALE' &&
-          (!selectedCategory || i.category_id === selectedCategory),
-      ),
-    [items, selectedCategory],
-  )
+  const saleItems = useMemo(() => {
+    const filtered = items.filter(
+      (i) =>
+        i.kind === 'SALE' &&
+        (!selectedCategory || i.category_id === selectedCategory),
+    )
+    // Build-your-own dishes (no fixed BOM, e.g. the Custom smoothie) sort last;
+    // everything else keeps its original order.
+    return filtered
+      .map((item, idx) => ({ item, idx }))
+      .sort((a, b) => {
+        const aByo = (componentsByDish.get(a.item.id)?.length ?? 0) === 0 ? 1 : 0
+        const bByo = (componentsByDish.get(b.item.id)?.length ?? 0) === 0 ? 1 : 0
+        return aByo - bByo || a.idx - b.idx
+      })
+      .map((x) => x.item)
+  }, [items, selectedCategory, componentsByDish])
 
   function handlePrint() {
     const html = buildCheatSheetHtml(
@@ -472,7 +487,7 @@ export function L2AssemblerView({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {saleItems.map((item) => (
           <SaleAssemblyCard
             key={item.id}
