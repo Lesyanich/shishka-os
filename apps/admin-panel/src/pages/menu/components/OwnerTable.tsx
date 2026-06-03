@@ -700,7 +700,17 @@ export function OwnerTable({
                 {/* Cost */}
                 <td className="px-3 py-2 text-right">
                   {hasCost ? (
-                    <span className="text-cream/60">{formatThb(cost)}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-cream/60">{formatThb(cost)}</span>
+                      {dish.cost_source === 'catalog_estimate' && (
+                        <span
+                          title="Cost estimated from the Makro catalog — no real purchase yet"
+                          className="rounded-sm bg-amber-watch/15 px-1 py-0.5 text-[9px] font-medium leading-none text-amber-watch"
+                        >
+                          ~est
+                        </span>
+                      )}
+                    </span>
                   ) : (
                     <span className="inline-flex rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-cream/60">
                       No BOM

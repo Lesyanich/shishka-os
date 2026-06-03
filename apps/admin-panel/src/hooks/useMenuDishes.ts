@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 
 export type PortionUnit = 'g' | 'ml' | 'pcs'
 
+/** Provenance of cost_per_unit (see nomenclature.cost_source, mig 221). */
+export type CostSource = 'wac' | 'catalog_estimate' | 'manual' | 'none'
+
 export interface MenuDish {
   id: string
   name: string
@@ -10,6 +13,7 @@ export interface MenuDish {
   product_code: string
   price: number | null
   cost_per_unit: number | null
+  cost_source: CostSource
   is_available: boolean
   is_featured: boolean
   image_url: string | null
@@ -74,7 +78,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       supabase
         .from('nomenclature')
         .select(`
-          id, name, product_code, price, cost_per_unit,
+          id, name, product_code, price, cost_per_unit, cost_source,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
           portion_size, portion_unit, launch_phase,
@@ -142,6 +146,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         product_code: d.product_code,
         price: d.price ? Number(d.price) : null,
         cost_per_unit: d.cost_per_unit ? Number(d.cost_per_unit) : null,
+        cost_source: (d.cost_source as CostSource) ?? 'none',
         is_available: d.is_available,
         is_featured: d.is_featured,
         image_url: d.image_url,
