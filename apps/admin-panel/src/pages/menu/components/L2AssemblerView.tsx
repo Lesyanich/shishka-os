@@ -84,7 +84,17 @@ function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;')
 }
 
-/** Build a clean, print-ready cheat-sheet document (light theme, A4). */
+/**
+ * Build a print-ready cheat-sheet that fits every dish on a SINGLE A4 page.
+ *
+ * Two mechanisms guarantee single-page output:
+ *  1. A dense card grid (column count scales with item count) instead of a
+ *     full-width vertical stack, with Ingredients|Process side-by-side inside
+ *     each card so a card's height is its tallest column, not the sum.
+ *  2. An on-load fit-to-page loop (see the inline <script>) that measures real
+ *     px-per-mm and shrinks the root font-size until the sheet content is no
+ *     taller than one A4 page — then prints.
+ */
 function buildCheatSheetHtml(
   items: MenuItem[],
   componentsByDish: Map<string, AssemblyComponent[]>,
@@ -94,6 +104,9 @@ function buildCheatSheetHtml(
   const title = items[0]?.category_name
     ? `${items[0].category_name} — Cheat-Sheet`
     : 'Menu Cheat-Sheet'
+
+  // More items → more columns. The fit loop handles any residual overflow.
+  const cols = items.length <= 4 ? 2 : items.length <= 12 ? 3 : 4
 
   const cards = items
     .map((item) => {
@@ -138,11 +151,9 @@ function buildCheatSheetHtml(
           ? steps
               .map(
                 (s) =>
-                  `<li><span class="num">${s.step_order}</span><span><b>${escapeHtml(
-                    s.operation_name,
-                  )}</b>${
-                    s.instruction_text ? ' — ' + escapeHtml(s.instruction_text) : ''
-                  }</span></li>`,
+                  `<li><span class="num">${s.step_order}</span><span>${escapeHtml(
+                    s.instruction_text ?? s.operation_name,
+                  )}</span></li>`,
               )
               .join('')
           : '<li class="muted">Process pending</li>'
@@ -163,28 +174,76 @@ function buildCheatSheetHtml(
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(
     title,
   )}</title><style>
+    @page { size: A4 portrait; margin: 0; }
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 16px; color: #111; }
-    h1 { font-size: 18px; margin: 0 0 12px; }
-    .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; page-break-inside: avoid; }
-    .card header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 8px; }
-    .card h2 { font-size: 15px; margin: 0; }
-    .price { font-weight: 700; font-size: 14px; }
-    .note { font-size: 11px; color: #555; margin: 0 0 8px; }
-    .cols { display: grid; grid-template-columns: 1fr 1.5fr; gap: 18px; }
-    .custom { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
-    h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #666; margin: 0 0 5px; }
-    ul, ol { margin: 0; padding: 0; list-style: none; font-size: 12px; }
-    ul.ing li, ul.opts li { display: flex; justify-content: space-between; gap: 8px; padding: 1.5px 0; }
-    ul.ing b, ul.opts b { font-variant-numeric: tabular-nums; color: #333; font-weight: 600; }
-    ol.proc li { display: flex; gap: 6px; padding: 2px 0; line-height: 1.35; }
-    ol.proc .num { flex: 0 0 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; background: #eee; border-radius: 50%; font-size: 10px; font-weight: 700; }
-    .muted { color: #999; font-style: italic; }
-    @media print { body { margin: 8mm; } .card { break-inside: avoid; } }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: #1a160f; background: #fff;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    /* font-size on .page is the single knob the fit-to-page loop turns. */
+    .page { font-size: 10px; width: 210mm; padding: 8mm 8mm 7mm; }
+    .head {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      border-bottom: 2px solid #1a160f; padding-bottom: .45em; margin-bottom: .75em;
+    }
+    .head h1 { margin: 0; font-size: 1.7em; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .head .sub { font-size: .92em; color: #9a8d7b; font-variant-numeric: tabular-nums; letter-spacing: .03em; }
+    .grid { display: grid; grid-template-columns: repeat(${cols}, 1fr); gap: .7em; align-items: start; }
+    .card {
+      border: 1px solid #e3dac9; border-radius: 7px; padding: .6em .7em;
+      background: #fdfbf6; break-inside: avoid; page-break-inside: avoid;
+      display: flex; flex-direction: column; gap: .45em;
+    }
+    .card > header {
+      display: flex; justify-content: space-between; align-items: baseline; gap: .4em;
+      border-bottom: 1px solid #efe7d6; padding-bottom: .32em;
+    }
+    .card h2 { margin: 0; font-size: 1.12em; font-weight: 650; line-height: 1.12; }
+    .price { font-weight: 700; font-size: 1em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .note { margin: 0; font-size: .84em; color: #8a7e6d; line-height: 1.3; }
+    h3 { margin: 0 0 .3em; font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: #b06a2c; }
+    .cols { display: grid; grid-template-columns: 1fr 1.15fr; gap: .7em; }
+    ul, ol { margin: 0; padding: 0; list-style: none; font-size: .92em; }
+    ul.ing li, ul.opts li { display: flex; justify-content: space-between; gap: .4em; padding: .07em 0; line-height: 1.25; }
+    ul.ing b, ul.opts b { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+    ul.ing b { color: #5a5246; }
+    ul.opts b { color: #3f7a3f; }
+    ol.proc li { display: flex; gap: .4em; padding: .08em 0; line-height: 1.25; }
+    ol.proc .num {
+      flex: 0 0 1.35em; height: 1.35em; display: inline-flex; align-items: center; justify-content: center;
+      background: #1a160f; color: #fff; border-radius: 50%; font-size: .78em; font-weight: 700;
+    }
+    .custom { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5em, 1fr)); gap: .55em; }
+    .muted { color: #b3a896; font-style: italic; }
   </style></head><body>
-    <h1>${escapeHtml(title)}</h1>
-    ${cards}
-    <script>window.onload = () => window.print()</script>
+    <div class="page">
+      <div class="head">
+        <h1>${escapeHtml(title)}</h1>
+        <span class="sub">${items.length} items · A4</span>
+      </div>
+      <div class="grid">${cards}</div>
+    </div>
+    <script>
+      window.onload = function () {
+        var page = document.querySelector('.page');
+        // Measure real px-per-mm (varies by zoom / DPI) with a throwaway ruler.
+        var ruler = document.createElement('div');
+        ruler.style.cssText = 'position:absolute;left:-9999px;top:0;width:100mm;height:0';
+        document.body.appendChild(ruler);
+        var pxPerMm = ruler.getBoundingClientRect().width / 100;
+        ruler.parentNode.removeChild(ruler);
+        var maxH = 297 * pxPerMm; // one A4 page, top to bottom
+        var size = 10;
+        // Shrink the single font-size knob until the whole sheet fits one page.
+        while (page.scrollHeight > maxH && size > 5) {
+          size -= 0.25;
+          page.style.fontSize = size + 'px';
+        }
+        window.print();
+      };
+    </script>
   </body></html>`
 }
 
