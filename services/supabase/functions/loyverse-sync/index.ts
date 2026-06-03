@@ -10,6 +10,7 @@
 //   POST ?action=push_dish&dish_id=X → push a single SALE-* dish (gated by
 //                                       fn_loyverse_sync_dish readiness check)
 //   POST ?action=pull_modifiers      → pull Loyverse modifier_lists into raw mirror
+//   POST ?action=create_modifier     → create a modifier list in Loyverse (body: JSON)
 //
 // Auth: Bearer token from LOYVERSE_API_TOKEN env var
 // ═══════════════════════════════════════════════════════════
@@ -522,6 +523,153 @@ async function handlePullModifiers() {
   })
 }
 
+// ── Loyverse DELETE helper ──
+
+async function loyverseDelete(path: string) {
+  const res = await fetch(`${LOYVERSE_BASE}${path}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${LOYVERSE_TOKEN}` },
+  })
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text()
+    throw new Error(`Loyverse DELETE ${path} failed (${res.status}): ${text}`)
+  }
+}
+
+// ── Action: get_item — debug: fetch a Loyverse item and return full JSON ──
+
+async function handleGetItem(itemId: string) {
+  if (!itemId) return json({ ok: false, error: "item_id required" }, 400)
+  try {
+    const item = await loyverseGet(`/items/${itemId}`)
+    return json({ ok: true, item })
+  } catch (e) {
+    return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
+  }
+}
+
+// ── Action: recreate_item ──
+// Accepts JSON body: { dish_id (our UUID), modifier_ids?: [loyverse modifier list UUIDs] }
+// Deletes existing Loyverse item, recreates with category + modifiers, updates our DB.
+
+async function handleRecreateItem(req: Request) {
+  const body = await req.json()
+  if (!body.dish_id) return json({ ok: false, error: "dish_id required" }, 400)
+
+  const storeId = await getStoreId()
+  if (!storeId) return json({ ok: false, error: "store_id not configured" }, 400)
+
+  // Fetch our dish with category
+  const { data: dish, error: dishErr } = await db
+    .from("nomenclature")
+    .select("id, name, price, loyverse_item_id, product_categories!category_id(loyverse_category_id)")
+    .eq("id", body.dish_id)
+    .single()
+  if (dishErr || !dish) return json({ ok: false, error: dishErr?.message ?? "dish not found" }, 404)
+
+  const oldLoyverseId = (dish as any).loyverse_item_id
+
+  // 1. Delete old item from Loyverse
+  if (oldLoyverseId) {
+    try { await loyverseDelete(`/items/${oldLoyverseId}`) } catch (_) { /* ignore if already gone */ }
+  }
+
+  // 2. Clear our DB reference
+  await db.from("nomenclature").update({ loyverse_item_id: null, pos_status: "approved" }).eq("id", body.dish_id)
+
+  // 3. Create new item with category + modifiers
+  const categoryId = (dish as any).product_categories?.loyverse_category_id ?? null
+  const price = (dish as any).price ?? 0
+
+  const itemBody: Record<string, unknown> = {
+    item_name: (dish as any).name,
+    variants: [{
+      variant_name: "Regular",
+      default_pricing_type: "FIXED",
+      default_price: price,
+      stores: [{ store_id: storeId, pricing_type: "FIXED", price, available_for_sale: true }],
+    }],
+  }
+  if (categoryId) itemBody.category_id = categoryId
+  if (body.modifier_ids?.length) {
+    itemBody.modifier_ids = body.modifier_ids
+  }
+
+  try {
+    const created = await loyversePost("/items", itemBody)
+    const newId = created.id
+
+    // 4. Update our DB
+    await db.from("nomenclature").update({ loyverse_item_id: newId, pos_status: "synced" }).eq("id", body.dish_id)
+
+    return json({
+      ok: true,
+      item_name: created.item_name,
+      loyverse_item_id: newId,
+      category_id: created.category_id,
+      modifiers_ids: created.modifiers_ids ?? [],
+      old_id: oldLoyverseId,
+    })
+  } catch (e) {
+    return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
+  }
+}
+
+// ── Action: assign_modifiers ──
+// Accepts JSON body: { item_id (loyverse), modifier_ids: [uuid, ...] }
+// Updates the Loyverse item to assign modifier lists.
+
+async function handleAssignModifiers(req: Request) {
+  const body = await req.json()
+  if (!body.item_id || !body.modifier_ids?.length) {
+    return json({ ok: false, error: "item_id and modifier_ids[] required" }, 400)
+  }
+  try {
+    // Loyverse requires item_name + variants on upsert — fetch existing first
+    const existing = await loyverseGet(`/items/${body.item_id}`)
+    const payload = {
+      id: body.item_id,
+      item_name: existing.item_name,
+      variants: existing.variants,
+      modifier_ids: body.modifier_ids,
+    }
+    const result = await loyversePost("/items", payload)
+    return json({ ok: true, item_name: result.item_name, modifiers_ids: result.modifiers_ids, category_id: result.category_id })
+  } catch (e) {
+    return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
+  }
+}
+
+// ── Action: create_modifier ──
+// Accepts JSON body: { name, min_select, max_select, modifier_options: [{ name, price }] }
+// Creates in Loyverse, mirrors locally, returns the created modifier list.
+
+async function handleCreateModifier(req: Request) {
+  const body = await req.json()
+  if (!body.name || !body.modifier_options?.length) {
+    return json({ ok: false, error: "name and modifier_options[] required" }, 400)
+  }
+
+  const payload = {
+    name: body.name,
+    min_select: body.min_select ?? 0,
+    max_select: body.max_select ?? 1,
+    modifier_options: body.modifier_options.map((o: { name: string; price?: number }) => ({
+      name: o.name,
+      price: o.price ?? 0,
+    })),
+  }
+
+  try {
+    const created = await loyversePost("/modifiers", payload)
+    // Mirror locally
+    await handlePullModifiers()
+    return json({ ok: true, modifier: created })
+  } catch (e) {
+    return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
+  }
+}
+
 // ── Main handler ──
 
 Deno.serve(async (req) => {
@@ -564,9 +712,24 @@ Deno.serve(async (req) => {
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handlePullModifiers()
 
+      case "create_modifier":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handleCreateModifier(req)
+
+      case "assign_modifiers":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handleAssignModifiers(req)
+
+      case "get_item":
+        return await handleGetItem(url.searchParams.get("item_id") ?? "")
+
+      case "recreate_item":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handleRecreateItem(req)
+
       default:
         return json(
-          { ok: false, error: "Unknown action. Use: status, categories, items, full, push_dish, pull_modifiers" },
+          { ok: false, error: "Unknown action. Use: status, categories, items, full, push_dish, pull_modifiers, create_modifier" },
           400,
         )
     }
