@@ -412,6 +412,7 @@ export function MenuPage() {
           onOpenDrawer={openDrawer}
           autoExpandId={justCreatedId}
           grabMargins={grabMargins}
+          onPushed={() => refetch()}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
         <OwnerGallery
