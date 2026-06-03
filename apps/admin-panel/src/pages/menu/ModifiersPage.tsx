@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import { RefreshCw, AlertTriangle, Plus } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Layers, UtensilsCrossed } from 'lucide-react'
 import { useLoyverseModifierPull } from '../../hooks/useLoyverseModifierPull'
-import { useModifierBindings } from '../../hooks/useModifierBindings'
-import { GroupOptionEditor } from '../../components/menu/modifiers/GroupOptionEditor'
-import { DishGroupAttachEditor } from '../../components/menu/modifiers/DishGroupAttachEditor'
-import { BindingsTable } from '../../components/menu/modifiers/BindingsTable'
-import { AddBindingForm } from '../../components/menu/modifiers/AddBindingForm'
+import { useDishModifierGroups } from '../../hooks/useDishModifierGroups'
+import { ModifierGroupsTab } from '../../components/menu/modifiers/ModifierGroupsTab'
+import { ModifierDishesTab } from '../../components/menu/modifiers/ModifierDishesTab'
 
 function formatPulledAt(iso: string | null): string {
   if (!iso) return 'never'
@@ -18,10 +16,15 @@ function formatPulledAt(iso: string | null): string {
   return new Date(iso).toLocaleDateString()
 }
 
+type TabKey = 'groups' | 'dishes'
+
 export function ModifiersPage() {
-  const { lists, options, lastPulledAt, lastWarnings, isPulling, error: pullError, pull } = useLoyverseModifierPull()
-  const { rows, error: bindingsError, create, remove } = useModifierBindings()
-  const [addOpen, setAddOpen] = useState(false)
+  const { lists, options, lastPulledAt, lastWarnings, isPulling, error: pullError, pull } =
+    useLoyverseModifierPull()
+  const { dishes, attachmentsByDish, error: dmgError, attach, detach } = useDishModifierGroups()
+  const [tab, setTab] = useState<TabKey>('groups')
+
+  const error = pullError ?? dmgError
 
   return (
     <div className="space-y-6">
@@ -29,7 +32,7 @@ export function ModifiersPage() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-100">Modifiers</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Last pull: {formatPulledAt(lastPulledAt)} · {lists.length} lists · {options.length} options · {rows.length} bindings
+            Last pull: {formatPulledAt(lastPulledAt)} · {lists.length} groups · {options.length} options · {dishes.length} dishes
           </p>
         </div>
         <button
@@ -43,10 +46,10 @@ export function ModifiersPage() {
         </button>
       </header>
 
-      {(pullError || bindingsError) && (
+      {error && (
         <div className="flex items-start gap-2 rounded-lg border border-rose-900/40 bg-rose-950/30 p-3 text-xs text-rose-300">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{pullError ?? bindingsError}</span>
+          <span>{error}</span>
         </div>
       )}
 
@@ -59,38 +62,48 @@ export function ModifiersPage() {
         </div>
       )}
 
-      <GroupOptionEditor lists={lists} options={options} />
+      {/* Two lenses on the same data: by group, or by dish. */}
+      <div className="inline-flex rounded-lg border border-slate-800 bg-slate-900/40 p-1 text-xs">
+        <button
+          type="button"
+          onClick={() => setTab('groups')}
+          className={[
+            'inline-flex items-center gap-1.5 rounded px-3 py-1.5',
+            tab === 'groups' ? 'bg-emerald-500/15 text-emerald-200' : 'text-slate-400 hover:text-slate-200',
+          ].join(' ')}
+        >
+          <Layers className="h-3.5 w-3.5" /> By group
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('dishes')}
+          className={[
+            'inline-flex items-center gap-1.5 rounded px-3 py-1.5',
+            tab === 'dishes' ? 'bg-emerald-500/15 text-emerald-200' : 'text-slate-400 hover:text-slate-200',
+          ].join(' ')}
+        >
+          <UtensilsCrossed className="h-3.5 w-3.5" /> By dish
+        </button>
+      </div>
 
-      <DishGroupAttachEditor lists={lists} />
-
-      <section className="rounded-lg border border-slate-800 bg-slate-900/40">
-        <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-200">Bindings</h2>
-          <button
-            type="button"
-            onClick={() => setAddOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300 hover:bg-emerald-500/20"
-          >
-            <Plus className="h-3 w-3" />
-            {addOpen ? 'Close' : 'Add binding'}
-          </button>
-        </header>
-        {addOpen && (
-          <div className="border-b border-slate-800 p-4">
-            <AddBindingForm
-              loyverseOptions={options}
-              loyverseLists={lists}
-              onSubmit={async (patch) => {
-                const res = await create(patch)
-                if (res.ok) setAddOpen(false)
-                return res
-              }}
-              onCancel={() => setAddOpen(false)}
-            />
-          </div>
-        )}
-        <BindingsTable rows={rows} onDelete={(id) => remove(id)} />
-      </section>
+      {tab === 'groups' ? (
+        <ModifierGroupsTab
+          lists={lists}
+          options={options}
+          dishes={dishes}
+          attachmentsByDish={attachmentsByDish}
+          attach={attach}
+          detach={detach}
+        />
+      ) : (
+        <ModifierDishesTab
+          lists={lists}
+          dishes={dishes}
+          attachmentsByDish={attachmentsByDish}
+          attach={attach}
+          detach={detach}
+        />
+      )}
     </div>
   )
 }
