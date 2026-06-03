@@ -19,6 +19,9 @@
 //   POST ?action=ensure_modifier_stores[&list_id=X]
 //                                        → set store availability so POS shows the modifiers
 //   GET  ?action=item_modifiers         → each Loyverse item + its modifier-list ids
+//   POST ?action=push_modifiers[&dry_run=true]
+//                                        → apply staged option prices then re-attach
+//                                          dish groups (fixed order); dry_run = plan only
 //
 // Auth: Bearer token from LOYVERSE_API_TOKEN env var
 // ═══════════════════════════════════════════════════════════
@@ -458,6 +461,12 @@ async function handlePullModifiers() {
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
   }
 
+  // Pull reconciled dish_modifier_groups FROM Loyverse, so admin == Loyverse now:
+  // stamp last_pulled_at and clear the attachments-dirty flag.
+  await db.from("modifier_sync_state")
+    .update({ last_pulled_at: new Date().toISOString(), attachments_dirty: false })
+    .eq("id", 1)
+
   await logFinish(logId, "success", listRows.length, 0)
   return json({ ok: true, lists: listRows.length, options: optionRows.length, dish_groups: dishGroups })
 }
@@ -606,6 +615,141 @@ async function handleItemModifiers() {
   return json({ ok: true, total: mapping.length, with_modifiers: withMods.length, items: mapping })
 }
 
+// ── Action: push_modifiers ──
+// The single admin "Push to Loyverse" for modifiers, in the FIXED order required by
+// the quirk that editing a modifier in Loyverse detaches it from all items:
+//   1) apply staged option price overrides → POST /modifiers (+stores) per changed list
+//   2) LAST: re-attach every dish's groups → update_item (modifier_ids), stable id
+//   3) delete applied overrides, stamp last_pushed_at, clear attachments_dirty, re-pull
+// ?dry_run=true returns the plan WITHOUT touching Loyverse.
+async function handlePushModifiers(req: Request) {
+  const dryRun = new URL(req.url).searchParams.get("dry_run") === "true"
+  const storeId = await getStoreId()
+  if (!storeId) return json({ ok: false, error: "store_id not configured" }, 400)
+
+  // Staged price overrides (option id -> desired price).
+  const { data: overrideRows } = await db
+    .from("modifier_option_overrides")
+    .select("loyverse_modifier_option_id, price")
+  const overrideById = new Map<string, number>(
+    (overrideRows ?? []).map((r: { loyverse_modifier_option_id: string; price: number }) => [
+      r.loyverse_modifier_option_id,
+      Number(r.price),
+    ]),
+  )
+
+  // Current Loyverse modifier lists (for full option arrays + names + stores).
+  const allLists = await loyverseGetAll<LoyverseModifierList>("/modifiers", "modifiers")
+
+  // Which lists have an option whose staged price differs from Loyverse?
+  const priceChanges: { list_id: string; list_name: string; option: string; from: number | null; to: number }[] = []
+  const affectedListIds = new Set<string>()
+  for (const l of allLists) {
+    for (const o of l.modifier_options ?? []) {
+      if (overrideById.has(o.id)) {
+        const to = overrideById.get(o.id) as number
+        if (to !== (o.price ?? null)) {
+          priceChanges.push({ list_id: l.id, list_name: l.name, option: o.name, from: o.price ?? null, to })
+          affectedListIds.add(l.id)
+        }
+      }
+    }
+  }
+
+  // Dish → group attachments to (re)apply. Re-attach ALL synced dishes that have
+  // groups: step 1 detaches changed lists, and this also pushes attachment edits.
+  const { data: dmgRows } = await db
+    .from("dish_modifier_groups")
+    .select("dish_id, loyverse_modifier_list_id")
+  const groupsByDish = new Map<string, string[]>()
+  for (const r of (dmgRows ?? []) as { dish_id: string; loyverse_modifier_list_id: string }[]) {
+    const arr = groupsByDish.get(r.dish_id) ?? []
+    arr.push(r.loyverse_modifier_list_id)
+    groupsByDish.set(r.dish_id, arr)
+  }
+  const { data: dishRows } = await db
+    .from("nomenclature")
+    .select("id, name, loyverse_item_id")
+    .like("product_code", "SALE-%")
+    .not("loyverse_item_id", "is", null)
+  const reattach = (dishRows ?? [])
+    .map((d: { id: string; name: string; loyverse_item_id: string }) => ({
+      dish: d,
+      list_ids: groupsByDish.get(d.id) ?? [],
+    }))
+    .filter((x) => x.list_ids.length > 0)
+
+  if (dryRun) {
+    return json({
+      ok: true,
+      dry_run: true,
+      price_changes: priceChanges,
+      affected_lists: affectedListIds.size,
+      reattach_dishes: reattach.map((r) => ({ name: r.dish.name, groups: r.list_ids.length })),
+    })
+  }
+
+  const logId = await logStart("modifiers_push", priceChanges.length + reattach.length)
+  try {
+    // 1) Apply price changes per affected list (full options array; preserves ids + stores).
+    for (const listId of affectedListIds) {
+      const l = allLists.find((x) => x.id === listId)
+      if (!l) continue
+      await loyversePost("/modifiers", {
+        id: l.id,
+        name: l.name,
+        min_select: l.min_select ?? 0,
+        max_select: l.max_select ?? 0,
+        stores: withStore(l.stores, storeId),
+        modifier_options: (l.modifier_options ?? []).map((o) => ({
+          id: o.id,
+          name: o.name,
+          price: overrideById.has(o.id) ? overrideById.get(o.id) : (o.price ?? 0),
+        })),
+      })
+    }
+
+    // 2) LAST: re-attach each dish's groups in place (stable id — no delete/recreate).
+    let reattached = 0
+    for (const { dish, list_ids } of reattach) {
+      const current = await loyverseGet(`/items/${dish.loyverse_item_id}`)
+      const itemBody: Record<string, unknown> = {
+        id: dish.loyverse_item_id,
+        item_name: current.item_name,
+        variants: current.variants,
+        modifier_ids: list_ids,
+      }
+      if (current.category_id) itemBody.category_id = current.category_id
+      if (current.description) itemBody.description = current.description
+      if (current.image_url) itemBody.image_url = current.image_url
+      await loyversePost("/items", itemBody)
+      reattached++
+    }
+
+    // 3) Clear applied overrides + stamp sync state.
+    if (overrideById.size > 0) {
+      await db.from("modifier_option_overrides").delete().neq("loyverse_modifier_option_id", "")
+    }
+    await db.from("modifier_sync_state")
+      .update({ last_pushed_at: new Date().toISOString(), attachments_dirty: false })
+      .eq("id", 1)
+
+    await logFinish(logId, "success", priceChanges.length + reattached, 0)
+    // Refresh the mirror so the admin reflects the just-pushed Loyverse state.
+    await handlePullModifiers()
+    return json({
+      ok: true,
+      prices_applied: priceChanges.length,
+      lists_updated: affectedListIds.size,
+      dishes_reattached: reattached,
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    await logFinish(logId, "error", 0, 1, msg)
+    return json({ ok: false, error: msg }, 502)
+  }
+}
+
 // ── Main handler ──
 
 Deno.serve(async (req) => {
@@ -656,6 +800,9 @@ Deno.serve(async (req) => {
         return await handleEnsureModifierStores(url.searchParams.get("list_id") ?? "")
       case "item_modifiers":
         return await handleItemModifiers()
+      case "push_modifiers":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handlePushModifiers(req)
       default:
         return json(
           {

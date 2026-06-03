@@ -15,7 +15,11 @@
 
 ## In-flight (backend foundation)
 
-- **2026-06-03 — Modifiers 2-level model, Phase 1 SHIPPED** (MC 38911fde, branch `claude/exciting-perlman-d3bb4a`). Backend only: mig 236 (`dish_modifier_groups` + `modifier_option_cost`) + edge fn loyverse-sync **v19** (`pull_modifiers` reconciles dish→group from Loyverse `item.modifier_ids`). Group SSoT = Loyverse lists (not `product_category`). Spec: `docs/modules/modifiers.md`. **Next:** Phases 3–5 = the admin `/menu/modifiers` 2-level editor + per-dish attachment + single Push-to-Loyverse (this is where admin frontend changes land).
+- **2026-06-03 — Modifiers 2-level model (MC 38911fde).**
+  - **Phase 1 SHIPPED** (PR #284, merged): mig 236 (`dish_modifier_groups` + `modifier_option_cost`) + edge fn loyverse-sync **v19** (`pull_modifiers` reconciles dish→group from Loyverse `item.modifier_ids`). Group SSoT = Loyverse lists (not `product_category`).
+  - **Phases 3+4 DONE** (branch `feature/admin/modifiers-2level-editor`): `/menu/modifiers` (ModifiersPage) now has `GroupOptionEditor` (groups→options + option→MOD cost-link editor, computed cost/margin) and `DishGroupAttachEditor` (per-dish group attach/detach). DB-only writes, no Loyverse side-effects.
+  - **Phase 5 PENDING** (separate review gate): single Push-to-Loyverse with fixed order (categories → groups/options/stores → item fields → LAST re-attach via `update_item`) — mutates the live POS.
+  - Spec: `docs/modules/modifiers.md`.
 
 ## Tech Stack
 
