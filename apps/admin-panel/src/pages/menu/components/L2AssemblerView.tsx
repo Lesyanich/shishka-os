@@ -7,7 +7,6 @@ import {
   Utensils,
   ChevronDown,
   ChevronRight,
-  Carrot,
   ClipboardList,
   Printer,
   Sparkles,
@@ -239,8 +238,9 @@ function SaleAssemblyCard({
   options,
   onOpen,
 }: SaleAssemblyCardProps) {
-  // Ingredients + process are shown expanded by default (CEO requirement).
-  const [expanded, setExpanded] = useState(true)
+  // Compact card: only the composition (ingredients / build-your-own menu) is
+  // shown by default; process + add-ons + meta live in a collapsed "Details".
+  const [showDetails, setShowDetails] = useState(false)
 
   const program = item.merrychef_program as
     | { temp_c?: number; time_sec?: number; preset?: string }
@@ -249,224 +249,170 @@ function SaleAssemblyCard({
     program?.temp_c != null && program?.time_sec != null
       ? `${program.temp_c}°C / ${program.time_sec}s${program.preset ? ` (${program.preset})` : ''}`
       : null
-  const orderStepCount = card?.assembly_order?.length ?? 0
-  const hasPhoto = !!card?.assembler_photo_url
   const foodCostPct =
     item.price && item.cost_per_unit
       ? Math.round((Number(item.cost_per_unit) / Number(item.price)) * 100)
       : null
   // Build-your-own: no fixed BOM, value is the customisation menu.
   const isBuildYourOwn = components.length === 0 && options.length > 0
+  // Process condensed to operation names — the full steps live in the drawer + print.
+  const shortProcess = steps.map((s) => s.operation_name).join(' → ')
+  const hasAddons = !isBuildYourOwn && options.length > 0
+  const hasMeta =
+    !!card?.container_l2 ||
+    !!merrychefSummary ||
+    card?.customer_eta_min != null ||
+    !!card?.has_cutlery ||
+    !!card?.has_lid_sticker ||
+    !!card?.pre_merrychef_prep ||
+    !!card?.post_merrychef_check ||
+    foodCostPct != null
+  const hasDetails =
+    (!isBuildYourOwn && steps.length > 0) || hasAddons || hasMeta
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-surface-3 bg-surface-2 p-4 transition hover:border-forest-soft/40">
+    <div className="flex flex-col gap-2 rounded-xl border border-surface-3 bg-surface-2 p-3 transition hover:border-forest-soft/40">
       {/* Header — click opens the full drawer */}
       <button
         type="button"
         onClick={onOpen}
-        className="group flex items-start justify-between gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
+        className="group flex items-center justify-between gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
       >
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-[var(--color-royal-green)]/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[color:var(--color-forest-soft)]">
-              SALE
-            </span>
-            <h3 className="truncate text-sm font-medium text-cream group-hover:text-forest-soft">
-              {item.name}
-            </h3>
-          </div>
-          <p className="mt-0.5 font-mono text-[10px] text-cream/40">
-            {item.product_code}
-          </p>
-        </div>
-        {hasPhoto && (
-          <img
-            src={card!.assembler_photo_url!}
-            alt={`${item.name} assembly reference`}
-            className="h-12 w-12 shrink-0 rounded-md object-cover"
-            loading="lazy"
-          />
+        <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-cream group-hover:text-forest-soft">
+          {item.name}
+        </h3>
+        {item.price != null && (
+          <span className="shrink-0 text-xs font-semibold text-cream/80">
+            ฿{Math.round(Number(item.price))}
+            {isBuildYourOwn && (
+              <span className="font-normal text-cream/40"> base</span>
+            )}
+          </span>
         )}
       </button>
 
-      {/* Price / food cost */}
-      {item.price != null && (
-        <div className="flex items-center gap-2 text-[11px] text-cream/60">
-          <span className="font-semibold text-cream/80">
-            ฿{Math.round(Number(item.price))}
-            {isBuildYourOwn && <span className="text-cream/45"> base</span>}
-          </span>
-          {foodCostPct != null && (
-            <span className="text-cream/45">· food cost {foodCostPct}%</span>
-          )}
-        </div>
-      )}
-
-      {item.assembler_note ? (
-        <p className="line-clamp-2 text-xs text-cream/65">
+      {/* Note — only when present (e.g. build-your-own explainer) */}
+      {item.assembler_note && (
+        <p className="line-clamp-2 text-[11px] text-cream/55">
           {item.assembler_note}
         </p>
-      ) : (
-        <p className="text-xs italic text-cream/35">No assembler note</p>
       )}
 
-      <dl className="grid grid-cols-2 gap-2 text-[11px]">
-        {card?.container_l2 && (
-          <div className="col-span-2 flex items-center gap-1.5 text-cream/65">
-            <Package className="h-3 w-3 text-cream/40" />
-            <span className="truncate">{card.container_l2}</span>
-          </div>
-        )}
-        {orderStepCount > 0 && (
-          <div className="flex items-center gap-1.5 text-cream/65">
-            <ListChecks className="h-3 w-3 text-cream/40" />
-            <span>
-              {orderStepCount} {orderStepCount === 1 ? 'step' : 'steps'}
-            </span>
-          </div>
-        )}
-        {merrychefSummary && (
-          <div className="flex items-center gap-1.5 text-cream/65">
-            <Flame className="h-3 w-3 text-amber-400" />
-            <span className="truncate">{merrychefSummary}</span>
-          </div>
-        )}
-        {card?.customer_eta_min != null && (
-          <div className="flex items-center gap-1.5 text-cream/65">
-            <ChefHat className="h-3 w-3 text-cream/40" />
-            <span>~{card.customer_eta_min} min</span>
-          </div>
-        )}
-        {(card?.has_cutlery || card?.has_lid_sticker) && (
-          <div className="col-span-2 flex items-center gap-2 text-[10px] text-cream/50">
-            {card.has_cutlery && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-surface-3 px-1.5 py-0.5">
-                <Utensils className="h-2.5 w-2.5" />
-                cutlery
+      {/* Primary composition — always visible */}
+      {isBuildYourOwn ? (
+        <CustomiseSection options={options} title="Customise" />
+      ) : components.length === 0 ? (
+        <p className="text-[11px] italic text-cream/35">No ingredients defined</p>
+      ) : (
+        <ul className="space-y-0.5">
+          {components.map((c) => (
+            <li
+              key={c.component_id}
+              className="flex items-center justify-between gap-2 text-[11px] text-cream/70"
+            >
+              <span className="min-w-0 truncate">{ingredientLabel(c)}</span>
+              <span className="shrink-0 font-mono text-[10px] text-cream/45">
+                {formatQty(c.qty_per_portion, c.base_unit)}
               </span>
-            )}
-            {card.has_lid_sticker && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-surface-3 px-1.5 py-0.5">
-                lid sticker
-              </span>
-            )}
-          </div>
-        )}
-      </dl>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      {(card?.pre_merrychef_prep || card?.post_merrychef_check) && (
-        <div className="space-y-1 border-t border-surface-3 pt-2 text-[10px] text-cream/55">
-          {card?.pre_merrychef_prep && (
-            <div>
-              <span className="text-cream/40">Pre:</span> {card.pre_merrychef_prep}
-            </div>
-          )}
-          {card?.post_merrychef_check && (
-            <div>
-              <span className="text-cream/40">Post:</span>{' '}
-              {card.post_merrychef_check}
+      {/* Details — collapsed by default */}
+      {hasDetails && (
+        <div className="border-t border-surface-3 pt-1.5">
+          <button
+            type="button"
+            onClick={() => setShowDetails((v) => !v)}
+            className="flex w-full items-center gap-1 text-[10px] uppercase tracking-widest text-cream/45 transition hover:text-cream/75"
+            aria-expanded={showDetails}
+          >
+            {showDetails ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            Details
+          </button>
+
+          {showDetails && (
+            <div className="mt-2 space-y-2.5">
+              {/* Process — condensed to a single line */}
+              {!isBuildYourOwn && steps.length > 0 && (
+                <div className="flex items-start gap-1.5 text-[11px] text-cream/65">
+                  <ClipboardList className="mt-px h-3 w-3 shrink-0 text-cream/40" />
+                  <span>{shortProcess}</span>
+                </div>
+              )}
+
+              {/* Add-ons */}
+              {hasAddons && <CustomiseSection options={options} title="Add-ons" />}
+
+              {/* Meta */}
+              {hasMeta && (
+                <dl className="grid grid-cols-2 gap-1.5 text-[10px]">
+                  {card?.container_l2 && (
+                    <div className="col-span-2 flex items-center gap-1.5 text-cream/55">
+                      <Package className="h-3 w-3 text-cream/40" />
+                      <span className="truncate">{card.container_l2}</span>
+                    </div>
+                  )}
+                  {merrychefSummary && (
+                    <div className="flex items-center gap-1.5 text-cream/55">
+                      <Flame className="h-3 w-3 text-amber-400" />
+                      <span className="truncate">{merrychefSummary}</span>
+                    </div>
+                  )}
+                  {card?.customer_eta_min != null && (
+                    <div className="flex items-center gap-1.5 text-cream/55">
+                      <ChefHat className="h-3 w-3 text-cream/40" />
+                      <span>~{card.customer_eta_min} min</span>
+                    </div>
+                  )}
+                  {foodCostPct != null && (
+                    <div className="flex items-center gap-1.5 text-cream/55">
+                      <ListChecks className="h-3 w-3 text-cream/40" />
+                      <span>food cost {foodCostPct}%</span>
+                    </div>
+                  )}
+                  {(card?.has_cutlery || card?.has_lid_sticker) && (
+                    <div className="col-span-2 flex items-center gap-2 text-[10px] text-cream/50">
+                      {card.has_cutlery && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-surface-3 px-1.5 py-0.5">
+                          <Utensils className="h-2.5 w-2.5" />
+                          cutlery
+                        </span>
+                      )}
+                      {card.has_lid_sticker && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-surface-3 px-1.5 py-0.5">
+                          lid sticker
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {(card?.pre_merrychef_prep || card?.post_merrychef_check) && (
+                    <div className="col-span-2 space-y-0.5 text-[10px] text-cream/50">
+                      {card?.pre_merrychef_prep && (
+                        <div>
+                          <span className="text-cream/35">Pre:</span>{' '}
+                          {card.pre_merrychef_prep}
+                        </div>
+                      )}
+                      {card?.post_merrychef_check && (
+                        <div>
+                          <span className="text-cream/35">Post:</span>{' '}
+                          {card.post_merrychef_check}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </dl>
+              )}
             </div>
           )}
         </div>
       )}
-
-      {/* Composition — collapsible, open by default */}
-      <div className="border-t border-surface-3 pt-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="flex w-full items-center gap-1.5 text-[10px] uppercase tracking-widest text-cream/50 transition hover:text-cream/80"
-          aria-expanded={expanded}
-        >
-          {expanded ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronRight className="h-3 w-3" />
-          )}
-          {isBuildYourOwn ? 'Build your own' : 'Ingredients & process'}
-        </button>
-
-        {expanded && (
-          <div className="mt-2 space-y-3">
-            {isBuildYourOwn ? (
-              <CustomiseSection options={options} title="Customise" />
-            ) : (
-              <>
-                {/* Ingredients */}
-                <section className="space-y-1.5">
-                  <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
-                    <Carrot className="h-3 w-3" />
-                    Ingredients
-                  </h4>
-                  {components.length === 0 ? (
-                    <p className="text-[11px] italic text-cream/35">
-                      No ingredients defined
-                    </p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {components.map((c) => (
-                        <li
-                          key={c.component_id}
-                          className="flex items-center justify-between gap-2 text-[11px] text-cream/70"
-                        >
-                          <span className="min-w-0 truncate">
-                            {ingredientLabel(c)}
-                          </span>
-                          <span className="shrink-0 font-mono text-[10px] text-cream/45">
-                            {formatQty(c.qty_per_portion, c.base_unit)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </section>
-
-                {/* Process */}
-                <section className="space-y-1.5">
-                  <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
-                    <ClipboardList className="h-3 w-3" />
-                    Process
-                  </h4>
-                  {steps.length === 0 ? (
-                    <p className="text-[11px] italic text-cream/35">
-                      Process pending — chef to add
-                    </p>
-                  ) : (
-                    <ol className="space-y-1.5">
-                      {steps.map((s) => (
-                        <li
-                          key={s.step_order}
-                          className="flex gap-2 text-[11px] text-cream/70"
-                        >
-                          <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-surface-3 font-mono text-[9px] text-cream/60">
-                            {s.step_order}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="font-medium text-cream/80">
-                              {s.operation_name}
-                            </span>
-                            {s.instruction_text && (
-                              <span className="text-cream/55">
-                                {' — '}
-                                {s.instruction_text}
-                              </span>
-                            )}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </section>
-
-                {/* Add-ons (optional customisation on a fixed dish) */}
-                {options.length > 0 && (
-                  <CustomiseSection options={options} title="Add-ons" />
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   )
 }
