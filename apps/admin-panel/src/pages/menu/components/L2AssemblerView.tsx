@@ -117,13 +117,15 @@ function buildCheatSheetHtml(
   const landscape = orientation === 'landscape'
   const pageWidthMm = landscape ? 297 : 210
   const pageHeightMm = landscape ? 210 : 297
+  // Prefer 3 wide columns (bigger, more readable cards); only go to 4 when
+  // there are too many cards to fit 3-up on one page.
   const cols = landscape
-    ? items.length <= 6
+    ? items.length <= 12
       ? 3
       : 4
-    : items.length <= 4
+    : items.length <= 2
       ? 2
-      : items.length <= 12
+      : items.length <= 15
         ? 3
         : 4
 
@@ -254,10 +256,22 @@ function buildCheatSheetHtml(
         var pxPerMm = ruler.getBoundingClientRect().width / 100;
         ruler.parentNode.removeChild(ruler);
         var maxH = ${pageHeightMm} * pxPerMm; // one A4 page, top to bottom
-        var size = 10;
-        // Shrink the single font-size knob until the whole sheet fits one page.
-        while (page.scrollHeight > maxH && size > 5) {
-          size -= 0.25;
+        // Grow the single font-size knob to FILL the page (bigger, readable
+        // text), then back off so it never spills onto a second page.
+        var size = 11;
+        var MAX = 26;
+        page.style.fontSize = size + 'px';
+        while (size < MAX) {
+          page.style.fontSize = size + 0.5 + 'px';
+          if (page.scrollHeight > maxH) {
+            page.style.fontSize = size + 'px';
+            break;
+          }
+          size += 0.5;
+        }
+        // Safety shrink in case even the base size overflows (very dense sets).
+        while (page.scrollHeight > maxH && size > 6) {
+          size -= 0.5;
           page.style.fontSize = size + 'px';
         }
         window.print();
