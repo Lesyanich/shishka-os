@@ -67,6 +67,11 @@ export function useDishModifierGroups() {
     reload()
   }, [reload])
 
+  // Local attach/detach diverges admin from Loyverse → flag "needs push".
+  const markDirty = async () => {
+    await supabase.from('modifier_sync_state').update({ attachments_dirty: true }).eq('id', 1)
+  }
+
   const attach = useCallback(
     async (dishId: string, listId: string) => {
       const { error: err } = await supabase
@@ -76,6 +81,7 @@ export function useDishModifierGroups() {
           { onConflict: 'dish_id,loyverse_modifier_list_id' },
         )
       if (err) return { ok: false as const, error: err.message }
+      await markDirty()
       await reload()
       return { ok: true as const }
     },
@@ -90,6 +96,7 @@ export function useDishModifierGroups() {
         .eq('dish_id', dishId)
         .eq('loyverse_modifier_list_id', listId)
       if (err) return { ok: false as const, error: err.message }
+      await markDirty()
       await reload()
       return { ok: true as const }
     },

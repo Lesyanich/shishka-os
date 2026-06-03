@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { RefreshCw, AlertTriangle, Layers, UtensilsCrossed } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Layers, UtensilsCrossed, UploadCloud, CheckCircle2, CircleAlert } from 'lucide-react'
 import { useLoyverseModifierPull } from '../../hooks/useLoyverseModifierPull'
 import { useDishModifierGroups } from '../../hooks/useDishModifierGroups'
+import { useModifierSync } from '../../hooks/useModifierSync'
 import { ModifierGroupsTab } from '../../components/menu/modifiers/ModifierGroupsTab'
 import { ModifierDishesTab } from '../../components/menu/modifiers/ModifierDishesTab'
 
@@ -19,31 +20,77 @@ function formatPulledAt(iso: string | null): string {
 type TabKey = 'groups' | 'dishes'
 
 export function ModifiersPage() {
-  const { lists, options, lastPulledAt, lastWarnings, isPulling, error: pullError, pull } =
+  const { lists, options, lastPulledAt, lastWarnings, isPulling, error: pullError, pull, reload: reloadPull } =
     useLoyverseModifierPull()
-  const { dishes, attachmentsByDish, error: dmgError, attach, detach } = useDishModifierGroups()
+  const { dishes, attachmentsByDish, error: dmgError, attach, detach, reload: reloadDmg } = useDishModifierGroups()
+  const { lastPushedAt, pending, priceDraftCount, attachmentsDirty, isPushing, error: syncError, push } =
+    useModifierSync()
   const [tab, setTab] = useState<TabKey>('groups')
 
-  const error = pullError ?? dmgError
+  const error = pullError ?? dmgError ?? syncError
+
+  const onPush = async () => {
+    const bits: string[] = []
+    if (priceDraftCount > 0) bits.push(`${priceDraftCount} price change(s)`)
+    if (attachmentsDirty) bits.push('dish attachment changes')
+    const summary = bits.length ? bits.join(' + ') : 'a re-sync of dish attachments'
+    if (!window.confirm(`Push ${summary} to the LIVE Loyverse POS now?`)) return
+    const res = await push(false)
+    if (res.ok) {
+      await Promise.all([reloadPull(), reloadDmg()])
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between border-b border-slate-800 pb-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-100">Modifiers</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Last pull: {formatPulledAt(lastPulledAt)} · {lists.length} groups · {options.length} options · {dishes.length} dishes
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500">
+            {/* Sync status */}
+            {pending ? (
+              <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">
+                <CircleAlert className="h-3 w-3" />
+                {[
+                  priceDraftCount > 0 ? `${priceDraftCount} price draft${priceDraftCount > 1 ? 's' : ''}` : null,
+                  attachmentsDirty ? 'attachment changes' : null,
+                ].filter(Boolean).join(' + ')} — needs push
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-xs text-emerald-300">
+                <CheckCircle2 className="h-3 w-3" /> in sync
+              </span>
+            )}
+            <span>· pulled {formatPulledAt(lastPulledAt)} · pushed {formatPulledAt(lastPushedAt)}</span>
+            <span>· {lists.length} groups · {options.length} options · {dishes.length} dishes</span>
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => pull()}
-          disabled={isPulling}
-          className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50"
-        >
-          <RefreshCw className={isPulling ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
-          {isPulling ? 'Pulling…' : 'Pull now'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => pull()}
+            disabled={isPulling}
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-700/40 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700/70 disabled:opacity-50"
+          >
+            <RefreshCw className={isPulling ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
+            {isPulling ? 'Pulling…' : 'Pull'}
+          </button>
+          <button
+            type="button"
+            onClick={onPush}
+            disabled={isPushing}
+            className={[
+              'inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50',
+              pending
+                ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
+                : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20',
+            ].join(' ')}
+            title="Apply staged prices + re-attach dish groups to the live Loyverse POS"
+          >
+            <UploadCloud className={isPushing ? 'h-3.5 w-3.5 animate-pulse' : 'h-3.5 w-3.5'} />
+            {isPushing ? 'Pushing…' : 'Push to Loyverse'}
+          </button>
+        </div>
       </header>
 
       {error && (
