@@ -13,6 +13,7 @@ export interface ModOption {
   product_code: string
   name: string
   cost_per_unit: number | null
+  base_unit: string | null
 }
 
 export interface OptionCostLink {
@@ -21,16 +22,15 @@ export interface OptionCostLink {
   modifier_code: string
   modifier_name: string
   modifier_cost_per_unit: number | null
+  modifier_base_unit: string | null
 }
 
+type ModRel = { id: string; product_code: string; name: string; cost_per_unit: number | null; base_unit: string | null }
 type RawCostRow = {
   loyverse_modifier_option_id: string
   modifier_id: string
   quantity_per_unit: number
-  modifier:
-    | { id: string; product_code: string; name: string; cost_per_unit: number | null }
-    | { id: string; product_code: string; name: string; cost_per_unit: number | null }[]
-    | null
+  modifier: ModRel | ModRel[] | null
 }
 type RawOverride = { loyverse_modifier_option_id: string; price: number }
 
@@ -53,12 +53,12 @@ export function useModifierOptionEditing() {
         .from('modifier_option_cost')
         .select(
           `loyverse_modifier_option_id, modifier_id, quantity_per_unit,
-           modifier:modifier_id ( id, product_code, name, cost_per_unit )`,
+           modifier:modifier_id ( id, product_code, name, cost_per_unit, base_unit )`,
         ),
       supabase.from('modifier_option_overrides').select('loyverse_modifier_option_id, price'),
       supabase
         .from('nomenclature')
-        .select('id, product_code, name, cost_per_unit')
+        .select('id, product_code, name, cost_per_unit, base_unit')
         .like('product_code', 'MOD-%')
         .order('product_code'),
     ])
@@ -76,6 +76,7 @@ export function useModifierOptionEditing() {
         modifier_code: mod.product_code,
         modifier_name: mod.name,
         modifier_cost_per_unit: mod.cost_per_unit != null ? Number(mod.cost_per_unit) : null,
+        modifier_base_unit: mod.base_unit ?? null,
       }
     }
     setCostByOptionId(costMap)

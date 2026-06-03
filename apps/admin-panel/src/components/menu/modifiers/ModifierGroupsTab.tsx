@@ -72,6 +72,8 @@ function OptionEditRow({
   const liveCost =
     draftMod?.cost_per_unit != null && Number.isFinite(Number(qty)) ? draftMod.cost_per_unit * Number(qty) : null
   const liveMargin = liveCost != null ? effectivePrice - liveCost : null
+  const editUnit = draftMod?.base_unit?.trim() || 'unit'
+  const costUnit = cost?.modifier_base_unit?.trim() || 'unit'
 
   const savePrice = async () => {
     const v = Number(priceDraft)
@@ -132,8 +134,8 @@ function OptionEditRow({
         <div className="mt-1 flex items-center gap-2 pl-1 text-[11px] text-slate-500">
           {cost ? (
             <>
-              <span>{cost.quantity_per_unit}× {cost.modifier_code}</span>
-              <span title="cost = ingredient cost × qty">cost {money(costValue)}</span>
+              <span>{cost.quantity_per_unit} {costUnit} × {cost.modifier_code}</span>
+              <span title="cost = ingredient cost × weight">cost {money(costValue)}</span>
               <span className={margin != null && margin < 0 ? 'text-rose-400' : 'text-emerald-400'} title="margin = price − cost">
                 margin {money(margin)}
               </span>
@@ -156,17 +158,20 @@ function OptionEditRow({
           >
             <option value="">— ingredient (MOD) —</option>
             {mods.map((m) => (
-              <option key={m.id} value={m.id}>{m.product_code} ({money(m.cost_per_unit)}/unit)</option>
+              <option key={m.id} value={m.id}>
+                {m.product_code} ({money(m.cost_per_unit)}/{m.base_unit?.trim() || 'unit'})
+              </option>
             ))}
           </select>
           <label className="flex items-center gap-1 text-[11px] text-slate-400">
             weight
             <input
-              type="number" min="0.01" step="0.01" value={qty}
+              type="number" min="0" step="any" value={qty}
               onChange={(e) => setQty(e.target.value)}
-              placeholder="g"
-              className="w-16 rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs text-slate-200"
+              placeholder="0"
+              className="w-20 rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-right text-xs text-slate-200"
             />
+            <span className="text-slate-500">{editUnit}</span>
           </label>
           {/* Live cost from weight × ingredient unit cost */}
           <span className="text-[11px] text-slate-400">
