@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, X, Plus } from 'lucide-react'
+import { ChevronRight, X, Plus, Search } from 'lucide-react'
 import type {
   LoyverseModifierListRow,
   LoyverseModifierOptionRow,
@@ -22,7 +22,7 @@ export function ModifierGroupsTab({ lists, options, dishes, attachmentsByDish, a
   const [selId, setSelId] = useState<string | null>(lists[0]?.id ?? null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [addDishId, setAddDishId] = useState('')
+  const [query, setQuery] = useState('')
 
   const sel = lists.find((l) => l.id === selId) ?? null
   const dishesForGroup = (listId: string) =>
@@ -48,6 +48,17 @@ export function ModifierGroupsTab({ lists, options, dishes, attachmentsByDish, a
   const selDishes = sel ? dishesForGroup(sel.id) : []
   const attachedIds = new Set(selDishes.map((d) => d.id))
   const unattachedDishes = dishes.filter((d) => !attachedIds.has(d.id))
+  const q = query.trim().toLowerCase()
+  const matches = q
+    ? unattachedDishes
+        .filter(
+          (d) =>
+            d.name.toLowerCase().includes(q) ||
+            d.product_code.toLowerCase().includes(q) ||
+            (d.category ?? '').toLowerCase().includes(q),
+        )
+        .slice(0, 50)
+    : []
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-[260px_1fr]">
@@ -61,7 +72,7 @@ export function ModifierGroupsTab({ lists, options, dishes, attachmentsByDish, a
             <li key={l.id}>
               <button
                 type="button"
-                onClick={() => { setSelId(l.id); setErr(null); setAddDishId('') }}
+                onClick={() => { setSelId(l.id); setErr(null); setQuery('') }}
                 className={[
                   'flex w-full items-center justify-between border-b border-slate-800/70 px-3 py-2.5 text-left',
                   isSel ? 'bg-emerald-500/10' : 'hover:bg-slate-900',
@@ -141,34 +152,42 @@ export function ModifierGroupsTab({ lists, options, dishes, attachmentsByDish, a
                 </ul>
               )}
 
-              {/* Add dish to this group */}
-              <div className="flex items-center gap-2 pt-1">
-                <select
-                  value={addDishId}
-                  onChange={(e) => setAddDishId(e.target.value)}
-                  className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200"
-                >
-                  <option value="">— add a dish —</option>
-                  {Array.from(new Set(unattachedDishes.map((d) => d.category ?? 'Uncategorized')))
-                    .sort()
-                    .map((cat) => (
-                      <optgroup key={cat} label={cat}>
-                        {unattachedDishes
-                          .filter((d) => (d.category ?? 'Uncategorized') === cat)
-                          .map((d) => (
-                            <option key={d.id} value={d.id}>{d.name}</option>
-                          ))}
-                      </optgroup>
-                    ))}
-                </select>
-                <button
-                  type="button"
-                  disabled={!addDishId || busy}
-                  onClick={async () => { await run(attach(addDishId, sel.id)); setAddDishId('') }}
-                  className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
-                >
-                  <Plus className="h-3 w-3" /> Add
-                </button>
+              {/* Add dish to this group — searchable */}
+              <div className="relative max-w-md pt-1">
+                <div className="flex items-center gap-1.5 rounded border border-slate-700 bg-slate-900 px-2 py-1">
+                  <Search className="h-3 w-3 shrink-0 text-slate-500" />
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search dish to add…"
+                    className="w-full bg-transparent text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none"
+                  />
+                </div>
+                {q && (
+                  <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded border border-slate-700 bg-slate-950 shadow-lg">
+                    {matches.length === 0 ? (
+                      <li className="px-2 py-1.5 text-xs text-slate-600">No matching dishes</li>
+                    ) : (
+                      matches.map((d) => (
+                        <li key={d.id}>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={async () => { await run(attach(d.id, sel.id)); setQuery('') }}
+                            className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Plus className="h-3 w-3 text-emerald-400" />
+                              {d.name}
+                            </span>
+                            <span className="text-[10px] text-slate-500">{d.category ?? 'Uncategorized'}</span>
+                          </button>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
               </div>
             </section>
           </div>
