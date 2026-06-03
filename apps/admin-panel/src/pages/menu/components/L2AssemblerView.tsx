@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Package,
   Flame,
@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Printer,
   Sparkles,
+  GripVertical,
 } from 'lucide-react'
 import type { MenuItem } from '../../../hooks/useMenuData'
 import type { DishCardData, AssemblyComponent } from '../../../hooks/useDishCard'
@@ -25,6 +26,8 @@ interface L2AssemblerViewProps {
   recipeStepsByDish: Map<string, MenuRecipeStep[]>
   modifierOptionsByDish: Map<string, DishModifierOption[]>
   onOpenDish: (id: string) => void
+  /** Persist a reordered set of cards (writes display_order per id). */
+  onReorder: (orderedIds: string[]) => Promise<{ ok: boolean; error?: string }>
 }
 
 interface SaleAssemblyCardProps {
@@ -504,18 +507,22 @@ export function L2AssemblerView({
   recipeStepsByDish,
   modifierOptionsByDish,
   onOpenDish,
+  onReorder,
 }: L2AssemblerViewProps) {
-  const saleItems = useMemo(() => {
+  // Seed order: persisted display_order first, then build-your-own dishes (no
+  // fixed BOM, e.g. the Custom smoothie) last, with original order as tiebreak.
+  const seed = useMemo(() => {
     const filtered = items.filter(
       (i) =>
         i.kind === 'SALE' &&
         (!selectedCategory || i.category_id === selectedCategory),
     )
-    // Build-your-own dishes (no fixed BOM, e.g. the Custom smoothie) sort last;
-    // everything else keeps its original order.
     return filtered
       .map((item, idx) => ({ item, idx }))
       .sort((a, b) => {
+        const ao = a.item.display_order ?? 0
+        const bo = b.item.display_order ?? 0
+        if (ao !== bo) return ao - bo
         const aByo = (componentsByDish.get(a.item.id)?.length ?? 0) === 0 ? 1 : 0
         const bByo = (componentsByDish.get(b.item.id)?.length ?? 0) === 0 ? 1 : 0
         return aByo - bByo || a.idx - b.idx
@@ -523,9 +530,45 @@ export function L2AssemblerView({
       .map((x) => x.item)
   }, [items, selectedCategory, componentsByDish])
 
+  // Local order drives instant drag feedback; it re-syncs whenever the seed
+  // (item set or persisted order) changes — e.g. category switch or saved drop.
+  const seedIds = useMemo(() => seed.map((i) => i.id).join(','), [seed])
+  const [orderIds, setOrderIds] = useState<string[]>(() => seed.map((i) => i.id))
+  useEffect(() => {
+    setOrderIds(seedIds ? seedIds.split(',') : [])
+  }, [seedIds])
+
+  const byId = useMemo(() => new Map(seed.map((i) => [i.id, i])), [seed])
+  // Tolerate drift: append any seed ids not yet tracked (new/removed items).
+  const ordered = useMemo(() => {
+    const tracked = orderIds.filter((id) => byId.has(id))
+    const trackedSet = new Set(tracked)
+    const missing = seed.filter((i) => !trackedSet.has(i.id)).map((i) => i.id)
+    return [...tracked, ...missing].map((id) => byId.get(id)!)
+  }, [orderIds, byId, seed])
+
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+
+  function handleDrop(targetId: string) {
+    const source = dragId
+    setDragId(null)
+    setOverId(null)
+    if (!source || source === targetId) return
+    const current = ordered.map((i) => i.id)
+    const from = current.indexOf(source)
+    const to = current.indexOf(targetId)
+    if (from === -1 || to === -1) return
+    const next = [...current]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    setOrderIds(next) // optimistic
+    void onReorder(next) // persist display_order; refetch re-syncs the seed
+  }
+
   function handlePrint() {
     const html = buildCheatSheetHtml(
-      saleItems,
+      ordered,
       componentsByDish,
       recipeStepsByDish,
       modifierOptionsByDish,
@@ -536,7 +579,7 @@ export function L2AssemblerView({
     win.document.close()
   }
 
-  if (saleItems.length === 0) {
+  if (ordered.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-20 text-cream/50">
         <Package className="h-10 w-10 text-cream/30" />
@@ -547,7 +590,11 @@ export function L2AssemblerView({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-between gap-3">
+        <p className="hidden items-center gap-1.5 text-[11px] text-cream/40 sm:flex">
+          <GripVertical className="h-3.5 w-3.5" />
+          Drag cards to reorder · saved automatically
+        </p>
         <button
           type="button"
           onClick={handlePrint}
@@ -560,17 +607,48 @@ export function L2AssemblerView({
       </div>
 
       <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {saleItems.map((item) => (
-          <SaleAssemblyCard
-            key={item.id}
-            item={item}
-            card={dishCardById.get(item.id)}
-            components={componentsByDish.get(item.id) ?? []}
-            steps={recipeStepsByDish.get(item.id) ?? []}
-            options={modifierOptionsByDish.get(item.id) ?? []}
-            onOpen={() => onOpenDish(item.id)}
-          />
-        ))}
+        {ordered.map((item) => {
+          const isDragging = dragId === item.id
+          const isOver =
+            overId === item.id && dragId !== null && dragId !== item.id
+          return (
+            <div
+              key={item.id}
+              draggable
+              onDragStart={(e) => {
+                setDragId(item.id)
+                e.dataTransfer.effectAllowed = 'move'
+                // Firefox requires data to be set for a drag to start.
+                e.dataTransfer.setData('text/plain', item.id)
+              }}
+              onDragEnd={() => {
+                setDragId(null)
+                setOverId(null)
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                if (overId !== item.id) setOverId(item.id)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                handleDrop(item.id)
+              }}
+              className={`cursor-grab rounded-xl transition active:cursor-grabbing ${
+                isDragging ? 'opacity-40' : ''
+              } ${isOver ? 'ring-2 ring-forest-soft/70' : ''}`}
+            >
+              <SaleAssemblyCard
+                item={item}
+                card={dishCardById.get(item.id)}
+                components={componentsByDish.get(item.id) ?? []}
+                steps={recipeStepsByDish.get(item.id) ?? []}
+                options={modifierOptionsByDish.get(item.id) ?? []}
+                onOpen={() => onOpenDish(item.id)}
+              />
+            </div>
+          )
+        })}
       </div>
     </div>
   )
