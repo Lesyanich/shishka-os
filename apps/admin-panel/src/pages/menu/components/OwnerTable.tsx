@@ -95,6 +95,45 @@ function CompletenessIndicator({ item }: { item: MenuItem }) {
   )
 }
 
+/** Loyverse POS lifecycle badge. draft → approved → synced. */
+const LOYVERSE_STATUS: Record<MenuItem['pos_status'], { label: string; cls: string }> = {
+  draft: {
+    label: 'Draft',
+    cls: 'bg-surface-3/60 text-cream/60 ring-cream/20',
+  },
+  approved: {
+    label: 'Approved',
+    cls: 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-[var(--color-amber-watch)]/40',
+  },
+  synced: {
+    label: 'Synced',
+    cls: 'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-[var(--color-forest-soft)]/40',
+  },
+}
+
+function LoyverseBadge({ status, itemId }: { status: MenuItem['pos_status']; itemId: string | null }) {
+  const { label, cls } = LOYVERSE_STATUS[status] ?? LOYVERSE_STATUS.draft
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ring-inset ${cls}`}
+      style={{ fontFamily: 'var(--font-display-sc)' }}
+      title={itemId ? `Loyverse item ${itemId}` : 'Not linked to a Loyverse item yet'}
+    >
+      {label}
+    </span>
+  )
+}
+
+/** Compact date + time for the last Loyverse sync, e.g. "02 Jun 14:30". */
+function formatSyncedAt(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  return `${date} ${time}`
+}
+
 function foodCostColor(pct: number): string {
   if (pct < 30) return 'text-forest-soft bg-royal-green/25'
   if (pct <= 45) return 'text-amber-watch bg-amber-watch/15'
@@ -401,6 +440,8 @@ export function OwnerTable({
             <th role="columnheader" className="px-3 py-2.5 text-center">Phase</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Version</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Verified</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Loyverse</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Synced</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Card</th>
           </tr>
         </thead>
@@ -409,7 +450,7 @@ export function OwnerTable({
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-surface-1/30">
-                  <td colSpan={20} className="px-3 py-2">
+                  <td colSpan={22} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-cream/50">
                       {item.subcategory.name}
                     </span>
@@ -740,6 +781,25 @@ export function OwnerTable({
                   )}
                 </td>
 
+                {/* Loyverse status */}
+                <td className="px-3 py-2 text-center">
+                  <LoyverseBadge status={dish.pos_status} itemId={dish.loyverse_item_id} />
+                </td>
+
+                {/* Last Loyverse sync */}
+                <td className="px-3 py-2 text-center">
+                  {(() => {
+                    const synced = formatSyncedAt(dish.loyverse_synced_at)
+                    return synced ? (
+                      <span className="text-[10px] tabular-nums text-cream/50" title={dish.loyverse_synced_at ?? undefined}>
+                        {synced}
+                      </span>
+                    ) : (
+                      <span className="text-cream/30">&mdash;</span>
+                    )
+                  })()}
+                </td>
+
                 {/* Completeness */}
                 <td className="px-3 py-2 text-center">
                   <CompletenessIndicator item={dish} />
@@ -754,7 +814,7 @@ export function OwnerTable({
               )}
               {isExpanded && (
                 <tr className="bg-surface-1/60">
-                  <td colSpan={20} className="p-0">
+                  <td colSpan={22} className="p-0">
                     <DishExpandedCard dish={dish} />
                     {onOpenDrawer && (
                       <div className="flex justify-end border-t border-surface-3/50 bg-surface-1/40 px-4 py-2">
@@ -864,6 +924,8 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
                 </span>
               )}
             </td>
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />

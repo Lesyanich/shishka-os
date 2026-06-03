@@ -22,6 +22,8 @@ export interface MenuItem extends MenuDish {
   last_verified_at: string | null
   last_verified_by: string | null
   pos_status: 'draft' | 'approved' | 'synced'
+  /** Timestamp of the last successful push to Loyverse POS. NULL = never synced. */
+  loyverse_synced_at: string | null
   customer_description: string | null
   customer_short_name: string | null
   customer_photo_url: string | null
@@ -96,6 +98,7 @@ interface RawNomenclatureRow {
   last_verified_at: string | null
   last_verified_by: string | null
   pos_status: string
+  loyverse_synced_at: string | null
   customer_description: string | null
   customer_short_name: string | null
   customer_photo_url: string | null
@@ -141,7 +144,7 @@ export function useMenuData(): UseMenuDataResult {
           calories, protein, carbs, fat,
           portion_size, portion_unit, launch_phase,
           category_id,
-          card_version, last_verified_at, last_verified_by, pos_status,
+          card_version, last_verified_at, last_verified_by, pos_status, loyverse_synced_at,
           customer_description, customer_short_name, customer_photo_url,
           assembler_note, kitchen_note,
           ttc_source_url, merrychef_program,
@@ -233,6 +236,7 @@ export function useMenuData(): UseMenuDataResult {
         last_verified_at: raw.last_verified_at,
         last_verified_by: raw.last_verified_by,
         pos_status: (raw.pos_status ?? 'draft') as 'draft' | 'approved' | 'synced',
+        loyverse_synced_at: raw.loyverse_synced_at,
         customer_description: raw.customer_description,
         customer_short_name: raw.customer_short_name,
         customer_photo_url: raw.customer_photo_url,
