@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Carrot,
   ClipboardList,
+  Printer,
 } from 'lucide-react'
 import type { MenuItem } from '../../../hooks/useMenuData'
 import type { DishCardData, AssemblyComponent } from '../../../hooks/useDishCard'
@@ -38,6 +39,91 @@ function formatQty(qty: number, baseUnit: string | null): string {
   return `${qty}${baseUnit ? ` ${baseUnit}` : ''}`
 }
 
+/** Clean culinary label, falling back to the raw supplier name. */
+function ingredientLabel(c: AssemblyComponent): string {
+  return c.component_short_name ?? c.component_name
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/** Build a clean, print-ready cheat-sheet document (light theme, A4). */
+function buildCheatSheetHtml(
+  items: MenuItem[],
+  componentsByDish: Map<string, AssemblyComponent[]>,
+  recipeStepsByDish: Map<string, MenuRecipeStep[]>,
+): string {
+  const title = items[0]?.category_name
+    ? `${items[0].category_name} — Cheat-Sheet`
+    : 'Menu Cheat-Sheet'
+
+  const cards = items
+    .map((item) => {
+      const comps = componentsByDish.get(item.id) ?? []
+      const steps = recipeStepsByDish.get(item.id) ?? []
+      const price = item.price != null ? `฿${Math.round(Number(item.price))}` : ''
+      const ing = comps.length
+        ? comps
+            .map(
+              (c) =>
+                `<li><span>${escapeHtml(ingredientLabel(c))}</span><b>${escapeHtml(
+                  formatQty(c.qty_per_portion, c.base_unit),
+                )}</b></li>`,
+            )
+            .join('')
+        : '<li class="muted">No ingredients defined</li>'
+      const proc = steps.length
+        ? steps
+            .map(
+              (s) =>
+                `<li><span class="num">${s.step_order}</span><span><b>${escapeHtml(
+                  s.operation_name,
+                )}</b>${
+                  s.instruction_text ? ' — ' + escapeHtml(s.instruction_text) : ''
+                }</span></li>`,
+            )
+            .join('')
+        : '<li class="muted">Process pending</li>'
+      return `<article class="card">
+        <header><h2>${escapeHtml(item.name)}</h2><span class="price">${price}</span></header>
+        <div class="cols">
+          <section><h3>Ingredients</h3><ul class="ing">${ing}</ul></section>
+          <section><h3>Process</h3><ol class="proc">${proc}</ol></section>
+        </div>
+      </article>`
+    })
+    .join('')
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(
+    title,
+  )}</title><style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 16px; color: #111; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; page-break-inside: avoid; }
+    .card header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 8px; }
+    .card h2 { font-size: 15px; margin: 0; }
+    .price { font-weight: 700; font-size: 14px; }
+    .cols { display: grid; grid-template-columns: 1fr 1.5fr; gap: 18px; }
+    h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #666; margin: 0 0 5px; }
+    ul, ol { margin: 0; padding: 0; list-style: none; font-size: 12px; }
+    ul.ing li { display: flex; justify-content: space-between; gap: 8px; padding: 1.5px 0; }
+    ul.ing b { font-variant-numeric: tabular-nums; color: #333; font-weight: 600; }
+    ol.proc li { display: flex; gap: 6px; padding: 2px 0; line-height: 1.35; }
+    ol.proc .num { flex: 0 0 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; background: #eee; border-radius: 50%; font-size: 10px; font-weight: 700; }
+    .muted { color: #999; font-style: italic; }
+    @media print { body { margin: 8mm; } .card { break-inside: avoid; } }
+  </style></head><body>
+    <h1>${escapeHtml(title)}</h1>
+    ${cards}
+    <script>window.onload = () => window.print()</script>
+  </body></html>`
+}
+
 function SaleAssemblyCard({
   item,
   card,
@@ -57,6 +143,10 @@ function SaleAssemblyCard({
       : null
   const orderStepCount = card?.assembly_order?.length ?? 0
   const hasPhoto = !!card?.assembler_photo_url
+  const foodCostPct =
+    item.price && item.cost_per_unit
+      ? Math.round((Number(item.cost_per_unit) / Number(item.price)) * 100)
+      : null
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-surface-3 bg-surface-2 p-4 transition hover:border-forest-soft/40">
@@ -88,6 +178,18 @@ function SaleAssemblyCard({
           />
         )}
       </button>
+
+      {/* Price / food cost */}
+      {item.price != null && (
+        <div className="flex items-center gap-2 text-[11px] text-cream/60">
+          <span className="font-semibold text-cream/80">
+            ฿{Math.round(Number(item.price))}
+          </span>
+          {foodCostPct != null && (
+            <span className="text-cream/45">· food cost {foodCostPct}%</span>
+          )}
+        </div>
+      )}
 
       {item.assembler_note ? (
         <p className="line-clamp-2 text-xs text-cream/65">
@@ -192,7 +294,7 @@ function SaleAssemblyCard({
                       key={c.component_id}
                       className="flex items-center justify-between gap-2 text-[11px] text-cream/70"
                     >
-                      <span className="min-w-0 truncate">{c.component_name}</span>
+                      <span className="min-w-0 truncate">{ingredientLabel(c)}</span>
                       <span className="shrink-0 font-mono text-[10px] text-cream/45">
                         {formatQty(c.qty_per_portion, c.base_unit)}
                       </span>
@@ -263,6 +365,14 @@ export function L2AssemblerView({
     [items, selectedCategory],
   )
 
+  function handlePrint() {
+    const html = buildCheatSheetHtml(saleItems, componentsByDish, recipeStepsByDish)
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(html)
+    win.document.close()
+  }
+
   if (saleItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-20 text-cream/50">
@@ -273,17 +383,31 @@ export function L2AssemblerView({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {saleItems.map((item) => (
-        <SaleAssemblyCard
-          key={item.id}
-          item={item}
-          card={dishCardById.get(item.id)}
-          components={componentsByDish.get(item.id) ?? []}
-          steps={recipeStepsByDish.get(item.id) ?? []}
-          onOpen={() => onOpenDish(item.id)}
-        />
-      ))}
+    <div className="space-y-3">
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={handlePrint}
+          className="flex items-center gap-1.5 rounded-lg border border-surface-3 bg-surface-2 px-3 py-1.5 text-xs font-medium text-cream transition hover:border-forest-soft/40 hover:bg-surface-3"
+          title="Print cheat-sheet for the assembler"
+        >
+          <Printer className="h-3.5 w-3.5" />
+          Print cheat-sheet
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {saleItems.map((item) => (
+          <SaleAssemblyCard
+            key={item.id}
+            item={item}
+            card={dishCardById.get(item.id)}
+            components={componentsByDish.get(item.id) ?? []}
+            steps={recipeStepsByDish.get(item.id) ?? []}
+            onOpen={() => onOpenDish(item.id)}
+          />
+        ))}
+      </div>
     </div>
   )
 }
