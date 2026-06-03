@@ -91,9 +91,9 @@ Customer upsell = Loyverse `option.price`. Margin per option = price − cost.
 
 1. **Schema + sync** — ✅ **DONE (mig 236, edge fn v19, 2026-06-03).** New tables `dish_modifier_groups` (36 rows backfilled) + `modifier_option_cost` (37 rows, option-centric). `pull_modifiers` now also reconciles `dish_modifier_groups` from Loyverse `item.modifier_ids` (new RPC `fn_refresh_dish_modifier_groups`) and captures `min/max_select` (still null from Loyverse — see Open issues). Soft refs to the mirror so cost links survive the wipe-and-reload pull (verified: 37 survived, 0 orphans). `nomenclature_modifier_options` kept (Phase 7 drops it).
 2. **Read path** — refactor `useModifierOptions` / ModifiersPage / drawer chips to the 2-level model.
-3. **Admin 2-level editor** — `/bom` MOD tab shows groups→options, drill in, add/remove options + price + option→MOD cost link.
-4. **Per-dish attachment editor** — attach/detach modifier groups to a dish in admin.
-5. **Push orchestration** — single admin "Push to Loyverse" that runs the fixed order (groups → items → re-attach) and auto re-attaches; per-dish/group sync-status + "needs push" indicator.
+3. **Admin 2-level editor** — ✅ **DONE (2026-06-03).** `/menu/modifiers` (ModifiersPage, NOT `/bom` — CEO-decided location) now renders **groups → options** (`GroupOptionEditor`) with the **option→MOD food-cost link** editor inline (`useModifierOptionCosts` → `modifier_option_cost`): pick MOD + portion, shows computed cost + margin vs Loyverse price. DB-only writes; **no** Loyverse side-effects. Note: add/remove option + price edits (which mutate Loyverse and detach items) deliberately deferred to Phase 5's orchestrated push — Phase 3 shows price read-only.
+4. **Per-dish attachment editor** — ✅ **DONE (2026-06-03).** `DishGroupAttachEditor` on `/menu/modifiers`: pick a SALE dish, toggle which modifier groups attach (`useDishModifierGroups` → `dish_modifier_groups`). DB-only; reaches Loyverse via Phase 5 push.
+5. **Push orchestration** — single admin "Push to Loyverse" that runs the fixed order (groups → items → re-attach) and auto re-attaches; per-dish/group sync-status + "needs push" indicator. **PENDING** (separate review gate — mutates the live POS).
 6. **Costing** — surface per-option cost/margin in the owner view.
 7. **Deprecate** `nomenclature_modifier_options`.
 

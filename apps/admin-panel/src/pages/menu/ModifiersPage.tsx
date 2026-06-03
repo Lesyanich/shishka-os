@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { RefreshCw, AlertTriangle, Plus } from 'lucide-react'
 import { useLoyverseModifierPull } from '../../hooks/useLoyverseModifierPull'
 import { useModifierBindings } from '../../hooks/useModifierBindings'
-import { PulledMirrorSection } from '../../components/menu/modifiers/PulledMirrorSection'
+import { GroupOptionEditor } from '../../components/menu/modifiers/GroupOptionEditor'
+import { DishGroupAttachEditor } from '../../components/menu/modifiers/DishGroupAttachEditor'
 import { BindingsTable } from '../../components/menu/modifiers/BindingsTable'
 import { AddBindingForm } from '../../components/menu/modifiers/AddBindingForm'
 
@@ -58,7 +59,9 @@ export function ModifiersPage() {
         </div>
       )}
 
-      <PulledMirrorSection lists={lists} options={options} />
+      <GroupOptionEditor lists={lists} options={options} />
+
+      <DishGroupAttachEditor lists={lists} />
 
       <section className="rounded-lg border border-slate-800 bg-slate-900/40">
         <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
