@@ -22,6 +22,8 @@ export interface AssemblyComponent {
   component_name: string
   /** Clean culinary label (nomenclature.customer_short_name); null → fall back to component_name. */
   component_short_name: string | null
+  /** Ingredient emoji (nomenclature.emoji); null → no prefix. */
+  component_emoji: string | null
   component_type: string
   qty_per_portion: number
   base_unit: string | null
