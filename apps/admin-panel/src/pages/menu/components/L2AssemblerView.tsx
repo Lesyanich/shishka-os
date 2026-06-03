@@ -105,8 +105,21 @@ function buildCheatSheetHtml(
     ? `${items[0].category_name} — Cheat-Sheet`
     : 'Menu Cheat-Sheet'
 
-  // More items → more columns. The fit loop handles any residual overflow.
-  const cols = items.length <= 4 ? 2 : items.length <= 12 ? 3 : 4
+  // Orientation by item count: a small/medium set is wide-and-short, so
+  // landscape fills the sheet and enlarges cards; a large set needs the extra
+  // vertical room of portrait. The fit loop covers any residual overflow.
+  const landscape = items.length <= 12
+  const orientation = landscape ? 'landscape' : 'portrait'
+  const pageWidthMm = landscape ? 297 : 210
+  const pageHeightMm = landscape ? 210 : 297
+  // More items / wider page → more columns.
+  const cols = landscape
+    ? items.length <= 6
+      ? 3
+      : 4
+    : items.length <= 12
+      ? 3
+      : 4
 
   const cards = items
     .map((item) => {
@@ -174,7 +187,7 @@ function buildCheatSheetHtml(
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(
     title,
   )}</title><style>
-    @page { size: A4 portrait; margin: 0; }
+    @page { size: A4 ${orientation}; margin: 0; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
@@ -183,7 +196,7 @@ function buildCheatSheetHtml(
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     /* font-size on .page is the single knob the fit-to-page loop turns. */
-    .page { font-size: 10px; width: 210mm; padding: 8mm 8mm 7mm; }
+    .page { font-size: 10px; width: ${pageWidthMm}mm; padding: 8mm 8mm 7mm; }
     .head {
       display: flex; justify-content: space-between; align-items: flex-end;
       border-bottom: 2px solid #1a160f; padding-bottom: .45em; margin-bottom: .75em;
@@ -234,7 +247,7 @@ function buildCheatSheetHtml(
         document.body.appendChild(ruler);
         var pxPerMm = ruler.getBoundingClientRect().width / 100;
         ruler.parentNode.removeChild(ruler);
-        var maxH = 297 * pxPerMm; // one A4 page, top to bottom
+        var maxH = ${pageHeightMm} * pxPerMm; // one A4 page, top to bottom
         var size = 10;
         // Shrink the single font-size knob until the whole sheet fits one page.
         while (page.scrollHeight > maxH && size > 5) {
