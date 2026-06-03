@@ -13,6 +13,10 @@
 - **Blockers:** batch-photos storage bucket not yet created. Phase D blocked on WiFi at L1.
 - **Modified files:** (Phase C) src/components/kitchen/FeedbackFAB.tsx (new), src/types/speech.d.ts (new), src/pages/MyTasks.tsx, src/pages/Dashboard.tsx
 
+## In-flight (backend foundation)
+
+- **2026-06-03 — Modifiers 2-level model, Phase 1 SHIPPED** (MC 38911fde, branch `claude/exciting-perlman-d3bb4a`). Backend only: mig 236 (`dish_modifier_groups` + `modifier_option_cost`) + edge fn loyverse-sync **v19** (`pull_modifiers` reconciles dish→group from Loyverse `item.modifier_ids`). Group SSoT = Loyverse lists (not `product_category`). Spec: `docs/modules/modifiers.md`. **Next:** Phases 3–5 = the admin `/menu/modifiers` 2-level editor + per-dish attachment + single Push-to-Loyverse (this is where admin frontend changes land).
+
 ## Tech Stack
 
 React 19 + Vite 7 + Tailwind v4 + Supabase + TypeScript strict mode.
