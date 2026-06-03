@@ -1,22 +1,53 @@
-import { useMemo } from 'react'
-import { Package, Flame, ListChecks, ChefHat, Utensils } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import {
+  Package,
+  Flame,
+  ListChecks,
+  ChefHat,
+  Utensils,
+  ChevronDown,
+  ChevronRight,
+  Carrot,
+  ClipboardList,
+} from 'lucide-react'
 import type { MenuItem } from '../../../hooks/useMenuData'
-import type { DishCardData } from '../../../hooks/useDishCard'
+import type { DishCardData, AssemblyComponent } from '../../../hooks/useDishCard'
+import type { MenuRecipeStep } from '../../../hooks/useMenuListEnrichment'
 
 interface L2AssemblerViewProps {
   items: MenuItem[]
   selectedCategory: string | null
   dishCardById: Map<string, DishCardData>
+  componentsByDish: Map<string, AssemblyComponent[]>
+  recipeStepsByDish: Map<string, MenuRecipeStep[]>
   onOpenDish: (id: string) => void
 }
 
 interface SaleAssemblyCardProps {
   item: MenuItem
   card: DishCardData | undefined
+  components: AssemblyComponent[]
+  steps: MenuRecipeStep[]
   onOpen: () => void
 }
 
-function SaleAssemblyCard({ item, card, onOpen }: SaleAssemblyCardProps) {
+/** Format a per-portion qty for kitchen readability: kg→g, L→ml, else raw. */
+function formatQty(qty: number, baseUnit: string | null): string {
+  if (baseUnit === 'kg') return `${Math.round(qty * 1000)} g`
+  if (baseUnit === 'L') return `${Math.round(qty * 1000)} ml`
+  return `${qty}${baseUnit ? ` ${baseUnit}` : ''}`
+}
+
+function SaleAssemblyCard({
+  item,
+  card,
+  components,
+  steps,
+  onOpen,
+}: SaleAssemblyCardProps) {
+  // Ingredients + process are shown expanded by default (CEO requirement).
+  const [expanded, setExpanded] = useState(true)
+
   const program = item.merrychef_program as
     | { temp_c?: number; time_sec?: number; preset?: string }
     | null
@@ -28,18 +59,19 @@ function SaleAssemblyCard({ item, card, onOpen }: SaleAssemblyCardProps) {
   const hasPhoto = !!card?.assembler_photo_url
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group flex flex-col gap-3 rounded-xl border border-surface-3 bg-surface-2 p-4 text-left transition hover:border-forest-soft/40 hover:bg-surface-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
-    >
-      <div className="flex items-start justify-between gap-2">
+    <div className="flex flex-col gap-3 rounded-xl border border-surface-3 bg-surface-2 p-4 transition hover:border-forest-soft/40">
+      {/* Header — click opens the full drawer */}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group flex items-start justify-between gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
+      >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-[var(--color-royal-green)]/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[color:var(--color-forest-soft)]">
               SALE
             </span>
-            <h3 className="truncate text-sm font-medium text-cream">
+            <h3 className="truncate text-sm font-medium text-cream group-hover:text-forest-soft">
               {item.name}
             </h3>
           </div>
@@ -55,7 +87,7 @@ function SaleAssemblyCard({ item, card, onOpen }: SaleAssemblyCardProps) {
             loading="lazy"
           />
         )}
-      </div>
+      </button>
 
       {item.assembler_note ? (
         <p className="line-clamp-2 text-xs text-cream/65">
@@ -124,7 +156,92 @@ function SaleAssemblyCard({ item, card, onOpen }: SaleAssemblyCardProps) {
           )}
         </div>
       )}
-    </button>
+
+      {/* Ingredients + process — collapsible, open by default */}
+      <div className="border-t border-surface-3 pt-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex w-full items-center gap-1.5 text-[10px] uppercase tracking-widest text-cream/50 transition hover:text-cream/80"
+          aria-expanded={expanded}
+        >
+          {expanded ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
+          Ingredients &amp; process
+        </button>
+
+        {expanded && (
+          <div className="mt-2 space-y-3">
+            {/* Ingredients */}
+            <section className="space-y-1.5">
+              <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
+                <Carrot className="h-3 w-3" />
+                Ingredients
+              </h4>
+              {components.length === 0 ? (
+                <p className="text-[11px] italic text-cream/35">
+                  No ingredients defined
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {components.map((c) => (
+                    <li
+                      key={c.component_id}
+                      className="flex items-center justify-between gap-2 text-[11px] text-cream/70"
+                    >
+                      <span className="min-w-0 truncate">{c.component_name}</span>
+                      <span className="shrink-0 font-mono text-[10px] text-cream/45">
+                        {formatQty(c.qty_per_portion, c.base_unit)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {/* Process */}
+            <section className="space-y-1.5">
+              <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
+                <ClipboardList className="h-3 w-3" />
+                Process
+              </h4>
+              {steps.length === 0 ? (
+                <p className="text-[11px] italic text-cream/35">
+                  Process pending — chef to add
+                </p>
+              ) : (
+                <ol className="space-y-1.5">
+                  {steps.map((s) => (
+                    <li
+                      key={s.step_order}
+                      className="flex gap-2 text-[11px] text-cream/70"
+                    >
+                      <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-surface-3 font-mono text-[9px] text-cream/60">
+                        {s.step_order}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="font-medium text-cream/80">
+                          {s.operation_name}
+                        </span>
+                        {s.instruction_text && (
+                          <span className="text-cream/55">
+                            {' — '}
+                            {s.instruction_text}
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -132,6 +249,8 @@ export function L2AssemblerView({
   items,
   selectedCategory,
   dishCardById,
+  componentsByDish,
+  recipeStepsByDish,
   onOpenDish,
 }: L2AssemblerViewProps) {
   const saleItems = useMemo(
@@ -160,6 +279,8 @@ export function L2AssemblerView({
           key={item.id}
           item={item}
           card={dishCardById.get(item.id)}
+          components={componentsByDish.get(item.id) ?? []}
+          steps={recipeStepsByDish.get(item.id) ?? []}
           onOpen={() => onOpenDish(item.id)}
         />
       ))}
