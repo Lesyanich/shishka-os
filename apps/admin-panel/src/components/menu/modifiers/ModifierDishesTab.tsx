@@ -18,6 +18,11 @@ export function ModifierDishesTab({ lists, dishes, attachmentsByDish, attach, de
   const [selId, setSelId] = useState<string | null>(dishes[0]?.id ?? null)
   const [busyList, setBusyList] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [catFilter, setCatFilter] = useState<string>('all')
+
+  const categories = Array.from(new Set(dishes.map((d) => d.category ?? 'Uncategorized'))).sort()
+  const visibleDishes =
+    catFilter === 'all' ? dishes : dishes.filter((d) => (d.category ?? 'Uncategorized') === catFilter)
 
   const sel = dishes.find((d) => d.id === selId) ?? null
   const attached = new Set(sel ? attachmentsByDish[sel.id] ?? [] : [])
@@ -41,9 +46,24 @@ export function ModifierDishesTab({ lists, dishes, attachmentsByDish, attach, de
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-[260px_1fr]">
-      {/* Master: dish list */}
-      <ul className="max-h-[70vh] overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/40">
-        {dishes.map((d) => {
+      {/* Master: dish list (filterable by category) */}
+      <div className="space-y-2">
+        <select
+          value={catFilter}
+          onChange={(e) => setCatFilter(e.target.value)}
+          className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200"
+        >
+          <option value="all">All categories ({dishes.length})</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c} ({dishes.filter((d) => (d.category ?? 'Uncategorized') === c).length})
+            </option>
+          ))}
+        </select>
+        <ul className="max-h-[70vh] overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/40">
+          {visibleDishes.length === 0 ? (
+            <li className="px-3 py-2.5 text-xs text-slate-600">No dishes in this category.</li>
+          ) : visibleDishes.map((d) => {
           const isSel = d.id === selId
           const count = (attachmentsByDish[d.id] ?? []).length
           return (
@@ -67,7 +87,8 @@ export function ModifierDishesTab({ lists, dishes, attachmentsByDish, attach, de
             </li>
           )
         })}
-      </ul>
+        </ul>
+      </div>
 
       {/* Detail: selected dish → group toggles */}
       <div className="rounded-lg border border-slate-800 bg-slate-900/40">

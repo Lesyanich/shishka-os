@@ -12,10 +12,18 @@ export interface DishRow {
   id: string
   product_code: string
   name: string
+  category: string | null
 }
 
-type RawDish = { id: string; product_code: string; name: string }
+type CatRel = { name: string } | { name: string }[] | null
+type RawDish = { id: string; product_code: string; name: string; product_categories: CatRel }
 type RawAttach = { dish_id: string; loyverse_modifier_list_id: string }
+
+function resolveCat(rel: CatRel): string | null {
+  if (!rel) return null
+  const r = Array.isArray(rel) ? rel[0] : rel
+  return r?.name ?? null
+}
 
 export function useDishModifierGroups() {
   const [dishes, setDishes] = useState<DishRow[]>([])
@@ -29,7 +37,7 @@ export function useDishModifierGroups() {
     const [dishRes, attachRes] = await Promise.all([
       supabase
         .from('nomenclature')
-        .select('id, product_code, name')
+        .select('id, product_code, name, product_categories!category_id ( name )')
         .like('product_code', 'SALE-%')
         .order('product_code'),
       supabase.from('dish_modifier_groups').select('dish_id, loyverse_modifier_list_id'),
@@ -39,7 +47,14 @@ export function useDishModifierGroups() {
     else if (attachRes.error) setError(attachRes.error.message)
     else setError(null)
 
-    setDishes((dishRes.data ?? []) as RawDish[])
+    setDishes(
+      ((dishRes.data ?? []) as RawDish[]).map((d) => ({
+        id: d.id,
+        product_code: d.product_code,
+        name: d.name,
+        category: resolveCat(d.product_categories),
+      })),
+    )
     const map: Record<string, string[]> = {}
     for (const r of (attachRes.data ?? []) as RawAttach[]) {
       ;(map[r.dish_id] ??= []).push(r.loyverse_modifier_list_id)

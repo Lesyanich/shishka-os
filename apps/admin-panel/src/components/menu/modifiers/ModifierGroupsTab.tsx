@@ -149,9 +149,17 @@ export function ModifierGroupsTab({ lists, options, dishes, attachmentsByDish, a
                   className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200"
                 >
                   <option value="">— add a dish —</option>
-                  {unattachedDishes.map((d) => (
-                    <option key={d.id} value={d.id}>{d.product_code} · {d.name}</option>
-                  ))}
+                  {Array.from(new Set(unattachedDishes.map((d) => d.category ?? 'Uncategorized')))
+                    .sort()
+                    .map((cat) => (
+                      <optgroup key={cat} label={cat}>
+                        {unattachedDishes
+                          .filter((d) => (d.category ?? 'Uncategorized') === cat)
+                          .map((d) => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                      </optgroup>
+                    ))}
                 </select>
                 <button
                   type="button"
