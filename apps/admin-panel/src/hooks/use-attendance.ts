@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { buildAttendanceBaseline, attendanceKey } from '../lib/attendanceBaseline'
 
 export interface AttendanceRecord {
   id: string
@@ -38,6 +39,7 @@ export function useAttendance(year: number, month: number) {
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [holidays, setHolidays] = useState<PublicHoliday[]>([])
+  const [closedWeekday, setClosedWeekday] = useState(1) // JS getDay(); 1 = Monday (default)
   const [isLoading, setIsLoading] = useState(true)
 
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`
@@ -49,7 +51,7 @@ export function useAttendance(year: number, month: number) {
   const fetchData = useCallback(async () => {
     setIsLoading(true)
 
-    const [staffRes, attendanceRes, holidaysRes] = await Promise.all([
+    const [staffRes, attendanceRes, holidaysRes, configRes] = await Promise.all([
       supabase
         .from('staff')
         .select('id, name, role, monthly_salary')
@@ -66,11 +68,17 @@ export function useAttendance(year: number, month: number) {
         .select('holiday_date, name_en')
         .gte('holiday_date', startDate)
         .lt('holiday_date', endDate),
+      supabase
+        .from('payroll_config')
+        .select('value')
+        .eq('key', 'closed_weekday')
+        .maybeSingle(),
     ])
 
     if (staffRes.data) setStaff(staffRes.data)
     if (attendanceRes.data) setAttendance(attendanceRes.data)
     if (holidaysRes.data) setHolidays(holidaysRes.data)
+    if (configRes.data?.value != null) setClosedWeekday(Number(configRes.data.value))
 
     setIsLoading(false)
   }, [startDate, endDate])
@@ -141,5 +149,57 @@ export function useAttendance(year: number, month: number) {
     [fetchData],
   )
 
-  return { staff, attendance, holidays, isLoading, upsertDay, removeDay }
+  /**
+   * Pre-fill the month's attendance baseline from the schedule + holidays.
+   * Fills ONLY days with no existing record (preserves manager edits).
+   * Statuses written: 'worked' | 'holiday' | 'day_off' — never 'absent' (payroll-safe).
+   * Returns the number of rows created.
+   */
+  const prefillMonth = useCallback(async (): Promise<number> => {
+    // Shifts in the month → which days each staff is scheduled (ignore no_show).
+    const { data: shiftRows } = await supabase
+      .from('shifts')
+      .select('staff_id, shift_date, status')
+      .gte('shift_date', startDate)
+      .lt('shift_date', endDate)
+      .neq('status', 'no_show')
+
+    const shiftDatesByStaff = new Map<string, Set<string>>()
+    for (const row of shiftRows ?? []) {
+      const set = shiftDatesByStaff.get(row.staff_id) ?? new Set<string>()
+      set.add(row.shift_date as string)
+      shiftDatesByStaff.set(row.staff_id, set)
+    }
+
+    const holidayDates = new Set(holidays.map((h) => h.holiday_date))
+    const existingKeys = new Set(
+      attendance.map((r) => attendanceKey(r.staff_id, r.attendance_date)),
+    )
+    const staffIds = staff.map((s) => s.id)
+
+    const rows = buildAttendanceBaseline(
+      year,
+      month,
+      staffIds,
+      shiftDatesByStaff,
+      holidayDates,
+      existingKeys,
+    )
+
+    if (rows.length > 0) {
+      const { error } = await supabase
+        .from('staff_attendance')
+        .upsert(rows, { onConflict: 'staff_id,attendance_date', ignoreDuplicates: true })
+      if (error) {
+        console.error('[useAttendance] prefill error', error)
+        await fetchData()
+        return 0
+      }
+    }
+
+    await fetchData()
+    return rows.length
+  }, [year, month, startDate, endDate, staff, attendance, holidays, fetchData])
+
+  return { staff, attendance, holidays, closedWeekday, isLoading, upsertDay, removeDay, prefillMonth }
 }
