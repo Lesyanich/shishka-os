@@ -8,6 +8,7 @@ export interface MenuDish {
   name: string
   description: string | null
   product_code: string
+  staff_code: string | null
   price: number | null
   cost_per_unit: number | null
   is_available: boolean
@@ -74,7 +75,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       supabase
         .from('nomenclature')
         .select(`
-          id, name, product_code, price, cost_per_unit,
+          id, name, product_code, staff_code, price, cost_per_unit,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
           portion_size, portion_unit, launch_phase,
@@ -140,6 +141,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         name: d.name,
         description: null,
         product_code: d.product_code,
+        staff_code: d.staff_code ?? null,
         price: d.price ? Number(d.price) : null,
         cost_per_unit: d.cost_per_unit ? Number(d.cost_per_unit) : null,
         is_available: d.is_available,

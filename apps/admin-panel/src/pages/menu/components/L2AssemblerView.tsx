@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Package, Flame, ListChecks, ChefHat, Utensils } from 'lucide-react'
 import type { MenuItem } from '../../../hooks/useMenuData'
 import type { DishCardData } from '../../../hooks/useDishCard'
+import { formatDishName } from '../utils/formatDishName'
 
 interface L2AssemblerViewProps {
   items: MenuItem[]
@@ -40,7 +41,7 @@ function SaleAssemblyCard({ item, card, onOpen }: SaleAssemblyCardProps) {
               SALE
             </span>
             <h3 className="truncate text-sm font-medium text-cream">
-              {item.name}
+              {formatDishName(item.staff_code, item.name)}
             </h3>
           </div>
           <p className="mt-0.5 font-mono text-[10px] text-cream/40">
