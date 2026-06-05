@@ -49,22 +49,49 @@ async function ensureTopsSupplier(sb: ReturnType<typeof getSupabase>): Promise<s
   return inserted.id as string;
 }
 
+/**
+ * Barcode variants for matching. Our catalog and Tops disagree on UPC-12 vs
+ * EAN-13 (e.g. we store Heinz as "013000008143", Tops returns
+ * "0013000008143"). Generate the equivalent forms so a lookup can hit either.
+ */
+export function barcodeVariants(input: string): string[] {
+  const v = new Set<string>();
+  const raw = String(input).trim();
+  if (raw) v.add(raw);
+  const d = raw.replace(/\D/g, "");
+  if (d) {
+    v.add(d);
+    if (d.length === 12) v.add("0" + d); // UPC-12 → EAN-13
+    if (d.length === 11) v.add("00" + d); // UPC-11 → EAN-13
+    if (d.length === 13 && d.startsWith("0")) v.add(d.slice(1)); // EAN-13 → UPC-12
+  }
+  return [...v];
+}
+
+/** A Tops product matched back to one of OUR requested barcodes. */
+interface MatchedPair {
+  ourBarcode: string;
+  p: TopsProduct;
+}
+
 function buildRows(
-  products: TopsProduct[],
+  pairs: MatchedPair[],
   supplierId: string,
   nomByBarcode: Map<string, string>,
   nowIso: string,
 ) {
   const seen = new Set<string>();
   const rows: Record<string, unknown>[] = [];
-  for (const p of products) {
-    if (!p.barcode || p.price_thb <= 0) continue;
-    if (seen.has(p.barcode)) continue;
-    seen.add(p.barcode);
+  for (const { ourBarcode, p } of pairs) {
+    if (!ourBarcode || p.price_thb <= 0) continue;
+    if (seen.has(ourBarcode)) continue;
+    seen.add(ourBarcode);
     rows.push({
       supplier_id: supplierId,
-      barcode: p.barcode,
-      nomenclature_id: nomByBarcode.get(p.barcode) ?? null,
+      // Store under OUR barcode so the Tops row lines up with our other
+      // suppliers' rows for the same product (UPC/EAN forms reconciled).
+      barcode: ourBarcode,
+      nomenclature_id: nomByBarcode.get(ourBarcode) ?? null,
       last_seen_price: p.price_thb,
       product_name: p.name || null,
       product_name_th: p.name_th || null,
@@ -114,10 +141,24 @@ export async function updateTopsPrices(args: {
   }
   if (barcodes.length === 0) return { error: "No barcodes to look up." };
 
-  // 2. Fetch live prices from Tops (headless browser + Cloudflare).
+  // 2. Expand each of our barcodes to its UPC/EAN variants and map every
+  //    candidate back to our canonical barcode, so a Tops hit on either form
+  //    attributes to the right product.
+  const candidateToOur = new Map<string, string>();
+  const candidates: string[] = [];
+  for (const bc of barcodes) {
+    for (const v of barcodeVariants(bc)) {
+      if (!candidateToOur.has(v)) {
+        candidateToOur.set(v, bc);
+        candidates.push(v);
+      }
+    }
+  }
+
+  // 3. Fetch live prices from Tops (headless browser + Cloudflare).
   let products: TopsProduct[];
   try {
-    products = await fetchTopsProductsBySkus(barcodes);
+    products = await fetchTopsProductsBySkus(candidates);
   } catch (e) {
     return {
       error: `Tops fetch failed: ${(e as Error).message}`,
@@ -125,23 +166,35 @@ export async function updateTopsPrices(args: {
       looked_up: barcodes.length,
     };
   }
-  const priced = products.filter((p) => p.barcode && p.price_thb > 0);
-  if (priced.length === 0) {
+
+  // 4. Attribute each Tops product back to one of our barcodes (via its EAN or
+  //    SKU matching a candidate). First hit per our barcode wins.
+  const pairs: MatchedPair[] = [];
+  const usedOur = new Set<string>();
+  for (const p of products) {
+    if (p.price_thb <= 0) continue;
+    const ourBarcode =
+      candidateToOur.get(p.barcode) ?? candidateToOur.get(p.sku) ?? "";
+    if (!ourBarcode || usedOur.has(ourBarcode)) continue;
+    usedOur.add(ourBarcode);
+    pairs.push({ ourBarcode, p });
+  }
+  if (pairs.length === 0) {
     return {
-      message: "Tops returned no priced products for these barcodes.",
+      message: "Tops returned no priced products matching these barcodes.",
       looked_up: barcodes.length,
       found_on_tops: products.length,
       results: [],
     };
   }
 
-  // 3. Link barcodes to our nomenclature where we already know the mapping.
-  const foundBarcodes = priced.map((p) => p.barcode);
+  // 5. Link to our nomenclature by our (canonical) barcode where known.
+  const ourFound = pairs.map((pr) => pr.ourBarcode);
   const nomByBarcode = new Map<string, string>();
   const { data: links } = await sb
     .from("supplier_catalog")
     .select("barcode, nomenclature_id")
-    .in("barcode", foundBarcodes)
+    .in("barcode", ourFound)
     .not("nomenclature_id", "is", null);
   for (const l of links ?? []) {
     const bc = String(l.barcode);
@@ -150,12 +203,12 @@ export async function updateTopsPrices(args: {
 
   const nowIso = new Date().toISOString();
   const supplierId = await ensureTopsSupplier(sb);
-  const rows = buildRows(priced, supplierId, nomByBarcode, nowIso);
+  const rows = buildRows(pairs, supplierId, nomByBarcode, nowIso);
   const matched = rows.filter((r) => r.nomenclature_id).length;
 
   const summary = {
     looked_up: barcodes.length,
-    found_on_tops: priced.length,
+    found_on_tops: pairs.length,
     to_write: rows.length,
     matched_to_nomenclature: matched,
     unmatched: rows.length - matched,
