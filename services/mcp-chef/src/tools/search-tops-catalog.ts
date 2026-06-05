@@ -521,3 +521,70 @@ export async function searchTopsCatalog(args: {
     }
   });
 }
+
+// ─── Tops internal REST API: products by SKU/barcode ─────────────────
+// www.tops.co.th/api/v2/product/list?skus=<csv> returns clean product JSON
+// (same shape as categoryData.products). Reuses the warm, CF-cleared browser.
+
+async function fetchTopsApiArray(p: Page, url: string, maxAttempts = 4): Promise<any[] | null> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const res: any = await p.evaluate(async (u: string) => {
+      try {
+        const r = await fetch(u, { headers: { accept: "application/json" } });
+        if (!r.ok) return { __status: r.status };
+        const ct = r.headers.get("content-type") || "";
+        if (!ct.includes("json")) return { __status: 403 }; // Cloudflare html interstitial
+        return await r.json();
+      } catch (e) {
+        return { __err: String(e) };
+      }
+    }, url);
+    if (Array.isArray(res)) return res;
+    if (res?.__status === 404) return null;
+    await p.waitForTimeout(1200 * 2 ** attempt);
+    if (attempt === 1) {
+      buildId = null;
+      await navigateAndClear(p).catch(() => {});
+    }
+  }
+  return null;
+}
+
+/**
+ * Look up Tops products by EAN barcode / SKU via the internal REST API
+ * (`/api/v2/product/list?skus=`). Batched, paced, retried with backoff.
+ * Returns mapped TopsProduct[] (deduped by barcode). Reuses the warm browser
+ * and the same call-serialization lock as searchTopsCatalog.
+ */
+export async function fetchTopsProductsBySkus(
+  skus: string[],
+  batchSize = 40,
+): Promise<TopsProduct[]> {
+  const uniq = [...new Set(skus.map((s) => String(s).trim()).filter(Boolean))];
+  if (uniq.length === 0) return [];
+
+  return withLock(async () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    try {
+      const p = await getReadyPage();
+      const seen = new Set<string>();
+      const out: TopsProduct[] = [];
+      for (let i = 0; i < uniq.length; i += batchSize) {
+        const batch = uniq.slice(i, i + batchSize);
+        const url = `${BASE_URL}/api/v2/product/list?skus=${batch.join(",")}`;
+        const arr = await fetchTopsApiArray(p, url);
+        for (const raw of arr || []) {
+          const prod = mapProduct(raw);
+          const key = prod.barcode || prod.sku;
+          if (key && seen.has(key)) continue;
+          if (key) seen.add(key);
+          out.push(prod);
+        }
+        if (i + batchSize < uniq.length) await p.waitForTimeout(700);
+      }
+      return out;
+    } finally {
+      scheduleIdleClose();
+    }
+  });
+}
