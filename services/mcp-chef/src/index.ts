@@ -235,6 +235,32 @@ server.tool(
 );
 
 server.tool(
+  "search_line_catalog",
+  "Pull a LINE SHOPPING storefront's FULL catalog by @handle — product names, prices (THB), discounts, stock for a single merchant on shop.line.me (e.g. @biovittofficial = Biovitt whey protein & supplements). Use for supplier/brand price lists. NOT a marketplace-wide search: pass the shop's @handle (or full shop.line.me URL). Pulls the complete catalog via the storefront API (paginated), falling back to SSR collection parsing. Optional query filters returned products by name token (Thai or English).",
+  {
+    handle: z.string().describe("Shop handle, e.g. '@biovittofficial' or the full https://shop.line.me/@... URL"),
+    query: z.string().optional().describe("Optional: filter returned products by name token match (Thai or English)"),
+    shop_id: z.number().optional().describe("Optional: numeric shopId to skip handle→id resolution (e.g. 402242 for biovittofficial)"),
+    limit: z.number().optional().describe("Max results (default: 200)"),
+    max_collections: z.number().optional().describe("SSR-fallback only: how many collections to scan (default: 15, max: 30)"),
+  },
+  lazyScraper("./tools/search-line-catalog.js", "searchLineCatalog")
+);
+
+server.tool(
+  "search_line_marketplace",
+  "Search the WHOLE LINE SHOPPING marketplace for a product across ALL sellers and compare prices — returns matching products from many shops with price, discount, stock, shop name + @handle, and a best-effort price-per-100g (parsed from pack size in the name) so powders sold in different sizes are comparable. Use to find suppliers for an ingredient/supplement (e.g. 'ครีเอทีน'/creatine, whey, collagen) and compare. Thai keywords usually yield more results. For a single known shop's full catalog use search_line_catalog instead.",
+  {
+    query: z.string().describe("Product search term, Thai or English (e.g. 'ครีเอทีน', 'creatine', 'whey protein isolate')"),
+    limit: z.number().optional().describe("Max products to fetch (default: 60, max: 100)"),
+    in_stock_only: z.boolean().optional().describe("Only return in-stock products (default: false)"),
+    e_receipt_only: z.boolean().optional().describe("Only return sellers that issue an e-receipt / tax invoice (default: false). Output always includes per-product has_e_receipt + an e_receipt_count summary."),
+    strict: z.boolean().optional().describe("Require the query to appear in the product name, cutting LINE's fuzzy false positives (default: true). Set false to see raw fuzzy matches."),
+  },
+  lazyScraper("./tools/search-line-marketplace.js", "searchLineMarketplace")
+);
+
+server.tool(
   "search_tops_catalog",
   "Search/browse the Tops Online supermarket catalog (tops.co.th) — real prices, barcodes, brands, stock, and images for groceries, fresh food, beverages, health & beauty, vitamins & supplements, household. Tops sits behind Cloudflare so this drives a headless browser (requires playwright). PREFER `search` (keyword across all categories, e.g. a brand or product name) — this matches the site's own search box. Use `category` (slug-path) only to browse one section. The optional `query` further filters returned products by name.",
   {
