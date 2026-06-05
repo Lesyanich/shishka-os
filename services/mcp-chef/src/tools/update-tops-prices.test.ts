@@ -4,6 +4,30 @@ import { describe, it, expect } from "vitest";
 // headless browser. These tests assert shape and the no-input guard, and
 // tolerate the environment lacking SUPABASE_* env or Playwright (clean error).
 
+describe("barcodeVariants", () => {
+  it("expands UPC-12 to EAN-13 (leading zero) and back", async () => {
+    const { barcodeVariants } = await import("./update-tops-prices.js");
+    const v12 = barcodeVariants("013000008143");
+    expect(v12).toContain("013000008143");
+    expect(v12).toContain("0013000008143"); // UPC-12 → EAN-13
+    const v13 = barcodeVariants("0013000008143");
+    expect(v13).toContain("013000008143"); // EAN-13 (leading 0) → UPC-12
+  });
+
+  it("keeps a plain EAN-13 and dedupes", async () => {
+    const { barcodeVariants } = await import("./update-tops-prices.js");
+    const v = barcodeVariants("8850332111118");
+    expect(v).toContain("8850332111118");
+    expect(new Set(v).size).toBe(v.length);
+  });
+
+  it("handles empty / non-numeric input safely", async () => {
+    const { barcodeVariants } = await import("./update-tops-prices.js");
+    expect(barcodeVariants("")).toEqual([]);
+    expect(Array.isArray(barcodeVariants("  "))).toBe(true);
+  });
+});
+
 describe("updateTopsPrices", () => {
   it("rejects when neither barcodes nor sweep is given", async () => {
     const { updateTopsPrices } = await import("./update-tops-prices.js");
