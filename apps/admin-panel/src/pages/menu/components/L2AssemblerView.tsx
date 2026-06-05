@@ -190,8 +190,11 @@ function buildCheatSheetHtml(
       </div>`
     }
 
+    const code = item.staff_code
+      ? `<span class="code">${escapeHtml(item.staff_code)}</span>`
+      : ''
     return `<article class="card">
-      <header><h2>${escapeHtml(item.name)}</h2><span class="price">${price}</span></header>
+      <header><h2>${code}${escapeHtml(item.name)}</h2><span class="price">${price}</span></header>
       ${note}
       ${body}
     </article>`
@@ -239,6 +242,11 @@ function buildCheatSheetHtml(
       border-bottom: 1px solid #efe7d6; padding-bottom: .32em;
     }
     .card h2 { margin: 0; font-size: 1.12em; font-weight: 650; line-height: 1.12; }
+    .code {
+      display: inline-block; background: #1a160f; color: #fff; border-radius: 5px;
+      padding: .04em .38em; margin-right: .38em; font-size: .92em; font-weight: 700;
+      font-variant-numeric: tabular-nums; vertical-align: baseline;
+    }
     .price { font-weight: 700; font-size: 1em; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .note { margin: 0; font-size: .84em; color: #8a7e6d; line-height: 1.3; }
     h3 { margin: 0 0 .3em; font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: #b06a2c; }
@@ -391,6 +399,11 @@ function SaleAssemblyCard({
         onClick={onOpen}
         className="group flex items-center justify-between gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
       >
+        {item.staff_code && (
+          <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-forest-soft">
+            {item.staff_code}
+          </span>
+        )}
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-cream group-hover:text-forest-soft">
           {item.name}
         </h3>
