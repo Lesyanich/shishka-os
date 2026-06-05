@@ -100,6 +100,7 @@ interface RawNomenclatureRow {
   portion_unit: PortionUnit | null
   launch_phase: number | string | null
   display_order: number | string | null
+  staff_code: string | null
   category_id: string | null
   card_version: number
   last_verified_at: string | null
@@ -150,7 +151,7 @@ export function useMenuData(): UseMenuDataResult {
           id, name, product_code, base_unit, price, cost_per_unit, cost_source,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
-          portion_size, portion_unit, launch_phase, display_order,
+          portion_size, portion_unit, launch_phase, display_order, staff_code,
           category_id,
           card_version, last_verified_at, last_verified_by, pos_status, loyverse_synced_at, updated_at,
           customer_description, customer_short_name, customer_photo_url,
@@ -237,6 +238,7 @@ export function useMenuData(): UseMenuDataResult {
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
         display_order: raw.display_order != null ? Number(raw.display_order) : null,
+        staff_code: raw.staff_code ?? null,
         launch_phase: raw.launch_phase != null ? Number(raw.launch_phase) : 1,
         tags: tagMap.get(raw.id) ?? [],
         kind,

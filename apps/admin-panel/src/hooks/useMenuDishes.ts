@@ -28,6 +28,7 @@ export interface MenuDish {
   category_name: string | null
   category_code: string | null
   display_order: number | null
+  staff_code: string | null
   launch_phase: number
   tags: MenuTag[]
 }
@@ -161,6 +162,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
         display_order: null,
+        staff_code: null,
         launch_phase: d.launch_phase != null ? Number(d.launch_phase) : 1,
         tags: tagMap.get(d.id) ?? [],
       }
