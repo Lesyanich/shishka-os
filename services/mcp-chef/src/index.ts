@@ -235,6 +235,19 @@ server.tool(
 );
 
 server.tool(
+  "search_tops_catalog",
+  "Search/browse the Tops Online supermarket catalog (tops.co.th) — real prices, barcodes, brands, stock, and images for groceries, fresh food, beverages, health & beauty, vitamins & supplements, household. Tops sits behind Cloudflare so this drives a headless browser (requires playwright). PREFER `search` (keyword across all categories, e.g. a brand or product name) — this matches the site's own search box. Use `category` (slug-path) only to browse one section. The optional `query` further filters returned products by name.",
+  {
+    search: z.string().optional().describe("Keyword to search across ALL categories (brand or product name, EN or TH), e.g. 'Biovitt', 'whey protein'. Matches the site's search box. Preferred over category."),
+    category: z.string().optional().describe("Browse one category: URL or slug-path, e.g. 'beverages' or the full https://www.tops.co.th/en/... URL. Ignored if `search` is set."),
+    query: z.string().optional().describe("Optional: further filter returned products by name token match (English or Thai)"),
+    limit: z.number().optional().describe("Max results (default: 40)"),
+    max_pages: z.number().optional().describe("How many pages to fetch, 40 products each (default: 3 for search, 1 for browse; max: 10)"),
+  },
+  lazyScraper("./tools/search-tops-catalog.js", "searchTopsCatalog")
+);
+
+server.tool(
   "search_makro_catalog",
   "Search Makro Pro product catalog — real prices, barcodes, brands, and ST166 Rawai stock. Use INSTEAD of WebSearch when looking for ingredients/products available at Makro. Set format='pdf' to generate a PDF shopping list with photos, barcodes, and prices.",
   {
