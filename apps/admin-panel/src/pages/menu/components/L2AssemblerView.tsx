@@ -242,8 +242,12 @@ function buildCheatSheetHtml(
     .price { font-weight: 700; font-size: 1em; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .note { margin: 0; font-size: .84em; color: #8a7e6d; line-height: 1.3; }
     h3 { margin: 0 0 .3em; font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: #b06a2c; }
-    .cols { display: grid; grid-template-columns: 1fr 1.15fr; gap: .7em; }
+    .cols { display: grid; grid-template-columns: 1.05fr 1.1fr; gap: .7em; }
     ul, ol { margin: 0; padding: 0; list-style: none; font-size: .92em; }
+    /* Ingredients are the at-a-glance info — render them larger; trim the
+       (secondary) process text a touch so the page still fills at a big size. */
+    ul.ing { font-size: 1.22em; line-height: 1.3; }
+    ol.proc { font-size: .82em; }
     ul.ing li, ul.opts li { display: flex; justify-content: space-between; gap: .4em; padding: .07em 0; line-height: 1.25; }
     ul.ing b, ul.opts b { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
     ul.ing b { color: #5a5246; }
