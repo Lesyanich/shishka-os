@@ -17,6 +17,7 @@ import {
   Package,
   Rewind,
   Rocket,
+  ShoppingCart,
   Table2,
   Timer,
   Trash2,
@@ -93,6 +94,7 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/targets', icon: Target, label: 'Targets' },
       { path: '/receive', icon: ClipboardCheck, label: 'Receiving' },
       { path: '/procurement', icon: Truck, label: 'Procurement' },
+      { path: '/shopping-list', icon: ShoppingCart, label: 'Shopping List' },
     ],
   },
   {
