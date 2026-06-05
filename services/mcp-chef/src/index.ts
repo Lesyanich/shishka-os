@@ -32,6 +32,7 @@ import { recordProduction } from "./tools/record-production.js";
 import { listSuppliers } from "./tools/list-suppliers.js";
 import { searchPurchaseHistory } from "./tools/search-purchase-history.js";
 import { makroShoppingList } from "./tools/makro-shopping-list.js";
+import { updateTopsPrices } from "./tools/update-tops-prices.js";
 // Scrapers are loaded lazily — a missing/broken scraper file must NOT crash the entire chef MCP.
 // See lazyScraper() helper below.
 import { storeMemory } from "./tools/store-memory.js";
@@ -245,6 +246,18 @@ server.tool(
     max_pages: z.number().optional().describe("How many pages to fetch, 40 products each (default: 3 for search, 1 for browse; max: 10)"),
   },
   lazyScraper("./tools/search-tops-catalog.js", "searchTopsCatalog")
+);
+
+server.tool(
+  "update_tops_prices",
+  "Record live Tops Online prices into supplier_catalog by EAN barcode (pre-purchase pricing — compare Tops vs Makro/etc. before buying). Pass `barcodes` to price specific items, or `sweep: true` to look up every barcode we already track. Writes under a 'Tops' supplier; links nomenclature when the barcode is known. Requires playwright (Tops is behind Cloudflare). Use `dry_run: true` to preview without writing.",
+  {
+    barcodes: z.array(z.string()).optional().describe("Explicit EAN barcodes to price on Tops"),
+    sweep: z.boolean().optional().describe("Look up every distinct barcode already in supplier_catalog (ignored if `barcodes` given)"),
+    limit: z.number().optional().describe("Max barcodes to sweep (default 300, max 2000)"),
+    dry_run: z.boolean().optional().describe("Preview what would be written without touching the DB"),
+  },
+  async (args) => jsonResult(await updateTopsPrices(args))
 );
 
 server.tool(
