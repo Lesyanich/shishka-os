@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* ════════════════════ shishka.health — Design Tokens ════════════════════
+ * SINGLE SOURCE OF TRUTH for the showcase menu's look.
+ *
+ * Figma → code handoff contract: the designer owns the values in this @theme
+ * block (colors, fonts, radii, shadow) and the Google Fonts <link> in
+ * index.html. Each token is named 1:1 with a Figma style. Prices, КБЖУ and
+ * photos come from the database (v_public_menu) — never edited here.
+ *
+ * Palette mirrors apps/admin-panel/src/index.css (extracted from the logo). */
+@theme {
+  /* ── Brand (Figma: Color/Brand) ── */
+  --color-royal-green: #2D3F1C;
+  --color-royal-red: #9B1C21;
+  --color-forest-soft: #5B7A3D;
+  --color-amber-watch: #B88830;
+  --color-cream: #F0EAD6;
+
+  /* ── Surfaces (Figma: Color/Surface) — page / card / hover ── */
+  --color-surface-1: #0B0F0A;
+  --color-surface-2: #12170F;
+  --color-surface-3: #1A2114;
+
+  /* ── Nutrition (Figma: Color/Nutrition) — КБЖУ donut + macro badges ── */
+  --color-nutri-pro: #38bdf8;   /* protein — sky   */
+  --color-nutri-car: #a78bfa;   /* carbs   — violet */
+  --color-nutri-fat: #fb7185;   /* fat     — rose  */
+
+  /* ── Typography (Figma: Text styles) ── */
+  --font-display: "Alegreya", ui-serif, Georgia, serif;
+  --font-sans: "Geist", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* ── Shape & elevation (Figma: Effects) ── */
+  --radius-card: 1rem;
+  --radius-pill: 9999px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+:root {
+  color-scheme: dark;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-surface-1);
+  color: var(--color-cream);
+}
