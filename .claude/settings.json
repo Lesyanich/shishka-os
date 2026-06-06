@@ -13,7 +13,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh scripts/session-start.sh",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/session-start.sh\"",
             "timeout": 10000
           }
         ]
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh scripts/session-end.sh",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/session-end.sh\"",
             "timeout": 5000
           }
         ]
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh scripts/post-tool-check.sh",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/post-tool-check.sh\"",
             "timeout": 15000
           }
         ]
@@ -57,7 +57,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh .claude/hooks/claim-gate-pretool.sh",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/claim-gate-pretool.sh\"",
             "timeout": 8000
           }
         ]
