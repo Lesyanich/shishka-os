@@ -27,13 +27,33 @@ export type OrderStatus = z.infer<typeof orderStatusSchema>
 export const paymentStatusSchema = z.enum(['unpaid', 'paid', 'refunded'])
 export type PaymentStatus = z.infer<typeof paymentStatusSchema>
 
+/** One chosen item inside a bundle (a manakish or a sauce). Prices are NOT
+ *  trusted from the client — create-order re-reads them and recomputes the
+ *  bundle total server-side. See packages/contracts/src/bundles.ts. */
+export const bundleChildSchema = z.object({
+  nomenclatureId: z.string().uuid(),
+  quantity: z.number().int().positive(),
+  role: z.enum(['manakish', 'sauce']),
+})
+export type BundleChild = z.infer<typeof bundleChildSchema>
+
 /** A single line the client wants to order. Price is NOT trusted from the client —
- *  create-order re-reads the authoritative price from nomenclature server-side. */
+ *  create-order re-reads the authoritative price from nomenclature server-side.
+ *
+ *  When `bundle` is present, `nomenclatureId` is the bundle dish (SALE-BUNDLE_*)
+ *  and `bundle.children` are the chosen manakish + sauces; the server validates
+ *  the counts/pools and computes the discounted bundle price. */
 export const cartItemSchema = z.object({
   nomenclatureId: z.string().uuid(),
   quantity: z.number().int().positive(),
   /** Selected modifier slugs (MOD-* options). Empty in v1 (ready dishes only). */
   modifierSlugs: z.array(z.string()).default([]),
+  /** Present only for bundle lines. */
+  bundle: z
+    .object({
+      children: z.array(bundleChildSchema).min(1),
+    })
+    .optional(),
 })
 export type CartItem = z.infer<typeof cartItemSchema>
 

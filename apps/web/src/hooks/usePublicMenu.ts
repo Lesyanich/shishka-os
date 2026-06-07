@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.ts'
 /** One dish as exposed by the v_public_menu view (customer-safe, no cost data). */
 export interface MenuDish {
   id: string
+  product_code: string
   name: string
   description: string | null
   price: number | null

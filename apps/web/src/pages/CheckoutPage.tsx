@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Minus, Plus, ArrowLeft } from 'lucide-react'
+import { Minus, Plus, ArrowLeft, Trash2 } from 'lucide-react'
 import { useCart } from '../state/cart.tsx'
 import { createOrder } from '../lib/api.ts'
 import type { FulfillmentType } from '@shishka/contracts'
@@ -36,11 +36,7 @@ export default function CheckoutPage() {
     try {
       const res = await createOrder({
         channel: 'own_web',
-        items: cart.lines.map((l) => ({
-          nomenclatureId: l.dish.id,
-          quantity: l.quantity,
-          modifierSlugs: [],
-        })),
+        items: cart.toOrderItems(),
         checkout: {
           customerName: name || null,
           customerPhone: phone || null,
@@ -65,33 +61,60 @@ export default function CheckoutPage() {
       <h1 className="font-display text-2xl text-cream mb-4">Your order</h1>
 
       <ul className="space-y-2 mb-6">
-        {cart.lines.map((l) => (
-          <li key={l.dish.id} className="flex items-center gap-3 rounded-lg bg-surface-2 p-3">
-            <div className="flex-1">
-              <p className="text-cream">{l.dish.name}</p>
-              <p className="text-amber-watch font-mono text-sm">{baht(l.dish.price ?? 0)}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label="decrease"
-                onClick={() => cart.setQuantity(l.dish.id, l.quantity - 1)}
-                className="rounded-full bg-surface-3 p-1.5 text-cream"
-              >
-                <Minus size={14} />
-              </button>
-              <span className="w-5 text-center font-mono text-cream">{l.quantity}</span>
-              <button
-                type="button"
-                aria-label="increase"
-                onClick={() => cart.setQuantity(l.dish.id, l.quantity + 1)}
-                className="rounded-full bg-surface-3 p-1.5 text-cream"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-          </li>
-        ))}
+        {cart.lines.map((l) =>
+          l.kind === 'bundle' ? (
+            <li key={l.id} className="rounded-lg bg-surface-2 p-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <p className="text-cream">{l.dish.name}</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {l.children.map((c, i) => (
+                      <li key={`${c.dish.id}-${i}`} className="text-cream/50 text-xs">
+                        {c.quantity}× {c.dish.name}
+                        {c.role === 'sauce' && ' (free)'}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-amber-watch font-mono text-sm mt-1">{baht(l.price)}</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="remove bundle"
+                  onClick={() => cart.remove(l.id)}
+                  className="rounded-full bg-surface-3 p-1.5 text-cream"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </li>
+          ) : (
+            <li key={l.id} className="flex items-center gap-3 rounded-lg bg-surface-2 p-3">
+              <div className="flex-1">
+                <p className="text-cream">{l.dish.name}</p>
+                <p className="text-amber-watch font-mono text-sm">{baht(l.dish.price ?? 0)}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="decrease"
+                  onClick={() => cart.setQuantity(l.id, l.quantity - 1)}
+                  className="rounded-full bg-surface-3 p-1.5 text-cream"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="w-5 text-center font-mono text-cream">{l.quantity}</span>
+                <button
+                  type="button"
+                  aria-label="increase"
+                  onClick={() => cart.setQuantity(l.id, l.quantity + 1)}
+                  className="rounded-full bg-surface-3 p-1.5 text-cream"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </li>
+          ),
+        )}
       </ul>
 
       <div className="space-y-3 mb-6">
