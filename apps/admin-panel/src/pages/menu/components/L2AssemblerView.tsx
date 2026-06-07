@@ -344,14 +344,25 @@ function CustomiseSection({
           <div className="flex flex-wrap gap-1">
             {items.map((o, i) => {
               const delta = priceDeltaLabel(o.price_delta)
+              const unavailable = o.modifier_stock_state !== 'in_stock'
+              const stockLabel = o.modifier_stock_state === 'out_of_stock' ? 'out' : 'soon'
               return (
                 <span
                   key={`${o.modifier_name}-${i}`}
-                  className="inline-flex items-center gap-1 rounded-full bg-surface-3 px-1.5 py-0.5 text-[10px] text-cream/70"
+                  className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] ${
+                    unavailable
+                      ? 'bg-surface-3/50 text-cream/40 line-through decoration-cream/30'
+                      : 'bg-surface-3 text-cream/70'
+                  }`}
                 >
                   {modifierLabel(o)}
                   {delta && (
-                    <span className="font-medium text-forest-soft/90">{delta}</span>
+                    <span className={`font-medium ${unavailable ? 'text-cream/40' : 'text-forest-soft/90'}`}>{delta}</span>
+                  )}
+                  {unavailable && (
+                    <span className="rounded-full bg-amber-watch/20 px-1 text-[8px] font-semibold uppercase tracking-wide text-amber-watch no-underline">
+                      {stockLabel}
+                    </span>
                   )}
                 </span>
               )

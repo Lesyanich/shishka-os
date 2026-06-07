@@ -94,6 +94,7 @@ export function CustomerPreview({
             })),
           allergens: allergensByDishId?.get(d.id) ?? [],
           etaMin: card?.customer_eta_min ?? null,
+          stockState: d.stock_state,
         }
       }),
     [filtered, allergensByDishId, dishCardById],
