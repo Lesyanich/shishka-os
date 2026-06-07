@@ -98,6 +98,18 @@ export function DishDrawer({
   const handleSave = useCallback(async () => {
     if (!item || !isSale) return
     const mergedCard = { ...(dishCard.card ?? {}), ...formCard }
+    // Packaging is mandatory for every dish — block save if none attached.
+    // Packaging lines are written immediately (bom_structures), so we check the
+    // live list rather than form state.
+    if (dishCard.packaging.length === 0) {
+      setActiveTab('l2-assembler')
+      setToast({
+        type: 'error',
+        text: 'Packaging is required — add at least one packaging item on the L2 Assembler tab before saving.',
+      })
+      setTimeout(() => setToast(null), 4000)
+      return
+    }
     const result = await saveDishCard(item.id, {
       expected_version: item.card_version,
       image_url:
@@ -302,6 +314,11 @@ export function DishDrawer({
                 onMerrychefChange={(program) =>
                   onNomenChange({ merrychef_program: program })
                 }
+                packaging={dishCard.packaging}
+                packagingCatalog={dishCard.packagingCatalog}
+                onAddPackaging={dishCard.addPackaging}
+                onUpdatePackagingQty={dishCard.updatePackagingQty}
+                onRemovePackaging={dishCard.removePackaging}
               />
             )}
             {resolvedTab === 'owner' && (

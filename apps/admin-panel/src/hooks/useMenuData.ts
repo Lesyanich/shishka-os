@@ -35,6 +35,11 @@ export interface MenuItem extends MenuDish {
   ttc_source_url: string | null
   merrychef_program: Record<string, unknown> | null
   hasBom?: boolean
+  /** Food-only cost (cost_per_unit minus packaging) — from v_dish_cost_split.
+   * Falls back to cost_per_unit when no split row exists. SALE-* only. */
+  food_cost?: number | null
+  /** Packaging cost rolled into cost_per_unit (sum of NF-PKG BOM lines). */
+  packaging_cost?: number | null
 }
 
 export interface MenuBomChild {
@@ -144,7 +149,7 @@ export function useMenuData(): UseMenuDataResult {
     setIsLoading(true)
     setError(null)
 
-    const [nomenResult, tagResult, subcatResult, bomResult] = await Promise.all([
+    const [nomenResult, tagResult, subcatResult, bomResult, costSplitResult] = await Promise.all([
       supabase
         .from('nomenclature')
         .select(`
@@ -172,6 +177,9 @@ export function useMenuData(): UseMenuDataResult {
       supabase
         .from('bom_structures')
         .select('id, parent_id, ingredient_id, quantity_per_unit, yield_loss_pct'),
+      supabase
+        .from('v_dish_cost_split')
+        .select('dish_id, food_cost, packaging_cost'),
     ])
 
     if (nomenResult.error) {
@@ -201,6 +209,19 @@ export function useMenuData(): UseMenuDataResult {
         sort_order: row.sort_order as number,
       })
       subcatMap.set(parentId, arr)
+    }
+
+    // Cost decomposition (food vs packaging) keyed by dish id (SALE-* only).
+    const costSplitMap = new Map<string, { food_cost: number | null; packaging_cost: number | null }>()
+    for (const row of (costSplitResult.data ?? []) as Array<{
+      dish_id: string
+      food_cost: number | null
+      packaging_cost: number | null
+    }>) {
+      costSplitMap.set(row.dish_id, {
+        food_cost: row.food_cost != null ? Number(row.food_cost) : null,
+        packaging_cost: row.packaging_cost != null ? Number(row.packaging_cost) : null,
+      })
     }
 
     // Build item index, categories, and a product_code→kind map
@@ -256,6 +277,10 @@ export function useMenuData(): UseMenuDataResult {
         kitchen_note: raw.kitchen_note,
         ttc_source_url: raw.ttc_source_url,
         merrychef_program: raw.merrychef_program,
+        food_cost:
+          costSplitMap.get(raw.id)?.food_cost ??
+          (raw.cost_per_unit != null ? Number(raw.cost_per_unit) : null),
+        packaging_cost: costSplitMap.get(raw.id)?.packaging_cost ?? 0,
       }
       itemsById.set(raw.id, item)
       itemList.push(item)

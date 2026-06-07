@@ -12,10 +12,15 @@ import {
   GripVertical,
   RectangleHorizontal,
   RectangleVertical,
+  AlertTriangle,
   X,
 } from 'lucide-react'
 import type { MenuItem } from '../../../hooks/useMenuData'
-import type { DishCardData, AssemblyComponent } from '../../../hooks/useDishCard'
+import type {
+  DishCardData,
+  AssemblyComponent,
+  DishPackagingLine,
+} from '../../../hooks/useDishCard'
 import type {
   MenuRecipeStep,
   DishModifierOption,
@@ -24,10 +29,13 @@ import type {
 interface L2AssemblerViewProps {
   items: MenuItem[]
   selectedCategory: string | null
+  /** null = all, true = active only, false = inactive only */
+  availableFilter: boolean | null
   dishCardById: Map<string, DishCardData>
   componentsByDish: Map<string, AssemblyComponent[]>
   recipeStepsByDish: Map<string, MenuRecipeStep[]>
   modifierOptionsByDish: Map<string, DishModifierOption[]>
+  packagingByDish: Map<string, DishPackagingLine[]>
   onOpenDish: (id: string) => void
   /** Persist a reordered set of cards (writes display_order per id). */
   onReorder: (orderedIds: string[]) => Promise<{ ok: boolean; error?: string }>
@@ -39,6 +47,7 @@ interface SaleAssemblyCardProps {
   components: AssemblyComponent[]
   steps: MenuRecipeStep[]
   options: DishModifierOption[]
+  packaging: DishPackagingLine[]
   onOpen: () => void
 }
 
@@ -360,6 +369,7 @@ function SaleAssemblyCard({
   components,
   steps,
   options,
+  packaging,
   onOpen,
 }: SaleAssemblyCardProps) {
   // Compact card: composition + a short process show by default;
@@ -373,15 +383,16 @@ function SaleAssemblyCard({
     program?.temp_c != null && program?.time_sec != null
       ? `${program.temp_c}°C / ${program.time_sec}s${program.preset ? ` (${program.preset})` : ''}`
       : null
+  // Food-cost % excludes packaging (owner decision) — use food_cost when present.
+  const foodCostBasis = item.food_cost ?? item.cost_per_unit
   const foodCostPct =
-    item.price && item.cost_per_unit
-      ? Math.round((Number(item.cost_per_unit) / Number(item.price)) * 100)
+    item.price && foodCostBasis
+      ? Math.round((Number(foodCostBasis) / Number(item.price)) * 100)
       : null
   // Build-your-own: no fixed BOM, value is the customisation menu.
   const isBuildYourOwn = components.length === 0 && options.length > 0
   const hasAddons = !isBuildYourOwn && options.length > 0
   const hasMeta =
-    !!card?.container_l2 ||
     !!merrychefSummary ||
     card?.customer_eta_min != null ||
     !!card?.has_cutlery ||
@@ -445,6 +456,27 @@ function SaleAssemblyCard({
         </ul>
       )}
 
+      {/* Packaging — always visible; loud warning when missing (required) */}
+      {packaging.length > 0 ? (
+        <p className="flex items-start gap-1.5 text-[11px] text-cream/60">
+          <Package className="mt-0.5 h-3 w-3 shrink-0 text-cream/40" />
+          <span className="min-w-0">
+            {packaging
+              .map((p) =>
+                p.qty_per_portion !== 1
+                  ? `${p.qty_per_portion}× ${p.packaging_name}`
+                  : p.packaging_name,
+              )
+              .join(', ')}
+          </span>
+        </p>
+      ) : (
+        <p className="flex items-center gap-1.5 rounded-md bg-brick-soft/15 px-1.5 py-1 text-[11px] font-medium text-brick-soft">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          No packaging set — required
+        </p>
+      )}
+
       {/* Process — short instructions, always visible for fixed dishes */}
       {!isBuildYourOwn && steps.length > 0 && (
         <ol className="space-y-0.5 border-t border-surface-3 pt-1.5">
@@ -489,12 +521,6 @@ function SaleAssemblyCard({
               {/* Meta */}
               {hasMeta && (
                 <dl className="grid grid-cols-2 gap-1.5 text-[10px]">
-                  {card?.container_l2 && (
-                    <div className="col-span-2 flex items-center gap-1.5 text-cream/55">
-                      <Package className="h-3 w-3 text-cream/40" />
-                      <span className="truncate">{card.container_l2}</span>
-                    </div>
-                  )}
                   {merrychefSummary && (
                     <div className="flex items-center gap-1.5 text-cream/55">
                       <Flame className="h-3 w-3 text-amber-400" />
@@ -557,20 +583,35 @@ function SaleAssemblyCard({
 export function L2AssemblerView({
   items,
   selectedCategory,
+  availableFilter,
   dishCardById,
   componentsByDish,
   recipeStepsByDish,
   modifierOptionsByDish,
+  packagingByDish,
   onOpenDish,
   onReorder,
 }: L2AssemblerViewProps) {
+  // SALE items in this category ignoring availability — lets us tell "nothing
+  // here" apart from "everything hidden by the availability filter".
+  const categorySaleCount = useMemo(
+    () =>
+      items.filter(
+        (i) =>
+          i.kind === 'SALE' &&
+          (!selectedCategory || i.category_id === selectedCategory),
+      ).length,
+    [items, selectedCategory],
+  )
+
   // Seed order: persisted display_order first, then build-your-own dishes (no
   // fixed BOM, e.g. the Custom smoothie) last, with original order as tiebreak.
   const seed = useMemo(() => {
     const filtered = items.filter(
       (i) =>
         i.kind === 'SALE' &&
-        (!selectedCategory || i.category_id === selectedCategory),
+        (!selectedCategory || i.category_id === selectedCategory) &&
+        (availableFilter === null || i.is_available === availableFilter),
     )
     return filtered
       .map((item, idx) => ({ item, idx }))
@@ -583,7 +624,7 @@ export function L2AssemblerView({
         return aByo - bByo || a.idx - b.idx
       })
       .map((x) => x.item)
-  }, [items, selectedCategory, componentsByDish])
+  }, [items, selectedCategory, availableFilter, componentsByDish])
 
   // Local order drives instant drag feedback; it re-syncs whenever the seed
   // (item set or persisted order) changes — e.g. category switch or saved drop.
@@ -645,10 +686,17 @@ export function L2AssemblerView({
   }
 
   if (ordered.length === 0) {
+    const hiddenByFilter = categorySaleCount > 0
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-20 text-cream/50">
         <Package className="h-10 w-10 text-cream/30" />
-        <p className="text-sm">No SALE items in this category.</p>
+        <p className="text-sm">
+          {hiddenByFilter
+            ? availableFilter === true
+              ? 'All dishes in this category are deactivated. Switch to "All" or "Inactive" to see them.'
+              : 'No deactivated dishes in this category.'
+            : 'No SALE items in this category.'}
+        </p>
       </div>
     )
   }
@@ -709,6 +757,7 @@ export function L2AssemblerView({
                 components={componentsByDish.get(item.id) ?? []}
                 steps={recipeStepsByDish.get(item.id) ?? []}
                 options={modifierOptionsByDish.get(item.id) ?? []}
+                packaging={packagingByDish.get(item.id) ?? []}
                 onOpen={() => onOpenDish(item.id)}
               />
             </div>

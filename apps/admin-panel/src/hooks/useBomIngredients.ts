@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { NF_PKG_CATEGORY_ID } from '../lib/packaging'
 
 export interface BomIngredient {
   ingredient_id: string
@@ -30,7 +31,7 @@ export function useBomIngredients(parentId: string | null): UseBomIngredientsRes
     setError(null)
     const { data, error: err } = await supabase
       .from('bom_structures')
-      .select('ingredient_id, quantity_per_unit, nomenclature!bom_structures_ingredient_id_fkey(product_code, name, type, base_unit)')
+      .select('ingredient_id, quantity_per_unit, nomenclature!bom_structures_ingredient_id_fkey(product_code, name, type, base_unit, category_id)')
       .eq('parent_id', parentId)
       // bom_structures has no `sort_order` column; ordering by `created_at`
       // matches the pattern used in useDishDetail and gives stable, insertion-
@@ -41,17 +42,23 @@ export function useBomIngredients(parentId: string | null): UseBomIngredientsRes
       setIsLoading(false)
       return
     }
-    const mapped: BomIngredient[] = ((data ?? []) as Record<string, unknown>[]).map((r) => {
-      const n = r.nomenclature as { product_code: string; name: string; type: string; base_unit: string | null } | null
-      return {
-        ingredient_id: r.ingredient_id as string,
-        product_code: n?.product_code ?? '',
-        name: n?.name ?? '',
-        type: n?.type ?? '',
-        quantity: r.quantity_per_unit as number,
-        base_unit: n?.base_unit ?? null,
-      }
-    })
+    const mapped: BomIngredient[] = ((data ?? []) as Record<string, unknown>[])
+      // Packaging (NF-PKG) lives in BOM for cost, but is not a cook ingredient.
+      .filter((r) => {
+        const n = r.nomenclature as { category_id: string | null } | null
+        return n?.category_id !== NF_PKG_CATEGORY_ID
+      })
+      .map((r) => {
+        const n = r.nomenclature as { product_code: string; name: string; type: string; base_unit: string | null } | null
+        return {
+          ingredient_id: r.ingredient_id as string,
+          product_code: n?.product_code ?? '',
+          name: n?.name ?? '',
+          type: n?.type ?? '',
+          quantity: r.quantity_per_unit as number,
+          base_unit: n?.base_unit ?? null,
+        }
+      })
     setIngredients(mapped)
     setIsLoading(false)
   }, [parentId])

@@ -139,6 +139,17 @@ export function MenuPage() {
     [updateParam],
   )
 
+  // L2 Assembler availability filter (kitchen station): defaults to Active-only.
+  // Shares the `available` param but treats an absent value as "Active" rather
+  // than "All", so deactivated dishes are hidden unless explicitly requested.
+  const l2AvailableFilter: boolean | null =
+    availableParam === 'all' ? null : availableParam === 'no' ? false : availableParam === 'yes' ? true : true
+  const setL2AvailableFilter = useCallback(
+    (v: boolean | null) =>
+      updateParam({ available: v === true ? 'yes' : v === false ? 'no' : 'all' }),
+    [updateParam],
+  )
+
   const openDrawer = useCallback(
     (id: string) => {
       const item = items.find((i) => i.id === id)
@@ -230,11 +241,13 @@ export function MenuPage() {
   const totalDishes = statsSource.length
   const availableCount = statsSource.filter((d) => d.is_available).length
   const featuredCount = statsSource.filter((d) => d.is_featured).length
-  const fcDenom = statsSource.filter((d) => d.price && d.cost_per_unit).length || 1
+  // Food-cost % uses FOOD-only cost (packaging excluded) per owner decision.
+  const fcDenom = statsSource.filter((d) => d.price && (d.food_cost ?? d.cost_per_unit)).length || 1
   const avgFoodCost =
     statsSource.reduce((sum, d) => {
-      if (!d.price || !d.cost_per_unit) return sum
-      return sum + (d.cost_per_unit / d.price) * 100
+      const foodCost = d.food_cost ?? d.cost_per_unit
+      if (!d.price || !foodCost) return sum
+      return sum + (foodCost / d.price) * 100
     }, 0) / fcDenom
 
   return (
@@ -371,15 +384,38 @@ export function MenuPage() {
           )}
         </div>
       )}
-      {/* L2: single-category strip (Customer view has its own section nav) */}
-      {view === 'l2-assembler' &&
-        categories.length > 0 && (
-          <CategoryTabs
-            categories={categories}
-            selectedId={selectedCategory}
-            onSelect={setSelectedCategory}
-          />
-        )}
+      {/* L2: availability toggle (default Active-only) + single-category strip */}
+      {view === 'l2-assembler' && (
+        <div className="space-y-2">
+          <div className="flex w-fit rounded-lg border border-surface-3 bg-surface-1 p-0.5">
+            {([
+              { value: true, label: 'Active' },
+              { value: false, label: 'Inactive' },
+              { value: null, label: 'All' },
+            ] as const).map(({ value, label }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setL2AvailableFilter(value)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                  l2AvailableFilter === value
+                    ? 'bg-surface-3 text-cream'
+                    : 'text-cream/50 hover:text-cream/80'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {categories.length > 0 && (
+            <CategoryTabs
+              categories={categories}
+              selectedId={selectedCategory}
+              onSelect={setSelectedCategory}
+            />
+          )}
+        </div>
+      )}
 
       {/* Content */}
       {isLoading ? (
@@ -438,10 +474,12 @@ export function MenuPage() {
         <L2AssemblerView
           items={items}
           selectedCategory={selectedCategory}
+          availableFilter={l2AvailableFilter}
           dishCardById={enrichment.dishCardById}
           componentsByDish={enrichment.componentsByDish}
           recipeStepsByDish={enrichment.recipeStepsByDish}
           modifierOptionsByDish={enrichment.modifierOptionsByDish}
+          packagingByDish={enrichment.packagingByDish}
           onOpenDish={openDrawer}
           onReorder={reorderItems}
         />
