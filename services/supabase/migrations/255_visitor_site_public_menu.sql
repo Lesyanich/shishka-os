@@ -74,9 +74,14 @@ on conflict (key) do nothing;
 
 -- 3) Public read-only menu view. Anon sees only available, POS-synced SALE dishes,
 --    and ONLY customer-safe columns — no cost_per_unit / margin / markup.
---    security_invoker = true so the caller's RLS on nomenclature still applies.
-create or replace view public.menu_public
-with (security_invoker = true) as
+--    Intentionally SECURITY DEFINER (no security_invoker): anon has no SELECT grant
+--    on the underlying nomenclature table (by design — it holds cost/margins/820 rows).
+--    A definer view exposes only the safe columns/rows below without granting anon the
+--    base table. Same pattern as menu_modifiers. The Supabase advisor flags this as
+--    `security_definer_view` — expected and accepted for the public visitor site.
+--    (NOTE: an earlier version used security_invoker=true, which made anon queries fail
+--    with "permission denied for table nomenclature" — fixed to definer 2026-06-07.)
+create or replace view public.menu_public as
   select
     n.id,
     n.product_code,
