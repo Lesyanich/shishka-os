@@ -50,10 +50,13 @@ export function isBundleCode(code: string): boolean {
  * Bundle price = manakish subtotal × (1 − discount), rounded to the nearest baht.
  * Pass the per-unit price of every chosen manakish (a 4-set passes 4 numbers;
  * repeats appear as repeated entries). Sauces are free and excluded.
+ *
+ * Each manakish is discounted and rounded individually (NOT the subtotal), so
+ * the result matches the POS exactly: on Loyverse each manakish is a slot-
+ * modifier priced at round(price × (1 − discount)), e.g. ฿59 → ฿50.
  */
 export function bundlePrice(manakishUnitPrices: number[]): number {
-  const subtotal = manakishUnitPrices.reduce((sum, p) => sum + p, 0)
-  return Math.round(subtotal * (1 - BUNDLE_DISCOUNT_PCT))
+  return manakishUnitPrices.reduce((sum, p) => sum + Math.round(p * (1 - BUNDLE_DISCOUNT_PCT)), 0)
 }
 
 /** À-la-carte total (no discount) — used to show the customer their savings. */

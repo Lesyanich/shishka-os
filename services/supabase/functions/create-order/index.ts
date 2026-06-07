@@ -39,8 +39,10 @@ const MANAKISH_BUNDLES: Record<string, { manakishCount: number; sauceCount: numb
   "SALE-BUNDLE_MANAKISH_8": { manakishCount: 8, sauceCount: 2 },
   "SALE-BUNDLE_MANAKISH_12": { manakishCount: 12, sauceCount: 3 },
 }
+// Discount + round each manakish individually so the total matches the POS
+// (each manakish is a slot-modifier priced at round(price × (1 − discount))).
 const bundlePrice = (manakishUnitPrices: number[]): number =>
-  Math.round(manakishUnitPrices.reduce((s, p) => s + p, 0) * (1 - BUNDLE_DISCOUNT_PCT))
+  manakishUnitPrices.reduce((s, p) => s + Math.round(p * (1 - BUNDLE_DISCOUNT_PCT)), 0)
 
 // Mirrors @shishka/contracts (kept inline — Deno can't resolve the workspace pkg).
 const bundleChildSchema = z.object({

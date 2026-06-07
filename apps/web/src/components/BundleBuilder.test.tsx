@@ -61,8 +61,8 @@ describe('BundleBuilder', () => {
 
     const confirm = screen.getByRole('button', { name: /add bundle/i })
     expect(confirm).toBeEnabled()
-    // 4 × 59 = 236 → ×0.85 = 200.6 → 201
-    expect(confirm).toHaveTextContent('฿201')
+    // each ฿59 → ฿50; 4 × 50 = ฿200
+    expect(confirm).toHaveTextContent('฿200')
   })
 
   it('confirms with the chosen children (repeats collapse to one line with qty) and price', () => {
@@ -73,7 +73,7 @@ describe('BundleBuilder', () => {
 
     expect(onConfirm).toHaveBeenCalledTimes(1)
     const [children, price] = onConfirm.mock.calls[0]
-    expect(price).toBe(201)
+    expect(price).toBe(200)
     expect(children).toEqual([
       { dish: zaatar, quantity: 4, role: 'manakish' },
       { dish: hummus, quantity: 1, role: 'sauce' },

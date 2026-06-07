@@ -47,9 +47,9 @@ describe('manakishPrices', () => {
 })
 
 describe('previewPrice', () => {
-  it('applies the 15% discount and rounds to the nearest baht', () => {
-    // 4 × 59 = 236 → ×0.85 = 200.6 → 201
-    expect(previewPrice({ zaatar: 4 }, pool)).toBe(201)
+  it('applies the 15% discount per item (matches POS slot pricing)', () => {
+    // each ฿59 → round(59 × 0.85) = ฿50; 4 × 50 = ฿200
+    expect(previewPrice({ zaatar: 4 }, pool)).toBe(200)
   })
   it('scales with the chosen flavours (truffle costs more)', () => {
     const cheap = previewPrice({ zaatar: 4 }, pool)
@@ -65,8 +65,8 @@ describe('previewPrice', () => {
 
 describe('previewSavings', () => {
   it('equals à-la-carte minus the discounted price', () => {
-    // 236 − 201 = 35
-    expect(previewSavings({ zaatar: 4 }, pool)).toBe(35)
+    // 236 − 200 = 36
+    expect(previewSavings({ zaatar: 4 }, pool)).toBe(36)
   })
 })
 
