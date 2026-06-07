@@ -201,13 +201,16 @@ export function MenuPage() {
     [ownerFilteredItems],
   )
 
-  // Counts per category (null key = "All") within the active type filter
+  // Counts per SECTION (null key = "All") within the active type filter.
+  // Keyed by section_id so the tab strip / filter chips (which list sections)
+  // show the rolled-up umbrella counts, not per-leaf-subcategory counts.
   const categoryCounts = useMemo(() => {
     const counts = new Map<string | null, number>()
     counts.set(null, typeFilteredItems.length)
     for (const item of typeFilteredItems) {
-      if (!item.category_id) continue
-      counts.set(item.category_id, (counts.get(item.category_id) ?? 0) + 1)
+      const sec = item.section_id ?? item.category_id
+      if (!sec) continue
+      counts.set(sec, (counts.get(sec) ?? 0) + 1)
     }
     return counts
   }, [typeFilteredItems])

@@ -25,7 +25,7 @@ function foodCostBg(pct: number): string {
 
 export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer }: OwnerGalleryProps) {
   const filtered = selectedCategory
-    ? dishes.filter((d) => d.category_id === selectedCategory)
+    ? dishes.filter((d) => (d.section_id ?? d.category_id) === selectedCategory)
     : dishes
 
   const [optimisticDishes, setOptimistic] = useOptimistic(

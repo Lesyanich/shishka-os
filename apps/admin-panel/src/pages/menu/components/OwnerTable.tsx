@@ -231,7 +231,7 @@ export function OwnerTable({
   onPushed,
 }: OwnerTableProps) {
   const filtered = selectedCategory
-    ? items.filter((d) => d.category_id === selectedCategory)
+    ? items.filter((d) => (d.section_id ?? d.category_id) === selectedCategory)
     : items
 
   const [optimisticDishes, setOptimistic] = useOptimistic(
@@ -359,7 +359,9 @@ export function OwnerTable({
   const groupedDishes = useMemo((): GroupItem[] => {
     const relevantL1Ids = selectedCategory
       ? [selectedCategory]
-      : (Array.from(new Set(optimisticDishes.map((d) => d.category_id).filter(Boolean))) as string[])
+      : (Array.from(
+          new Set(optimisticDishes.map((d) => d.section_id ?? d.category_id).filter(Boolean)),
+        ) as string[])
 
     const groups: GroupItem[] = []
     const claimed = new Set<string>()

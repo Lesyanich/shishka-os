@@ -171,8 +171,8 @@ export function useMenuData(): UseMenuDataResult {
         .select('nomenclature_id, tags(slug, name, tag_group, color)'),
       supabase
         .from('product_categories')
-        .select('id, name, parent_id, sort_order')
-        .not('parent_id', 'is', null)
+        .select('id, code, name, parent_id, sort_order, is_menu_section')
+        .eq('is_active', true)
         .order('sort_order', { ascending: true }),
       supabase
         .from('bom_structures')
@@ -198,18 +198,55 @@ export function useMenuData(): UseMenuDataResult {
       tagMap.set(nid, arr)
     }
 
-    const subcatMap = new Map<string, MenuSubcategory[]>()
-    for (const row of subcatResult.data ?? []) {
-      const parentId = row.parent_id as string
-      const arr = subcatMap.get(parentId) ?? []
-      arr.push({
-        id: row.id as string,
-        name: row.name as string,
-        parent_id: parentId,
-        sort_order: row.sort_order as number,
-      })
-      subcatMap.set(parentId, arr)
+    // Category tree: index every active category so we can walk a dish up to
+    // its nearest is_menu_section ancestor (the customer "section" it rolls up
+    // to). A dish's own category below that section becomes a subcategory.
+    interface CatRow {
+      id: string
+      code: string
+      name: string
+      parent_id: string | null
+      sort_order: number
+      is_menu_section: boolean
     }
+    const catById = new Map<string, CatRow>()
+    for (const row of subcatResult.data ?? []) {
+      catById.set(row.id as string, {
+        id: row.id as string,
+        code: (row.code as string) ?? '',
+        name: row.name as string,
+        parent_id: (row.parent_id as string | null) ?? null,
+        sort_order: (row.sort_order as number) ?? 0,
+        is_menu_section: (row.is_menu_section as boolean) ?? false,
+      })
+    }
+
+    // Nearest is_menu_section ancestor-or-self. Falls back to the category
+    // itself when nothing in the chain is flagged (legacy/uncategorised).
+    const sectionOf = (catId: string | null): CatRow | null => {
+      let cur = catId ? catById.get(catId) ?? null : null
+      const seen = new Set<string>()
+      while (cur && !cur.is_menu_section) {
+        if (seen.has(cur.id)) break
+        seen.add(cur.id)
+        cur = cur.parent_id ? catById.get(cur.parent_id) ?? null : null
+      }
+      return cur
+    }
+
+    // Subcategories grouped by their owning section (non-section categories
+    // whose section ancestor is a different node). OwnerTable renders these as
+    // subheaders under the section.
+    const subcatMap = new Map<string, MenuSubcategory[]>()
+    for (const c of catById.values()) {
+      if (c.is_menu_section) continue
+      const sec = sectionOf(c.id)
+      if (!sec || sec.id === c.id) continue
+      const arr = subcatMap.get(sec.id) ?? []
+      arr.push({ id: c.id, name: c.name, parent_id: sec.id, sort_order: c.sort_order })
+      subcatMap.set(sec.id, arr)
+    }
+    for (const arr of subcatMap.values()) arr.sort((a, b) => a.sort_order - b.sort_order)
 
     // Cost decomposition (food vs packaging) keyed by dish id (SALE-* only).
     const costSplitMap = new Map<string, { food_cost: number | null; packaging_cost: number | null }>()
@@ -233,8 +270,11 @@ export function useMenuData(): UseMenuDataResult {
       const kind = kindFromCode(raw.product_code)
       if (!kind) continue
       const cat = raw.product_categories
-      if (cat && !catMap.has(cat.id)) {
-        catMap.set(cat.id, { id: cat.id, code: cat.code, name: cat.name, sort_order: cat.sort_order })
+      // Top-level menu grouping is by SECTION (umbrella), not the dish's leaf
+      // category — so the tab strip / filters show "Manakish", "Drinks", etc.
+      const sec = sectionOf(raw.category_id)
+      if (sec && !catMap.has(sec.id)) {
+        catMap.set(sec.id, { id: sec.id, code: sec.code, name: sec.name, sort_order: sec.sort_order })
       }
       const item: MenuItem = {
         id: raw.id,
@@ -258,6 +298,7 @@ export function useMenuData(): UseMenuDataResult {
         category_id: raw.category_id,
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
+        section_id: sec?.id ?? raw.category_id,
         display_order: raw.display_order != null ? Number(raw.display_order) : null,
         staff_code: raw.staff_code ?? null,
         launch_phase: raw.launch_phase != null ? Number(raw.launch_phase) : 1,
