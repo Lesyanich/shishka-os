@@ -172,7 +172,8 @@ Deno.serve(async (req) => {
         const catCode = cd.category?.code ?? null
 
         if (child.role === "manakish") {
-          if (catCode !== MANAKISH_CATEGORY) {
+          // Manakish live in the KP-FIN-MAN subtree (Classic/Signature/Premium leaves).
+          if (!String(catCode ?? "").startsWith(MANAKISH_CATEGORY)) {
             return json({ error: "bundle_child_not_manakish", id: child.nomenclatureId }, 400)
           }
           if (cd.price == null) {
@@ -182,8 +183,12 @@ Deno.serve(async (req) => {
           for (let i = 0; i < child.quantity; i++) manakishPrices.push(Number(cd.price))
           children.push({ ...child, price: Number(cd.price) })
         } else {
-          // sauce — free, but must be an eligible cup
-          if (catCode !== SAUCE_CATEGORY || cd.price == null || Number(cd.price) > SAUCE_MAX_PRICE) {
+          // sauce — free, but must be an eligible cup (SAUCE category subtree)
+          if (
+            !String(catCode ?? "").startsWith(SAUCE_CATEGORY) ||
+            cd.price == null ||
+            Number(cd.price) > SAUCE_MAX_PRICE
+          ) {
             return json({ error: "bundle_child_not_eligible_sauce", id: child.nomenclatureId }, 400)
           }
           sauceQty += child.quantity

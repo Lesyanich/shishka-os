@@ -28,13 +28,17 @@ export default function MenuPage() {
 
   const dishesIn = (code: string): MenuDish[] =>
     categories.find((c) => c.code === code)?.dishes ?? []
+  // Pool from a whole category subtree by code prefix — manakish live in the
+  // KP-FIN-MAN umbrella's leaves (Classic/Signature/Premium) after the taxonomy split.
+  const dishesUnder = (prefix: string): MenuDish[] =>
+    categories.filter((c) => c.code?.startsWith(prefix)).flatMap((c) => c.dishes)
 
   const manakishPool = useMemo(
-    () => dishesIn(MANAKISH_CATEGORY).filter((d) => d.price != null),
+    () => dishesUnder(MANAKISH_CATEGORY).filter((d) => d.price != null),
     [categories],
   )
   const saucePool = useMemo(
-    () => dishesIn(SAUCE_CATEGORY).filter((d) => d.price != null && d.price <= SAUCE_MAX_PRICE),
+    () => dishesUnder(SAUCE_CATEGORY).filter((d) => d.price != null && d.price <= SAUCE_MAX_PRICE),
     [categories],
   )
   const bundleDishes = useMemo(() => dishesIn(BUNDLE_CATEGORY), [categories])
