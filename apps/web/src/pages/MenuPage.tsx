@@ -15,6 +15,10 @@ import BundleBuilder from '../components/BundleBuilder.tsx'
 
 const baht = (n: number | null) => (n == null ? '' : `฿${Number(n).toLocaleString()}`)
 
+/** Price tag for a menu card: "From ฿X" for build-your-own dishes, else the price. */
+const priceTag = (dish: MenuDish): string =>
+  dish.from_price != null ? `From ${baht(dish.from_price)}` : baht(dish.price)
+
 // Skeleton layout only — Shishka's designer replaces the card/visual styling.
 export default function MenuPage() {
   const { categories, isLoading, error } = usePublicMenu()
@@ -71,7 +75,7 @@ export default function MenuPage() {
                       <p className="text-cream/50 text-sm line-clamp-2">{dish.description}</p>
                     )}
                     {from != null && (
-                      <p className="text-amber-watch mt-1 font-mono text-sm">from {baht(from)}</p>
+                      <p className="text-amber-watch mt-1 font-mono text-sm">From {baht(from)}</p>
                     )}
                   </div>
                   <button
@@ -102,13 +106,16 @@ export default function MenuPage() {
                   {dish.description && (
                     <p className="text-cream/50 text-sm line-clamp-2">{dish.description}</p>
                   )}
-                  <p className="text-amber-watch mt-1 font-mono text-sm">{baht(dish.price)}</p>
+                  <p className="text-amber-watch mt-1 font-mono text-sm">{priceTag(dish)}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => cart.add(dish)}
                   aria-label={`Add ${dish.name}`}
-                  disabled={dish.price == null}
+                  // Build-your-own dishes (from_price set) can't be ordered at the
+                  // base price — they need their own builder, so don't allow a
+                  // plain add (which would undercharge).
+                  disabled={dish.price == null || dish.from_price != null}
                   className="shrink-0 rounded-full bg-forest-soft p-2 text-surface-1 disabled:opacity-40"
                 >
                   <Plus size={18} />

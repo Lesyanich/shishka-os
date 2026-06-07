@@ -8,6 +8,8 @@ export interface MenuDish {
   name: string
   description: string | null
   price: number | null
+  /** For build-your-own dishes: the true minimum ("From ฿X"). Null otherwise. */
+  from_price: number | null
   portion_size: number | null
   portion_unit: string | null
   image_url: string | null

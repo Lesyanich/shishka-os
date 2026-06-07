@@ -8,6 +8,7 @@ const dish = (id: string, name: string, price: number | null): MenuDish => ({
   name,
   description: null,
   price,
+  from_price: null,
   portion_size: null,
   portion_unit: null,
   image_url: null,
