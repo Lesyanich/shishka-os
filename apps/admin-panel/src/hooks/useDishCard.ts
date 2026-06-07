@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { NF_PKG_CATEGORY_ID } from '../lib/packaging'
+import { NF_PKG_CODE_PREFIX } from '../lib/packaging'
 
 export interface DishCardData {
   nomenclature_id: string
@@ -105,8 +105,8 @@ export function useDishCard(dishId: string | null): UseDishCardResult {
         .eq('dish_id', dishId),
       supabase
         .from('nomenclature')
-        .select('id, name, cost_per_unit, base_unit')
-        .eq('category_id', NF_PKG_CATEGORY_ID)
+        .select('id, name, cost_per_unit, base_unit, product_categories!category_id!inner(code)')
+        .like('product_categories.code', `${NF_PKG_CODE_PREFIX}%`)
         .order('name', { ascending: true }),
     ])
 

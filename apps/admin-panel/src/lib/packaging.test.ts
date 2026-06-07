@@ -1,12 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { NF_PKG_CATEGORY_ID } from './packaging'
+import { NF_PKG_CODE_PREFIX, isPackagingCategoryCode } from './packaging'
 
 describe('packaging', () => {
-  it('exposes the NF-PKG category id as a stable UUID', () => {
-    expect(NF_PKG_CATEGORY_ID).toBe('db03ad01-c11c-421a-b754-8715f7eef8be')
-    // Guards against accidental truncation/format drift.
-    expect(NF_PKG_CATEGORY_ID).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    )
+  it('exposes the NF-PKG category code prefix', () => {
+    expect(NF_PKG_CODE_PREFIX).toBe('NF-PKG')
+  })
+
+  it('matches the whole NF-PKG subtree by code prefix', () => {
+    // parent + all known children
+    expect(isPackagingCategoryCode('NF-PKG')).toBe(true)
+    expect(isPackagingCategoryCode('NF-PKG-CNT')).toBe(true)
+    expect(isPackagingCategoryCode('NF-PKG-BAG')).toBe(true)
+    expect(isPackagingCategoryCode('NF-PKG-CTL')).toBe(true)
+    // non-packaging
+    expect(isPackagingCategoryCode('KP-FIN-SLD')).toBe(false)
+    expect(isPackagingCategoryCode('NF-CLN')).toBe(false)
+    expect(isPackagingCategoryCode(null)).toBe(false)
+    expect(isPackagingCategoryCode(undefined)).toBe(false)
   })
 })

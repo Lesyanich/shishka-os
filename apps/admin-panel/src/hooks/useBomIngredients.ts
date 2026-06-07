@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { NF_PKG_CATEGORY_ID } from '../lib/packaging'
+import { isPackagingCategoryCode } from '../lib/packaging'
 
 export interface BomIngredient {
   ingredient_id: string
@@ -31,7 +31,7 @@ export function useBomIngredients(parentId: string | null): UseBomIngredientsRes
     setError(null)
     const { data, error: err } = await supabase
       .from('bom_structures')
-      .select('ingredient_id, quantity_per_unit, nomenclature!bom_structures_ingredient_id_fkey(product_code, name, type, base_unit, category_id)')
+      .select('ingredient_id, quantity_per_unit, nomenclature!bom_structures_ingredient_id_fkey(product_code, name, type, base_unit, product_categories!category_id(code))')
       .eq('parent_id', parentId)
       // bom_structures has no `sort_order` column; ordering by `created_at`
       // matches the pattern used in useDishDetail and gives stable, insertion-
@@ -43,10 +43,11 @@ export function useBomIngredients(parentId: string | null): UseBomIngredientsRes
       return
     }
     const mapped: BomIngredient[] = ((data ?? []) as Record<string, unknown>[])
-      // Packaging (NF-PKG) lives in BOM for cost, but is not a cook ingredient.
+      // Packaging (NF-PKG subtree) lives in BOM for cost, but is not a cook
+      // ingredient — exclude it from the cook's ingredient list.
       .filter((r) => {
-        const n = r.nomenclature as { category_id: string | null } | null
-        return n?.category_id !== NF_PKG_CATEGORY_ID
+        const n = r.nomenclature as { product_categories?: { code?: string | null } | null } | null
+        return !isPackagingCategoryCode(n?.product_categories?.code)
       })
       .map((r) => {
         const n = r.nomenclature as { product_code: string; name: string; type: string; base_unit: string | null } | null
