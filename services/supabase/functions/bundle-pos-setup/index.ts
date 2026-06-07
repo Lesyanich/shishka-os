@@ -74,6 +74,27 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS })
   if (!TOKEN) return json({ ok: false, error: "LOYVERSE_API_TOKEN not set" }, 500)
 
+  // GET = read-only verification of what's actually in Loyverse right now.
+  if (req.method === "GET") {
+    try {
+      const cats = await lvGetAll("/categories", "categories")
+      const items = await lvGetAll("/items", "items")
+      const out = cats
+        .filter((c) => !c.deleted_at && /Bundle/i.test(c.name))
+        .map((c) => ({
+          category: c.name,
+          id: c.id,
+          items: items
+            .filter((it) => it.category_id === c.id && !it.deleted_at)
+            // deno-lint-ignore no-explicit-any
+            .map((it) => ({ name: it.item_name, price: (it.variants?.[0] as any)?.default_price })),
+        }))
+      return json({ ok: true, bundle_categories: out })
+    } catch (e) {
+      return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500)
+    }
+  }
+
   try {
     const { data: cfg } = await db.rpc("fn_get_loyverse_config")
     const storeId = (cfg as Record<string, string> | null)?.store_id ?? ""
@@ -121,7 +142,7 @@ Deno.serve(async (req) => {
 
     const tiers: BundleTier[] = (tierMeta ?? []).map((t: { tier_code: string; label: string }) => ({
       tier_code: t.tier_code,
-      category_name: `🧆 ${t.label}`,
+      category_name: t.label, // e.g. "Manakish set of 4"
       manakish: (manaRows ?? [])
         // deno-lint-ignore no-explicit-any
         .filter((r: any) => r.tier_code === t.tier_code)
@@ -141,6 +162,19 @@ Deno.serve(async (req) => {
     const catIdByName = new Map<string, string>(
       existingCats.filter((c) => !c.deleted_at).map((c) => [c.name, c.id]),
     )
+
+    // Migrate any old "🧆 Bundle ×N" category name → "Manakish set of N"
+    // (keeps the category + its items, just renames). Idempotent: a no-op once renamed.
+    for (const c of existingCats) {
+      const m = /^🧆 Bundle ×(\d+)$/.exec(c.name ?? "")
+      if (m && !c.deleted_at) {
+        const newName = `Manakish set of ${m[1]}`
+        await lvPost("/categories", { id: c.id, name: newName })
+        catIdByName.delete(c.name)
+        catIdByName.set(newName, c.id)
+      }
+    }
+
     const allItems = await lvGetAll("/items", "items")
 
     const result: Record<string, { created: number; updated: number }> = {}
