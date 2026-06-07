@@ -6,6 +6,7 @@ import type {
   MenuSubcategory,
   MenuTag,
   PortionUnit,
+  StockState,
 } from './useMenuDishes'
 
 export type NomenclatureKind = 'SALE' | 'PF' | 'MOD'
@@ -69,7 +70,7 @@ export interface UseMenuDataResult {
     patch: Partial<
       Pick<
         MenuDish,
-        'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'
+        'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'
       >
     >,
   ) => Promise<{ ok: boolean; error?: string }>
@@ -104,6 +105,7 @@ interface RawNomenclatureRow {
   portion_size: number | string | null
   portion_unit: PortionUnit | null
   launch_phase: number | string | null
+  stock_state: string | null
   display_order: number | string | null
   staff_code: string | null
   category_id: string | null
@@ -156,7 +158,7 @@ export function useMenuData(): UseMenuDataResult {
           id, name, product_code, base_unit, price, cost_per_unit, cost_source,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
-          portion_size, portion_unit, launch_phase, display_order, staff_code,
+          portion_size, portion_unit, launch_phase, stock_state, display_order, staff_code,
           category_id,
           card_version, last_verified_at, last_verified_by, pos_status, loyverse_synced_at, updated_at,
           customer_description, customer_short_name, customer_photo_url,
@@ -261,6 +263,7 @@ export function useMenuData(): UseMenuDataResult {
         display_order: raw.display_order != null ? Number(raw.display_order) : null,
         staff_code: raw.staff_code ?? null,
         launch_phase: raw.launch_phase != null ? Number(raw.launch_phase) : 1,
+        stock_state: (raw.stock_state as StockState) ?? 'in_stock',
         tags: tagMap.get(raw.id) ?? [],
         kind,
         isDualType: false,
@@ -338,7 +341,7 @@ export function useMenuData(): UseMenuDataResult {
       patch: Partial<
         Pick<
           MenuDish,
-          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'
+          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'
         >
       >,
     ): Promise<{ ok: boolean; error?: string }> => {
@@ -350,6 +353,7 @@ export function useMenuData(): UseMenuDataResult {
       if (patch.portion_size !== undefined) updates.portion_size = patch.portion_size
       if (patch.portion_unit !== undefined) updates.portion_unit = patch.portion_unit
       if (patch.launch_phase !== undefined) updates.launch_phase = patch.launch_phase
+      if (patch.stock_state !== undefined) updates.stock_state = patch.stock_state
 
       const { error: updateErr } = await supabase
         .from('nomenclature')

@@ -17,7 +17,7 @@ interface OwnerTableProps {
   subcategories: Map<string, MenuSubcategory[]>
   childrenByParent: Map<string, MenuBomChild[]>
   dualTypeIds: Set<string>
-  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'>>) => Promise<{ ok: boolean; error?: string }>
+  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'>>) => Promise<{ ok: boolean; error?: string }>
   /** Parent-provided: true when a recent inline commit failed for this id. */
   isFailed?: (id: string) => boolean
   /** Parent-provided: last error message (used as row-level tooltip). */
@@ -158,6 +158,19 @@ const PHASE_STYLE: Record<number, string> = {
 const PHASE_DEFAULT_STYLE = 'bg-surface-3/50 text-cream/60 ring-cream/20'
 const PHASE_OPTIONS = [1, 2, 3, 4, 5] as const
 
+// Stock state (mig 249): in_stock = normal; coming_soon / out_of_stock keep the
+// dish visible on the menu but greyed + not orderable / not pushable to POS.
+const STOCK_OPTIONS = [
+  { value: 'in_stock', short: 'Stock', label: 'In stock' },
+  { value: 'coming_soon', short: 'Soon', label: 'Coming soon' },
+  { value: 'out_of_stock', short: 'Out', label: 'Out of stock' },
+] as const
+const STOCK_STYLE: Record<string, string> = {
+  in_stock: 'bg-[var(--color-royal-green)]/20 text-[color:var(--color-forest-soft)] ring-[var(--color-forest-soft)]/40',
+  coming_soon: 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-[var(--color-amber-watch)]/40',
+  out_of_stock: 'bg-[var(--color-royal-red)]/20 text-[color:var(--color-brick-soft)] ring-[var(--color-brick-soft)]/40',
+}
+
 function formatThb(v: number | null): string {
   if (v == null) return '-'
   return `\u0E3F${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -297,7 +310,7 @@ export function OwnerTable({
       patch: Partial<
         Pick<
           MenuDish,
-          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'
+          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'
         >
       >,
     ) => {
@@ -563,7 +576,7 @@ export function OwnerTable({
                     ? 'ring-2 ring-inset ring-[var(--color-brick-soft)]/70 bg-[var(--color-royal-red)]/5'
                     : ''
                 } ${rowFailed ? 'animate-[inline-flash_1200ms_ease-out]' : ''} ${
-                  !dish.is_available ? 'opacity-45' : ''
+                  !dish.is_available ? 'opacity-45' : dish.stock_state !== 'in_stock' ? 'opacity-70' : ''
                 }`}
               >
                 {/* Expand toggle (tech card) */}
@@ -798,20 +811,40 @@ export function OwnerTable({
                   })()}
                 </td>
 
-                {/* Available toggle */}
+                {/* Available toggle + stock state */}
                 <td className="px-3 py-2 text-center">
-                  <button
-                    onClick={() => toggleField(dish, 'is_available')}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
-                      dish.is_available ? 'bg-royal-green' : 'bg-surface-3'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                        dish.is_available ? 'translate-x-4' : 'translate-x-1'
+                  <div className="flex flex-col items-center gap-1.5">
+                    <button
+                      onClick={() => toggleField(dish, 'is_available')}
+                      title={dish.is_available ? 'Shown on menu' : 'Hidden from menu'}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
+                        dish.is_available ? 'bg-royal-green' : 'bg-surface-3'
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                          dish.is_available ? 'translate-x-4' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <select
+                      value={dish.stock_state}
+                      onChange={(e) => {
+                        const next = e.target.value as MenuDish['stock_state']
+                        if (next !== dish.stock_state) {
+                          void commitPatch(dish.id, { stock_state: next })
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className={`cursor-pointer appearance-none rounded-full px-2 py-0.5 text-center text-[10px] font-semibold ring-1 ring-inset focus:outline-none focus:ring-2 ${STOCK_STYLE[dish.stock_state] ?? STOCK_STYLE.in_stock}`}
+                      style={{ fontFamily: 'var(--font-display-sc)' }}
+                      title="Stock state — coming soon / out of stock show greyed on the menu and block ordering"
+                    >
+                      {STOCK_OPTIONS.map((s) => (
+                        <option key={s.value} value={s.value}>{s.short}</option>
+                      ))}
+                    </select>
+                  </div>
                 </td>
 
                 {/* Featured toggle */}
@@ -910,12 +943,17 @@ export function OwnerTable({
                   {dish.kind === 'SALE' ? (
                     (() => {
                       const isPushing = pushingId === dish.id
-                      const blocked = dish.pos_status === 'draft' || !dish.is_available
+                      const blocked =
+                        dish.pos_status === 'draft' ||
+                        !dish.is_available ||
+                        dish.stock_state !== 'in_stock'
                       const msg = pushMsg?.id === dish.id ? pushMsg : null
                       const title = blocked
                         ? dish.pos_status === 'draft'
                           ? 'Set POS status to Approved before pushing'
-                          : 'Dish must be available to push'
+                          : !dish.is_available
+                            ? 'Dish must be available to push'
+                            : 'Not in stock (coming soon / out of stock) — cannot push to POS'
                         : isLoyverseStale(dish)
                           ? 'Re-push: dish edited after last sync'
                           : 'Push to Loyverse'

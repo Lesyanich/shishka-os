@@ -24,6 +24,9 @@ export interface DishModifierOption {
   modifier_short_name: string | null
   modifier_emoji: string | null
   price_delta: number | null
+  /** Stock state of the underlying modifier (mig 249). 'coming_soon' /
+   *  'out_of_stock' render the option greyed / badged in the picker. */
+  modifier_stock_state: 'in_stock' | 'coming_soon' | 'out_of_stock'
 }
 
 export interface UseMenuListEnrichmentResult {
@@ -175,6 +178,7 @@ export function useMenuListEnrichment(
         modifier_short_name: row.modifier_short_name,
         modifier_emoji: row.modifier_emoji,
         price_delta: row.price_delta != null ? Number(row.price_delta) : null,
+        modifier_stock_state: row.modifier_stock_state ?? 'in_stock',
       })
       mods.set(row.dish_id, list)
     }
