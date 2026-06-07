@@ -32,6 +32,10 @@ export interface MenuDish {
   category_id: string | null
   category_name: string | null
   category_code: string | null
+  /** Nearest is_menu_section ancestor of category_id (the customer "section"
+   * the dish rolls up to). Equals category_id for flat sections. Undefined in
+   * the legacy useMenuDishes path — consumers fall back to category_id. */
+  section_id?: string | null
   display_order: number | null
   staff_code: string | null
   launch_phase: number

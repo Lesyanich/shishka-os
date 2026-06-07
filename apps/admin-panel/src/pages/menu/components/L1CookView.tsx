@@ -319,7 +319,7 @@ export function L1CookView({
       if (i.kind === 'MOD') return false
       if (typeFilter === 'SALE' && i.kind !== 'SALE') return false
       if (typeFilter === 'PF' && i.kind !== 'PF' && !i.isDualType) return false
-      if (selectedCategory && i.category_id !== selectedCategory) return false
+      if (selectedCategory && (i.section_id ?? i.category_id) !== selectedCategory) return false
       if (availableFilter !== null && i.is_available !== availableFilter) return false
       return true
     })

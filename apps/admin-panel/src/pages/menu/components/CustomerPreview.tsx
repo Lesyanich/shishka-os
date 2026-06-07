@@ -47,14 +47,17 @@ export function CustomerPreview({
   const filtered = useMemo(
     () =>
       selectedCategory
-        ? visible.filter((d) => d.category_id === selectedCategory)
+        ? visible.filter((d) => (d.section_id ?? d.category_id) === selectedCategory)
         : visible,
     [visible, selectedCategory],
   )
 
+  // Group by SECTION (umbrella) so the preview mirrors the customer site's
+  // top-level sections (Manakish, Drinks, …). Subcategory subheaders within a
+  // section land with the public-site stage.
   const categoryOfId = useMemo(() => {
     const map = new Map<string, string | null>()
-    for (const d of filtered) map.set(d.id, d.category_id)
+    for (const d of filtered) map.set(d.id, d.section_id ?? d.category_id)
     return map
   }, [filtered])
 

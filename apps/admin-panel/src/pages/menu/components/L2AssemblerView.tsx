@@ -610,7 +610,7 @@ export function L2AssemblerView({
       items.filter(
         (i) =>
           i.kind === 'SALE' &&
-          (!selectedCategory || i.category_id === selectedCategory),
+          (!selectedCategory || (i.section_id ?? i.category_id) === selectedCategory),
       ).length,
     [items, selectedCategory],
   )
@@ -621,7 +621,7 @@ export function L2AssemblerView({
     const filtered = items.filter(
       (i) =>
         i.kind === 'SALE' &&
-        (!selectedCategory || i.category_id === selectedCategory) &&
+        (!selectedCategory || (i.section_id ?? i.category_id) === selectedCategory) &&
         (availableFilter === null || i.is_available === availableFilter),
     )
     return filtered
