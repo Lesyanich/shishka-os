@@ -16,6 +16,8 @@ interface Props {
   bundleDish: MenuDish
   manakishCount: number
   sauceCount: number
+  /** This bundle size's discount %, e.g. 15 for −15%. */
+  discountPct: number
   manakishPool: MenuDish[]
   saucePool: MenuDish[]
   onClose: () => void
@@ -71,6 +73,7 @@ export default function BundleBuilder({
   bundleDish,
   manakishCount,
   sauceCount,
+  discountPct,
   manakishPool,
   saucePool,
   onClose,
@@ -85,8 +88,8 @@ export default function BundleBuilder({
   const sauceFull = sauceChosen >= sauceCount
   const complete = manakishChosen === manakishCount && sauceChosen === sauceCount
 
-  const price = previewPrice(manakishSel, manakishPool)
-  const savings = previewSavings(manakishSel, manakishPool)
+  const price = previewPrice(manakishSel, manakishPool, discountPct)
+  const savings = previewSavings(manakishSel, manakishPool, discountPct)
 
   const bump = (
     setter: typeof setManakishSel,

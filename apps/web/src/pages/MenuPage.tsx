@@ -6,10 +6,11 @@ import {
   MANAKISH_CATEGORY,
   SAUCE_CATEGORY,
   SAUCE_MAX_PRICE,
-  bundlePrice,
   findBundle,
+  tierPrice,
 } from '@shishka/contracts'
 import { usePublicMenu, type MenuDish } from '../hooks/usePublicMenu.ts'
+import { usePriceTiers } from '../hooks/usePriceTiers.ts'
 import { useCart } from '../state/cart.tsx'
 import BundleBuilder from '../components/BundleBuilder.tsx'
 
@@ -22,6 +23,7 @@ const priceTag = (dish: MenuDish): string =>
 // Skeleton layout only — Shishka's designer replaces the card/visual styling.
 export default function MenuPage() {
   const { categories, isLoading, error } = usePublicMenu()
+  const { discounts } = usePriceTiers()
   const cart = useCart()
   const [activeBundle, setActiveBundle] = useState<MenuDish | null>(null)
 
@@ -43,12 +45,20 @@ export default function MenuPage() {
   if (isLoading) return <p className="p-6 text-cream/60">Loading menu…</p>
   if (error) return <p className="p-6 text-royal-red">Could not load the menu: {error}</p>
 
-  /** "from ฿X" = cheapest possible fill of the bundle. */
+  /** This bundle's size discount (e.g. 10), or null until tiers load. */
+  const discountFor = (dish: MenuDish): number | null => {
+    const def = findBundle(dish.product_code)
+    const pct = def ? discounts[def.tierCode] : undefined
+    return pct ?? null
+  }
+
+  /** "from ฿X" = cheapest possible fill at this bundle's tier discount. */
   const fromPrice = (dish: MenuDish): number | null => {
     const def = findBundle(dish.product_code)
-    if (!def || manakishPool.length === 0) return null
+    const disc = discountFor(dish)
+    if (!def || disc == null || manakishPool.length === 0) return null
     const cheapest = Math.min(...manakishPool.map((d) => d.price ?? Infinity))
-    return bundlePrice(Array(def.manakishCount).fill(cheapest))
+    return def.manakishCount * tierPrice(cheapest, disc)
   }
 
   return (
@@ -67,10 +77,18 @@ export default function MenuPage() {
           <ul className="space-y-3">
             {bundleDishes.map((dish) => {
               const from = fromPrice(dish)
+              const disc = discountFor(dish)
               return (
                 <li key={dish.id} className="flex items-start gap-3 rounded-lg bg-surface-2 p-3">
                   <div className="flex-1">
-                    <p className="text-cream">{dish.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-cream">{dish.name}</p>
+                      {disc != null && (
+                        <span className="rounded-full bg-royal-green/80 px-1.5 py-0.5 text-[10px] font-semibold text-cream">
+                          −{disc}%
+                        </span>
+                      )}
+                    </div>
                     {dish.description && (
                       <p className="text-cream/50 text-sm line-clamp-2">{dish.description}</p>
                     )}
@@ -142,12 +160,14 @@ export default function MenuPage() {
       {activeBundle &&
         (() => {
           const def = findBundle(activeBundle.product_code)
-          if (!def) return null
+          const disc = discountFor(activeBundle)
+          if (!def || disc == null) return null
           return (
             <BundleBuilder
               bundleDish={activeBundle}
               manakishCount={def.manakishCount}
               sauceCount={def.sauceCount}
+              discountPct={disc}
               manakishPool={manakishPool}
               saucePool={saucePool}
               onClose={() => setActiveBundle(null)}

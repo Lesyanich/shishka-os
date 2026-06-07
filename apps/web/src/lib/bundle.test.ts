@@ -47,26 +47,29 @@ describe('manakishPrices', () => {
 })
 
 describe('previewPrice', () => {
-  it('applies the 15% discount per item (matches POS slot pricing)', () => {
+  it('discounts each manakish individually at the tier % (15 → −15%)', () => {
     // each ฿59 → round(59 × 0.85) = ฿50; 4 × 50 = ฿200
-    expect(previewPrice({ zaatar: 4 }, pool)).toBe(200)
+    expect(previewPrice({ zaatar: 4 }, pool, 15)).toBe(200)
+  })
+  it('escalates with the tier: bigger discount → lower price', () => {
+    expect(previewPrice({ zaatar: 4 }, pool, 20)).toBeLessThan(previewPrice({ zaatar: 4 }, pool, 10))
   })
   it('scales with the chosen flavours (truffle costs more)', () => {
-    const cheap = previewPrice({ zaatar: 4 }, pool)
-    const pricey = previewPrice({ truffle: 4 }, pool)
+    const cheap = previewPrice({ zaatar: 4 }, pool, 15)
+    const pricey = previewPrice({ truffle: 4 }, pool, 15)
     expect(pricey).toBeGreaterThan(cheap)
   })
   it('is always cheaper than buying the same set à la carte', () => {
     const sel = { zaatar: 2, beef: 1, truffle: 1 }
     const alaCarte = manakishPrices(sel, pool).reduce((s, p) => s + p, 0)
-    expect(previewPrice(sel, pool)).toBeLessThan(alaCarte)
+    expect(previewPrice(sel, pool, 15)).toBeLessThan(alaCarte)
   })
 })
 
 describe('previewSavings', () => {
   it('equals à-la-carte minus the discounted price', () => {
     // 236 − 200 = 36
-    expect(previewSavings({ zaatar: 4 }, pool)).toBe(36)
+    expect(previewSavings({ zaatar: 4 }, pool, 15)).toBe(36)
   })
 })
 

@@ -21,15 +21,24 @@ export function manakishPrices(sel: Selection, pool: MenuDish[]): number[] {
   return prices
 }
 
-/** Discounted bundle preview price (client-side; server recomputes on order). */
-export function previewPrice(manakishSel: Selection, manakishPool: MenuDish[]): number {
-  return bundlePrice(manakishPrices(manakishSel, manakishPool))
+/** Discounted bundle preview price (client-side; server recomputes on order).
+ *  `discountPct` is the bundle size's tier discount, e.g. 15 for −15%. */
+export function previewPrice(
+  manakishSel: Selection,
+  manakishPool: MenuDish[],
+  discountPct: number,
+): number {
+  return bundlePrice(manakishPrices(manakishSel, manakishPool), discountPct)
 }
 
 /** How much the customer saves versus buying the same manakish à la carte. */
-export function previewSavings(manakishSel: Selection, manakishPool: MenuDish[]): number {
+export function previewSavings(
+  manakishSel: Selection,
+  manakishPool: MenuDish[],
+  discountPct: number,
+): number {
   const prices = manakishPrices(manakishSel, manakishPool)
-  return alaCarteTotal(prices) - bundlePrice(prices)
+  return alaCarteTotal(prices) - bundlePrice(prices, discountPct)
 }
 
 /** Turn the two selections into cart child lines (manakish first, then sauces). */

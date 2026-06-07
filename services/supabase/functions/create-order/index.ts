@@ -28,21 +28,21 @@ import { z } from "npm:zod@4"
 import { db } from "../_shared/supabase.ts"
 import { CORS, json } from "../_shared/cors.ts"
 
-// ── Bundle config — MUST stay in sync with packages/contracts/src/bundles.ts ──
-// (Deno can't import the workspace pkg, so the constants are mirrored here.)
+// ── Bundle config — structure mirrors packages/contracts/src/bundles.ts.
+// The discount itself is NOT hard-coded: it's read from the `price_tiers` table
+// (one tier per size, escalating). Each bundle maps to its tier via tierCode.
 const MANAKISH_CATEGORY = "KP-FIN-MAN"
 const SAUCE_CATEGORY = "KP-FIN-SDR"
 const SAUCE_MAX_PRICE = 50
-const BUNDLE_DISCOUNT_PCT = 0.15
-const MANAKISH_BUNDLES: Record<string, { manakishCount: number; sauceCount: number }> = {
-  "SALE-BUNDLE_MANAKISH_4": { manakishCount: 4, sauceCount: 1 },
-  "SALE-BUNDLE_MANAKISH_8": { manakishCount: 8, sauceCount: 2 },
-  "SALE-BUNDLE_MANAKISH_12": { manakishCount: 12, sauceCount: 3 },
+const MANAKISH_BUNDLES: Record<string, { manakishCount: number; sauceCount: number; tierCode: string }> = {
+  "SALE-BUNDLE_MANAKISH_4": { manakishCount: 4, sauceCount: 1, tierCode: "bundle4" },
+  "SALE-BUNDLE_MANAKISH_8": { manakishCount: 8, sauceCount: 2, tierCode: "bundle8" },
+  "SALE-BUNDLE_MANAKISH_12": { manakishCount: 12, sauceCount: 3, tierCode: "bundle12" },
 }
-// Discount + round each manakish individually so the total matches the POS
-// (each manakish is a slot-modifier priced at round(price × (1 − discount))).
-const bundlePrice = (manakishUnitPrices: number[]): number =>
-  manakishUnitPrices.reduce((s, p) => s + Math.round(p * (1 - BUNDLE_DISCOUNT_PCT)), 0)
+// Each manakish is discounted + rounded individually (matches the per-item tier
+// price). discountPct is a whole number, e.g. 15 for −15%.
+const bundlePrice = (manakishUnitPrices: number[], discountPct: number): number =>
+  manakishUnitPrices.reduce((s, p) => s + Math.round(p * (1 - discountPct / 100)), 0)
 
 // Mirrors @shishka/contracts (kept inline — Deno can't resolve the workspace pkg).
 const bundleChildSchema = z.object({
@@ -120,6 +120,15 @@ Deno.serve(async (req) => {
     (dishes ?? []).map((d) => [d.id as string, d as unknown as DishRow]),
   )
 
+  // Bundle discounts come from price_tiers (one tier per size, escalating).
+  const { data: tierRows } = await db
+    .from("price_tiers")
+    .select("tier_code, discount_pct")
+    .eq("is_active", true)
+  const discountByTier = new Map<string, number>(
+    (tierRows ?? []).map((t) => [t.tier_code as string, Number(t.discount_pct)]),
+  )
+
   // 3. Validate items + compute the server-authoritative total.
   //    Bundle lines carry { parentId, total, children[] } for the insert step.
   interface NormalLine { nomenclatureId: string; quantity: number; price: number }
@@ -194,7 +203,11 @@ Deno.serve(async (req) => {
         )
       }
 
-      const lineTotal = bundlePrice(manakishPrices)
+      const discountPct = discountByTier.get(bundleDef.tierCode)
+      if (discountPct == null) {
+        return json({ error: "bundle_tier_missing", tier: bundleDef.tierCode }, 500)
+      }
+      const lineTotal = bundlePrice(manakishPrices, discountPct)
       total += lineTotal
       bundleLines.push({ nomenclatureId: it.nomenclatureId, total: lineTotal, children })
       continue

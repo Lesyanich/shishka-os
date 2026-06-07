@@ -39,6 +39,7 @@ function setup(onConfirm = vi.fn()) {
       bundleDish={bundleDish}
       manakishCount={4}
       sauceCount={1}
+      discountPct={15}
       manakishPool={[zaatar, beef]}
       saucePool={[hummus]}
       onClose={vi.fn()}
