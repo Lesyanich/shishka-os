@@ -15,6 +15,12 @@
 
 ## In-flight (backend foundation)
 
+- **2026-06-07 — Packaging-as-BOM + L2 availability filter (MC 2385d288, branch `feature/menu/packaging-as-bom`).**
+  - Migs **246** (normalize 9 NF-PKG containers to per-piece cost, base_unit=pcs; pack counts verified via Makro scraper) + **247** (`v_dish_packaging`, `v_dish_cost_split`) + **248** (views match whole **NF-PKG subtree** `code LIKE 'NF-PKG%'` — NF-PKG + NF-PKG-CNT/BAG/CTL, so cup/bottle on ~17 drink dishes count) — all applied to prod.
+  - Packaging now modelled as `bom_structures` lines whose component's category code starts with **NF-PKG**; cost auto-rolls into `cost_per_unit` via existing trigger (migs 137/211). Food-cost % switched to **food-only** (`food_cost` from `v_dish_cost_split`), margin stays on full cost.
+  - Drawer L2 tab: free-text container replaced by a packaging editor (add/remove NF-PKG lines, qty). Save blocked until ≥1 packaging line. L2 list card shows the packaging set; red warning when missing. L2 view gained an **Active/Inactive/All** availability toggle (default Active). L1 ingredient list excludes NF-PKG.
+  - Follow-ups: `get_channel_margins` RPC channel FC% still includes packaging; no dishes have packaging assigned yet (owner data-entry); NF-PKG names still carry OCR garble.
+
 - **2026-06-03 — Modifiers 2-level model (MC 38911fde).**
   - **Phase 1 SHIPPED** (PR #284, merged): mig 236 (`dish_modifier_groups` + `modifier_option_cost`) + edge fn loyverse-sync **v19** (`pull_modifiers` reconciles dish→group from Loyverse `item.modifier_ids`). Group SSoT = Loyverse lists (not `product_category`).
   - **Phases 3+4 DONE** (branch `feature/admin/modifiers-2level-editor`): `/menu/modifiers` (ModifiersPage) now has `GroupOptionEditor` (groups→options + option→MOD cost-link editor, computed cost/margin) and `DishGroupAttachEditor` (per-dish group attach/detach). DB-only writes, no Loyverse side-effects.

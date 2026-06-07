@@ -528,7 +528,10 @@ export function OwnerTable({
             const cost = dish.cost_per_unit
             const price = dish.price ?? 0
             const hasCost = cost != null
-            const foodCostPct = hasCost && price > 0 ? (cost / price) * 100 : 0
+            // Food-cost % excludes packaging (owner decision); margin uses full
+            // cost (packaging is a real cost) so profitability stays accurate.
+            const foodCost = dish.food_cost ?? cost
+            const foodCostPct = foodCost != null && price > 0 ? (foodCost / price) * 100 : 0
             const margin = hasCost ? price - cost : 0
 
             const isExpanded = expandedId === dish.id

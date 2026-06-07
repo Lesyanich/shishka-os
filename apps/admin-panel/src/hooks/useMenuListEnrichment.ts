@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { AssemblyComponent, DishCardData } from './useDishCard'
+import type { AssemblyComponent, DishCardData, DishPackagingLine } from './useDishCard'
 import type { PfPackCardData } from './usePfPackCard'
 import type { MenuBomChild, MenuItem } from './useMenuData'
 
@@ -41,6 +41,8 @@ export interface UseMenuListEnrichmentResult {
   modifierOptionsByDish: Map<string, DishModifierOption[]>
   /** Allergen slugs derived by walking BOM tree + direct tags. SALE-* keyed. */
   allergensByDishId: Map<string, string[]>
+  /** Packaging lines (NF-PKG BOM components) keyed by dish id. SALE-* only. */
+  packagingByDish: Map<string, DishPackagingLine[]>
   isLoading: boolean
   error: string | null
   refetch: () => void
@@ -76,13 +78,16 @@ export function useMenuListEnrichment(
   const [modifierOptionsByDish, setModifierOptionsByDish] = useState<
     Map<string, DishModifierOption[]>
   >(new Map())
+  const [packagingByDish, setPackagingByDish] = useState<
+    Map<string, DishPackagingLine[]>
+  >(new Map())
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
-    const [dishCardRes, pfPackRes, recipeRes, compRes, modRes] = await Promise.all([
+    const [dishCardRes, pfPackRes, recipeRes, compRes, modRes, pkgRes] = await Promise.all([
       supabase.from('dish_card').select('*'),
       supabase.from('pf_pack_card').select('*'),
       supabase
@@ -91,6 +96,7 @@ export function useMenuListEnrichment(
         .order('step_order', { ascending: true }),
       supabase.from('v_dish_assembly_components').select('*'),
       supabase.from('v_dish_modifier_options').select('*'),
+      supabase.from('v_dish_packaging').select('*'),
     ])
     if (dishCardRes.error) {
       setError(dishCardRes.error.message)
@@ -114,6 +120,11 @@ export function useMenuListEnrichment(
     }
     if (modRes.error) {
       setError(modRes.error.message)
+      setIsLoading(false)
+      return
+    }
+    if (pkgRes.error) {
+      setError(pkgRes.error.message)
       setIsLoading(false)
       return
     }
@@ -167,12 +178,19 @@ export function useMenuListEnrichment(
       })
       mods.set(row.dish_id, list)
     }
+    const pkg = new Map<string, DishPackagingLine[]>()
+    for (const row of (pkgRes.data ?? []) as DishPackagingLine[]) {
+      const list = pkg.get(row.dish_id) ?? []
+      list.push(row)
+      pkg.set(row.dish_id, list)
+    }
     setDishCardById(dc)
     setPfPackCardById(pf)
     setRecipeStatsById(rs)
     setRecipeStepsByDish(steps)
     setComponentsByDish(comps)
     setModifierOptionsByDish(mods)
+    setPackagingByDish(pkg)
     setIsLoading(false)
   }, [])
 
@@ -219,6 +237,7 @@ export function useMenuListEnrichment(
     recipeStepsByDish,
     modifierOptionsByDish,
     allergensByDishId,
+    packagingByDish,
     isLoading,
     error,
     refetch: fetchData,
