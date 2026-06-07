@@ -1,4 +1,4 @@
--- 249_visitor_site_public_menu.sql
+-- 255_visitor_site_public_menu.sql
 -- Mirror of schema applied directly in Supabase for the shishka.health visitor site.
 -- These objects are already live in the prod project; this file captures them as
 -- source-of-truth so the schema is reproducible from the repo.
@@ -141,7 +141,7 @@ grant select on public.menu_modifiers to anon, authenticated;
 
 INSERT INTO public.migration_log (filename, applied_by, notes)
 VALUES (
-  '249_visitor_site_public_menu.sql',
+  '255_visitor_site_public_menu.sql',
   'claude-code',
   'Mirror of shishka.health visitor-site schema applied directly in Supabase (MC a22a5362): nomenclature.customer_ingredients, site_content table (+RLS/grants/seed), menu_public view (security_invoker, no cost), menu_modifiers view (intentional security_definer). Objects already live in prod; recorded for reproducibility.'
 ) on conflict (filename) do nothing;
