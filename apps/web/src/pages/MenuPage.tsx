@@ -7,7 +7,6 @@ import {
   SAUCE_CATEGORY,
   SAUCE_MAX_PRICE,
   findBundle,
-  tierPrice,
 } from '@shishka/contracts'
 import { usePublicMenu, type MenuDish } from '../hooks/usePublicMenu.ts'
 import { usePriceTiers } from '../hooks/usePriceTiers.ts'
@@ -45,20 +44,13 @@ export default function MenuPage() {
   if (isLoading) return <p className="p-6 text-cream/60">Loading menu…</p>
   if (error) return <p className="p-6 text-royal-red">Could not load the menu: {error}</p>
 
-  /** This bundle's size discount (e.g. 10), or null until tiers load. */
+  /** This bundle's size discount (e.g. 10), or null until tiers load.
+   *  Used for the "−X%" badge + to price the constructor as you select.
+   *  The "From ฿X" floor itself comes straight from v_public_menu.from_price. */
   const discountFor = (dish: MenuDish): number | null => {
     const def = findBundle(dish.product_code)
     const pct = def ? discounts[def.tierCode] : undefined
     return pct ?? null
-  }
-
-  /** "from ฿X" = cheapest possible fill at this bundle's tier discount. */
-  const fromPrice = (dish: MenuDish): number | null => {
-    const def = findBundle(dish.product_code)
-    const disc = discountFor(dish)
-    if (!def || disc == null || manakishPool.length === 0) return null
-    const cheapest = Math.min(...manakishPool.map((d) => d.price ?? Infinity))
-    return def.manakishCount * tierPrice(cheapest, disc)
   }
 
   return (
@@ -76,7 +68,7 @@ export default function MenuPage() {
           </h2>
           <ul className="space-y-3">
             {bundleDishes.map((dish) => {
-              const from = fromPrice(dish)
+              const from = dish.from_price
               const disc = discountFor(dish)
               return (
                 <li key={dish.id} className="flex items-start gap-3 rounded-lg bg-surface-2 p-3">
