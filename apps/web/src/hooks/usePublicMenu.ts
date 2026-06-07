@@ -20,6 +20,9 @@ export interface MenuDish {
   category_name: string | null
   tags: { slug: string; name: string; group?: string | null; color?: string | null }[]
   allergens: string[]
+  /** Stock state (mig 249). 'coming_soon' / 'out_of_stock' render the card
+   *  greyed with a badge and non-interactive. Defaults to 'in_stock'. */
+  stock_state: 'in_stock' | 'coming_soon' | 'out_of_stock'
 }
 
 export interface MenuCategory {

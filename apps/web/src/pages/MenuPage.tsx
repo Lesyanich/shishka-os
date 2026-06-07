@@ -95,10 +95,17 @@ function Placeholder({ name, id }: { name: string; id: string }) {
 
 function DishCard({ dish, onOpen }: { dish: MenuDish; onOpen: () => void }) {
   const portion = portionLabel(dish)
+  // Coming soon / out of stock: shown on the menu but not orderable — greyed,
+  // badged, and non-interactive so the customer knows it's upcoming.
+  const unavailable = dish.stock_state !== 'in_stock'
+  const stockLabel = dish.stock_state === 'out_of_stock' ? 'Out of stock' : 'Coming soon'
   return (
     <article
-      onClick={onOpen}
-      className="flex cursor-pointer flex-col overflow-hidden rounded-[var(--radius-card)] bg-surface-2 shadow-[var(--shadow-card)] ring-1 ring-white/5 transition hover:ring-white/15"
+      onClick={unavailable ? undefined : onOpen}
+      aria-disabled={unavailable || undefined}
+      className={`flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-surface-2 shadow-[var(--shadow-card)] ring-1 ring-white/5 transition ${
+        unavailable ? 'cursor-default opacity-60 saturate-50' : 'cursor-pointer hover:ring-white/15'
+      }`}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-3">
         {dish.image_url ? (
@@ -111,9 +118,14 @@ function DishCard({ dish, onOpen }: { dish: MenuDish; onOpen: () => void }) {
         ) : (
           <Placeholder name={dish.name} id={dish.id} />
         )}
-        {dish.is_featured && (
+        {dish.is_featured && !unavailable && (
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-amber-watch/90 px-2 py-0.5 text-[10px] font-semibold text-surface-1">
             <Star size={10} className="fill-current" /> Featured
+          </span>
+        )}
+        {unavailable && (
+          <span className="absolute left-2 top-2 rounded-full bg-surface-1/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cream ring-1 ring-white/15 backdrop-blur">
+            {stockLabel}
           </span>
         )}
       </div>
