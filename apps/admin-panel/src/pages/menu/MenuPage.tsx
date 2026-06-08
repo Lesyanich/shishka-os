@@ -148,8 +148,8 @@ export function MenuPage() {
   )
 
   // Subcategories of the currently-selected section, shaped for CategoryTabs.
-  // Only meaningful in the L2 strip; empty when the section has no children.
-  const l2Subcats = useMemo(
+  // Drives the L1/L2 drill-down strip; empty when the section has no children.
+  const selectedSubcats = useMemo(
     () =>
       (selectedCategory ? subcategories.get(selectedCategory) ?? [] : []).map((s) => ({
         id: s.id,
@@ -415,6 +415,14 @@ export function MenuPage() {
               counts={categoryCounts}
             />
           )}
+          {/* Drill-down strip: subcategories of the selected section. */}
+          {selectedSubcats.length > 0 && (
+            <CategoryTabs
+              categories={selectedSubcats}
+              selectedId={selectedSubcategory}
+              onSelect={setSelectedSubcategory}
+            />
+          )}
         </div>
       )}
       {/* L2: availability toggle (default Active-only) + single-category strip */}
@@ -450,9 +458,9 @@ export function MenuPage() {
           {/* Drill-down strip: subcategories of the selected section (e.g. Coffee
               / Smoothies / Lemonades under Drinks). Hidden until a section with
               children is selected. */}
-          {l2Subcats.length > 0 && (
+          {selectedSubcats.length > 0 && (
             <CategoryTabs
-              categories={l2Subcats}
+              categories={selectedSubcats}
               selectedId={selectedSubcategory}
               onSelect={setSelectedSubcategory}
             />
@@ -505,6 +513,7 @@ export function MenuPage() {
         <L1CookView
           items={items}
           selectedCategory={selectedCategory}
+          selectedSubcategory={selectedSubcategory}
           typeFilter={typeFilter}
           availableFilter={availableFilter}
           pfPackCardById={enrichment.pfPackCardById}
