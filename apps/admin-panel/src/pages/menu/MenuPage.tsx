@@ -82,10 +82,24 @@ export function MenuPage() {
   const { filters, setFilters } = useMenuFilters()
   // Back-compat for L1/L2/Customer single-cat strip — derive single string|null
   const selectedCategory = filters.categoryIds[0] ?? null
+  // L2 drill-down: second-level subcategory within the selected section (e.g.
+  // "Coffee" under the "Drinks" umbrella). Held in its own `subcat` param so the
+  // section strip and the subcategory strip stay independent.
+  const selectedSubcategory = searchParams.get('subcat')
   const setSelectedCategory = useCallback(
-    (id: string | null) =>
-      setFilters({ categoryIds: id ? [id] : [], available: null, loyverse: null, flags: [] }),
-    [setFilters],
+    (id: string | null) => {
+      setFilters({ categoryIds: id ? [id] : [], available: null, loyverse: null, flags: [] })
+      // Switching section invalidates any drilled-in subcategory.
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('subcat')
+          return next
+        },
+        { replace: false },
+      )
+    },
+    [setFilters, setSearchParams],
   )
 
   // URL-driven drawer: /menu/dish/:productCode opens DetailDrawer on that dish.
@@ -127,6 +141,22 @@ export function MenuPage() {
   const setTypeFilter = useCallback(
     (t: TypeFilterValue) => updateParam({ type: t === 'SALE' ? null : t }),
     [updateParam],
+  )
+  const setSelectedSubcategory = useCallback(
+    (id: string | null) => updateParam({ subcat: id }),
+    [updateParam],
+  )
+
+  // Subcategories of the currently-selected section, shaped for CategoryTabs.
+  // Only meaningful in the L2 strip; empty when the section has no children.
+  const l2Subcats = useMemo(
+    () =>
+      (selectedCategory ? subcategories.get(selectedCategory) ?? [] : []).map((s) => ({
+        id: s.id,
+        code: '',
+        name: s.name,
+      })),
+    [selectedCategory, subcategories],
   )
 
   // Availability filter for L1 Cook view (URL-driven: ?available=yes|no)
@@ -417,6 +447,16 @@ export function MenuPage() {
               onSelect={setSelectedCategory}
             />
           )}
+          {/* Drill-down strip: subcategories of the selected section (e.g. Coffee
+              / Smoothies / Lemonades under Drinks). Hidden until a section with
+              children is selected. */}
+          {l2Subcats.length > 0 && (
+            <CategoryTabs
+              categories={l2Subcats}
+              selectedId={selectedSubcategory}
+              onSelect={setSelectedSubcategory}
+            />
+          )}
         </div>
       )}
 
@@ -477,6 +517,7 @@ export function MenuPage() {
         <L2AssemblerView
           items={items}
           selectedCategory={selectedCategory}
+          selectedSubcategory={selectedSubcategory}
           availableFilter={l2AvailableFilter}
           dishCardById={enrichment.dishCardById}
           componentsByDish={enrichment.componentsByDish}
