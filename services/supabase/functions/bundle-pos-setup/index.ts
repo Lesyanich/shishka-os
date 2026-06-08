@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
       const cats = await lvGetAll("/categories", "categories")
       const items = await lvGetAll("/items", "items")
       const out = cats
-        .filter((c) => !c.deleted_at && /Bundle/i.test(c.name))
+        .filter((c) => !c.deleted_at && /Manakish set of|Bundle/i.test(c.name))
         .map((c) => ({
           category: c.name,
           id: c.id,
@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
 
     const tiers: BundleTier[] = (tierMeta ?? []).map((t: { tier_code: string; label: string }) => ({
       tier_code: t.tier_code,
-      category_name: t.label, // e.g. "Manakish set of 4"
+      category_name: `🫓 ${t.label}`, // 🫓 like the Manakish category → sorts together
       manakish: (manaRows ?? [])
         // deno-lint-ignore no-explicit-any
         .filter((r: any) => r.tier_code === t.tier_code)
@@ -163,16 +163,17 @@ Deno.serve(async (req) => {
       existingCats.filter((c) => !c.deleted_at).map((c) => [c.name, c.id]),
     )
 
-    // Migrate any old "🧆 Bundle ×N" category name → "Manakish set of N"
-    // (keeps the category + its items, just renames). Idempotent: a no-op once renamed.
+    // Normalise any earlier bundle category name ("🧆 Bundle ×N", "Manakish set
+    // of N") → the current "🫓 Manakish set of N" (keeps items). Idempotent.
     for (const c of existingCats) {
-      const m = /^🧆 Bundle ×(\d+)$/.exec(c.name ?? "")
-      if (m && !c.deleted_at) {
-        const newName = `Manakish set of ${m[1]}`
-        await lvPost("/categories", { id: c.id, name: newName })
-        catIdByName.delete(c.name)
-        catIdByName.set(newName, c.id)
-      }
+      if (c.deleted_at) continue
+      const m = /(?:Bundle ×|Manakish set of )(\d+)\s*$/.exec(c.name ?? "")
+      if (!m) continue
+      const newName = `🫓 Manakish set of ${m[1]}`
+      if (c.name === newName) continue
+      await lvPost("/categories", { id: c.id, name: newName })
+      catIdByName.delete(c.name)
+      catIdByName.set(newName, c.id)
     }
 
     const allItems = await lvGetAll("/items", "items")
