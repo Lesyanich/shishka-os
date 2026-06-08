@@ -1,83 +1,93 @@
 # Manakish Bundles
 
-Build-your-own manakish sets. The customer picks which manakish (any flavour,
-repeats allowed) + free sauce(s); the price is computed from the selection and
-is always cheaper than buying the same items à la carte.
+Build-your-own manakish sets: **Manakish set of 4 / 8 / 12**. The customer picks
+the manakish (any flavour, **repeats allowed**) + free sauces; the price is
+computed from the selection and the discount **grows with size**.
 
-| Bundle | Manakish | Sauces | Floor |
-|--------|----------|--------|-------|
-| `SALE-BUNDLE_MANAKISH_4`  | pick 4  | 1 free | From ฿200 |
-| `SALE-BUNDLE_MANAKISH_8`  | pick 8  | 2 free | From ฿400 |
-| `SALE-BUNDLE_MANAKISH_12` | pick 12 | 3 free | From ฿600 |
+| Set | Manakish | Free sauces | Discount | Floor |
+|-----|----------|-------------|----------|-------|
+| ×4  | pick 4   | 1 | −10 % | From ฿212 |
+| ×8  | pick 8   | 2 | −15 % | From ฿400 |
+| ×12 | pick 12  | 3 | −20 % | From ฿564 |
 
-## Pricing
+## Pricing — `price_tiers` is the source of truth
 
-Each manakish is discounted **−15 % and rounded individually** (this keeps the
-website and the POS identical to the baht):
+One product, many prices. The regular price stays on `nomenclature.price`; every
+other context (the three bundle sizes, and later Grab/delivery or timed promos)
+is a row in **`price_tiers`** (`tier_code`, `discount_pct`, `category_code`,
+`valid_from/to`, `is_active`, + bundle metadata `bundle_dish_code`,
+`bundle_manakish_count`, `bundle_sauce_count`). Migrations **255 / 256 / 258 / 259**.
 
-| À la carte | In a bundle |
-|-----------|-------------|
-| ฿59 | ฿50 |
-| ฿69 | ฿59 |
-| ฿79 | ฿67 |
-| ฿89 (Lion's Mane) | ฿76 |
+- Each manakish is discounted **and rounded individually** (`Σ round(price ×
+  (1 − pct))`), so the website, the ordering app and the POS match to the baht.
+- `v_dish_tier_prices` = the effective per-dish price for each active tier.
+- `v_public_menu.from_price` derives the bundle floor (`count × cheapest manakish
+  at the tier`) → ฿212 / 400 / 564. (The Custom Smoothie's floor still comes from
+  its modifier groups — ฿109.)
+- **Manakish pool** = the `KP-FIN-MAN` **subtree** (Classic/Signature/Premium
+  leaves after the taxonomy split, mig 258 — match by prefix). **Sauce pool** =
+  `KP-FIN-SDR` cups (≤ ฿50).
+- **Change the discount:** edit `price_tiers.discount_pct`, then re-run the POS
+  generator (below). The site + `create-order` read it live.
+- `valid_from/to` are reserved for time-bounded promos (logic is a future add).
 
-`bundle price = Σ round(manakish × 0.85)`; sauces are free. The "floor" is the
-cheapest fill (all ฿50 manakish). Discount % lives in **two synced places**:
-`packages/contracts/src/bundles.ts` (`BUNDLE_DISCOUNT_PCT`) and the inline mirror
-in `services/supabase/functions/create-order/index.ts`. The slot-modifier option
-prices in Loyverse are baked at setup time — re-run the setup (below) if the
-discount changes.
+## Three surfaces, one price model
 
-## "From ฿X" pricing (also covers the Custom Smoothie)
+### 1. Cashier — Loyverse POS (`bundle-pos-setup` edge fn)
 
-Build-your-own dishes show **From ฿X** = the cheapest orderable configuration.
-The mandatory count per modifier group is stored in `dish_modifier_groups.min_select`
-(Loyverse doesn't sync min_select, so we own it). `v_public_menu.from_price`
-computes `base + Σ(min_select × cheapest option per group)`:
-- Custom Smoothie: ฿89 + 2 cheapest fruits (฿10) = **From ฿109**.
-- Bundles: base ฿0 + N × cheapest manakish slot (฿50) = **From ฿200 / 400 / 600**.
+**No modifiers, no Loyverse discount, zero cashier steps.** One Loyverse
+**category per size** — `🫓 Manakish set of 4 / 8 / 12` (the 🫓 sorts them next to
+the Manaish category) — each holding **every manakish at that size's discounted
+price** + the **free sauces at ฿0**. The cashier opens the category, taps manakish
+(repeat = quantity) + a free sauce; the price is already the bundle price.
 
-## Website / app (apps/web)
+These items live **only in Loyverse** (a generated projection) — no duplication in
+the catalog or on the site.
 
-The Bundles section opens a constructor (`BundleBuilder`): pick the manakish with
-+/- steppers (repeats allowed) + the sauce(s); live price + savings shown.
+Built/maintained by the **`bundle-pos-setup`** edge function (verify_jwt off):
+- `POST /functions/v1/bundle-pos-setup` — deletes any leftover slot lists, ensures
+  the 3 categories (renaming older names in place), and upserts every item at the
+  price from `v_dish_tier_prices`. **Idempotent** — re-run after any price/discount
+  or roster change.
+- `GET` the same URL — read-only check: returns the live categories + item prices.
 
-The server is the source of truth: `create-order` re-reads every manakish price,
-re-validates pools (manakish = `KP-FIN-MAN`; sauce = `KP-FIN-SDR` ≤ ฿50) and the
-exact counts, and recomputes the total. A bundle is stored as a **parent
-`order_items` row** (the bundle dish, carrying the money) + **child rows** (the
-chosen manakish/sauces, `parent_item_id`, `modifier_type` = `manakish` | `sauce`).
+### 2. Live site — shishka.health (`shishka-health` repo)
 
-## Cashier (Loyverse POS) — slot modifiers
+A lightweight **order builder (cart)** — no payment; guests assemble an order and
+see the total to show at the counter. The **Manakish section** shows 3 bundle
+cards (“Manakish set of 4 — from ฿212”, −X% badge). Tapping one opens a
+**constructor** with **strict counts** (exactly 4/8/12 manakish via steppers,
+repeats allowed; 1/2/3 free sauces), a live total + savings. Reads `price_tiers`
++ `menu_public`. (PR `shishka-health#5`.)
 
-Each bundle is a Loyverse item (base ฿0) bound to **slot modifier lists**, the
-same shape as the Custom Smoothie. Because there are 13 flavours and ×12 needs
-repeats, each pick is its own single-select slot (so the same flavour can be
-chosen in several slots):
+### 3. Ordering app — `shishka-os/apps/web` (PR #314, with PR #279)
 
-- **12 shared "Bundle Manakish #1..#12"** lists, each holding all flavours priced
-  at their discounted value. ×4 binds #1–4, ×8 binds #1–8, ×12 binds #1–12.
-- **3 shared "Bundle Sauce #1..#3"** lists (sauces at ฿0). ×4 binds #1, ×8 #1–2,
-  ×12 #1–3.
+The QR/ordering app's `BundleBuilder` + `create-order` edge function. The server
+re-reads every manakish price, re-validates the pools (manakish = `KP-FIN-MAN`
+subtree; sauce = `KP-FIN-SDR` ≤ ฿50) and the exact counts, reads the tier
+discount from `price_tiers`, and recomputes the total. A bundle persists as a
+**parent `order_items` row** (carries the money) + **child rows**
+(`parent_item_id`, `modifier_type` = `manakish` | `sauce`).
 
-The cashier opens the bundle, taps a flavour in each slot + a sauce per slot;
-Loyverse sums the price. Repeats are supported (pick Za'atar in every slot).
+## Key objects
 
-### Re-running / maintaining the POS setup
+- Migrations **250–259** (bundle dishes, `product_code` on the view,
+  `chk_modifier_type`, `price_tiers` + bundle metadata, subtree match, labels).
+- Edge functions: **`create-order`** (v5), **`bundle-pos-setup`**.
+- Bundle dishes: `SALE-BUNDLE_MANAKISH_{4,8,12}` in category `KP-FIN-BND`
+  (catalog/site representation; price 0, floor computed).
 
-Everything is created via the `loyverse-sync` edge function (no Back Office UI):
-1. `?action=create_modifier` (POST `{name, min_select:1, max_select:1, modifier_options:[{name, price}]}`) — one call per slot list.
-2. `?action=recreate_item` (POST `{dish_id, modifier_ids:[...]}`) — binds the slots to each bundle item.
-3. `?action=pull_modifiers` — mirrors the new lists into `pos_loyverse_modifier_*` + `dish_modifier_groups`.
-4. SQL: set `nomenclature.price = 0` on the bundle dishes and `dish_modifier_groups.min_select = 1` on their slots (drives `from_price`).
+## Superseded approaches (history)
 
-If the manakish roster or the discount changes, update each slot list's options
-(`add_modifier_option` / `remove_modifier_option` / `push_modifiers`) — the
-option price is baked, so all 12 manakish slots must be updated together.
+Two earlier POS designs were abandoned: a **single-item % discount** (couldn't
+cleanly do free sauce) and **Loyverse slot modifiers** (12 single-select lists —
+the cashier hated the dropdowns). Migration **254** and
+`scripts/loyverse/setup-bundle-modifiers.sh` belonged to the slot approach and
+are no longer used; the slot lists were deleted from Loyverse by `bundle-pos-setup`.
 
-## Open decisions (owner)
+## Open / future
 
-- **Exact discount %** (currently 15 %).
-- Whether the website should also move to the slot-modifier model (today it uses
-  its own parent/child order flow — both channels price identically).
+- Loyverse-only bundle items don't map back to `nomenclature` for receipt BOM /
+  reporting (acceptable for now).
+- Timed-promo logic on `price_tiers.valid_from/to`.
+- The website cart has no online payment by design (pay at the counter).
