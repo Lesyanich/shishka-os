@@ -15,6 +15,11 @@
 
 ## In-flight (backend foundation)
 
+- **2026-06-08 — Build-your-own "from ฿X" floor on shishka.health (site).**
+  - Mig **259** (`menu_modifiers_expose_min_select`): view `menu_modifiers` now also exposes `dish_modifier_groups.min_select` as `group_min_select` (appended col — CREATE OR REPLACE can't insert mid-list). Additive; row filter unchanged. Applied to prod.
+  - shishka-health (PR — branch `feat/custom-smoothie-from-price`): dishes with a required modifier group (`minSelect>0`) now price **"from ฿X"** = base + cheapest mandatory add-ons (new `src/lib/modifiers.js` `dishFloor`). Custom Smoothie now shows **from ฿109** (89 + 2 cheapest fruits @฿10) instead of flat ฿89, on the card + dialog. ModifierBuilder pre-selects the required minimum, blocks dropping below it, shows "pick at least N". Mirrors the manakish-bundle `from ฿X` floor.
+  - GAP (MC **5a3d4792**): ModifierBuilder selections still don't flow into the cart — `addDish` adds at base price, so build-your-own lines undercharge. Separate task.
+
 - **2026-06-07 — Packaging-as-BOM + L2 availability filter (MC 2385d288, branch `feature/menu/packaging-as-bom`).**
   - Migs **246** (normalize 9 NF-PKG containers to per-piece cost, base_unit=pcs; pack counts verified via Makro scraper) + **247** (`v_dish_packaging`, `v_dish_cost_split`) + **248** (views match whole **NF-PKG subtree** `code LIKE 'NF-PKG%'` — NF-PKG + NF-PKG-CNT/BAG/CTL, so cup/bottle on ~17 drink dishes count) — all applied to prod.
   - Packaging now modelled as `bom_structures` lines whose component's category code starts with **NF-PKG**; cost auto-rolls into `cost_per_unit` via existing trigger (migs 137/211). Food-cost % switched to **food-only** (`food_cost` from `v_dish_cost_split`), margin stays on full cost.
