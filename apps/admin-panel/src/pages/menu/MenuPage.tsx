@@ -513,6 +513,9 @@ export function MenuPage() {
         onClose={closeDrawer}
         onSaved={() => refetch()}
         returnFocusToId={drawerItem?.id ?? null}
+        modifierOptions={
+          drawerItem ? (enrichment.modifierOptionsByDish.get(drawerItem.id) ?? []) : []
+        }
       />
     </div>
   )

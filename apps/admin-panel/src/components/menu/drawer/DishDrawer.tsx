@@ -5,6 +5,7 @@ import { useDishCard } from '../../../hooks/useDishCard'
 import type { DishCardData } from '../../../hooks/useDishCard'
 import { useAllergens } from '../../../hooks/useAllergens'
 import { useModifierOptions } from '../../../hooks/useModifierOptions'
+import type { DishModifierOption } from '../../../hooks/useMenuListEnrichment'
 import { useDishScorecard } from '../../../hooks/useDishScorecard'
 import { useDishCardSave } from '../../../hooks/useDishCardSave'
 import type { MerrychefProgram } from '../../../hooks/useDishCardSave'
@@ -31,6 +32,9 @@ interface DishDrawerProps {
   onClose: () => void
   onSaved?: () => void
   returnFocusToId?: string | null
+  /** Customisation options (with per-portion nutrition + min/max) for the
+   *  customer build-preview. From enrichment.modifierOptionsByDish. */
+  modifierOptions?: DishModifierOption[]
 }
 
 export function DishDrawer({
@@ -38,6 +42,7 @@ export function DishDrawer({
   onClose,
   onSaved,
   returnFocusToId,
+  modifierOptions = [],
 }: DishDrawerProps) {
   const open = item != null
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -268,8 +273,7 @@ export function DishDrawer({
                 dishCard={dishCard.card}
                 allergens={allergens.allergens}
                 allergensLoading={allergens.isLoading}
-                modifiers={modifiers.modifiers}
-                modifiersLoading={modifiers.isLoading}
+                modifierOptions={modifierOptions}
                 customerPhotoUrl={
                   formNomen?.image_url !== undefined
                     ? formNomen.image_url
