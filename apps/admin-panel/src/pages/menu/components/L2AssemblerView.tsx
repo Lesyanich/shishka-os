@@ -29,6 +29,9 @@ import type {
 interface L2AssemblerViewProps {
   items: MenuItem[]
   selectedCategory: string | null
+  /** Leaf subcategory drill-down within the selected section. When set, only
+   *  dishes whose own category_id matches are shown. null = whole section. */
+  selectedSubcategory: string | null
   /** null = all, true = active only, false = inactive only */
   availableFilter: boolean | null
   dishCardById: Map<string, DishCardData>
@@ -594,6 +597,7 @@ function SaleAssemblyCard({
 export function L2AssemblerView({
   items,
   selectedCategory,
+  selectedSubcategory,
   availableFilter,
   dishCardById,
   componentsByDish,
@@ -610,9 +614,10 @@ export function L2AssemblerView({
       items.filter(
         (i) =>
           i.kind === 'SALE' &&
-          (!selectedCategory || (i.section_id ?? i.category_id) === selectedCategory),
+          (!selectedCategory || (i.section_id ?? i.category_id) === selectedCategory) &&
+          (!selectedSubcategory || i.category_id === selectedSubcategory),
       ).length,
-    [items, selectedCategory],
+    [items, selectedCategory, selectedSubcategory],
   )
 
   // Seed order: persisted display_order first, then build-your-own dishes (no
@@ -622,6 +627,7 @@ export function L2AssemblerView({
       (i) =>
         i.kind === 'SALE' &&
         (!selectedCategory || (i.section_id ?? i.category_id) === selectedCategory) &&
+        (!selectedSubcategory || i.category_id === selectedSubcategory) &&
         (availableFilter === null || i.is_available === availableFilter),
     )
     return filtered
@@ -635,7 +641,7 @@ export function L2AssemblerView({
         return aByo - bByo || a.idx - b.idx
       })
       .map((x) => x.item)
-  }, [items, selectedCategory, availableFilter, componentsByDish])
+  }, [items, selectedCategory, selectedSubcategory, availableFilter, componentsByDish])
 
   // Local order drives instant drag feedback; it re-syncs whenever the seed
   // (item set or persisted order) changes — e.g. category switch or saved drop.
