@@ -24,9 +24,19 @@ export interface DishModifierOption {
   modifier_short_name: string | null
   modifier_emoji: string | null
   price_delta: number | null
+  is_default: boolean
   /** Stock state of the underlying modifier (mig 249). 'coming_soon' /
    *  'out_of_stock' render the option greyed / badged in the picker. */
   modifier_stock_state: 'in_stock' | 'coming_soon' | 'out_of_stock'
+  /** Per-portion nutrition (nomenclature × quantity_per_unit), for the live
+   *  KBJU build-preview. mig 261/262. */
+  calories: number | null
+  protein: number | null
+  carbs: number | null
+  fat: number | null
+  /** Required min / max picks for the option's group (mig 262). null = unbounded. */
+  group_min_select: number | null
+  group_max_select: number | null
 }
 
 export interface UseMenuListEnrichmentResult {
@@ -167,8 +177,14 @@ export function useMenuListEnrichment(
       comps.set(row.dish_id, list)
     }
     const mods = new Map<string, DishModifierOption[]>()
+    // Postgres numeric columns can arrive as strings; widen them so Number(...) is sound.
     for (const row of (modRes.data ?? []) as Array<
-      Omit<DishModifierOption, 'price_delta'> & { price_delta: number | string | null }
+      Omit<DishModifierOption, 'price_delta' | 'protein' | 'carbs' | 'fat'> & {
+        price_delta: number | string | null
+        protein: number | string | null
+        carbs: number | string | null
+        fat: number | string | null
+      }
     >) {
       const list = mods.get(row.dish_id) ?? []
       list.push({
@@ -178,7 +194,14 @@ export function useMenuListEnrichment(
         modifier_short_name: row.modifier_short_name,
         modifier_emoji: row.modifier_emoji,
         price_delta: row.price_delta != null ? Number(row.price_delta) : null,
+        is_default: !!row.is_default,
         modifier_stock_state: row.modifier_stock_state ?? 'in_stock',
+        calories: row.calories != null ? Number(row.calories) : null,
+        protein: row.protein != null ? Number(row.protein) : null,
+        carbs: row.carbs != null ? Number(row.carbs) : null,
+        fat: row.fat != null ? Number(row.fat) : null,
+        group_min_select: row.group_min_select != null ? Number(row.group_min_select) : null,
+        group_max_select: row.group_max_select != null ? Number(row.group_max_select) : null,
       })
       mods.set(row.dish_id, list)
     }
