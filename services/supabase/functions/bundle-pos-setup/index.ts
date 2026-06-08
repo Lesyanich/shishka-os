@@ -163,17 +163,23 @@ Deno.serve(async (req) => {
       existingCats.filter((c) => !c.deleted_at).map((c) => [c.name, c.id]),
     )
 
-    // Normalise any earlier bundle category name ("🧆 Bundle ×N", "Manakish set
-    // of N") → the current "🫓 Manakish set of N" (keeps items). Idempotent.
+    // Rename any earlier bundle category (matched by its size number) to the
+    // CURRENT target name from the DB label — label-driven, so it follows any
+    // label change ("+ N sauces free", etc.) and keeps the category's items.
+    const targetByCount = new Map<string, string>()
+    for (const t of tiers) {
+      const m = /Manakish set of (\d+)/.exec(t.category_name)
+      if (m) targetByCount.set(m[1], t.category_name)
+    }
     for (const c of existingCats) {
       if (c.deleted_at) continue
-      const m = /(?:Bundle ×|Manakish set of )(\d+)\s*$/.exec(c.name ?? "")
+      const m = /(?:Bundle ×|Manakish set of )(\d+)/.exec(c.name ?? "")
       if (!m) continue
-      const newName = `🫓 Manakish set of ${m[1]}`
-      if (c.name === newName) continue
-      await lvPost("/categories", { id: c.id, name: newName })
+      const target = targetByCount.get(m[1])
+      if (!target || c.name === target) continue
+      await lvPost("/categories", { id: c.id, name: target })
       catIdByName.delete(c.name)
-      catIdByName.set(newName, c.id)
+      catIdByName.set(target, c.id)
     }
 
     const allItems = await lvGetAll("/items", "items")
