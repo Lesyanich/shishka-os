@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
 
     const allItems = await lvGetAll("/items", "items")
 
-    const result: Record<string, { created: number; updated: number }> = {}
+    const result: Record<string, { created: number; updated: number; removed: number }> = {}
 
     for (const tier of tiers) {
       let catId = catIdByName.get(tier.category_name)
@@ -201,7 +201,19 @@ Deno.serve(async (req) => {
 
       let created = 0
       let updated = 0
+      let removed = 0
       const lines = [...tier.manakish, ...tier.sauces]
+
+      // Drop items no longer in the desired set (a manakish was renamed or
+      // removed) so the category mirrors the DB exactly.
+      const desiredNames = new Set(lines.map((l) => l.name))
+      for (const [nm, info] of inCat) {
+        if (!desiredNames.has(nm)) {
+          await lvDelete(`/items/${info.id}`)
+          removed++
+        }
+      }
+
       for (const line of lines) {
         const existing = inCat.get(line.name)
         const variant = {
@@ -225,7 +237,7 @@ Deno.serve(async (req) => {
           created++
         }
       }
-      result[tier.category_name] = { created, updated }
+      result[tier.category_name] = { created, updated, removed }
     }
 
     return json({ ok: true, deleted_slots: orphanSlots.length, categories: result })
