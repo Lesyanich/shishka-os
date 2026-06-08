@@ -16,8 +16,8 @@
 ## In-flight (backend foundation)
 
 - **2026-06-08 — Build-your-own "from ฿X" floor on shishka.health (site).**
-  - Mig **259** (`menu_modifiers_expose_min_select`): view `menu_modifiers` now also exposes `dish_modifier_groups.min_select` as `group_min_select` (appended col — CREATE OR REPLACE can't insert mid-list). Additive; row filter unchanged. Applied to prod.
-  - shishka-health (PR — branch `feat/custom-smoothie-from-price`): dishes with a required modifier group (`minSelect>0`) now price **"from ฿X"** = base + cheapest mandatory add-ons (new `src/lib/modifiers.js` `dishFloor`). Custom Smoothie now shows **from ฿109** (89 + 2 cheapest fruits @฿10) instead of flat ฿89, on the card + dialog. ModifierBuilder pre-selects the required minimum, blocks dropping below it, shows "pick at least N". Mirrors the manakish-bundle `from ฿X` floor.
+  - Migs **259** (`group_min_select`) + **260** (`group_max_select` — adds `dish_modifier_groups.max_select`, caps Custom Smoothie "Pick Fruits" at 4): view `menu_modifiers` now exposes both min/max select (appended cols — CREATE OR REPLACE can't insert mid-list). Additive; row filter unchanged. Applied to prod.
+  - shishka-health (PRs #6 + #7 + #8): dishes with a required modifier group (`minSelect>0`) price **"from ฿X"** = base + cheapest mandatory add-ons (new `src/lib/modifiers.js` `dishFloor`). Custom Smoothie shows **from ฿109** (89 + 2 cheapest fruits @฿10) on card + dialog. ModifierBuilder opens **empty** (no pre-select), enforces min **and** max per group (Pick Fruits = "pick 2–4"; at cap, unpicked options disabled), and shows the `from ฿X` floor as the total until the min is met. Mirrors the manakish-bundle `from ฿X` floor.
   - GAP (MC **5a3d4792**): ModifierBuilder selections still don't flow into the cart — `addDish` adds at base price, so build-your-own lines undercharge. Separate task.
 
 - **2026-06-07 — Packaging-as-BOM + L2 availability filter (MC 2385d288, branch `feature/menu/packaging-as-bom`).**
