@@ -88,18 +88,22 @@ export function MenuPage() {
   const selectedSubcategory = searchParams.get('subcat')
   const setSelectedCategory = useCallback(
     (id: string | null) => {
-      setFilters({ categoryIds: id ? [id] : [], available: null, loyverse: null, flags: [] })
-      // Switching section invalidates any drilled-in subcategory.
+      // Single setSearchParams call — two calls in one handler only apply the
+      // last one in React Router v7 navigation, so cat update would be lost.
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev)
+          if (id) next.set('cat', id); else next.delete('cat')
+          next.delete('available')
+          next.delete('loyverse')
+          next.delete('flags')
           next.delete('subcat')
           return next
         },
         { replace: false },
       )
     },
-    [setFilters, setSearchParams],
+    [setSearchParams],
   )
 
   // URL-driven drawer: /menu/dish/:productCode opens DetailDrawer on that dish.
