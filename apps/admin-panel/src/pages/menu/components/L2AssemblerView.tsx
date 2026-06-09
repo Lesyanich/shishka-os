@@ -442,8 +442,8 @@ function SaleAssemblyCard({
         )}
       </button>
 
-      {/* Note — only when present (e.g. build-your-own explainer) */}
-      {item.assembler_note && (
+      {/* Note — only when present AND not superseded by structured steps */}
+      {item.assembler_note && steps.length === 0 && (
         <p className="line-clamp-2 text-[11px] text-cream/55">
           {item.assembler_note}
         </p>
