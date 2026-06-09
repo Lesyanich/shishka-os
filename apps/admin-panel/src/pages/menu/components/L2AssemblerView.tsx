@@ -236,7 +236,7 @@ function buildCheatSheetHtml(
     }
     /* font-size on .page is the single knob the fit-to-page loop turns. */
     .page { font-size: 12px; width: ${contentWidthMm}mm; }
-    .sheet.byo { break-before: page; page-break-before: always; }
+    .sheet.byo { margin-top: 1.2em; }
     .head {
       display: flex; justify-content: space-between; align-items: flex-end;
       border-bottom: 2px solid #1a160f; padding-bottom: .45em; margin-bottom: .75em;
@@ -308,14 +308,14 @@ function buildCheatSheetHtml(
         page.style.fontSize = size + 'px';
         while (size < MAX) {
           page.style.fontSize = size + 0.5 + 'px';
-          if (firstPage.scrollHeight > maxH) {
+          if (page.scrollHeight > maxH) {
             page.style.fontSize = size + 'px';
             break;
           }
           size += 0.5;
         }
         // Safety shrink if even the base size overflows (very dense sets).
-        while (firstPage.scrollHeight > maxH && size > 7) {
+        while (page.scrollHeight > maxH && size > 7) {
           size -= 0.5;
           page.style.fontSize = size + 'px';
         }
