@@ -3,26 +3,6 @@
 // Push categories + SALE-* menu items to Loyverse POS, and
 // pull / manage modifier lists.
 //
-// Actions:
-//   GET  ?action=status                 → last 10 sync log entries
-//   POST ?action=categories             → push product_categories → Loyverse
-//   POST ?action=push_dish&dish_id=X    → push a single SALE-* dish (RPC-gated)
-//   POST ?action=pull_modifiers         → pull Loyverse modifier_lists → raw mirror
-//                                          + reconcile dish_modifier_groups from item.modifier_ids
-//   POST ?action=create_modifier        → create a new modifier list (body)
-//   GET  ?action=get_item&item_id=X     → fetch a single Loyverse item (raw)
-//   POST ?action=recreate_item          → delete+recreate an item with modifiers_ids (body)
-//   POST ?action=add_modifier_option&list_id=X&name=Y&price=N
-//                                        → add one option to an existing modifier list
-//   POST ?action=remove_modifier_option&list_id=X&name=Y
-//                                        → remove one option (keeps other option ids)
-//   POST ?action=ensure_modifier_stores[&list_id=X]
-//                                        → set store availability so POS shows the modifiers
-//   GET  ?action=item_modifiers         → each Loyverse item + its modifier-list ids
-//   POST ?action=push_modifiers[&dry_run=true]
-//                                        → apply staged option prices then re-attach
-//                                          dish groups (fixed order); dry_run = plan only
-//
 // Auth: Bearer token from LOYVERSE_API_TOKEN env var
 // ═══════════════════════════════════════════════════════════
 
@@ -47,7 +27,14 @@ function json(data: unknown, status = 200) {
   })
 }
 
-// ── Loyverse API helpers ──
+// deno-lint-ignore no-explicit-any
+function baseName(d: any): string {
+  const short = (d.customer_short_name ?? "").trim()
+  return short !== "" ? short : d.name
+}
+function posItemName(staffCode: string | null | undefined, base: string): string {
+  return staffCode ? `${staffCode} ${base}` : base
+}
 
 async function loyverseGet(path: string) {
   const res = await fetch(`${LOYVERSE_BASE}${path}`, {
@@ -87,7 +74,6 @@ async function loyverseDelete(path: string) {
   }
 }
 
-// Paginated fetch — Loyverse uses cursor-based pagination
 async function loyverseGetAll<T>(path: string, key: string): Promise<T[]> {
   const all: T[] = []
   let cursor: string | undefined
@@ -99,8 +85,6 @@ async function loyverseGetAll<T>(path: string, key: string): Promise<T[]> {
   } while (cursor)
   return all
 }
-
-// ── Config / log helpers ──
 
 async function getStoreId(): Promise<string> {
   const { data } = await db.rpc("fn_get_loyverse_config")
@@ -135,8 +119,6 @@ async function logFinish(
     .eq("id", id)
 }
 
-// ── Action: status ──
-
 async function handleStatus() {
   const { data, error } = await db
     .from("loyverse_sync_log")
@@ -146,8 +128,6 @@ async function handleStatus() {
   if (error) throw new Error(`Sync log query failed: ${error.message}`)
   return json({ ok: true, logs: data })
 }
-
-// ── Action: get_item ──
 
 async function handleGetItem(itemId: string) {
   if (!itemId) return json({ ok: false, error: "item_id required" }, 400)
@@ -159,9 +139,16 @@ async function handleGetItem(itemId: string) {
   }
 }
 
-// ── Action: recreate_item ──
-// Loyverse upsert ignores category_id + modifiers_ids on existing items, so to
-// (re)bind modifiers we must DELETE the old item then CREATE a fresh one.
+async function handleDeleteItem(itemId: string) {
+  if (!itemId) return json({ ok: false, error: "item_id required" }, 400)
+  try {
+    await loyverseDelete(`/items/${itemId}`)
+    await db.from("nomenclature").update({ loyverse_item_id: null, pos_status: "draft", loyverse_synced_at: null, loyverse_price: null }).eq("loyverse_item_id", itemId)
+    return json({ ok: true, deleted: itemId })
+  } catch (e) {
+    return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
+  }
+}
 
 async function handleRecreateItem(req: Request) {
   const body = await req.json()
@@ -171,7 +158,7 @@ async function handleRecreateItem(req: Request) {
 
   const { data: dish, error: dishErr } = await db
     .from("nomenclature")
-    .select("id, name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
+    .select("id, name, staff_code, customer_short_name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
     .eq("id", body.dish_id)
     .single()
   if (dishErr || !dish) return json({ ok: false, error: dishErr?.message ?? "dish not found" }, 404)
@@ -188,7 +175,7 @@ async function handleRecreateItem(req: Request) {
   const categoryId = d.product_categories?.loyverse_category_id ?? null
   const price = d.price ?? 0
   const itemBody: Record<string, unknown> = {
-    item_name: d.name,
+    item_name: posItemName(d.staff_code, baseName(d)),
     variants: [{
       variant_name: "Regular",
       default_pricing_type: "FIXED",
@@ -197,19 +184,15 @@ async function handleRecreateItem(req: Request) {
     }],
   }
   if (categoryId) itemBody.category_id = categoryId
-  // Preserve customer-facing description + photo so a DELETE+CREATE re-bind
-  // does not strip them from the Loyverse item.
   if (d.customer_description) itemBody.description = d.customer_description
   const img = d.image_url ?? d.customer_photo_url
   if (img) itemBody.image_url = img
-  // Loyverse item field is `modifier_ids` (verified via GET /items). An earlier
-  // note claimed `modifiers_ids` — that is wrong; the API silently ignores it.
   if (body.modifier_ids && body.modifier_ids.length > 0) itemBody.modifier_ids = body.modifier_ids
 
   try {
     const created = await loyversePost("/items", itemBody)
     const newId = created.id
-    await db.from("nomenclature").update({ loyverse_item_id: newId, pos_status: "synced" }).eq("id", body.dish_id)
+    await db.from("nomenclature").update({ loyverse_item_id: newId, pos_status: "synced", loyverse_synced_at: new Date().toISOString(), loyverse_price: price }).eq("id", body.dish_id)
     return json({
       ok: true,
       item_name: created.item_name,
@@ -223,19 +206,13 @@ async function handleRecreateItem(req: Request) {
   }
 }
 
-// ── Action: update_item ──
-// In-place update of an existing Loyverse item (NO delete) — stable id.
-// Re-sends the current variants (preserving ids/prices/stores) plus the desired
-// modifier_ids. Tests whether upsert honors modifier_ids with the correct field.
-//   POST ?action=update_item  body: { dish_id, modifier_ids? }
-
 async function handleUpdateItem(req: Request) {
   const body = await req.json()
   if (!body.dish_id) return json({ ok: false, error: "dish_id required" }, 400)
 
   const { data: dish, error: dishErr } = await db
     .from("nomenclature")
-    .select("id, name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
+    .select("id, name, staff_code, customer_short_name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
     .eq("id", body.dish_id)
     .single()
   if (dishErr || !dish) return json({ ok: false, error: dishErr?.message ?? "dish not found" }, 404)
@@ -243,13 +220,24 @@ async function handleUpdateItem(req: Request) {
   const d = dish as any
   if (!d.loyverse_item_id) return json({ ok: false, error: "dish not synced yet (no loyverse_item_id)" }, 400)
 
-  // Fetch current Loyverse item to preserve variants verbatim.
   const current = await loyverseGet(`/items/${d.loyverse_item_id}`)
+
+  // Sync the DB price into every variant/store, preserving the rest of the
+  // variant structure (ids, sku, barcode, etc.) so the update stays in place.
+  const newPrice = d.price ?? 0
+  // deno-lint-ignore no-explicit-any
+  const syncedVariants = (current.variants ?? []).map((v: any) => ({
+    ...v,
+    default_pricing_type: v.default_pricing_type ?? "FIXED",
+    default_price: newPrice,
+    // deno-lint-ignore no-explicit-any
+    stores: (v.stores ?? []).map((s: any) => ({ ...s, pricing_type: s.pricing_type ?? "FIXED", price: newPrice })),
+  }))
 
   const itemBody: Record<string, unknown> = {
     id: d.loyverse_item_id,
-    item_name: d.name,
-    variants: current.variants,
+    item_name: posItemName(d.staff_code, baseName(d)),
+    variants: syncedVariants,
   }
   const categoryId = d.product_categories?.loyverse_category_id ?? current.category_id ?? null
   if (categoryId) itemBody.category_id = categoryId
@@ -262,18 +250,18 @@ async function handleUpdateItem(req: Request) {
 
   try {
     const result = await loyversePost("/items", itemBody)
+    await db.from("nomenclature").update({ loyverse_synced_at: new Date().toISOString(), loyverse_price: newPrice }).eq("id", d.id)
     return json({
       ok: true,
       loyverse_item_id: result.id,
       id_unchanged: result.id === d.loyverse_item_id,
+      price: newPrice,
       modifier_ids: result.modifier_ids,
     })
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
   }
 }
-
-// ── Action: categories ──
 
 async function handleCategories() {
   const storeId = await getStoreId()
@@ -326,8 +314,6 @@ async function handleCategories() {
   return json({ ok: true, total: toSync.length, synced, failed })
 }
 
-// ── Action: push_dish (single SALE-* item) ──
-
 async function handlePushDish(dishId: string) {
   if (!dishId) return json({ ok: false, error: "dish_id required" }, 400)
   const storeId = await getStoreId()
@@ -348,6 +334,8 @@ async function handlePushDish(dishId: string) {
   if (dishErr) return json({ ok: false, error: dishErr.message }, 500)
   // deno-lint-ignore no-explicit-any
   const linkedCategoryId = (dishRow as any).product_categories?.loyverse_category_id ?? null
+  // deno-lint-ignore no-explicit-any
+  let loyverseItemId = (dishRow as any).loyverse_item_id
 
   const logId = await logStart("dish_push", 1)
   try {
@@ -355,22 +343,56 @@ async function handlePushDish(dishId: string) {
     const itemBody: Record<string, unknown> = {
       item_name: rpc.payload.name,
       description: rpc.payload.description,
-      variants: [{
+    }
+
+    if (loyverseItemId) {
+      // RE-PUSH: the item already exists in Loyverse. Fetch it and reuse its
+      // variant structure + attached modifier_ids, rebasing ONLY the price, so
+      // a price re-sync never strips modifiers/variants (e.g. smoothie add-ons).
+      itemBody.id = loyverseItemId
+      const current = await loyverseGet(`/items/${loyverseItemId}`)
+      // deno-lint-ignore no-explicit-any
+      const existingVariants = (current.variants ?? []) as any[]
+      if (existingVariants.length > 0) {
+        // deno-lint-ignore no-explicit-any
+        itemBody.variants = existingVariants.map((v: any) => ({
+          ...v,
+          default_pricing_type: v.default_pricing_type ?? "FIXED",
+          default_price: price,
+          // deno-lint-ignore no-explicit-any
+          stores: (v.stores ?? []).map((s: any) => ({ ...s, pricing_type: s.pricing_type ?? "FIXED", price })),
+        }))
+      } else {
+        itemBody.variants = [{
+          variant_name: "Regular",
+          default_pricing_type: "FIXED",
+          default_price: price,
+          stores: [{ store_id: storeId, pricing_type: "FIXED", price, available_for_sale: true }],
+        }]
+      }
+      const mods = current.modifier_ids ?? current.modifiers_ids
+      if (Array.isArray(mods) && mods.length > 0) itemBody.modifier_ids = mods
+      const catId = linkedCategoryId ?? current.category_id ?? null
+      if (catId) itemBody.category_id = catId
+      if (!rpc.payload.description && current.description) itemBody.description = current.description
+      const img = rpc.payload.image_url ?? current.image_url
+      if (img) itemBody.image_url = img
+    } else {
+      // FIRST PUSH: create a fresh single-variant item.
+      itemBody.variants = [{
         variant_name: "Regular",
         default_pricing_type: "FIXED",
         default_price: price,
         stores: [{ store_id: storeId, pricing_type: "FIXED", price, available_for_sale: true }],
-      }],
+      }]
+      if (linkedCategoryId) itemBody.category_id = linkedCategoryId
+      if (rpc.payload.image_url) itemBody.image_url = rpc.payload.image_url
     }
-    if (linkedCategoryId) itemBody.category_id = linkedCategoryId
-    if (rpc.payload.image_url) itemBody.image_url = rpc.payload.image_url
-    // deno-lint-ignore no-explicit-any
-    let loyverseItemId = (dishRow as any).loyverse_item_id
-    if (loyverseItemId) itemBody.id = loyverseItemId
+
     const result = await loyversePost("/items", itemBody)
     loyverseItemId = result.id ?? loyverseItemId
     if (loyverseItemId) {
-      await db.from("nomenclature").update({ loyverse_item_id: loyverseItemId, pos_status: "synced" }).eq("id", dishId)
+      await db.from("nomenclature").update({ loyverse_item_id: loyverseItemId, pos_status: "synced", loyverse_synced_at: new Date().toISOString(), loyverse_price: price }).eq("id", dishId)
     }
     await logFinish(logId, "success", 1, 0)
     return json({ ok: true, loyverse_item_id: loyverseItemId, payload: rpc.payload })
@@ -381,7 +403,42 @@ async function handlePushDish(dishId: string) {
   }
 }
 
-// ── Action: pull_modifiers ──
+// Reconcile loyverse_price with the live Loyverse price for every synced dish.
+// Read-only against Loyverse (GET /items); writes only nomenclature.loyverse_price.
+async function handleReconcilePrices() {
+  const { data: dishes, error } = await db
+    .from("nomenclature")
+    .select("id, name, price, loyverse_item_id")
+    .like("product_code", "SALE-%")
+    .not("loyverse_item_id", "is", null)
+  if (error) return json({ ok: false, error: error.message }, 500)
+
+  let updated = 0
+  let failed = 0
+  let drift = 0
+  const mismatches: { name: string; db: number | null; pos: number | null }[] = []
+  const errors: string[] = []
+
+  for (const d of (dishes ?? []) as Array<{ id: string; name: string; price: number | null; loyverse_item_id: string }>) {
+    try {
+      const item = await loyverseGet(`/items/${d.loyverse_item_id}`)
+      // deno-lint-ignore no-explicit-any
+      const v = ((item.variants ?? []) as any[])[0]
+      const posPrice = v?.default_price ?? null
+      await db.from("nomenclature").update({ loyverse_price: posPrice }).eq("id", d.id)
+      updated++
+      if (posPrice != null && d.price != null && Number(posPrice) !== Number(d.price)) {
+        drift++
+        mismatches.push({ name: d.name, db: d.price, pos: posPrice })
+      }
+    } catch (e) {
+      failed++
+      errors.push(`${d.name}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  return json({ ok: true, updated, failed, drift, mismatches, errors })
+}
 
 interface LoyverseModifierOption {
   id: string
@@ -398,9 +455,6 @@ interface LoyverseModifierList {
   modifier_options?: LoyverseModifierOption[]
 }
 
-// A modifier shows "Not available in stores" in the POS unless its `stores`
-// array lists the store id. Every POST /modifiers MUST carry stores or Loyverse
-// resets it to empty. This guarantees the configured store is always present.
 function withStore(existing: string[] | undefined, storeId: string): string[] {
   const set = new Set(existing ?? [])
   if (storeId) set.add(storeId)
@@ -435,10 +489,6 @@ async function handlePullModifiers() {
     return json({ ok: false, error: txErr.message }, 500)
   }
 
-  // Phase 1 (MC 38911fde): also reconcile dish->group attachments from Loyverse
-  // item.modifier_ids into dish_modifier_groups, so a single pull keeps the 2-level
-  // structure (groups+options mirror + dish attachments) fully in sync. Runs AFTER
-  // the mirror refresh so the RPC can validate list ids against the fresh mirror.
   let dishGroups = 0
   try {
     const items = await loyverseGetAll<LoyverseItemModifiers>("/items", "items")
@@ -461,8 +511,6 @@ async function handlePullModifiers() {
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
   }
 
-  // Pull reconciled dish_modifier_groups FROM Loyverse, so admin == Loyverse now:
-  // stamp last_pulled_at and clear the attachments-dirty flag.
   await db.from("modifier_sync_state")
     .update({ last_pulled_at: new Date().toISOString(), attachments_dirty: false })
     .eq("id", 1)
@@ -470,8 +518,6 @@ async function handlePullModifiers() {
   await logFinish(logId, "success", listRows.length, 0)
   return json({ ok: true, lists: listRows.length, options: optionRows.length, dish_groups: dishGroups })
 }
-
-// ── Action: create_modifier ──
 
 async function handleCreateModifier(req: Request) {
   const body = await req.json()
@@ -494,11 +540,6 @@ async function handleCreateModifier(req: Request) {
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
   }
 }
-
-// ── Action: add_modifier_option ──
-// Adds a single option to an existing Loyverse modifier list (idempotent by name).
-// Loyverse updates a modifier by POST /modifiers with the id and the FULL
-// modifier_options array — existing options keep their ids, new ones omit id.
 
 async function handleAddModifierOption(listId: string, optName: string, price: number) {
   if (!listId || !optName) return json({ ok: false, error: "list_id and name required" }, 400)
@@ -524,16 +565,10 @@ async function handleAddModifierOption(listId: string, optName: string, price: n
       { name: optName, price },
     ],
   })
-  // Adding an option detached this list from its items — re-attach before pulling
-  // (else the pull would reconcile dish_modifier_groups to the detached state).
   const reattached = await reattachAllDishes()
   await handlePullModifiers()
   return json({ ok: true, list: list.name, added: optName, price, reattached, modifier_id: (result as { id?: string }).id })
 }
-
-// ── Action: remove_modifier_option ──
-// Removes a single option from an existing Loyverse modifier list by name,
-// preserving the ids (and thus existing bindings) of all kept options.
 
 async function handleRemoveModifierOption(listId: string, optName: string) {
   if (!listId || !optName) return json({ ok: false, error: "list_id and name required" }, 400)
@@ -557,16 +592,10 @@ async function handleRemoveModifierOption(listId: string, optName: string) {
     stores: withStore(list.stores, storeId),
     modifier_options: kept.map((o) => ({ id: o.id, name: o.name, price: o.price ?? 0 })),
   })
-  // Removing an option detached this list from its items — re-attach before pulling.
   const reattached = await reattachAllDishes()
   await handlePullModifiers()
   return json({ ok: true, list: list.name, removed: optName, reattached, modifier_id: (result as { id?: string }).id })
 }
-
-// ── Action: ensure_modifier_stores ──
-// Re-POST modifier lists with the configured store id in `stores`, so they stop
-// showing "Not available in stores" in the POS. Preserves option ids + prices.
-// Optional ?list_id=X to target one list; otherwise fixes every list.
 
 async function handleEnsureModifierStores(listId: string) {
   const storeId = await getStoreId()
@@ -579,7 +608,7 @@ async function handleEnsureModifierStores(listId: string) {
   const fixed: string[] = []
   for (const list of targets) {
     const stores = withStore(list.stores, storeId)
-    if ((list.stores ?? []).includes(storeId)) continue // already available
+    if ((list.stores ?? []).includes(storeId)) continue
     await loyversePost("/modifiers", {
       id: list.id,
       name: list.name,
@@ -593,11 +622,6 @@ async function handleEnsureModifierStores(listId: string) {
   await handlePullModifiers()
   return json({ ok: true, store_id: storeId, fixed_count: fixed.length, fixed })
 }
-
-// ── Action: item_modifiers ──
-// Returns each Loyverse item with the modifier-list ids attached, to mirror the
-// dish→modifier-list bindings exactly as configured in Loyverse. Loyverse has used
-// both `modifiers_ids` and `modifier_ids` across versions — read both.
 
 interface LoyverseItemModifiers {
   id: string
@@ -620,10 +644,6 @@ async function handleItemModifiers() {
   return json({ ok: true, total: mapping.length, with_modifiers: withMods.length, items: mapping })
 }
 
-// Re-attach every synced dish's groups to its Loyverse item. Editing a modifier
-// (add/remove option, price, stores) detaches the list from all items, so this MUST
-// run after any such edit to restore dish↔group attachments (mirrors our
-// dish_modifier_groups). Returns the number of dishes re-attached.
 async function reattachAllDishes(): Promise<number> {
   const { data: dmgRows } = await db
     .from("dish_modifier_groups")
@@ -659,19 +679,73 @@ async function reattachAllDishes(): Promise<number> {
   return n
 }
 
-// ── Action: push_modifiers ──
-// The single admin "Push to Loyverse" for modifiers, in the FIXED order required by
-// the quirk that editing a modifier in Loyverse detaches it from all items:
-//   1) apply staged option price overrides → POST /modifiers (+stores) per changed list
-//   2) LAST: re-attach every dish's groups → update_item (modifier_ids), stable id
-//   3) delete applied overrides, stamp last_pushed_at, clear attachments_dirty, re-pull
-// ?dry_run=true returns the plan WITHOUT touching Loyverse.
+async function handleResyncNames() {
+  const { data: dmgRows } = await db
+    .from("dish_modifier_groups")
+    .select("dish_id, loyverse_modifier_list_id")
+  const groupsByDish = new Map<string, string[]>()
+  for (const r of (dmgRows ?? []) as { dish_id: string; loyverse_modifier_list_id: string }[]) {
+    const arr = groupsByDish.get(r.dish_id) ?? []
+    arr.push(r.loyverse_modifier_list_id)
+    groupsByDish.set(r.dish_id, arr)
+  }
+
+  const { data: dishes, error } = await db
+    .from("nomenclature")
+    .select("id, name, staff_code, customer_short_name, loyverse_item_id")
+    .like("product_code", "SALE-%")
+    .not("loyverse_item_id", "is", null)
+    .not("staff_code", "is", null)
+  if (error) return json({ ok: false, error: error.message }, 500)
+
+  let renamed = 0
+  let skipped = 0
+  let failed = 0
+  const errors: string[] = []
+  const changes: { to: string; mods: number }[] = []
+
+  for (const d of (dishes ?? []) as Array<{ id: string; name: string; staff_code: string; customer_short_name: string | null; loyverse_item_id: string }>) {
+    try {
+      const desired = posItemName(d.staff_code, baseName(d))
+      const current = await loyverseGet(`/items/${d.loyverse_item_id}`)
+      const listIds = groupsByDish.get(d.id) ?? []
+      const currentMods: string[] = current.modifier_ids ?? current.modifiers_ids ?? []
+      const targetMods = listIds.length > 0 ? listIds : currentMods
+      const sameName = current.item_name === desired
+      const sameMods = targetMods.length === currentMods.length &&
+        targetMods.every((m) => currentMods.includes(m))
+      if (sameName && sameMods) { skipped++; continue }
+
+      const itemBody: Record<string, unknown> = {
+        id: d.loyverse_item_id,
+        item_name: desired,
+        variants: current.variants,
+      }
+      if (current.category_id) itemBody.category_id = current.category_id
+      if (current.description) itemBody.description = current.description
+      if (current.image_url) itemBody.image_url = current.image_url
+      if (targetMods.length > 0) itemBody.modifier_ids = targetMods
+
+      await loyversePost("/items", itemBody)
+      await db.from("nomenclature")
+        .update({ loyverse_synced_at: new Date().toISOString() })
+        .eq("id", d.id)
+      renamed++
+      changes.push({ to: desired, mods: targetMods.length })
+    } catch (e) {
+      failed++
+      errors.push(`${d.name}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  return json({ ok: true, total: (dishes ?? []).length, renamed, skipped, failed, changes, errors })
+}
+
 async function handlePushModifiers(req: Request) {
   const dryRun = new URL(req.url).searchParams.get("dry_run") === "true"
   const storeId = await getStoreId()
   if (!storeId) return json({ ok: false, error: "store_id not configured" }, 400)
 
-  // Staged price overrides (option id -> desired price).
   const { data: overrideRows } = await db
     .from("modifier_option_overrides")
     .select("loyverse_modifier_option_id, price")
@@ -682,10 +756,8 @@ async function handlePushModifiers(req: Request) {
     ]),
   )
 
-  // Current Loyverse modifier lists (for full option arrays + names + stores).
   const allLists = await loyverseGetAll<LoyverseModifierList>("/modifiers", "modifiers")
 
-  // Which lists have an option whose staged price differs from Loyverse?
   const priceChanges: { list_id: string; list_name: string; option: string; from: number | null; to: number }[] = []
   const affectedListIds = new Set<string>()
   for (const l of allLists) {
@@ -700,8 +772,6 @@ async function handlePushModifiers(req: Request) {
     }
   }
 
-  // Dish → group attachments to (re)apply. Re-attach ALL synced dishes that have
-  // groups: step 1 detaches changed lists, and this also pushes attachment edits.
   const { data: dmgRows } = await db
     .from("dish_modifier_groups")
     .select("dish_id, loyverse_modifier_list_id")
@@ -735,7 +805,6 @@ async function handlePushModifiers(req: Request) {
 
   const logId = await logStart("modifiers_push", priceChanges.length + reattach.length)
   try {
-    // 1) Apply price changes per affected list (full options array; preserves ids + stores).
     for (const listId of affectedListIds) {
       const l = allLists.find((x) => x.id === listId)
       if (!l) continue
@@ -753,10 +822,8 @@ async function handlePushModifiers(req: Request) {
       })
     }
 
-    // 2) LAST: re-attach each dish's groups in place (stable id — no delete/recreate).
     const reattached = await reattachAllDishes()
 
-    // 3) Clear applied overrides + stamp sync state.
     if (overrideById.size > 0) {
       await db.from("modifier_option_overrides").delete().neq("loyverse_modifier_option_id", "")
     }
@@ -765,7 +832,6 @@ async function handlePushModifiers(req: Request) {
       .eq("id", 1)
 
     await logFinish(logId, "success", priceChanges.length + reattached, 0)
-    // Refresh the mirror so the admin reflects the just-pushed Loyverse state.
     await handlePullModifiers()
     return json({
       ok: true,
@@ -779,8 +845,6 @@ async function handlePushModifiers(req: Request) {
     return json({ ok: false, error: msg }, 502)
   }
 }
-
-// ── Main handler ──
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
@@ -798,6 +862,9 @@ Deno.serve(async (req) => {
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handlePushDish(url.searchParams.get("dish_id") ?? "")
       }
+      case "reconcile_prices":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handleReconcilePrices()
       case "pull_modifiers":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handlePullModifiers()
@@ -806,12 +873,19 @@ Deno.serve(async (req) => {
         return await handleCreateModifier(req)
       case "get_item":
         return await handleGetItem(url.searchParams.get("item_id") ?? "")
+      case "delete_item": {
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handleDeleteItem(url.searchParams.get("item_id") ?? "")
+      }
       case "recreate_item":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handleRecreateItem(req)
       case "update_item":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handleUpdateItem(req)
+      case "resync_names":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handleResyncNames()
       case "add_modifier_option": {
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         const listId = url.searchParams.get("list_id") ?? ""
@@ -838,7 +912,7 @@ Deno.serve(async (req) => {
           {
             ok: false,
             error:
-              "Unknown action. Use: status, categories, push_dish, pull_modifiers, create_modifier, get_item, recreate_item, add_modifier_option, remove_modifier_option, ensure_modifier_stores, item_modifiers",
+              "Unknown action. Use: status, categories, push_dish, reconcile_prices, pull_modifiers, create_modifier, get_item, delete_item, recreate_item, update_item, resync_names, add_modifier_option, remove_modifier_option, ensure_modifier_stores, item_modifiers, push_modifiers",
           },
           400,
         )

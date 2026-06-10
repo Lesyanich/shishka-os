@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
-import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch, PanelRightOpen, Upload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch, PanelRightOpen, Upload, Loader2, CheckCircle2, AlertCircle, Globe, EyeOff } from 'lucide-react'
 import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useMenuDishes'
 import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
 import { useLoyversePushDish } from '../../../hooks/useLoyversePushDish'
@@ -17,7 +17,7 @@ interface OwnerTableProps {
   subcategories: Map<string, MenuSubcategory[]>
   childrenByParent: Map<string, MenuBomChild[]>
   dualTypeIds: Set<string>
-  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'>>) => Promise<{ ok: boolean; error?: string }>
+  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'> & { is_web_visible: boolean }>) => Promise<{ ok: boolean; error?: string }>
   /** Parent-provided: true when a recent inline commit failed for this id. */
   isFailed?: (id: string) => boolean
   /** Parent-provided: last error message (used as row-level tooltip). */
@@ -128,6 +128,15 @@ function LoyverseBadge({ status, itemId }: { status: MenuItem['pos_status']; ite
   )
 }
 
+/** Website (showcase) visibility — driven solely by is_web_visible (mig 263),
+ * decoupled from Loyverse/availability. SALE-only; PF/MOD never hit the site. */
+const SITE_STATUS_STYLE = {
+  live: 'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-[var(--color-forest-soft)]/40',
+  // Live but needs attention: not orderable (is_available=false) or Loyverse-stale.
+  warn: 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-[var(--color-amber-watch)]/40',
+  hidden: 'bg-surface-3/60 text-cream/60 ring-cream/20',
+} as const
+
 /** Compact date + time for the last Loyverse sync, e.g. "02 Jun 14:30". */
 function formatSyncedAt(iso: string | null): string | null {
   if (!iso) return null
@@ -143,6 +152,24 @@ function formatSyncedAt(iso: string | null): string | null {
 function isLoyverseStale(item: MenuItem): boolean {
   if (item.kind !== 'SALE' || !item.loyverse_synced_at || !item.updated_at) return false
   return new Date(item.updated_at).getTime() > new Date(item.loyverse_synced_at).getTime()
+}
+
+export type SiteBadgeState = 'live' | 'warn' | 'hidden' | 'na'
+
+/** Website badge state for a dish (mig 263). Visibility is driven solely by
+ * is_web_visible; 'warn' flags a dish that IS on the site but needs attention —
+ * not orderable (is_available off) or Loyverse price stale. 'na' for non-SALE. */
+export function siteBadgeState(item: MenuItem): SiteBadgeState {
+  if (item.kind !== 'SALE') return 'na'
+  if (!item.is_web_visible) return 'hidden'
+  return isLoyverseStale(item) || !item.is_available ? 'warn' : 'live'
+}
+
+/** POS price drift: the price Loyverse currently holds differs from our DB price.
+ * Returns the Loyverse price when it mismatches, else null (in sync / unknown). */
+export function loyversePriceDrift(item: MenuItem): number | null {
+  if (item.kind !== 'SALE' || item.loyverse_price == null || item.price == null) return null
+  return Number(item.loyverse_price) !== Number(item.price) ? Number(item.loyverse_price) : null
 }
 
 function foodCostColor(pct: number): string {
@@ -311,7 +338,7 @@ export function OwnerTable({
         Pick<
           MenuDish,
           'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'
-        >
+        > & { is_web_visible: boolean }
       >,
     ) => {
       setOptimistic({ id, patch })
@@ -323,6 +350,15 @@ export function OwnerTable({
   const toggleField = useCallback(
     async (dish: MenuDish, field: 'is_available' | 'is_featured') => {
       await commitPatch(dish.id, { [field]: !dish[field] })
+    },
+    [commitPatch],
+  )
+
+  /** Toggle website visibility (mig 263). Decoupled from Loyverse: showing a
+   * dish on the site no longer requires a POS push; hiding leaves it sellable. */
+  const toggleWeb = useCallback(
+    async (dish: MenuItem) => {
+      await commitPatch(dish.id, { is_web_visible: !dish.is_web_visible })
     },
     [commitPatch],
   )
@@ -522,6 +558,7 @@ export function OwnerTable({
             <th role="columnheader" className="px-3 py-2.5 text-center">Synced</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">DB Updated</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Push</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Site</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Card</th>
           </tr>
         </thead>
@@ -530,7 +567,7 @@ export function OwnerTable({
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-surface-1/30">
-                  <td colSpan={25} className="px-3 py-2">
+                  <td colSpan={26} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-cream/50">
                       {item.subcategory.name}
                     </span>
@@ -899,9 +936,23 @@ export function OwnerTable({
                   )}
                 </td>
 
-                {/* Loyverse status */}
+                {/* Loyverse status + POS price drift */}
                 <td className="px-3 py-2 text-center">
-                  <LoyverseBadge status={dish.pos_status} itemId={dish.loyverse_item_id} />
+                  <div className="flex flex-col items-center gap-0.5">
+                    <LoyverseBadge status={dish.pos_status} itemId={dish.loyverse_item_id} />
+                    {(() => {
+                      const posPrice = loyversePriceDrift(dish)
+                      if (posPrice == null) return null
+                      return (
+                        <span
+                          className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brick-soft ring-1 ring-inset ring-[var(--color-brick-soft)]/40 bg-[var(--color-royal-red)]/15"
+                          title={`Loyverse has ${formatThb(posPrice)} but DB price is ${formatThb(dish.price)} — click Push to update the POS`}
+                        >
+                          POS {formatThb(posPrice)} ≠ {formatThb(dish.price)}
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </td>
 
                 {/* Last Loyverse sync */}
@@ -995,6 +1046,45 @@ export function OwnerTable({
                   )}
                 </td>
 
+                {/* Site — website visibility (mig 263), SALE-only. Toggles is_web_visible. */}
+                <td className="px-3 py-2 text-center">
+                  {dish.kind === 'SALE' ? (
+                    (() => {
+                      const live = dish.is_web_visible
+                      const since = formatSyncedAt(dish.web_published_at)
+                      const stale = isLoyverseStale(dish)
+                      const state = siteBadgeState(dish)
+                      const cls =
+                        state === 'warn'
+                          ? SITE_STATUS_STYLE.warn
+                          : state === 'live'
+                            ? SITE_STATUS_STYLE.live
+                            : SITE_STATUS_STYLE.hidden
+                      const title = live
+                        ? `On site${since ? ` since ${since}` : ''}` +
+                          (!dish.is_available ? ' · not orderable (is_available off)' : '') +
+                          (stale ? ' · Loyverse price stale, re-push' : '') +
+                          ' — click to hide'
+                        : 'Hidden from the website — click to show'
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => toggleWeb(dish)}
+                          title={title}
+                          aria-label={`${live ? 'Hide from' : 'Show on'} website: ${dish.name}`}
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ring-inset transition hover:brightness-110 ${cls}`}
+                          style={{ fontFamily: 'var(--font-display-sc)' }}
+                        >
+                          {live ? <Globe className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                          {live ? 'Live' : 'Hidden'}
+                        </button>
+                      )
+                    })()
+                  ) : (
+                    <span className="text-cream/30">&mdash;</span>
+                  )}
+                </td>
+
                 {/* Completeness */}
                 <td className="px-3 py-2 text-center">
                   <CompletenessIndicator item={dish} />
@@ -1009,7 +1099,7 @@ export function OwnerTable({
               )}
               {isExpanded && (
                 <tr className="bg-surface-1/60">
-                  <td colSpan={25} className="p-0">
+                  <td colSpan={26} className="p-0">
                     <DishExpandedCard dish={dish} />
                     {onOpenDrawer && (
                       <div className="flex justify-end border-t border-surface-3/50 bg-surface-1/40 px-4 py-2">

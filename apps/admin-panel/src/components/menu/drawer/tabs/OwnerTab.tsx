@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Shield, ExternalLink, Hash, Upload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Shield, ExternalLink, Hash, Upload, Loader2, CheckCircle2, AlertCircle, Globe, EyeOff } from 'lucide-react'
 import type { MenuItem } from '../../../../hooks/useMenuData'
 import type { DishScorecard } from '../../../../hooks/useDishScorecard'
 import type { ModifierOption } from '../../../../hooks/useModifierOptions'
@@ -15,6 +15,9 @@ interface OwnerTabProps {
   modifiers?: ModifierOption[]
   /** Notify parent after a successful push so it can refetch. */
   onSynced?: () => void
+  /** Toggle website visibility (is_web_visible, mig 263). Undefined disables
+   * the control. The parent's update refetches, so `item` reflects the result. */
+  onToggleWeb?: (id: string, next: boolean) => void | Promise<void>
 }
 
 function posStatusBadge(status: string) {
@@ -35,14 +38,37 @@ export function OwnerTab({
   scorecardError,
   modifiers = [],
   onSynced,
+  onToggleWeb,
 }: OwnerTabProps) {
   const { pushDish, isPushing, lastResult } = useLoyversePushDish()
   const [pushToast, setPushToast] = useState<{
     type: 'ok' | 'error'
     text: string
   } | null>(null)
+  const [webPending, setWebPending] = useState(false)
 
   const isSale = item.kind === 'SALE'
+  // Drift: DB row edited after the last Loyverse push → POS price is stale.
+  // The site always shows DB price, so "stale" only flags a Loyverse mismatch.
+  const webStale =
+    isSale &&
+    !!item.loyverse_synced_at &&
+    !!item.updated_at &&
+    new Date(item.updated_at).getTime() > new Date(item.loyverse_synced_at).getTime()
+
+  // POS price drift: Loyverse holds a different price than our DB (exact, from
+  // the stored loyverse_price). The site always shows DB price, so this is the
+  // only place a real money mismatch can hide.
+  const posPriceDrift =
+    isSale && item.loyverse_price != null && item.price != null &&
+    Number(item.loyverse_price) !== Number(item.price)
+
+  const handleToggleWeb = async () => {
+    if (!onToggleWeb) return
+    setWebPending(true)
+    await onToggleWeb(item.id, !item.is_web_visible)
+    setWebPending(false)
+  }
 
   const handlePush = async () => {
     setPushToast(null)
@@ -251,6 +277,71 @@ export function OwnerTab({
               </pre>
             </details>
           )}
+        </section>
+      )}
+
+      {/* Website visibility — SALE-only. Independent of Loyverse (mig 263):
+          shows/hides the dish on shishka.health by flipping is_web_visible. */}
+      {isSale && (
+        <section className="space-y-2 border-t border-surface-3 pt-4">
+          <h4 className="text-[10px] uppercase tracking-widest text-cream/50">
+            <Globe className="mr-1 inline h-3 w-3" />
+            Website (shishka.health)
+          </h4>
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                item.is_web_visible
+                  ? 'bg-[var(--color-royal-green)]/20 text-[color:var(--color-forest-soft)]'
+                  : 'bg-surface-3 text-cream/60'
+              }`}
+            >
+              {item.is_web_visible ? (
+                <Globe className="h-3 w-3" />
+              ) : (
+                <EyeOff className="h-3 w-3" />
+              )}
+              {item.is_web_visible ? 'Live' : 'Hidden'}
+            </span>
+            {item.is_web_visible && item.web_published_at && (
+              <span className="text-[10px] text-cream/45">
+                on site since{' '}
+                {new Date(item.web_published_at).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-cream/45">
+            Site price always equals DB price (
+            {item.price != null ? `฿${item.price.toLocaleString()}` : '—'}).{' '}
+            {posPriceDrift ? (
+              <span className="font-semibold text-brick-soft">
+                ⚠ Loyverse has ฿{Number(item.loyverse_price).toLocaleString()} — push to sync the POS.
+              </span>
+            ) : webStale ? (
+              '⚠ Edited after last Loyverse sync — re-push to be safe.'
+            ) : (
+              'Loyverse: in sync.'
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={handleToggleWeb}
+            disabled={webPending || !onToggleWeb}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+              item.is_web_visible
+                ? 'border border-slate-700 bg-[var(--color-surface-1)] text-[color:var(--color-cream)]/75 hover:border-[var(--color-brick-soft)]/50 hover:text-[color:var(--color-brick-soft)]'
+                : 'border border-forest-soft/40 bg-[var(--color-royal-green)]/20 text-[color:var(--color-forest-soft)] hover:bg-[var(--color-royal-green)]/30'
+            }`}
+          >
+            {webPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : item.is_web_visible ? (
+              <EyeOff className="h-3.5 w-3.5" />
+            ) : (
+              <Globe className="h-3.5 w-3.5" />
+            )}
+            {item.is_web_visible ? 'Hide from site' : 'Show on site'}
+          </button>
         </section>
       )}
     </div>

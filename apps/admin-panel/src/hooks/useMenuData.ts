@@ -25,9 +25,18 @@ export interface MenuItem extends MenuDish {
   pos_status: 'draft' | 'approved' | 'synced'
   /** Timestamp of the last successful push to Loyverse POS. NULL = never synced. */
   loyverse_synced_at: string | null
+  /** Price Loyverse POS currently holds (last push / reconcile sweep). Compare
+   * with `price` to surface a real POS drift. NULL = never pushed / unknown. */
+  loyverse_price: number | null
   /** Last time this row changed in our DB. Compare against loyverse_synced_at
    * to detect drift (dish edited after its last Loyverse push). */
   updated_at: string | null
+  /** Owner switch — dish is shown on the customer website (menu_public gate).
+   * Decoupled from Loyverse/is_available. */
+  is_web_visible: boolean
+  /** Last time the dish was turned on for the web (false->true). NULL = never
+   * published. Set by the DB trigger, never written from the client. */
+  web_published_at: string | null
   customer_description: string | null
   customer_short_name: string | null
   customer_photo_url: string | null
@@ -71,7 +80,7 @@ export interface UseMenuDataResult {
       Pick<
         MenuDish,
         'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'
-      >
+      > & { is_web_visible: boolean }
     >,
   ) => Promise<{ ok: boolean; error?: string }>
   /** Persist a new card order: writes `display_order` = position for each id. */
@@ -114,7 +123,10 @@ interface RawNomenclatureRow {
   last_verified_by: string | null
   pos_status: string
   loyverse_synced_at: string | null
+  loyverse_price: number | string | null
   updated_at: string | null
+  is_web_visible: boolean
+  web_published_at: string | null
   customer_description: string | null
   customer_short_name: string | null
   customer_photo_url: string | null
@@ -161,6 +173,7 @@ export function useMenuData(): UseMenuDataResult {
           portion_size, portion_unit, launch_phase, stock_state, display_order, staff_code,
           category_id,
           card_version, last_verified_at, last_verified_by, pos_status, loyverse_synced_at, updated_at,
+          is_web_visible, web_published_at, loyverse_price,
           customer_description, customer_short_name, customer_photo_url,
           assembler_note, kitchen_note,
           ttc_source_url, merrychef_program,
@@ -313,7 +326,10 @@ export function useMenuData(): UseMenuDataResult {
         last_verified_by: raw.last_verified_by,
         pos_status: (raw.pos_status ?? 'draft') as 'draft' | 'approved' | 'synced',
         loyverse_synced_at: raw.loyverse_synced_at,
+        loyverse_price: raw.loyverse_price != null ? Number(raw.loyverse_price) : null,
         updated_at: raw.updated_at,
+        is_web_visible: raw.is_web_visible ?? false,
+        web_published_at: raw.web_published_at,
         customer_description: raw.customer_description,
         customer_short_name: raw.customer_short_name,
         customer_photo_url: raw.customer_photo_url,
@@ -383,7 +399,7 @@ export function useMenuData(): UseMenuDataResult {
         Pick<
           MenuDish,
           'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'
-        >
+        > & { is_web_visible: boolean }
       >,
     ): Promise<{ ok: boolean; error?: string }> => {
       const updates: Record<string, unknown> = {}
@@ -395,6 +411,7 @@ export function useMenuData(): UseMenuDataResult {
       if (patch.portion_unit !== undefined) updates.portion_unit = patch.portion_unit
       if (patch.launch_phase !== undefined) updates.launch_phase = patch.launch_phase
       if (patch.stock_state !== undefined) updates.stock_state = patch.stock_state
+      if (patch.is_web_visible !== undefined) updates.is_web_visible = patch.is_web_visible
 
       const { error: updateErr } = await supabase
         .from('nomenclature')
