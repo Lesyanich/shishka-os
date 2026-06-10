@@ -35,6 +35,8 @@ interface DishDrawerProps {
   /** Customisation options (with per-portion nutrition + min/max) for the
    *  customer build-preview. From enrichment.modifierOptionsByDish. */
   modifierOptions?: DishModifierOption[]
+  /** Toggle website visibility (is_web_visible, mig 263) from the Owner tab. */
+  onToggleWeb?: (id: string, next: boolean) => void | Promise<void>
 }
 
 export function DishDrawer({
@@ -43,6 +45,7 @@ export function DishDrawer({
   onSaved,
   returnFocusToId,
   modifierOptions = [],
+  onToggleWeb,
 }: DishDrawerProps) {
   const open = item != null
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -333,6 +336,7 @@ export function DishDrawer({
                 scorecardError={scorecard.error}
                 modifiers={modifiers.modifiers}
                 onSynced={() => onSaved?.()}
+                onToggleWeb={onToggleWeb}
               />
             )}
           </div>
