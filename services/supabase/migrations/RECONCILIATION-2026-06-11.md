@@ -54,7 +54,7 @@ these steps. Marked with TOMBSTONE notes in migration_log.
 |---|---|
 | 099, 108, 142a, 143, 168a, 174_financial_dashboard, 178, 191, 198a, 206, 207, 250b | **Backfilled** in 268 (applied_at = git date; object-level verification where possible — see notes in migration_log) |
 | `105_brain_quality_tests_seed.sql` | **Renamed** to `107_…` to match its actual log row |
-| `217a_drop_brain_lightrag_legacy.sql` | **Genuinely PENDING** — LIGHTRAG_* tables are gone but `brain_quality_tests`, `brain_query_log`, `brain_inbox` still exist in prod. Left unlogged on purpose. Needs a CEO decision to apply (destructive DROPs). |
+| `217a_drop_brain_lightrag_legacy.sql` | Was genuinely PENDING. **Re-scoped and APPLIED 2026-06-11** after CEO rule "drop unused, keep used": dropped `brain_quality_tests` + `brain_gaps` view + LIGHTRAG_* remnants; **kept** `brain_query_log` (still read by admin `/api-cost` legacy section — see apiCost.ts) and `brain_inbox`. |
 
 ## Replay caveat
 
