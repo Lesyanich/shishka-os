@@ -47,7 +47,7 @@ END $$;
 -- Self-register
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '105_brain_quality_tests_seed.sql',
+  '107_brain_quality_tests_seed.sql',
   'claude-code',
   NULL,
   'Seed 6 known-answer regression tests for brain quality (MC 087e6502)'

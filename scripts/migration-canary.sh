@@ -116,7 +116,10 @@ check_numbering() {
     | sed -nE 's/.*\/([0-9]+)[a-z]?_.*\.sql$/\1/p' | sort -n | tail -1)
   if [ -n "$head_max" ]; then
     local added
-    added=$(git diff --cached --name-only --diff-filter=A | grep -E '^services/supabase/migrations/[0-9]+[a-z]?_.*\.sql$' || true)
+    # Letter-suffixed files (e.g. 264a_) are exempt: that is the designated
+    # slot-in mechanism for already-applied migrations arriving late (renumber
+    # procedure / recovered files). Check A still protects them from duplicates.
+    added=$(git diff --cached --name-only --diff-filter=A | grep -E '^services/supabase/migrations/[0-9]+_.*\.sql$' || true)
     for f in $added; do
       local base num
       base=$(basename "$f")
