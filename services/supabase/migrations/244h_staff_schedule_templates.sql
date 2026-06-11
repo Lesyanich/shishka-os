@@ -1,4 +1,4 @@
--- 236_staff_schedule_templates.sql
+-- 244h_staff_schedule_templates.sql
 -- Staff weekly schedule templates + closed-weekday config.
 -- Powers the /hr/schedule "Generate Month" action and the /hr/attendance baseline.
 --
@@ -37,7 +37,7 @@ ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '236_staff_schedule_templates.sql',
+  '244h_staff_schedule_templates.sql',
   'claude-code',
   NULL,
   'Staff weekly schedule templates + closed_weekday config; powers monthly schedule auto-generator and attendance baseline (MC 9d4da69d)'
