@@ -61,6 +61,6 @@ SELECT
 GRANT SELECT ON public.v_public_menu TO anon, authenticated;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('256_bundle_from_price_from_tiers.sql','claude-code',NULL,
+VALUES ('255a_bundle_from_price_from_tiers.sql','claude-code',NULL,
   'price_tiers gains bundle metadata; v_public_menu.from_price derives bundle floor from tiers')
 ON CONFLICT DO NOTHING;

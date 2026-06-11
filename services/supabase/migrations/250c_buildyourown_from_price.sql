@@ -69,6 +69,6 @@ SELECT
 GRANT SELECT ON public.v_public_menu TO anon, authenticated;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('253_buildyourown_from_price.sql','claude-code',NULL,
+VALUES ('250c_buildyourown_from_price.sql','claude-code',NULL,
   'Add dish_modifier_groups.min_select + v_public_menu.from_price; smoothie floor ฿109')
 ON CONFLICT DO NOTHING;

@@ -23,6 +23,6 @@ WHERE dmg.dish_id = n.id
   AND dmg.min_select <> 1;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('254_bundle_slot_config.sql','claude-code',NULL,
+VALUES ('250d_bundle_slot_config.sql','claude-code',NULL,
   'Bundle dishes base price 0 + slot min_select 1 (drives from_price). Loyverse lists created via edge fn.')
 ON CONFLICT DO NOTHING;

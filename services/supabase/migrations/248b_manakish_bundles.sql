@@ -42,7 +42,7 @@ ON CONFLICT (product_code) DO NOTHING;
 -- Self-register
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '250_manakish_bundles.sql',
+  '248b_manakish_bundles.sql',
   'claude-code',
   NULL,
   'Add 🎁 Bundles category + 3 build-your-own manakish bundle dishes (price NULL = computed at order time)'

@@ -43,6 +43,6 @@ SELECT
 GRANT SELECT ON public.v_public_menu TO anon, authenticated;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('251_public_menu_product_code.sql','claude-code',NULL,
+VALUES ('248c_public_menu_product_code.sql','claude-code',NULL,
   'Append product_code to v_public_menu so the ordering site can recognise bundle dishes')
 ON CONFLICT DO NOTHING;

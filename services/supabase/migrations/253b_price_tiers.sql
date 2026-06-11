@@ -60,6 +60,6 @@ GRANT SELECT ON public.price_tiers, public.v_dish_tier_prices TO anon, authentic
 GRANT INSERT, UPDATE, DELETE ON public.price_tiers TO authenticated;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('255_price_tiers.sql','claude-code',NULL,
+VALUES ('253b_price_tiers.sql','claude-code',NULL,
   'Add price_tiers (bundle4/8/12 = 10/15/20%, date-ready) + v_dish_tier_prices')
 ON CONFLICT DO NOTHING;

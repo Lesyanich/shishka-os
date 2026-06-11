@@ -14,6 +14,6 @@ ALTER TABLE public.order_items ADD CONSTRAINT chk_modifier_type CHECK (
 );
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('252_order_items_bundle_modifier_type.sql','claude-code',NULL,
+VALUES ('248d_order_items_bundle_modifier_type.sql','claude-code',NULL,
   'Widen order_items.chk_modifier_type to allow bundle child roles manakish/sauce')
 ON CONFLICT DO NOTHING;

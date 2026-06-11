@@ -13,6 +13,6 @@ SET label = 'Manakish set of ' || bundle_manakish_count || ' + ' || bundle_sauce
 WHERE bundle_dish_code IS NOT NULL;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('260_bundle_sauce_labels.sql','claude-code',NULL,
+VALUES ('259a_bundle_sauce_labels.sql','claude-code',NULL,
   'Append "+ N sauce(s) free" to bundle tier labels (drives Loyverse category + site card names)')
 ON CONFLICT DO NOTHING;

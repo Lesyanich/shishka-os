@@ -22,6 +22,6 @@ WHERE n.is_available AND n.price IS NOT NULL AND pt.is_active
   AND (pt.valid_to   IS NULL OR pt.valid_to   >= CURRENT_DATE);
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('258_bundle_pool_subtree.sql','claude-code',NULL,
+VALUES ('258a_bundle_pool_subtree.sql','claude-code',NULL,
   'v_dish_tier_prices matches manakish category by prefix (KP-FIN-MAN subtree) after taxonomy split')
 ON CONFLICT DO NOTHING;

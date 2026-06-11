@@ -9,6 +9,6 @@ UPDATE public.price_tiers SET label = 'Manakish set of 8'  WHERE tier_code = 'bu
 UPDATE public.price_tiers SET label = 'Manakish set of 12' WHERE tier_code = 'bundle12';
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('259_bundle_labels.sql','claude-code',NULL,
+VALUES ('258b_bundle_labels.sql','claude-code',NULL,
   'Rename bundle tier labels to "Manakish set of N" (drives Loyverse category name)')
 ON CONFLICT DO NOTHING;
