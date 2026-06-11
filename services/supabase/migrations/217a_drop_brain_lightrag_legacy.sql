@@ -1,31 +1,29 @@
 -- ═══════════════════════════════════════════════════════════════
--- Migration 218: Drop dead Brain v1 / LightRAG / MemPalace tables
+-- Migration 217a: Drop dead Brain v1 / LightRAG / MemPalace objects
 --
--- Brain v2 Phase 0 (MC b1c255bc / 6b9fc2d5). PR #266 removed all code
--- references to these tables. This migration drops the orphan tables.
+-- Brain v2 Phase 0 (MC b1c255bc / 6b9fc2d5). Originally written 2026-05-29
+-- but never applied (caught by reconciliation MC 835eb489). Re-scoped and
+-- applied 2026-06-11 after CEO rule: "drop what Claude does not use, keep
+-- what is used."
 --
--- DESTRUCTIVE. CEO approved on 2026-05-29. Reversal requires re-running
--- migrations 099, 103, 104, 105 (lightrag-server auto-creates its own
--- LIGHTRAG_* tables on first boot if the service is ever revived).
+-- DESTRUCTIVE. CEO approved 2026-05-29, re-confirmed (conditional) 2026-06-11.
 --
--- DROPPED:
---   * brain_query_log (created in 103, extended in 104)
---   * brain_quality_tests (created in 104, seeded in 105)
---   * brain_gaps (view created in 104)
---   * LIGHTRAG_DOC_FULL, LIGHTRAG_DOC_CHUNKS, LIGHTRAG_VDB_ENTITY,
---     LIGHTRAG_VDB_RELATION, LIGHTRAG_VDB_CHUNKS, LIGHTRAG_LLM_CACHE,
---     LIGHTRAG_DOC_STATUS (auto-created by lightrag-server; drop only
---     if they exist — guarded by IF EXISTS)
+-- DROPPED (zero live code references on main, verified 2026-06-11):
+--   * brain_gaps (view, created in 104)
+--   * brain_quality_tests (created in 104, seeded in 105/107; 18 stale rows)
+--   * LIGHTRAG_* tables both casings (auto-created by lightrag-server;
+--     verified already absent in prod — IF EXISTS keeps this idempotent)
 --
--- KEPT:
---   * EXTENSION vector (pgvector) — may be consumed by other features
---     (embeddings, semantic search elsewhere). Drop separately if/when
---     confirmed no other consumer.
---   * Migration history rows 099/103/104/105 — DO NOT delete from
---     migration_log; they are historical record per RULE-MIGRATION-TRACKING.
+-- KEPT (live usage verified 2026-06-11):
+--   * brain_query_log — apps/admin-panel/src/api/apiCost.ts still reads it
+--     for the legacy-costs section of /api-cost. Drop only after that code
+--     path is removed (backlogged).
+--   * brain_inbox — Brain v2 inbox, active.
+--   * EXTENSION vector (pgvector) — may be consumed by other features.
+--   * Migration history rows 099/103/104/107 in migration_log — historical
+--     record per RULE-MIGRATION-TRACKING.
 --
--- Self-register: RULE-MIGRATION-TRACKING (engineering-rules.md /
--- technical-rules.md). Idempotent: re-runnable.
+-- Self-register: RULE-MIGRATION-TRACKING. Idempotent: re-runnable.
 -- ═══════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -34,17 +32,12 @@ BEGIN;
 -- INTENTIONAL DROP: Brain v2 Phase 0, view created in 104
 DROP VIEW IF EXISTS public.brain_gaps;
 
--- ── Brain v1 quality + cost telemetry tables ────────────────────
--- INTENTIONAL DROP: Brain v2 Phase 0, table created in 104, seeded in 105
+-- ── Brain v1 quality telemetry table (no live code references) ──
+-- INTENTIONAL DROP: Brain v2 Phase 0, table created in 104, seeded in 105/107
 DROP TABLE IF EXISTS public.brain_quality_tests;
--- INTENTIONAL DROP: Brain v2 Phase 0, table created in 103, extended in 104
-DROP TABLE IF EXISTS public.brain_query_log;
 
 -- ── LightRAG storage tables (case-sensitive — created with double-
 --    quoted identifiers by lightrag-server postgres_impl.py) ─────
---
--- Use IF EXISTS so the migration succeeds even if lightrag-server
--- never booted (in which case these were never created).
 -- INTENTIONAL DROP: Brain v2 Phase 0, LightRAG decommissioned (auto-created via 099)
 DROP TABLE IF EXISTS public."LIGHTRAG_DOC_FULL";
 -- INTENTIONAL DROP: Brain v2 Phase 0, LightRAG decommissioned
@@ -59,10 +52,7 @@ DROP TABLE IF EXISTS public."LIGHTRAG_VDB_CHUNKS";
 DROP TABLE IF EXISTS public."LIGHTRAG_LLM_CACHE";
 -- INTENTIONAL DROP: Brain v2 Phase 0, LightRAG decommissioned
 DROP TABLE IF EXISTS public."LIGHTRAG_DOC_STATUS";
-
--- Also try lowercase form — some versions of lightrag-server may have
--- folded identifiers depending on Postgres folding rules.
--- INTENTIONAL DROP: Brain v2 Phase 0, LightRAG lowercase variant
+-- INTENTIONAL DROP: Brain v2 Phase 0, LightRAG lowercase variants
 DROP TABLE IF EXISTS public.lightrag_doc_full;
 -- INTENTIONAL DROP: Brain v2 Phase 0, LightRAG lowercase variant
 DROP TABLE IF EXISTS public.lightrag_doc_chunks;
@@ -82,7 +72,7 @@ INSERT INTO migration_log (filename, applied_by, notes)
 VALUES (
     '217a_drop_brain_lightrag_legacy.sql',
     'claude-code',
-    'Brain v2 Phase 0: drop orphan tables brain_query_log + brain_quality_tests + brain_gaps view + LIGHTRAG_* tables. CEO-approved destructive cleanup; code-side already zero refs after PR #266. Keeps pgvector extension and migration history.'
+    'Brain v2 Phase 0 (re-scoped 2026-06-11, MC 835eb489): drop brain_quality_tests + brain_gaps view + LIGHTRAG_* tables. KEEPS brain_query_log (still read by admin /api-cost legacy section) and brain_inbox. CEO-approved conditional cleanup.'
 ) ON CONFLICT (filename) DO NOTHING;
 
 COMMIT;
