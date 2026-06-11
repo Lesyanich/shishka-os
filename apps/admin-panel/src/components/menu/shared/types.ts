@@ -45,6 +45,10 @@ export interface DishSummary {
   etaMin?: number | null
   /** Modifier chips ("+chicken +50฿"). */
   modifiers?: DishModifierSummary[]
+  /** Stock availability (mig 249). 'coming_soon' / 'out_of_stock' render the
+   *  card greyed with a badge and make it non-interactive (not orderable).
+   *  Undefined / 'in_stock' = normal. */
+  stockState?: 'in_stock' | 'coming_soon' | 'out_of_stock'
 }
 
 export const FOOD_COST_THRESHOLDS = {

@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/* Brand tokens shared with admin-panel (apps/admin-panel/src/index.css).
+ * Skeleton styling only — Shishka's designer will replace cards/visuals.
+ * Kept in sync by copy for now; could move to a shared CSS package later. */
+@theme {
+  --color-royal-green: #2D3F1C;
+  --color-royal-red: #9B1C21;
+  --color-forest-soft: #5B7A3D;
+  --color-amber-watch: #B88830;
+  --color-cream: #F0EAD6;
+
+  --color-surface-1: #0B0F0A;
+  --color-surface-2: #12170F;
+  --color-surface-3: #1A2114;
+
+  --font-display: "Alegreya", ui-serif, Georgia, serif;
+  --font-sans: "Geist", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: dark;
+  font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface-1);
+  color: var(--color-cream);
+}

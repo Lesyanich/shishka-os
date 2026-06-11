@@ -1,18 +1,18 @@
 import { NutritionBadges } from '../../shared/NutritionBadges'
 import { AllergenBadges } from '../sections/AllergenBadges'
-import { ModifierChips } from '../sections/ModifierChips'
+import { ModifierBuildPreview } from '../sections/ModifierBuildPreview'
 import { PhotoUpload } from '../sections/PhotoUpload'
 import type { MenuItem } from '../../../../hooks/useMenuData'
 import type { DishCardData } from '../../../../hooks/useDishCard'
-import type { ModifierOption } from '../../../../hooks/useModifierOptions'
+import type { DishModifierOption } from '../../../../hooks/useMenuListEnrichment'
 
 interface CustomerTabProps {
   item: MenuItem
   dishCard: DishCardData | null
   allergens: string[]
   allergensLoading: boolean
-  modifiers: ModifierOption[]
-  modifiersLoading: boolean
+  /** Customisation options (with nutrition + min/max) for the build-preview. */
+  modifierOptions: DishModifierOption[]
   /** Current photo URL (merged: form override OR persisted column). */
   customerPhotoUrl: string | null
   /** Pass new public URL (or null to clear). Caller saves on Save & Verify. */
@@ -24,8 +24,7 @@ export function CustomerTab({
   dishCard,
   allergens,
   allergensLoading,
-  modifiers,
-  modifiersLoading,
+  modifierOptions,
   customerPhotoUrl,
   onCustomerPhotoChange,
 }: CustomerTabProps) {
@@ -78,12 +77,22 @@ export function CustomerTab({
         <AllergenBadges allergens={allergens} isLoading={allergensLoading} />
       </section>
 
-      {/* Modifiers */}
+      {/* Modifiers — interactive build-preview with a live KBJU + price counter,
+          mirroring the customer build-your-own on shishka.health. */}
       <section className="space-y-2">
         <h4 className="text-[10px] uppercase tracking-widest text-cream/50">
-          Modifier Options
+          Build Preview
         </h4>
-        <ModifierChips modifiers={modifiers} isLoading={modifiersLoading} />
+        <ModifierBuildPreview
+          options={modifierOptions}
+          base={{
+            calories: item.calories,
+            protein: item.protein,
+            carbs: item.carbs,
+            fat: item.fat,
+          }}
+          basePrice={item.price}
+        />
       </section>
 
       {/* Nutrition */}
