@@ -659,6 +659,11 @@ export function OwnerTable({
                 {/* Name */}
                 <td className="px-3 py-2" data-inline-cell="name">
                   <span className="flex items-center gap-2">
+                    {dish.staff_code && (
+                      <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-cream/70">
+                        {dish.staff_code}
+                      </span>
+                    )}
                     <InlineEditCell<string | null>
                       value={dish.name}
                       onCommit={(next) => {

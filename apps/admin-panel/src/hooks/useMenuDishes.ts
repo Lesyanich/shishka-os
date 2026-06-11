@@ -16,6 +16,7 @@ export interface MenuDish {
   name: string
   description: string | null
   product_code: string
+  staff_code: string | null
   price: number | null
   cost_per_unit: number | null
   cost_source: CostSource
@@ -37,7 +38,6 @@ export interface MenuDish {
    * the legacy useMenuDishes path — consumers fall back to category_id. */
   section_id?: string | null
   display_order: number | null
-  staff_code: string | null
   launch_phase: number
   stock_state: StockState
   tags: MenuTag[]
@@ -89,7 +89,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       supabase
         .from('nomenclature')
         .select(`
-          id, name, product_code, price, cost_per_unit, cost_source,
+          id, name, product_code, staff_code, price, cost_per_unit, cost_source,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
           portion_size, portion_unit, launch_phase, stock_state,
@@ -155,6 +155,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         name: d.name,
         description: null,
         product_code: d.product_code,
+        staff_code: d.staff_code ?? null,
         price: d.price ? Number(d.price) : null,
         cost_per_unit: d.cost_per_unit ? Number(d.cost_per_unit) : null,
         cost_source: (d.cost_source as CostSource) ?? 'none',
@@ -172,7 +173,6 @@ export function useMenuDishes(): UseMenuDishesResult {
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
         display_order: null,
-        staff_code: null,
         launch_phase: d.launch_phase != null ? Number(d.launch_phase) : 1,
         stock_state: (d.stock_state as StockState) ?? 'in_stock',
         tags: tagMap.get(d.id) ?? [],
