@@ -99,6 +99,7 @@ interface RawNomenclatureRow {
   id: string
   name: string
   product_code: string
+  staff_code: string | null
   base_unit: string | null
   price: number | string | null
   cost_per_unit: number | string | null
@@ -116,7 +117,6 @@ interface RawNomenclatureRow {
   launch_phase: number | string | null
   stock_state: string | null
   display_order: number | string | null
-  staff_code: string | null
   category_id: string | null
   card_version: number
   last_verified_at: string | null
@@ -167,10 +167,10 @@ export function useMenuData(): UseMenuDataResult {
       supabase
         .from('nomenclature')
         .select(`
-          id, name, product_code, base_unit, price, cost_per_unit, cost_source,
+          id, name, product_code, staff_code, base_unit, price, cost_per_unit, cost_source,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
-          portion_size, portion_unit, launch_phase, stock_state, display_order, staff_code,
+          portion_size, portion_unit, launch_phase, stock_state, display_order,
           category_id,
           card_version, last_verified_at, last_verified_by, pos_status, loyverse_synced_at, updated_at,
           is_web_visible, web_published_at, loyverse_price,
@@ -296,6 +296,7 @@ export function useMenuData(): UseMenuDataResult {
         name: raw.name,
         description: null,
         product_code: raw.product_code,
+        staff_code: raw.staff_code ?? null,
         base_unit: raw.base_unit,
         price: raw.price != null ? Number(raw.price) : null,
         cost_per_unit: raw.cost_per_unit != null ? Number(raw.cost_per_unit) : null,
@@ -315,7 +316,6 @@ export function useMenuData(): UseMenuDataResult {
         category_code: cat?.code ?? null,
         section_id: sec?.id ?? raw.category_id,
         display_order: raw.display_order != null ? Number(raw.display_order) : null,
-        staff_code: raw.staff_code ?? null,
         launch_phase: raw.launch_phase != null ? Number(raw.launch_phase) : 1,
         stock_state: (raw.stock_state as StockState) ?? 'in_stock',
         tags: tagMap.get(raw.id) ?? [],

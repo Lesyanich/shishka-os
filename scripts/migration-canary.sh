@@ -110,7 +110,19 @@ check_numbering() {
     errors=$((errors + 1))
   fi
 
-  # B. Staged NEW migrations must be numbered strictly above the max in HEAD
+  # B. Staged NEW migrations must be numbered strictly above the max in HEAD.
+  # Skipped during merge commits: merging an old branch stages main's own
+  # migrations as "added vs branch HEAD" — false positives. The duplicate
+  # check (A) still guards merges; B re-fires on normal commits.
+  if git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+    if [ "$errors" -gt 0 ]; then
+      echo ""
+      echo "CANARY FAILED — migration numbering violations"
+      exit 1
+    fi
+    echo "OK    numbering (merge commit: duplicate check only, $(ls "$MIGRATIONS_DIR" | grep -c -E '^[0-9]+[a-z]?_.*\.sql$') files, no collisions)"
+    exit 0
+  fi
   local head_max
   head_max=$(git ls-tree -r --name-only HEAD -- services/supabase/migrations 2>/dev/null \
     | sed -nE 's/.*\/([0-9]+)[a-z]?_.*\.sql$/\1/p' | sort -n | tail -1)

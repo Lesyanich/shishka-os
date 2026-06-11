@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
@@ -13,5 +14,9 @@ export default defineConfig({
         new URL('../../packages/contracts/src/index.ts', import.meta.url),
       ),
     },
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
   },
 })

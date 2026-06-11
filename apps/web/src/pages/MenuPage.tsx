@@ -1,17 +1,61 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, ShoppingBag } from 'lucide-react'
-import { usePublicMenu } from '../hooks/usePublicMenu.ts'
+import { Plus, ShoppingBag, Sparkles } from 'lucide-react'
+import {
+  BUNDLE_CATEGORY,
+  MANAKISH_CATEGORY,
+  SAUCE_CATEGORY,
+  SAUCE_MAX_PRICE,
+  findBundle,
+} from '@shishka/contracts'
+import { usePublicMenu, type MenuDish } from '../hooks/usePublicMenu.ts'
+import { usePriceTiers } from '../hooks/usePriceTiers.ts'
 import { useCart } from '../state/cart.tsx'
+import BundleBuilder from '../components/BundleBuilder.tsx'
 
 const baht = (n: number | null) => (n == null ? '' : `฿${Number(n).toLocaleString()}`)
+
+/** Price tag for a menu card: "From ฿X" for build-your-own dishes, else the price. */
+const priceTag = (dish: MenuDish): string =>
+  dish.from_price != null ? `From ${baht(dish.from_price)}` : baht(dish.price)
 
 // Skeleton layout only — Shishka's designer replaces the card/visual styling.
 export default function MenuPage() {
   const { categories, isLoading, error } = usePublicMenu()
+  const { discounts } = usePriceTiers()
   const cart = useCart()
+  const [activeBundle, setActiveBundle] = useState<MenuDish | null>(null)
+
+  const dishesIn = (code: string): MenuDish[] =>
+    categories.find((c) => c.code === code)?.dishes ?? []
+  // Pool from a whole category subtree by code prefix — manakish live in the
+  // KP-FIN-MAN umbrella's leaves (Classic/Signature/Premium) after the taxonomy split.
+  const dishesUnder = (prefix: string): MenuDish[] =>
+    categories.filter((c) => c.code?.startsWith(prefix)).flatMap((c) => c.dishes)
+
+  const manakishPool = useMemo(
+    () => dishesUnder(MANAKISH_CATEGORY).filter((d) => d.price != null),
+    [categories],
+  )
+  const saucePool = useMemo(
+    () => dishesUnder(SAUCE_CATEGORY).filter((d) => d.price != null && d.price <= SAUCE_MAX_PRICE),
+    [categories],
+  )
+  const bundleDishes = useMemo(() => dishesIn(BUNDLE_CATEGORY), [categories])
+  // Bundles render in their own section; hide the raw bundle category below.
+  const normalCategories = categories.filter((c) => c.code !== BUNDLE_CATEGORY)
 
   if (isLoading) return <p className="p-6 text-cream/60">Loading menu…</p>
   if (error) return <p className="p-6 text-royal-red">Could not load the menu: {error}</p>
+
+  /** This bundle's size discount (e.g. 10), or null until tiers load.
+   *  Used for the "−X%" badge + to price the constructor as you select.
+   *  The "From ฿X" floor itself comes straight from v_public_menu.from_price. */
+  const discountFor = (dish: MenuDish): number | null => {
+    const def = findBundle(dish.product_code)
+    const pct = def ? discounts[def.tierCode] : undefined
+    return pct ?? null
+  }
 
   return (
     <div className="min-h-screen pb-24">
@@ -20,7 +64,49 @@ export default function MenuPage() {
         <p className="text-cream/50 text-sm">Healthy Kitchen</p>
       </header>
 
-      {categories.map((cat) => (
+      {/* Bundles — build-your-own sets */}
+      {bundleDishes.length > 0 && manakishPool.length > 0 && (
+        <section className="px-5 mb-8">
+          <h2 className="font-display text-xl text-cream/90 mb-3 flex items-center gap-2">
+            <Sparkles size={18} className="text-amber-watch" /> Bundles
+          </h2>
+          <ul className="space-y-3">
+            {bundleDishes.map((dish) => {
+              const from = dish.from_price
+              const disc = discountFor(dish)
+              return (
+                <li key={dish.id} className="flex items-start gap-3 rounded-lg bg-surface-2 p-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-cream">{dish.name}</p>
+                      {disc != null && (
+                        <span className="rounded-full bg-royal-green/80 px-1.5 py-0.5 text-[10px] font-semibold text-cream">
+                          −{disc}%
+                        </span>
+                      )}
+                    </div>
+                    {dish.description && (
+                      <p className="text-cream/50 text-sm line-clamp-2">{dish.description}</p>
+                    )}
+                    {from != null && (
+                      <p className="text-amber-watch mt-1 font-mono text-sm">From {baht(from)}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveBundle(dish)}
+                    className="shrink-0 rounded-full bg-forest-soft px-3 py-2 text-xs font-medium text-surface-1"
+                  >
+                    Build
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+
+      {normalCategories.map((cat) => (
         <section key={cat.code} className="px-5 mb-8">
           <h2 className="font-display text-xl text-cream/90 mb-3">{cat.name}</h2>
           <ul className="space-y-3">
@@ -34,13 +120,16 @@ export default function MenuPage() {
                   {dish.description && (
                     <p className="text-cream/50 text-sm line-clamp-2">{dish.description}</p>
                   )}
-                  <p className="text-amber-watch mt-1 font-mono text-sm">{baht(dish.price)}</p>
+                  <p className="text-amber-watch mt-1 font-mono text-sm">{priceTag(dish)}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => cart.add(dish)}
                   aria-label={`Add ${dish.name}`}
-                  disabled={dish.price == null}
+                  // Build-your-own dishes (from_price set) can't be ordered at the
+                  // base price — they need their own builder, so don't allow a
+                  // plain add (which would undercharge).
+                  disabled={dish.price == null || dish.from_price != null}
                   className="shrink-0 rounded-full bg-forest-soft p-2 text-surface-1 disabled:opacity-40"
                 >
                   <Plus size={18} />
@@ -63,6 +152,25 @@ export default function MenuPage() {
           <span className="font-mono">{baht(cart.total)} · Checkout</span>
         </Link>
       )}
+
+      {activeBundle &&
+        (() => {
+          const def = findBundle(activeBundle.product_code)
+          const disc = discountFor(activeBundle)
+          if (!def || disc == null) return null
+          return (
+            <BundleBuilder
+              bundleDish={activeBundle}
+              manakishCount={def.manakishCount}
+              sauceCount={def.sauceCount}
+              discountPct={disc}
+              manakishPool={manakishPool}
+              saucePool={saucePool}
+              onClose={() => setActiveBundle(null)}
+              onConfirm={(childLines, price) => cart.addBundle(activeBundle, childLines, price)}
+            />
+          )
+        })()}
     </div>
   )
 }
