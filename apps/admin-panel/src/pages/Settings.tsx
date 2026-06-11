@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { SyrveConfigPanel } from '../components/settings/SyrveConfigPanel'
 import { SyrvePocReport } from '../components/settings/SyrvePocReport'
 import { LoyverseConfigPanel } from '../components/settings/LoyverseConfigPanel'
+import { StockSheetSettings } from '../components/settings/StockSheetSettings'
 import { useSyrveIntegration } from '../hooks/useSyrveIntegration'
 import { useLoyverseIntegration } from '../hooks/useLoyverseIntegration'
 
@@ -23,6 +24,9 @@ export function Settings() {
           System configuration and integrations.
         </p>
       </div>
+
+      {/* Staff stock-order sheet */}
+      <StockSheetSettings />
 
       {/* Loyverse POS */}
       <LoyverseConfigPanel

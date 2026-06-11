@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
-import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch, PanelRightOpen, Upload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch, PanelRightOpen, Upload, Loader2, CheckCircle2, AlertCircle, Globe, EyeOff } from 'lucide-react'
 import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useMenuDishes'
 import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
 import { useLoyversePushDish } from '../../../hooks/useLoyversePushDish'
@@ -17,7 +17,7 @@ interface OwnerTableProps {
   subcategories: Map<string, MenuSubcategory[]>
   childrenByParent: Map<string, MenuBomChild[]>
   dualTypeIds: Set<string>
-  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'>>) => Promise<{ ok: boolean; error?: string }>
+  onUpdate: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'> & { is_web_visible: boolean }>) => Promise<{ ok: boolean; error?: string }>
   /** Parent-provided: true when a recent inline commit failed for this id. */
   isFailed?: (id: string) => boolean
   /** Parent-provided: last error message (used as row-level tooltip). */
@@ -128,6 +128,15 @@ function LoyverseBadge({ status, itemId }: { status: MenuItem['pos_status']; ite
   )
 }
 
+/** Website (showcase) visibility — driven solely by is_web_visible (mig 263),
+ * decoupled from Loyverse/availability. SALE-only; PF/MOD never hit the site. */
+const SITE_STATUS_STYLE = {
+  live: 'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-[var(--color-forest-soft)]/40',
+  // Live but needs attention: not orderable (is_available=false) or Loyverse-stale.
+  warn: 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-[var(--color-amber-watch)]/40',
+  hidden: 'bg-surface-3/60 text-cream/60 ring-cream/20',
+} as const
+
 /** Compact date + time for the last Loyverse sync, e.g. "02 Jun 14:30". */
 function formatSyncedAt(iso: string | null): string | null {
   if (!iso) return null
@@ -145,6 +154,24 @@ function isLoyverseStale(item: MenuItem): boolean {
   return new Date(item.updated_at).getTime() > new Date(item.loyverse_synced_at).getTime()
 }
 
+export type SiteBadgeState = 'live' | 'warn' | 'hidden' | 'na'
+
+/** Website badge state for a dish (mig 263). Visibility is driven solely by
+ * is_web_visible; 'warn' flags a dish that IS on the site but needs attention —
+ * not orderable (is_available off) or Loyverse price stale. 'na' for non-SALE. */
+export function siteBadgeState(item: MenuItem): SiteBadgeState {
+  if (item.kind !== 'SALE') return 'na'
+  if (!item.is_web_visible) return 'hidden'
+  return isLoyverseStale(item) || !item.is_available ? 'warn' : 'live'
+}
+
+/** POS price drift: the price Loyverse currently holds differs from our DB price.
+ * Returns the Loyverse price when it mismatches, else null (in sync / unknown). */
+export function loyversePriceDrift(item: MenuItem): number | null {
+  if (item.kind !== 'SALE' || item.loyverse_price == null || item.price == null) return null
+  return Number(item.loyverse_price) !== Number(item.price) ? Number(item.loyverse_price) : null
+}
+
 function foodCostColor(pct: number): string {
   if (pct < 30) return 'text-forest-soft bg-royal-green/25'
   if (pct <= 45) return 'text-amber-watch bg-amber-watch/15'
@@ -157,6 +184,19 @@ const PHASE_STYLE: Record<number, string> = {
 }
 const PHASE_DEFAULT_STYLE = 'bg-surface-3/50 text-cream/60 ring-cream/20'
 const PHASE_OPTIONS = [1, 2, 3, 4, 5] as const
+
+// Stock state (mig 249): in_stock = normal; coming_soon / out_of_stock keep the
+// dish visible on the menu but greyed + not orderable / not pushable to POS.
+const STOCK_OPTIONS = [
+  { value: 'in_stock', short: 'Stock', label: 'In stock' },
+  { value: 'coming_soon', short: 'Soon', label: 'Coming soon' },
+  { value: 'out_of_stock', short: 'Out', label: 'Out of stock' },
+] as const
+const STOCK_STYLE: Record<string, string> = {
+  in_stock: 'bg-[var(--color-royal-green)]/20 text-[color:var(--color-forest-soft)] ring-[var(--color-forest-soft)]/40',
+  coming_soon: 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)] ring-[var(--color-amber-watch)]/40',
+  out_of_stock: 'bg-[var(--color-royal-red)]/20 text-[color:var(--color-brick-soft)] ring-[var(--color-brick-soft)]/40',
+}
 
 function formatThb(v: number | null): string {
   if (v == null) return '-'
@@ -231,7 +271,7 @@ export function OwnerTable({
   onPushed,
 }: OwnerTableProps) {
   const filtered = selectedCategory
-    ? items.filter((d) => d.category_id === selectedCategory)
+    ? items.filter((d) => (d.section_id ?? d.category_id) === selectedCategory)
     : items
 
   const [optimisticDishes, setOptimistic] = useOptimistic(
@@ -297,8 +337,8 @@ export function OwnerTable({
       patch: Partial<
         Pick<
           MenuDish,
-          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'
-        >
+          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'
+        > & { is_web_visible: boolean }
       >,
     ) => {
       setOptimistic({ id, patch })
@@ -310,6 +350,15 @@ export function OwnerTable({
   const toggleField = useCallback(
     async (dish: MenuDish, field: 'is_available' | 'is_featured') => {
       await commitPatch(dish.id, { [field]: !dish[field] })
+    },
+    [commitPatch],
+  )
+
+  /** Toggle website visibility (mig 263). Decoupled from Loyverse: showing a
+   * dish on the site no longer requires a POS push; hiding leaves it sellable. */
+  const toggleWeb = useCallback(
+    async (dish: MenuItem) => {
+      await commitPatch(dish.id, { is_web_visible: !dish.is_web_visible })
     },
     [commitPatch],
   )
@@ -359,7 +408,9 @@ export function OwnerTable({
   const groupedDishes = useMemo((): GroupItem[] => {
     const relevantL1Ids = selectedCategory
       ? [selectedCategory]
-      : (Array.from(new Set(optimisticDishes.map((d) => d.category_id).filter(Boolean))) as string[])
+      : (Array.from(
+          new Set(optimisticDishes.map((d) => d.section_id ?? d.category_id).filter(Boolean)),
+        ) as string[])
 
     const groups: GroupItem[] = []
     const claimed = new Set<string>()
@@ -507,6 +558,7 @@ export function OwnerTable({
             <th role="columnheader" className="px-3 py-2.5 text-center">Synced</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">DB Updated</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Push</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center">Site</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Card</th>
           </tr>
         </thead>
@@ -515,7 +567,7 @@ export function OwnerTable({
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-surface-1/30">
-                  <td colSpan={25} className="px-3 py-2">
+                  <td colSpan={26} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-cream/50">
                       {item.subcategory.name}
                     </span>
@@ -528,7 +580,10 @@ export function OwnerTable({
             const cost = dish.cost_per_unit
             const price = dish.price ?? 0
             const hasCost = cost != null
-            const foodCostPct = hasCost && price > 0 ? (cost / price) * 100 : 0
+            // Food-cost % excludes packaging (owner decision); margin uses full
+            // cost (packaging is a real cost) so profitability stays accurate.
+            const foodCost = dish.food_cost ?? cost
+            const foodCostPct = foodCost != null && price > 0 ? (foodCost / price) * 100 : 0
             const margin = hasCost ? price - cost : 0
 
             const isExpanded = expandedId === dish.id
@@ -560,7 +615,7 @@ export function OwnerTable({
                     ? 'ring-2 ring-inset ring-[var(--color-brick-soft)]/70 bg-[var(--color-royal-red)]/5'
                     : ''
                 } ${rowFailed ? 'animate-[inline-flash_1200ms_ease-out]' : ''} ${
-                  !dish.is_available ? 'opacity-45' : ''
+                  !dish.is_available ? 'opacity-45' : dish.stock_state !== 'in_stock' ? 'opacity-70' : ''
                 }`}
               >
                 {/* Expand toggle (tech card) */}
@@ -795,20 +850,40 @@ export function OwnerTable({
                   })()}
                 </td>
 
-                {/* Available toggle */}
+                {/* Available toggle + stock state */}
                 <td className="px-3 py-2 text-center">
-                  <button
-                    onClick={() => toggleField(dish, 'is_available')}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
-                      dish.is_available ? 'bg-royal-green' : 'bg-surface-3'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                        dish.is_available ? 'translate-x-4' : 'translate-x-1'
+                  <div className="flex flex-col items-center gap-1.5">
+                    <button
+                      onClick={() => toggleField(dish, 'is_available')}
+                      title={dish.is_available ? 'Shown on menu' : 'Hidden from menu'}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
+                        dish.is_available ? 'bg-royal-green' : 'bg-surface-3'
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                          dish.is_available ? 'translate-x-4' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <select
+                      value={dish.stock_state}
+                      onChange={(e) => {
+                        const next = e.target.value as MenuDish['stock_state']
+                        if (next !== dish.stock_state) {
+                          void commitPatch(dish.id, { stock_state: next })
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className={`cursor-pointer appearance-none rounded-full px-2 py-0.5 text-center text-[10px] font-semibold ring-1 ring-inset focus:outline-none focus:ring-2 ${STOCK_STYLE[dish.stock_state] ?? STOCK_STYLE.in_stock}`}
+                      style={{ fontFamily: 'var(--font-display-sc)' }}
+                      title="Stock state — coming soon / out of stock show greyed on the menu and block ordering"
+                    >
+                      {STOCK_OPTIONS.map((s) => (
+                        <option key={s.value} value={s.value}>{s.short}</option>
+                      ))}
+                    </select>
+                  </div>
                 </td>
 
                 {/* Featured toggle */}
@@ -861,9 +936,23 @@ export function OwnerTable({
                   )}
                 </td>
 
-                {/* Loyverse status */}
+                {/* Loyverse status + POS price drift */}
                 <td className="px-3 py-2 text-center">
-                  <LoyverseBadge status={dish.pos_status} itemId={dish.loyverse_item_id} />
+                  <div className="flex flex-col items-center gap-0.5">
+                    <LoyverseBadge status={dish.pos_status} itemId={dish.loyverse_item_id} />
+                    {(() => {
+                      const posPrice = loyversePriceDrift(dish)
+                      if (posPrice == null) return null
+                      return (
+                        <span
+                          className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brick-soft ring-1 ring-inset ring-[var(--color-brick-soft)]/40 bg-[var(--color-royal-red)]/15"
+                          title={`Loyverse has ${formatThb(posPrice)} but DB price is ${formatThb(dish.price)} — click Push to update the POS`}
+                        >
+                          POS {formatThb(posPrice)} ≠ {formatThb(dish.price)}
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </td>
 
                 {/* Last Loyverse sync */}
@@ -907,12 +996,17 @@ export function OwnerTable({
                   {dish.kind === 'SALE' ? (
                     (() => {
                       const isPushing = pushingId === dish.id
-                      const blocked = dish.pos_status === 'draft' || !dish.is_available
+                      const blocked =
+                        dish.pos_status === 'draft' ||
+                        !dish.is_available ||
+                        dish.stock_state !== 'in_stock'
                       const msg = pushMsg?.id === dish.id ? pushMsg : null
                       const title = blocked
                         ? dish.pos_status === 'draft'
                           ? 'Set POS status to Approved before pushing'
-                          : 'Dish must be available to push'
+                          : !dish.is_available
+                            ? 'Dish must be available to push'
+                            : 'Not in stock (coming soon / out of stock) — cannot push to POS'
                         : isLoyverseStale(dish)
                           ? 'Re-push: dish edited after last sync'
                           : 'Push to Loyverse'
@@ -952,6 +1046,45 @@ export function OwnerTable({
                   )}
                 </td>
 
+                {/* Site — website visibility (mig 263), SALE-only. Toggles is_web_visible. */}
+                <td className="px-3 py-2 text-center">
+                  {dish.kind === 'SALE' ? (
+                    (() => {
+                      const live = dish.is_web_visible
+                      const since = formatSyncedAt(dish.web_published_at)
+                      const stale = isLoyverseStale(dish)
+                      const state = siteBadgeState(dish)
+                      const cls =
+                        state === 'warn'
+                          ? SITE_STATUS_STYLE.warn
+                          : state === 'live'
+                            ? SITE_STATUS_STYLE.live
+                            : SITE_STATUS_STYLE.hidden
+                      const title = live
+                        ? `On site${since ? ` since ${since}` : ''}` +
+                          (!dish.is_available ? ' · not orderable (is_available off)' : '') +
+                          (stale ? ' · Loyverse price stale, re-push' : '') +
+                          ' — click to hide'
+                        : 'Hidden from the website — click to show'
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => toggleWeb(dish)}
+                          title={title}
+                          aria-label={`${live ? 'Hide from' : 'Show on'} website: ${dish.name}`}
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ring-inset transition hover:brightness-110 ${cls}`}
+                          style={{ fontFamily: 'var(--font-display-sc)' }}
+                        >
+                          {live ? <Globe className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                          {live ? 'Live' : 'Hidden'}
+                        </button>
+                      )
+                    })()
+                  ) : (
+                    <span className="text-cream/30">&mdash;</span>
+                  )}
+                </td>
+
                 {/* Completeness */}
                 <td className="px-3 py-2 text-center">
                   <CompletenessIndicator item={dish} />
@@ -966,7 +1099,7 @@ export function OwnerTable({
               )}
               {isExpanded && (
                 <tr className="bg-surface-1/60">
-                  <td colSpan={25} className="p-0">
+                  <td colSpan={26} className="p-0">
                     <DishExpandedCard dish={dish} />
                     {onOpenDrawer && (
                       <div className="flex justify-end border-t border-surface-3/50 bg-surface-1/40 px-4 py-2">
