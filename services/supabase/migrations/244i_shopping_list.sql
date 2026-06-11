@@ -127,7 +127,7 @@ GRANT EXECUTE ON FUNCTION public.fn_seed_shopping_list_from_menu(TEXT) TO authen
 -- ─── Self-register ───────────────────────────────────────
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '245_shopping_list.sql',
+  '244i_shopping_list.sql',
   'claude-code',
   NULL,
   'shopping_list_items table + fn_seed_shopping_list_from_menu (procurement checklist)'
