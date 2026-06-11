@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { AssemblyComponent, DishCardData } from './useDishCard'
+import type { AssemblyComponent, DishCardData, DishPackagingLine } from './useDishCard'
 import type { PfPackCardData } from './usePfPackCard'
 import type { MenuBomChild, MenuItem } from './useMenuData'
 
@@ -24,6 +24,19 @@ export interface DishModifierOption {
   modifier_short_name: string | null
   modifier_emoji: string | null
   price_delta: number | null
+  is_default: boolean
+  /** Stock state of the underlying modifier (mig 249). 'coming_soon' /
+   *  'out_of_stock' render the option greyed / badged in the picker. */
+  modifier_stock_state: 'in_stock' | 'coming_soon' | 'out_of_stock'
+  /** Per-portion nutrition (nomenclature × quantity_per_unit), for the live
+   *  KBJU build-preview. mig 261/262. */
+  calories: number | null
+  protein: number | null
+  carbs: number | null
+  fat: number | null
+  /** Required min / max picks for the option's group (mig 262). null = unbounded. */
+  group_min_select: number | null
+  group_max_select: number | null
 }
 
 export interface UseMenuListEnrichmentResult {
@@ -41,6 +54,8 @@ export interface UseMenuListEnrichmentResult {
   modifierOptionsByDish: Map<string, DishModifierOption[]>
   /** Allergen slugs derived by walking BOM tree + direct tags. SALE-* keyed. */
   allergensByDishId: Map<string, string[]>
+  /** Packaging lines (NF-PKG BOM components) keyed by dish id. SALE-* only. */
+  packagingByDish: Map<string, DishPackagingLine[]>
   isLoading: boolean
   error: string | null
   refetch: () => void
@@ -76,13 +91,16 @@ export function useMenuListEnrichment(
   const [modifierOptionsByDish, setModifierOptionsByDish] = useState<
     Map<string, DishModifierOption[]>
   >(new Map())
+  const [packagingByDish, setPackagingByDish] = useState<
+    Map<string, DishPackagingLine[]>
+  >(new Map())
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
-    const [dishCardRes, pfPackRes, recipeRes, compRes, modRes] = await Promise.all([
+    const [dishCardRes, pfPackRes, recipeRes, compRes, modRes, pkgRes] = await Promise.all([
       supabase.from('dish_card').select('*'),
       supabase.from('pf_pack_card').select('*'),
       supabase
@@ -91,6 +109,7 @@ export function useMenuListEnrichment(
         .order('step_order', { ascending: true }),
       supabase.from('v_dish_assembly_components').select('*'),
       supabase.from('v_dish_modifier_options').select('*'),
+      supabase.from('v_dish_packaging').select('*'),
     ])
     if (dishCardRes.error) {
       setError(dishCardRes.error.message)
@@ -114,6 +133,11 @@ export function useMenuListEnrichment(
     }
     if (modRes.error) {
       setError(modRes.error.message)
+      setIsLoading(false)
+      return
+    }
+    if (pkgRes.error) {
+      setError(pkgRes.error.message)
       setIsLoading(false)
       return
     }
@@ -153,8 +177,14 @@ export function useMenuListEnrichment(
       comps.set(row.dish_id, list)
     }
     const mods = new Map<string, DishModifierOption[]>()
+    // Postgres numeric columns can arrive as strings; widen them so Number(...) is sound.
     for (const row of (modRes.data ?? []) as Array<
-      Omit<DishModifierOption, 'price_delta'> & { price_delta: number | string | null }
+      Omit<DishModifierOption, 'price_delta' | 'protein' | 'carbs' | 'fat'> & {
+        price_delta: number | string | null
+        protein: number | string | null
+        carbs: number | string | null
+        fat: number | string | null
+      }
     >) {
       const list = mods.get(row.dish_id) ?? []
       list.push({
@@ -164,8 +194,22 @@ export function useMenuListEnrichment(
         modifier_short_name: row.modifier_short_name,
         modifier_emoji: row.modifier_emoji,
         price_delta: row.price_delta != null ? Number(row.price_delta) : null,
+        is_default: !!row.is_default,
+        modifier_stock_state: row.modifier_stock_state ?? 'in_stock',
+        calories: row.calories != null ? Number(row.calories) : null,
+        protein: row.protein != null ? Number(row.protein) : null,
+        carbs: row.carbs != null ? Number(row.carbs) : null,
+        fat: row.fat != null ? Number(row.fat) : null,
+        group_min_select: row.group_min_select != null ? Number(row.group_min_select) : null,
+        group_max_select: row.group_max_select != null ? Number(row.group_max_select) : null,
       })
       mods.set(row.dish_id, list)
+    }
+    const pkg = new Map<string, DishPackagingLine[]>()
+    for (const row of (pkgRes.data ?? []) as DishPackagingLine[]) {
+      const list = pkg.get(row.dish_id) ?? []
+      list.push(row)
+      pkg.set(row.dish_id, list)
     }
     setDishCardById(dc)
     setPfPackCardById(pf)
@@ -173,6 +217,7 @@ export function useMenuListEnrichment(
     setRecipeStepsByDish(steps)
     setComponentsByDish(comps)
     setModifierOptionsByDish(mods)
+    setPackagingByDish(pkg)
     setIsLoading(false)
   }, [])
 
@@ -219,6 +264,7 @@ export function useMenuListEnrichment(
     recipeStepsByDish,
     modifierOptionsByDish,
     allergensByDishId,
+    packagingByDish,
     isLoading,
     error,
     refetch: fetchData,

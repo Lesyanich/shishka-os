@@ -93,6 +93,13 @@ if git diff --cached --name-only --diff-filter=d | grep -q "^services/supabase/m
       exit 1
     fi
   done
+  # Numbering guard: no duplicate numbers, new migrations strictly above HEAD max (MC 7e4f0f9c)
+  sh scripts/migration-canary.sh --check-numbering
+  NUMBERING_EXIT=$?
+  if [ $NUMBERING_EXIT -ne 0 ]; then
+    echo "BLOCKED: Migration numbering violation. Fix before committing."
+    exit 1
+  fi
   echo "[migration-canary] OK"
 fi
 

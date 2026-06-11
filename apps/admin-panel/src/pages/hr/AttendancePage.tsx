@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Loader2, Sparkles } from 'lucide-react'
 import {
   useAttendance,
   type AttendanceStatus,
@@ -46,10 +46,6 @@ function getDayOfWeek(year: number, month: number, day: number): number {
   return new Date(year, month - 1, day).getDay()
 }
 
-function isSunday(year: number, month: number, day: number): boolean {
-  return getDayOfWeek(year, month, day) === 0
-}
-
 function dateStr(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
@@ -68,13 +64,28 @@ export function AttendancePage() {
   const [popover, setPopover] = useState<PopoverState | null>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
 
-  const { staff, attendance, holidays, isLoading, upsertDay, removeDay } =
+  const { staff, attendance, holidays, closedWeekday, isLoading, upsertDay, removeDay, prefillMonth } =
     useAttendance(year, month)
+
+  const [prefilling, setPrefilling] = useState(false)
+  const [prefillResult, setPrefillResult] = useState<string | null>(null)
 
   const daysInMonth = getDaysInMonth(year, month)
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
 
   const holidayDates = new Set(holidays.map((h) => h.holiday_date))
+
+  function isClosedDay(day: number): boolean {
+    return getDayOfWeek(year, month, day) === closedWeekday
+  }
+
+  async function handlePrefill() {
+    setPrefilling(true)
+    setPrefillResult(null)
+    const created = await prefillMonth()
+    setPrefillResult(`Filled ${created} days`)
+    setPrefilling(false)
+  }
 
   // Close popover on outside click
   useEffect(() => {
@@ -122,7 +133,7 @@ export function AttendancePage() {
   function countWorkingDays(): number {
     let count = 0
     for (let d = 1; d <= daysInMonth; d++) {
-      if (!isSunday(year, month, d) && !holidayDates.has(dateStr(year, month, d))) {
+      if (!isClosedDay(d) && !holidayDates.has(dateStr(year, month, d))) {
         count++
       }
     }
@@ -179,6 +190,19 @@ export function AttendancePage() {
         >
           <ChevronRight className="h-4 w-4" />
         </button>
+
+        <div className="flex-1" />
+
+        <button
+          onClick={handlePrefill}
+          disabled={prefilling}
+          className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-50 transition"
+          title="Fill this month from the schedule (worked / day-off / holiday); your manual edits are kept"
+        >
+          {prefilling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          Pre-fill from schedule
+        </button>
+        {prefillResult && <span className="text-xs text-emerald-400">{prefillResult}</span>}
       </div>
 
       {/* Legend */}
@@ -201,14 +225,14 @@ export function AttendancePage() {
               </th>
               {days.map((d) => {
                 const date = dateStr(year, month, d)
-                const sun = isSunday(year, month, d)
+                const closed = isClosedDay(d)
                 const hol = holidayDates.has(date)
                 return (
                   <th
                     key={d}
                     className={[
                       'min-w-[28px] px-0.5 py-2 text-center font-medium',
-                      sun
+                      closed
                         ? 'text-red-400/60'
                         : hol
                           ? 'text-violet-400/60'
@@ -233,7 +257,7 @@ export function AttendancePage() {
                 {days.map((d) => {
                   const date = dateStr(year, month, d)
                   const record = getRecord(s.id, date)
-                  const sun = isSunday(year, month, d)
+                  const closed = isClosedDay(d)
                   const hol = holidayDates.has(date)
                   const status = record?.status
                   const color = status ? STATUS_COLOR[status] : ''
@@ -244,7 +268,7 @@ export function AttendancePage() {
                       key={d}
                       className={[
                         'px-0.5 py-1.5 text-center cursor-pointer transition-colors',
-                        sun && !status ? 'bg-slate-900/40' : '',
+                        closed && !status ? 'bg-slate-900/40' : '',
                         hol && !status ? 'bg-violet-500/5' : '',
                       ].join(' ')}
                       onClick={(e) => handleCellClick(s.id, date, e)}

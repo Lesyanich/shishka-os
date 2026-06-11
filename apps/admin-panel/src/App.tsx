@@ -12,6 +12,10 @@ import { Loader2 } from 'lucide-react'
 import { LoginPage } from './pages/LoginPage'
 import { OpeningRoadmap } from './pages/OpeningRoadmap'
 
+// Public, no-auth staff page (PIN-gated). Kept out of the lazy graph so the
+// shared staff link loads fast and never touches the authenticated bundle.
+import { StockSheetPage } from './pages/StockSheetPage'
+
 // Lazy — loaded on-demand per route
 const BOMHub = lazy(() => import('./pages/BOMHub').then(m => ({ default: m.BOMHub })))
 const KDSBoard = lazy(() => import('./pages/KDSBoard').then(m => ({ default: m.KDSBoard })))
@@ -46,6 +50,7 @@ const AttendancePage = lazy(() => import('./pages/hr/AttendancePage').then(m => 
 const PayrollPage = lazy(() => import('./pages/hr/PayrollPage').then(m => ({ default: m.PayrollPage })))
 const StaffPage = lazy(() => import('./pages/hr/StaffPage').then(m => ({ default: m.StaffPage })))
 const SchedulePage = lazy(() => import('./pages/hr/SchedulePage').then(m => ({ default: m.SchedulePage })))
+const CashierPage = lazy(() => import('./pages/cashier/CashierPage').then(m => ({ default: m.CashierPage })))
 
 function PageLoader() {
   return (
@@ -90,6 +95,8 @@ function App() {
         <Sentry.ErrorBoundary fallback={FallbackError}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            {/* Public staff stock-order sheet — no auth, PIN-gated server-side */}
+            <Route path="/stock" element={<StockSheetPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
                 {/* ── Owner-only routes ── */}
@@ -127,6 +134,7 @@ function App() {
                 </Route>
 
                 {/* ── Kitchen + Production — accessible to all authenticated ── */}
+                <Route path="/cashier" element={<Suspense fallback={<PageLoader />}><CashierPage /></Suspense>} />
                 <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
                 <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
                 <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />

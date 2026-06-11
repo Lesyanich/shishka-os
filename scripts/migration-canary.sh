@@ -5,6 +5,7 @@
 # Usage: ./scripts/migration-canary.sh [migration_file.sql]
 #   No args: validates all pending migrations (not in migration_log)
 #   With arg: validates the specified file only
+#   --check-numbering: validates migration numbering (collisions + monotonicity)
 #
 # Checks:
 #   1. File has self-register INSERT INTO migration_log (RULE-MIGRATION-TRACKING)
@@ -12,6 +13,15 @@
 #   3. No DROP TABLE without explicit comment "-- INTENTIONAL DROP"
 #   4. No TRUNCATE without explicit comment "-- INTENTIONAL TRUNCATE"
 #   5. Syntax: basic SQL structure validation
+#
+# --check-numbering (MC 7e4f0f9c, audit-2026-06-11):
+#   A. No two files in migrations/ may share a numeric prefix (081 vs 081a are distinct)
+#   B. Staged NEW migrations must be numbered strictly above the max in HEAD
+#   Numbers in the gaps may belong to migrations already applied to prod from
+#   unmerged branches — never reuse a gap. If your branch carries a migration
+#   already applied to prod whose number now collides, renumber the FILE to a
+#   fresh number and ship a migration that UPDATEs its migration_log.filename
+#   (see services/supabase/migrations/RENUMBERING-2026-06-11.md for precedent).
 
 set -euo pipefail
 
@@ -87,7 +97,73 @@ validate_migration() {
   fi
 }
 
+check_numbering() {
+  local errors=0
+
+  # A. Duplicate numeric prefixes anywhere in the migrations directory
+  local dups
+  dups=$(ls "$MIGRATIONS_DIR" | grep -E '^[0-9]+[a-z]?_.*\.sql$' | sed -E 's/^([0-9]+[a-z]?)_.*/\1/' | sort | uniq -d)
+  if [ -n "$dups" ]; then
+    echo "FAIL  numbering: duplicate migration number(s): $(echo "$dups" | tr '\n' ' ')"
+    echo "  ✗ Two migrations sharing a number replay in undefined order."
+    echo "  ✗ Renumber the NEWER file to a fresh number (see header of this script)."
+    errors=$((errors + 1))
+  fi
+
+  # B. Staged NEW migrations must be numbered strictly above the max in HEAD.
+  # Skipped during merge commits: merging an old branch stages main's own
+  # migrations as "added vs branch HEAD" — false positives. The duplicate
+  # check (A) still guards merges; B re-fires on normal commits.
+  if git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+    if [ "$errors" -gt 0 ]; then
+      echo ""
+      echo "CANARY FAILED — migration numbering violations"
+      exit 1
+    fi
+    echo "OK    numbering (merge commit: duplicate check only, $(ls "$MIGRATIONS_DIR" | grep -c -E '^[0-9]+[a-z]?_.*\.sql$') files, no collisions)"
+    exit 0
+  fi
+  local head_max
+  head_max=$(git ls-tree -r --name-only HEAD -- services/supabase/migrations 2>/dev/null \
+    | sed -nE 's/.*\/([0-9]+)[a-z]?_.*\.sql$/\1/p' | sort -n | tail -1)
+  if [ -n "$head_max" ]; then
+    local added
+    # Letter-suffixed files (e.g. 264a_) are exempt: that is the designated
+    # slot-in mechanism for already-applied migrations arriving late (renumber
+    # procedure / recovered files). Check A still protects them from duplicates.
+    added=$(git diff --cached --name-only --diff-filter=A | grep -E '^services/supabase/migrations/[0-9]+_.*\.sql$' || true)
+    for f in $added; do
+      local base num
+      base=$(basename "$f")
+      num=$(echo "$base" | sed -E 's/^([0-9]+).*/\1/')
+      if [ "$((10#$num))" -le "$((10#$head_max))" ]; then
+        echo "FAIL  numbering: $base — number $num is not above current max ($head_max)"
+        echo "  ✗ New migrations must use a number strictly greater than the max in HEAD."
+        echo "  ✗ Gap numbers may already be applied to prod from unmerged branches — check migration_log."
+        echo "  ✗ If this migration is ALREADY applied to prod under this name, renumber the file"
+        echo "    and ship a migration_log.filename UPDATE (see RENUMBERING-2026-06-11.md)."
+        errors=$((errors + 1))
+      elif [ "$((10#$num))" -gt "$((10#$head_max + 1))" ]; then
+        echo "WARN  numbering: $base — skips ahead of max+1 ($((10#$head_max + 1)))"
+        echo "  ! Allowed only when the skipped numbers are taken by applied-but-unmerged migrations."
+        echo "  ! Verify against migration_log before committing."
+      fi
+    done
+  fi
+
+  if [ "$errors" -gt 0 ]; then
+    echo ""
+    echo "CANARY FAILED — migration numbering violations"
+    exit 1
+  fi
+  echo "OK    numbering ($(ls "$MIGRATIONS_DIR" | grep -c -E '^[0-9]+[a-z]?_.*\.sql$') files, no collisions, HEAD max $head_max)"
+  exit 0
+}
+
 # Main
+if [ "${1:-}" = "--check-numbering" ]; then
+  check_numbering
+fi
 if [ $# -gt 0 ]; then
   # Validate specific file
   if [ -f "$1" ]; then
