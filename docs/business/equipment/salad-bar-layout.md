@@ -75,6 +75,24 @@ Plus: 1 work surface (150x25cm), 1 bottom shelf (100kg refrigerated)
 - **200 kg** refrigerated bottom storage
 - **2 assembly surfaces** (300 x 25 cm total)
 
+## Admin grid model (implemented — `/salad-bar`)
+
+The factory cells (6×GN1/3 + 16×GN1/6 + 6×GN1/9 per unit) tile the well **exactly** as an
+**8-column × 2-row grid** of GN-1/3 footprints. This is the single source of truth for the
+`salad_bar_slots` layout — do not introduce GN 1/1 or GN 1/2 pans (265mm is not a multiple of
+the 176mm column → breaks the tiling and leaves gaps; this was the original bug).
+
+- **Column** = 176 mm along the bar · **Row depth** = 325 mm
+- **Well** = 8 × 176 = **1408 mm** wide × 2 × 325 = **650 mm** deep (fits the 150×80 cm unit)
+- Each 176×325 footprint holds exactly one of: `1×GN1/3` (full depth) · `2×GN1/6` (split in depth) · `3×GN1/9` (split in depth)
+- **Back row** (far from guest) = bases + bulky items, mostly GN1/3 · **Front row** (near guest) = toppings, herbs, seeds (GN1/6 / GN1/9)
+- Empty footprints = spare capacity (dividers are field-adjustable)
+
+DB columns (`salad_bar_slots`): `row` (`back`|`front`), `position` (column 1-8),
+`depth_pos` (0-based order of a pan within a column, front→back). Slot codes:
+`U{unit}-{A|B}{col}[a|b|c]` (A=back, B=front; suffix = depth order). Seeded by migration
+`221_salad_bar_grid_reseed.sql`.
+
 ## Spare containers
 - GN Pan 1/3 (Poly) — equipment code `L-2-S--42`, 20 pcs (32 x 17 x 10 cm) — TO ORDER from Makro
   - Purpose: Polycarbonate clear spare containers for salad bar rotation

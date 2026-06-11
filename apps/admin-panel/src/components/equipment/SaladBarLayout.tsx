@@ -1,331 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
-import { Check, Loader2, Search, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import type { SaladBarSlot, NomenclatureOption } from '../../hooks/useSaladBarLayout'
+import { SaladBarEditorUnit } from './SaladBarEditor'
+import type { GnSize } from './saladBarGrid'
 
-/* ─── Color map ─── */
-
-const COLOR_MAP: Record<string, string> = {
-  base: 'bg-emerald-900/50 text-emerald-200 border-emerald-600/40',
-  vegetable: 'bg-orange-900/50 text-orange-200 border-orange-600/40',
-  protein: 'bg-red-900/50 text-red-200 border-red-600/40',
-  topping: 'bg-yellow-900/50 text-yellow-200 border-yellow-600/40',
-  accent: 'bg-violet-900/50 text-violet-200 border-violet-600/40',
-}
-
-const EMPTY_COLOR = 'bg-slate-800/60 text-slate-400 border-slate-700/40'
-
-function slotColor(group: string | null): string {
-  if (!group) return EMPTY_COLOR
-  return COLOR_MAP[group] ?? EMPTY_COLOR
-}
-
-/* ─── GN real dimensions (mm along the salad bar, left→right) ─── */
-// From spec: docs/business/equipment/salad-bar-layout.md
-// Back row pans sit in 325mm depth, front row in 176mm depth
-// All pans in their rows, side by side — like a puzzle
-const GN_WIDTH_MM: Record<string, number> = {
-  '1/1': 530,   // 530×325 — longest pan, fills ~44% of back row
-  '1/2': 325,   // 265×325 — 325mm side along bar
-  '1/3': 176,   // 176×325 — 176mm along bar
-  '1/6': 162,   // 176×162 — 162mm along bar
-  '1/9': 108,   // 176×108 — 108mm along bar
-}
-
-/* ─── Ingredient Picker ─── */
-
-function IngredientPicker({
-  ingredients,
-  currentId,
-  onSelect,
-  onClose,
-}: {
-  ingredients: NomenclatureOption[]
-  currentId: string | null
-  onSelect: (id: string | null) => void
-  onClose: () => void
-}) {
-  const [search, setSearch] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
-
-  const filtered = search
-    ? ingredients.filter(
-        (i) =>
-          i.name.toLowerCase().includes(search.toLowerCase()) ||
-          i.product_code.toLowerCase().includes(search.toLowerCase()),
-      )
-    : ingredients
-
-  return (
-    <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
-      <div className="flex items-center gap-2 border-b border-slate-700 px-3 py-2">
-        <Search className="h-3.5 w-3.5 text-slate-500" />
-        <input
-          ref={inputRef}
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search ingredients..."
-          className="flex-1 bg-transparent text-xs text-slate-200 outline-none placeholder:text-slate-600"
-        />
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <div className="max-h-48 overflow-y-auto">
-        <button
-          onClick={() => onSelect(null)}
-          className={[
-            'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition hover:bg-slate-800',
-            !currentId ? 'text-emerald-300' : 'text-slate-400',
-          ].join(' ')}
-        >
-          {!currentId && <Check className="h-3 w-3" />}
-          <span className={!currentId ? '' : 'ml-5'}>— Empty —</span>
-        </button>
-
-        {filtered.slice(0, 50).map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onSelect(item.id)}
-            className={[
-              'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition hover:bg-slate-800',
-              item.id === currentId ? 'text-emerald-300' : 'text-slate-200',
-            ].join(' ')}
-          >
-            {item.id === currentId && <Check className="h-3 w-3" />}
-            <span className={item.id === currentId ? '' : 'ml-5'}>
-              <span className="font-mono text-[10px] text-slate-500">{item.product_code}</span>
-              {' '}
-              {item.name}
-            </span>
-          </button>
-        ))}
-
-        {filtered.length === 0 && (
-          <p className="px-3 py-3 text-center text-xs text-slate-600">No matches</p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/* ─── Slot Card ─── */
-
-function SlotCard({
-  slot,
-  ingredients,
-  onUpdate,
-  cellNumber,
-}: {
-  slot: SaladBarSlot
-  ingredients: NomenclatureOption[]
-  onUpdate: (slotId: string, ingredientId: string | null) => void
-  cellNumber: number
-}) {
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!pickerOpen) return
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setPickerOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [pickerOpen])
-
-  const hasIngredient = !!slot.ingredient_id
-  const colorClass = hasIngredient ? slotColor(slot.color_group) : EMPTY_COLOR
-  const label = slot.display_name ?? slot.ingredient_name ?? 'Empty'
-
-  return (
-    <div ref={containerRef} className="relative h-full min-w-0">
-      <button
-        onClick={() => setPickerOpen(!pickerOpen)}
-        className={[
-          'flex h-full w-full flex-col overflow-hidden rounded border p-1.5 text-left transition-all',
-          'hover:brightness-125 hover:ring-1 hover:ring-white/20',
-          colorClass,
-        ].join(' ')}
-      >
-        {/* Header row */}
-        <div className="flex w-full items-center gap-1 min-w-0">
-          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[8px] font-bold leading-none">
-            {cellNumber}
-          </span>
-          <span className="truncate text-[9px] font-semibold opacity-60">{slot.slot_code}</span>
-          <span className="ml-auto shrink-0 text-[8px] font-mono opacity-50">
-            {slot.gn_size}
-          </span>
-        </div>
-
-        {/* Name */}
-        <p className="mt-0.5 w-full truncate text-[11px] font-semibold leading-tight">{label}</p>
-
-        {/* Prep — only if enough space (back row / full-depth) */}
-        {slot.prep_method && (
-          <p className="mt-auto w-full truncate text-[8px] opacity-50 leading-tight">
-            {slot.prep_method}
-          </p>
-        )}
-      </button>
-
-      {pickerOpen && (
-        <IngredientPicker
-          ingredients={ingredients}
-          currentId={slot.ingredient_id}
-          onSelect={(id) => {
-            onUpdate(slot.id, id)
-            setPickerOpen(false)
-          }}
-          onClose={() => setPickerOpen(false)}
-        />
-      )}
-    </div>
-  )
-}
-
-/* ─── Scale: mm → px (fixed, no responsive shrink) ─── */
-const PX_PER_MM = 0.52
-
-function mm(v: number): number {
-  return Math.round(v * PX_PER_MM)
-}
-
-/* ─── Slot Row ─── */
-
-function SlotRow({
-  slots,
-  ingredients,
-  onUpdate,
-  numbering,
-  depthMm,
-  wellMm,
-}: {
-  slots: SaladBarSlot[]
-  ingredients: NomenclatureOption[]
-  onUpdate: (slotId: string, ingredientId: string | null) => void
-  numbering: Map<string, number>
-  depthMm: number
-  wellMm: number
-}) {
-  const totalMm = slots.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-  const gap = wellMm - totalMm
-
-  return (
-    <div className="flex gap-px" style={{ height: `${mm(depthMm)}px` }}>
-      {slots.map((slot) => {
-        const widthMm = GN_WIDTH_MM[slot.gn_size] ?? 108
-        return (
-          <div
-            key={slot.id}
-            className="shrink-0"
-            style={{ width: `${mm(widthMm)}px` }}
-          >
-            <SlotCard
-              slot={slot}
-              ingredients={ingredients}
-              onUpdate={onUpdate}
-              cellNumber={numbering.get(slot.id) ?? 0}
-            />
-          </div>
-        )
-      })}
-      {gap > 20 && (
-        <div
-          className="shrink-0 rounded border border-dashed border-slate-700/30 flex items-center justify-center"
-          style={{ width: `${mm(gap)}px`, opacity: 0.3 }}
-        >
-          <span className="text-[8px] text-slate-600">{gap}mm</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* ─── Unit Visual ─── */
-
-function UnitVisual({
-  title,
-  subtitle,
-  slots,
-  ingredients,
-  onUpdate,
-}: {
-  title: string
-  subtitle: string
-  slots: SaladBarSlot[]
-  ingredients: NomenclatureOption[]
-  onUpdate: (slotId: string, ingredientId: string | null) => void
-}) {
-  // Simple 2-row layout: all back row pans side by side, all front row pans side by side
-  const backRow = slots.filter((s) => s.row === 'back').sort((a, b) => a.position - b.position)
-  const frontRow = slots.filter((s) => s.row === 'front').sort((a, b) => a.position - b.position)
-
-  // Sequential numbering: back L→R, then front L→R
-  const numbering = new Map<string, number>()
-  let n = 1
-  for (const s of backRow) numbering.set(s.id, n++)
-  for (const s of frontRow) numbering.set(s.id, n++)
-
-  const backTotalMm = backRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-  const frontTotalMm = frontRow.reduce((s, sl) => s + (GN_WIDTH_MM[sl.gn_size] ?? 108), 0)
-  const wellMm = Math.max(backTotalMm, frontTotalMm)
-
-  return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-3">
-      {/* Header */}
-      <div className="mb-2 flex items-baseline justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
-          <p className="text-[10px] text-slate-500">{subtitle}</p>
-        </div>
-        <span className="text-[9px] font-mono text-slate-600">~{wellMm}mm</span>
-      </div>
-
-      {/* Work surface */}
-      <div className="mb-1.5 rounded bg-slate-800/40 px-2 py-1 text-center text-[9px] text-slate-600 border border-slate-700/20">
-        WORK SURFACE · 150 × 25 cm
-      </div>
-
-      {/* Two rows stacked — front on top, back below. Fixed pixel sizes, scroll if needed */}
-      <div className="overflow-x-auto">
-        <div className="flex flex-col gap-px" style={{ width: `${mm(wellMm)}px` }}>
-          <SlotRow
-            slots={frontRow}
-            ingredients={ingredients}
-            onUpdate={onUpdate}
-            numbering={numbering}
-            depthMm={176}
-            wellMm={wellMm}
-          />
-          <SlotRow
-            slots={backRow}
-            ingredients={ingredients}
-            onUpdate={onUpdate}
-            numbering={numbering}
-            depthMm={325}
-            wellMm={wellMm}
-          />
-        </div>
-      </div>
-
-      {/* Dimension labels */}
-      <div className="mt-1 flex items-center gap-2 text-[8px] text-slate-600">
-        <span>Front {frontRow.length} slots · 176mm depth · {frontTotalMm}mm</span>
-        <span className="opacity-50">|</span>
-        <span>Back {backRow.length} slots · 325mm depth · {backTotalMm}mm</span>
-      </div>
-    </div>
-  )
-}
+type MutResult = { ok: boolean; error?: string }
 
 /* ─── Color Legend ─── */
 
@@ -363,18 +41,18 @@ interface SaladRecipe {
 }
 
 const SALAD_RECIPES: SaladRecipe[] = [
-  { name: 'Tabbouleh', base: '—', vegetables: 'B7, A3, B6', proteins: '—', toppings: 'A4, B3, B8', dressing: 'Sumac' },
-  { name: 'Fattoush', base: 'A1 Crispy', vegetables: 'A3, A4, B1, B5, B6, B7', proteins: '—', toppings: '+ Crackers', dressing: 'Sumac' },
-  { name: 'Beetroot Walnut', base: '—', vegetables: '—', proteins: 'A5 beet', toppings: 'B6 walnuts', dressing: 'Mayo' },
-  { name: 'Smoked Salmon', base: 'A2 Superfood', vegetables: 'A3, B6', proteins: 'A2 trout, A3 eggs', toppings: '+ Avocado, Dill', dressing: 'Olive-Lemon' },
-  { name: 'Chicken Mexican', base: 'A1 Crispy', vegetables: 'A3, B1, B2, B3, B4, B6, B7', proteins: 'A1 chicken', toppings: 'B1 beans', dressing: 'Olive-Lemon' },
-  { name: 'Chicken Power', base: 'A2 Superfood', vegetables: 'A3, B1, B2, B4', proteins: 'A1 chicken, A3, A4', toppings: 'B2, B7, B8, B9', dressing: 'Tahini' },
-  { name: 'Caesar', base: 'A2 Superfood', vegetables: 'A3', proteins: 'A1 chicken', toppings: 'B5 parmesan', dressing: 'Tahini' },
-  { name: 'Greek', base: 'A1 Crispy', vegetables: 'A3, A4, B1, B6', proteins: '—', toppings: 'B4 feta', dressing: 'Olive-Lemon' },
-  { name: 'Kale Avocado', base: 'A2 Superfood', vegetables: 'A3, B2', proteins: '—', toppings: 'A4 quinoa, + Avocado', dressing: 'Olive-Lemon' },
-  { name: 'Shrimp', base: 'A1 Crispy', vegetables: 'A3, A4, B2, B6', proteins: '+ Shrimp', toppings: '—', dressing: 'Olive-Lemon' },
-  { name: 'Harvest Root', base: 'A2 Superfood', vegetables: '—', proteins: 'A5 beet', toppings: 'B4 feta, B6 walnuts', dressing: 'Tahini' },
-  { name: 'Thai Noodles', base: 'A1 Crispy', vegetables: 'B3, B4, B1, B6', proteins: 'A1 chicken', toppings: '+ Cashew, Sesame', dressing: 'Cashew Sauce' },
+  { name: 'Tabbouleh', base: '—', vegetables: 'Parsley, Tomato, Onion', proteins: '—', toppings: 'Cucumber, Cabbage', dressing: 'Sumac' },
+  { name: 'Fattoush', base: 'Crispy', vegetables: 'Tomato, Cucumber, Pepper, Radish', proteins: '—', toppings: '+ Crackers', dressing: 'Sumac' },
+  { name: 'Beetroot Walnut', base: '—', vegetables: '—', proteins: 'Beetroot', toppings: 'Walnuts', dressing: 'Mayo' },
+  { name: 'Smoked Salmon', base: 'Superfood', vegetables: 'Tomato, Onion', proteins: 'Trout, Eggs', toppings: '+ Avocado, Dill', dressing: 'Olive-Lemon' },
+  { name: 'Chicken Mexican', base: 'Crispy', vegetables: 'Tomato, Pepper, Corn, Cabbage', proteins: 'Chicken', toppings: 'Beans', dressing: 'Olive-Lemon' },
+  { name: 'Chicken Power', base: 'Superfood', vegetables: 'Tomato, Beans, Edamame', proteins: 'Chicken, Eggs', toppings: 'Seeds, Almond', dressing: 'Tahini' },
+  { name: 'Caesar', base: 'Superfood', vegetables: 'Tomato', proteins: 'Chicken', toppings: 'Parmesan', dressing: 'Tahini' },
+  { name: 'Greek', base: 'Crispy', vegetables: 'Tomato, Cucumber, Pepper, Onion', proteins: '—', toppings: 'Feta', dressing: 'Olive-Lemon' },
+  { name: 'Kale Avocado', base: 'Superfood', vegetables: 'Tomato, Corn', proteins: '—', toppings: 'Quinoa, + Avocado', dressing: 'Olive-Lemon' },
+  { name: 'Shrimp', base: 'Crispy', vegetables: 'Tomato, Cucumber, Onion', proteins: '+ Shrimp', toppings: '—', dressing: 'Olive-Lemon' },
+  { name: 'Harvest Root', base: 'Superfood', vegetables: '—', proteins: 'Beetroot', toppings: 'Feta, Walnuts', dressing: 'Tahini' },
+  { name: 'Thai Noodles', base: 'Crispy', vegetables: 'Cabbage, Carrot, Pepper', proteins: 'Chicken', toppings: '+ Cashew, Sesame', dressing: 'Cashew Sauce' },
 ]
 
 function CheatSheet() {
@@ -420,6 +98,10 @@ export function SaladBarLayout({
   isLoading,
   error,
   onUpdateSlot,
+  onMoveSlot,
+  onAddSlot,
+  onRemoveSlot,
+  onResetUnit,
 }: {
   unit1Slots: SaladBarSlot[]
   unit2Slots: SaladBarSlot[]
@@ -427,6 +109,10 @@ export function SaladBarLayout({
   isLoading: boolean
   error: string | null
   onUpdateSlot: (slotId: string, ingredientId: string | null) => void
+  onMoveSlot: (slotId: string, xMm: number, yMm: number, rotation: number) => Promise<MutResult>
+  onAddSlot: (unitNumber: 1 | 2, gnSize: GnSize, xMm: number, yMm: number, rotation: number) => Promise<MutResult>
+  onRemoveSlot: (slotId: string) => Promise<MutResult>
+  onResetUnit: (unitNumber: 1 | 2) => void
 }) {
   if (isLoading) {
     return (
@@ -450,7 +136,7 @@ export function SaladBarLayout({
     return (
       <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-6 text-center">
         <p className="text-sm text-slate-400">No salad bar slots configured</p>
-        <p className="mt-1 text-xs text-slate-600">Run migration 218 to seed slot data</p>
+        <p className="mt-1 text-xs text-slate-600">Use “Reset” to load the factory layout</p>
       </div>
     )
   }
@@ -459,19 +145,27 @@ export function SaladBarLayout({
     <div className="space-y-4">
       <ColorLegend />
 
-      <UnitVisual
+      <SaladBarEditorUnit
         title="Unit 1 — Bases + Vegetables"
         subtitle="Assembly start · 150 × 80 cm"
         slots={unit1Slots}
         ingredients={ingredients}
-        onUpdate={onUpdateSlot}
+        onMove={onMoveSlot}
+        onAdd={(gn, x, y, rot) => onAddSlot(1, gn, x, y, rot)}
+        onRemove={onRemoveSlot}
+        onAssign={onUpdateSlot}
+        onReset={() => onResetUnit(1)}
       />
-      <UnitVisual
+      <SaladBarEditorUnit
         title="Unit 2 — Proteins + Toppings"
         subtitle="Accents + dressings · 150 × 80 cm"
         slots={unit2Slots}
         ingredients={ingredients}
-        onUpdate={onUpdateSlot}
+        onMove={onMoveSlot}
+        onAdd={(gn, x, y, rot) => onAddSlot(2, gn, x, y, rot)}
+        onRemove={onRemoveSlot}
+        onAssign={onUpdateSlot}
+        onReset={() => onResetUnit(2)}
       />
 
       <CheatSheet />

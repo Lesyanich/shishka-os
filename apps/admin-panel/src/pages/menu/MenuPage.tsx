@@ -63,6 +63,7 @@ export function MenuPage() {
     isLoading,
     error,
     updateItem,
+    reorderItems,
     refetch,
   } = useMenuData()
   const inlineUpdate = useInlineUpdate(updateItem)
@@ -81,10 +82,28 @@ export function MenuPage() {
   const { filters, setFilters } = useMenuFilters()
   // Back-compat for L1/L2/Customer single-cat strip — derive single string|null
   const selectedCategory = filters.categoryIds[0] ?? null
+  // L2 drill-down: second-level subcategory within the selected section (e.g.
+  // "Coffee" under the "Drinks" umbrella). Held in its own `subcat` param so the
+  // section strip and the subcategory strip stay independent.
+  const selectedSubcategory = searchParams.get('subcat')
   const setSelectedCategory = useCallback(
-    (id: string | null) =>
-      setFilters({ categoryIds: id ? [id] : [], available: null, loyverse: null, flags: [] }),
-    [setFilters],
+    (id: string | null) => {
+      // Single setSearchParams call — two calls in one handler only apply the
+      // last one in React Router v7 navigation, so cat update would be lost.
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (id) next.set('cat', id); else next.delete('cat')
+          next.delete('available')
+          next.delete('loyverse')
+          next.delete('flags')
+          next.delete('subcat')
+          return next
+        },
+        { replace: false },
+      )
+    },
+    [setSearchParams],
   )
 
   // URL-driven drawer: /menu/dish/:productCode opens DetailDrawer on that dish.
@@ -127,6 +146,22 @@ export function MenuPage() {
     (t: TypeFilterValue) => updateParam({ type: t === 'SALE' ? null : t }),
     [updateParam],
   )
+  const setSelectedSubcategory = useCallback(
+    (id: string | null) => updateParam({ subcat: id }),
+    [updateParam],
+  )
+
+  // Subcategories of the currently-selected section, shaped for CategoryTabs.
+  // Drives the L1/L2 drill-down strip; empty when the section has no children.
+  const selectedSubcats = useMemo(
+    () =>
+      (selectedCategory ? subcategories.get(selectedCategory) ?? [] : []).map((s) => ({
+        id: s.id,
+        code: '',
+        name: s.name,
+      })),
+    [selectedCategory, subcategories],
+  )
 
   // Availability filter for L1 Cook view (URL-driven: ?available=yes|no)
   const availableParam = searchParams.get('available')
@@ -135,6 +170,17 @@ export function MenuPage() {
   const setAvailableFilter = useCallback(
     (v: boolean | null) =>
       updateParam({ available: v === true ? 'yes' : v === false ? 'no' : null }),
+    [updateParam],
+  )
+
+  // L2 Assembler availability filter (kitchen station): defaults to Active-only.
+  // Shares the `available` param but treats an absent value as "Active" rather
+  // than "All", so deactivated dishes are hidden unless explicitly requested.
+  const l2AvailableFilter: boolean | null =
+    availableParam === 'all' ? null : availableParam === 'no' ? false : availableParam === 'yes' ? true : true
+  const setL2AvailableFilter = useCallback(
+    (v: boolean | null) =>
+      updateParam({ available: v === true ? 'yes' : v === false ? 'no' : 'all' }),
     [updateParam],
   )
 
@@ -189,13 +235,16 @@ export function MenuPage() {
     [ownerFilteredItems],
   )
 
-  // Counts per category (null key = "All") within the active type filter
+  // Counts per SECTION (null key = "All") within the active type filter.
+  // Keyed by section_id so the tab strip / filter chips (which list sections)
+  // show the rolled-up umbrella counts, not per-leaf-subcategory counts.
   const categoryCounts = useMemo(() => {
     const counts = new Map<string | null, number>()
     counts.set(null, typeFilteredItems.length)
     for (const item of typeFilteredItems) {
-      if (!item.category_id) continue
-      counts.set(item.category_id, (counts.get(item.category_id) ?? 0) + 1)
+      const sec = item.section_id ?? item.category_id
+      if (!sec) continue
+      counts.set(sec, (counts.get(sec) ?? 0) + 1)
     }
     return counts
   }, [typeFilteredItems])
@@ -229,11 +278,13 @@ export function MenuPage() {
   const totalDishes = statsSource.length
   const availableCount = statsSource.filter((d) => d.is_available).length
   const featuredCount = statsSource.filter((d) => d.is_featured).length
-  const fcDenom = statsSource.filter((d) => d.price && d.cost_per_unit).length || 1
+  // Food-cost % uses FOOD-only cost (packaging excluded) per owner decision.
+  const fcDenom = statsSource.filter((d) => d.price && (d.food_cost ?? d.cost_per_unit)).length || 1
   const avgFoodCost =
     statsSource.reduce((sum, d) => {
-      if (!d.price || !d.cost_per_unit) return sum
-      return sum + (d.cost_per_unit / d.price) * 100
+      const foodCost = d.food_cost ?? d.cost_per_unit
+      if (!d.price || !foodCost) return sum
+      return sum + (foodCost / d.price) * 100
     }, 0) / fcDenom
 
   return (
@@ -368,17 +419,58 @@ export function MenuPage() {
               counts={categoryCounts}
             />
           )}
+          {/* Drill-down strip: subcategories of the selected section. */}
+          {selectedSubcats.length > 0 && (
+            <CategoryTabs
+              categories={selectedSubcats}
+              selectedId={selectedSubcategory}
+              onSelect={setSelectedSubcategory}
+            />
+          )}
         </div>
       )}
-      {/* L2: single-category strip (Customer view has its own section nav) */}
-      {view === 'l2-assembler' &&
-        categories.length > 0 && (
-          <CategoryTabs
-            categories={categories}
-            selectedId={selectedCategory}
-            onSelect={setSelectedCategory}
-          />
-        )}
+      {/* L2: availability toggle (default Active-only) + single-category strip */}
+      {view === 'l2-assembler' && (
+        <div className="space-y-2">
+          <div className="flex w-fit rounded-lg border border-surface-3 bg-surface-1 p-0.5">
+            {([
+              { value: true, label: 'Active' },
+              { value: false, label: 'Inactive' },
+              { value: null, label: 'All' },
+            ] as const).map(({ value, label }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setL2AvailableFilter(value)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                  l2AvailableFilter === value
+                    ? 'bg-surface-3 text-cream'
+                    : 'text-cream/50 hover:text-cream/80'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {categories.length > 0 && (
+            <CategoryTabs
+              categories={categories}
+              selectedId={selectedCategory}
+              onSelect={setSelectedCategory}
+            />
+          )}
+          {/* Drill-down strip: subcategories of the selected section (e.g. Coffee
+              / Smoothies / Lemonades under Drinks). Hidden until a section with
+              children is selected. */}
+          {selectedSubcats.length > 0 && (
+            <CategoryTabs
+              categories={selectedSubcats}
+              selectedId={selectedSubcategory}
+              onSelect={setSelectedSubcategory}
+            />
+          )}
+        </div>
+      )}
 
       {/* Content */}
       {isLoading ? (
@@ -412,6 +504,7 @@ export function MenuPage() {
           onOpenDrawer={openDrawer}
           autoExpandId={justCreatedId}
           grabMargins={grabMargins}
+          onPushed={() => refetch()}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
         <OwnerGallery
@@ -424,6 +517,7 @@ export function MenuPage() {
         <L1CookView
           items={items}
           selectedCategory={selectedCategory}
+          selectedSubcategory={selectedSubcategory}
           typeFilter={typeFilter}
           availableFilter={availableFilter}
           pfPackCardById={enrichment.pfPackCardById}
@@ -436,8 +530,15 @@ export function MenuPage() {
         <L2AssemblerView
           items={items}
           selectedCategory={selectedCategory}
+          selectedSubcategory={selectedSubcategory}
+          availableFilter={l2AvailableFilter}
           dishCardById={enrichment.dishCardById}
+          componentsByDish={enrichment.componentsByDish}
+          recipeStepsByDish={enrichment.recipeStepsByDish}
+          modifierOptionsByDish={enrichment.modifierOptionsByDish}
+          packagingByDish={enrichment.packagingByDish}
           onOpenDish={openDrawer}
+          onReorder={reorderItems}
         />
       ) : (
         <CustomerPreview
@@ -465,7 +566,13 @@ export function MenuPage() {
         item={drawerItem}
         onClose={closeDrawer}
         onSaved={() => refetch()}
+        onToggleWeb={(id, next) => {
+          void updateItem(id, { is_web_visible: next })
+        }}
         returnFocusToId={drawerItem?.id ?? null}
+        modifierOptions={
+          drawerItem ? (enrichment.modifierOptionsByDish.get(drawerItem.id) ?? []) : []
+        }
       />
     </div>
   )

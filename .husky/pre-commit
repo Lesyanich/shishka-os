@@ -82,9 +82,10 @@ for MCP_SVC in mcp-chef mcp-finance mcp-mission-control; do
 done
 
 # --- 3. Migration canary (RULE-MIGRATION-TRACKING) ---
-if git diff --cached --name-only | grep -q "^services/supabase/migrations/.*\.sql$"; then
+if git diff --cached --name-only --diff-filter=d | grep -q "^services/supabase/migrations/.*\.sql$"; then
   echo "[migration-canary] Validating staged migrations..."
-  for f in $(git diff --cached --name-only | grep "^services/supabase/migrations/.*\.sql$"); do
+  # --diff-filter=d excludes deletions: a removed migration has no file to validate.
+  for f in $(git diff --cached --name-only --diff-filter=d | grep "^services/supabase/migrations/.*\.sql$"); do
     sh scripts/migration-canary.sh "$f"
     CANARY_EXIT=$?
     if [ $CANARY_EXIT -ne 0 ]; then
@@ -92,6 +93,13 @@ if git diff --cached --name-only | grep -q "^services/supabase/migrations/.*\.sq
       exit 1
     fi
   done
+  # Numbering guard: no duplicate numbers, new migrations strictly above HEAD max (MC 7e4f0f9c)
+  sh scripts/migration-canary.sh --check-numbering
+  NUMBERING_EXIT=$?
+  if [ $NUMBERING_EXIT -ne 0 ]; then
+    echo "BLOCKED: Migration numbering violation. Fix before committing."
+    exit 1
+  fi
   echo "[migration-canary] OK"
 fi
 

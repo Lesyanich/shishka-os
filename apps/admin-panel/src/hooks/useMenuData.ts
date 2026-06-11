@@ -6,6 +6,7 @@ import type {
   MenuSubcategory,
   MenuTag,
   PortionUnit,
+  StockState,
 } from './useMenuDishes'
 
 export type NomenclatureKind = 'SALE' | 'PF' | 'MOD'
@@ -22,6 +23,20 @@ export interface MenuItem extends MenuDish {
   last_verified_at: string | null
   last_verified_by: string | null
   pos_status: 'draft' | 'approved' | 'synced'
+  /** Timestamp of the last successful push to Loyverse POS. NULL = never synced. */
+  loyverse_synced_at: string | null
+  /** Price Loyverse POS currently holds (last push / reconcile sweep). Compare
+   * with `price` to surface a real POS drift. NULL = never pushed / unknown. */
+  loyverse_price: number | null
+  /** Last time this row changed in our DB. Compare against loyverse_synced_at
+   * to detect drift (dish edited after its last Loyverse push). */
+  updated_at: string | null
+  /** Owner switch — dish is shown on the customer website (menu_public gate).
+   * Decoupled from Loyverse/is_available. */
+  is_web_visible: boolean
+  /** Last time the dish was turned on for the web (false->true). NULL = never
+   * published. Set by the DB trigger, never written from the client. */
+  web_published_at: string | null
   customer_description: string | null
   customer_short_name: string | null
   customer_photo_url: string | null
@@ -30,6 +45,11 @@ export interface MenuItem extends MenuDish {
   ttc_source_url: string | null
   merrychef_program: Record<string, unknown> | null
   hasBom?: boolean
+  /** Food-only cost (cost_per_unit minus packaging) — from v_dish_cost_split.
+   * Falls back to cost_per_unit when no split row exists. SALE-* only. */
+  food_cost?: number | null
+  /** Packaging cost rolled into cost_per_unit (sum of NF-PKG BOM lines). */
+  packaging_cost?: number | null
 }
 
 export interface MenuBomChild {
@@ -59,10 +79,12 @@ export interface UseMenuDataResult {
     patch: Partial<
       Pick<
         MenuDish,
-        'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'
-      >
+        'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'
+      > & { is_web_visible: boolean }
     >,
   ) => Promise<{ ok: boolean; error?: string }>
+  /** Persist a new card order: writes `display_order` = position for each id. */
+  reorderItems: (orderedIds: string[]) => Promise<{ ok: boolean; error?: string }>
   refetch: () => void
 }
 
@@ -81,6 +103,7 @@ interface RawNomenclatureRow {
   base_unit: string | null
   price: number | string | null
   cost_per_unit: number | string | null
+  cost_source: string | null
   is_available: boolean
   is_featured: boolean
   image_url: string | null
@@ -92,11 +115,19 @@ interface RawNomenclatureRow {
   portion_size: number | string | null
   portion_unit: PortionUnit | null
   launch_phase: number | string | null
+  stock_state: string | null
+  display_order: number | string | null
+  staff_code: string | null
   category_id: string | null
   card_version: number
   last_verified_at: string | null
   last_verified_by: string | null
   pos_status: string
+  loyverse_synced_at: string | null
+  loyverse_price: number | string | null
+  updated_at: string | null
+  is_web_visible: boolean
+  web_published_at: string | null
   customer_description: string | null
   customer_short_name: string | null
   customer_photo_url: string | null
@@ -133,16 +164,17 @@ export function useMenuData(): UseMenuDataResult {
     setIsLoading(true)
     setError(null)
 
-    const [nomenResult, tagResult, subcatResult, bomResult] = await Promise.all([
+    const [nomenResult, tagResult, subcatResult, bomResult, costSplitResult] = await Promise.all([
       supabase
         .from('nomenclature')
         .select(`
-          id, name, product_code, staff_code, base_unit, price, cost_per_unit,
+          id, name, product_code, staff_code, base_unit, price, cost_per_unit, cost_source,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
-          portion_size, portion_unit, launch_phase,
+          portion_size, portion_unit, launch_phase, stock_state, display_order, staff_code,
           category_id,
-          card_version, last_verified_at, last_verified_by, pos_status,
+          card_version, last_verified_at, last_verified_by, pos_status, loyverse_synced_at, updated_at,
+          is_web_visible, web_published_at, loyverse_price,
           customer_description, customer_short_name, customer_photo_url,
           assembler_note, kitchen_note,
           ttc_source_url, merrychef_program,
@@ -155,12 +187,15 @@ export function useMenuData(): UseMenuDataResult {
         .select('nomenclature_id, tags(slug, name, tag_group, color)'),
       supabase
         .from('product_categories')
-        .select('id, name, parent_id, sort_order')
-        .not('parent_id', 'is', null)
+        .select('id, code, name, parent_id, sort_order, is_menu_section')
+        .eq('is_active', true)
         .order('sort_order', { ascending: true }),
       supabase
         .from('bom_structures')
         .select('id, parent_id, ingredient_id, quantity_per_unit, yield_loss_pct'),
+      supabase
+        .from('v_dish_cost_split')
+        .select('dish_id, food_cost, packaging_cost'),
     ])
 
     if (nomenResult.error) {
@@ -179,17 +214,67 @@ export function useMenuData(): UseMenuDataResult {
       tagMap.set(nid, arr)
     }
 
-    const subcatMap = new Map<string, MenuSubcategory[]>()
+    // Category tree: index every active category so we can walk a dish up to
+    // its nearest is_menu_section ancestor (the customer "section" it rolls up
+    // to). A dish's own category below that section becomes a subcategory.
+    interface CatRow {
+      id: string
+      code: string
+      name: string
+      parent_id: string | null
+      sort_order: number
+      is_menu_section: boolean
+    }
+    const catById = new Map<string, CatRow>()
     for (const row of subcatResult.data ?? []) {
-      const parentId = row.parent_id as string
-      const arr = subcatMap.get(parentId) ?? []
-      arr.push({
+      catById.set(row.id as string, {
         id: row.id as string,
+        code: (row.code as string) ?? '',
         name: row.name as string,
-        parent_id: parentId,
-        sort_order: row.sort_order as number,
+        parent_id: (row.parent_id as string | null) ?? null,
+        sort_order: (row.sort_order as number) ?? 0,
+        is_menu_section: (row.is_menu_section as boolean) ?? false,
       })
-      subcatMap.set(parentId, arr)
+    }
+
+    // Nearest is_menu_section ancestor-or-self. Falls back to the category
+    // itself when nothing in the chain is flagged (legacy/uncategorised).
+    const sectionOf = (catId: string | null): CatRow | null => {
+      let cur = catId ? catById.get(catId) ?? null : null
+      const seen = new Set<string>()
+      while (cur && !cur.is_menu_section) {
+        if (seen.has(cur.id)) break
+        seen.add(cur.id)
+        cur = cur.parent_id ? catById.get(cur.parent_id) ?? null : null
+      }
+      return cur
+    }
+
+    // Subcategories grouped by their owning section (non-section categories
+    // whose section ancestor is a different node). OwnerTable renders these as
+    // subheaders under the section.
+    const subcatMap = new Map<string, MenuSubcategory[]>()
+    for (const c of catById.values()) {
+      if (c.is_menu_section) continue
+      const sec = sectionOf(c.id)
+      if (!sec || sec.id === c.id) continue
+      const arr = subcatMap.get(sec.id) ?? []
+      arr.push({ id: c.id, name: c.name, parent_id: sec.id, sort_order: c.sort_order })
+      subcatMap.set(sec.id, arr)
+    }
+    for (const arr of subcatMap.values()) arr.sort((a, b) => a.sort_order - b.sort_order)
+
+    // Cost decomposition (food vs packaging) keyed by dish id (SALE-* only).
+    const costSplitMap = new Map<string, { food_cost: number | null; packaging_cost: number | null }>()
+    for (const row of (costSplitResult.data ?? []) as Array<{
+      dish_id: string
+      food_cost: number | null
+      packaging_cost: number | null
+    }>) {
+      costSplitMap.set(row.dish_id, {
+        food_cost: row.food_cost != null ? Number(row.food_cost) : null,
+        packaging_cost: row.packaging_cost != null ? Number(row.packaging_cost) : null,
+      })
     }
 
     // Build item index, categories, and a product_code→kind map
@@ -201,8 +286,11 @@ export function useMenuData(): UseMenuDataResult {
       const kind = kindFromCode(raw.product_code)
       if (!kind) continue
       const cat = raw.product_categories
-      if (cat && !catMap.has(cat.id)) {
-        catMap.set(cat.id, { id: cat.id, code: cat.code, name: cat.name, sort_order: cat.sort_order })
+      // Top-level menu grouping is by SECTION (umbrella), not the dish's leaf
+      // category — so the tab strip / filters show "Manakish", "Drinks", etc.
+      const sec = sectionOf(raw.category_id)
+      if (sec && !catMap.has(sec.id)) {
+        catMap.set(sec.id, { id: sec.id, code: sec.code, name: sec.name, sort_order: sec.sort_order })
       }
       const item: MenuItem = {
         id: raw.id,
@@ -213,6 +301,7 @@ export function useMenuData(): UseMenuDataResult {
         base_unit: raw.base_unit,
         price: raw.price != null ? Number(raw.price) : null,
         cost_per_unit: raw.cost_per_unit != null ? Number(raw.cost_per_unit) : null,
+        cost_source: (raw.cost_source as MenuItem['cost_source']) ?? 'none',
         is_available: raw.is_available,
         is_featured: raw.is_featured,
         image_url: raw.image_url,
@@ -226,8 +315,11 @@ export function useMenuData(): UseMenuDataResult {
         category_id: raw.category_id,
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
-        display_order: null,
+        section_id: sec?.id ?? raw.category_id,
+        display_order: raw.display_order != null ? Number(raw.display_order) : null,
+        staff_code: raw.staff_code ?? null,
         launch_phase: raw.launch_phase != null ? Number(raw.launch_phase) : 1,
+        stock_state: (raw.stock_state as StockState) ?? 'in_stock',
         tags: tagMap.get(raw.id) ?? [],
         kind,
         isDualType: false,
@@ -235,6 +327,11 @@ export function useMenuData(): UseMenuDataResult {
         last_verified_at: raw.last_verified_at,
         last_verified_by: raw.last_verified_by,
         pos_status: (raw.pos_status ?? 'draft') as 'draft' | 'approved' | 'synced',
+        loyverse_synced_at: raw.loyverse_synced_at,
+        loyverse_price: raw.loyverse_price != null ? Number(raw.loyverse_price) : null,
+        updated_at: raw.updated_at,
+        is_web_visible: raw.is_web_visible ?? false,
+        web_published_at: raw.web_published_at,
         customer_description: raw.customer_description,
         customer_short_name: raw.customer_short_name,
         customer_photo_url: raw.customer_photo_url,
@@ -242,6 +339,10 @@ export function useMenuData(): UseMenuDataResult {
         kitchen_note: raw.kitchen_note,
         ttc_source_url: raw.ttc_source_url,
         merrychef_program: raw.merrychef_program,
+        food_cost:
+          costSplitMap.get(raw.id)?.food_cost ??
+          (raw.cost_per_unit != null ? Number(raw.cost_per_unit) : null),
+        packaging_cost: costSplitMap.get(raw.id)?.packaging_cost ?? 0,
       }
       itemsById.set(raw.id, item)
       itemList.push(item)
@@ -299,8 +400,8 @@ export function useMenuData(): UseMenuDataResult {
       patch: Partial<
         Pick<
           MenuDish,
-          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'
-        >
+          'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'
+        > & { is_web_visible: boolean }
       >,
     ): Promise<{ ok: boolean; error?: string }> => {
       const updates: Record<string, unknown> = {}
@@ -311,12 +412,30 @@ export function useMenuData(): UseMenuDataResult {
       if (patch.portion_size !== undefined) updates.portion_size = patch.portion_size
       if (patch.portion_unit !== undefined) updates.portion_unit = patch.portion_unit
       if (patch.launch_phase !== undefined) updates.launch_phase = patch.launch_phase
+      if (patch.stock_state !== undefined) updates.stock_state = patch.stock_state
+      if (patch.is_web_visible !== undefined) updates.is_web_visible = patch.is_web_visible
 
       const { error: updateErr } = await supabase
         .from('nomenclature')
         .update(updates)
         .eq('id', id)
       if (updateErr) return { ok: false, error: updateErr.message }
+
+      await fetchData()
+      return { ok: true }
+    },
+    [fetchData],
+  )
+
+  const reorderItems = useCallback(
+    async (orderedIds: string[]): Promise<{ ok: boolean; error?: string }> => {
+      const results = await Promise.all(
+        orderedIds.map((id, idx) =>
+          supabase.from('nomenclature').update({ display_order: idx }).eq('id', id),
+        ),
+      )
+      const failed = results.find((r) => r.error)
+      if (failed?.error) return { ok: false, error: failed.error.message }
 
       await fetchData()
       return { ok: true }
@@ -336,6 +455,7 @@ export function useMenuData(): UseMenuDataResult {
     isLoading,
     error,
     updateItem,
+    reorderItems,
     refetch: fetchData,
   }
 }
