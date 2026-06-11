@@ -19,6 +19,9 @@ interface Props {
   onCreated: (result: CreatePOResult) => void
   createPO: (payload: CreatePOPayload) => Promise<CreatePOResult>
   isCreating: boolean
+  /** Pre-populate the form (e.g. from a staff stock request). */
+  initialLines?: { nomenclature_id: string; qty_ordered: number }[]
+  initialNotes?: string
 }
 
 interface DraftLine {
@@ -29,7 +32,7 @@ interface DraftLine {
 
 const defaultToday = new Date().toISOString().slice(0, 10)
 
-export function PurchaseOrderForm({ onCreated, createPO, isCreating }: Props) {
+export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLines, initialNotes }: Props) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [items, setItems] = useState<NomItem[]>([])
   const [isLoadingLookups, setIsLoadingLookups] = useState(true)
@@ -60,6 +63,32 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating }: Props) {
     }
     load()
   }, [])
+
+  // Apply a prefill (e.g. from a staff stock request). Re-runs when the parent
+  // hands over a new prefill array, and guarantees the dropdown lists those items.
+  useEffect(() => {
+    if (!initialLines || initialLines.length === 0) return
+    setLines(
+      initialLines.map((l) => ({
+        nomenclature_id: l.nomenclature_id,
+        qty_ordered: l.qty_ordered,
+        unit_price_expected: null,
+      })),
+    )
+    if (initialNotes) setNotes(initialNotes)
+    const ids = initialLines.map((l) => l.nomenclature_id)
+    supabase
+      .from('nomenclature')
+      .select('id, product_code, name, base_unit')
+      .in('id', ids)
+      .then(({ data }) => {
+        if (!data) return
+        setItems((prev) => {
+          const have = new Set(prev.map((p) => p.id))
+          return [...prev, ...(data as NomItem[]).filter((d) => !have.has(d.id))]
+        })
+      })
+  }, [initialLines, initialNotes])
 
   const addLine = useCallback(() => {
     setLines((prev) => [...prev, { nomenclature_id: '', qty_ordered: '', unit_price_expected: null }])

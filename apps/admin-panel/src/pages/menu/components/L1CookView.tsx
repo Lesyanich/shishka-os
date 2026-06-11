@@ -18,6 +18,9 @@ import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 interface L1CookViewProps {
   items: MenuItem[]
   selectedCategory: string | null
+  /** Leaf subcategory drill-down within the selected section (matches on the
+   *  dish's own category_id). null = whole section. */
+  selectedSubcategory: string | null
   typeFilter: TypeFilterValue
   /** null = show all, true = available only, false = unavailable only */
   availableFilter: boolean | null
@@ -305,6 +308,7 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
 export function L1CookView({
   items,
   selectedCategory,
+  selectedSubcategory,
   typeFilter,
   availableFilter,
   pfPackCardById,
@@ -319,11 +323,12 @@ export function L1CookView({
       if (i.kind === 'MOD') return false
       if (typeFilter === 'SALE' && i.kind !== 'SALE') return false
       if (typeFilter === 'PF' && i.kind !== 'PF' && !i.isDualType) return false
-      if (selectedCategory && i.category_id !== selectedCategory) return false
+      if (selectedCategory && (i.section_id ?? i.category_id) !== selectedCategory) return false
+      if (selectedSubcategory && i.category_id !== selectedSubcategory) return false
       if (availableFilter !== null && i.is_available !== availableFilter) return false
       return true
     })
-  }, [items, selectedCategory, typeFilter, availableFilter])
+  }, [items, selectedCategory, selectedSubcategory, typeFilter, availableFilter])
 
   // Group by category for structured rendering
   const grouped = useMemo(() => {

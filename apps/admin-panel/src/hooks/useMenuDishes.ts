@@ -3,6 +3,14 @@ import { supabase } from '../lib/supabase'
 
 export type PortionUnit = 'g' | 'ml' | 'pcs'
 
+/** Provenance of cost_per_unit (see nomenclature.cost_source, mig 221). */
+export type CostSource = 'wac' | 'catalog_estimate' | 'manual' | 'none'
+
+/** Visible-but-not-orderable stock state (mig 249), orthogonal to is_available
+ * (which hard-hides). coming_soon / out_of_stock render the item greyed with a
+ * badge on menu surfaces and block ordering / Loyverse push. */
+export type StockState = 'in_stock' | 'coming_soon' | 'out_of_stock'
+
 export interface MenuDish {
   id: string
   name: string
@@ -10,6 +18,7 @@ export interface MenuDish {
   product_code: string
   price: number | null
   cost_per_unit: number | null
+  cost_source: CostSource
   is_available: boolean
   is_featured: boolean
   image_url: string | null
@@ -23,8 +32,14 @@ export interface MenuDish {
   category_id: string | null
   category_name: string | null
   category_code: string | null
+  /** Nearest is_menu_section ancestor of category_id (the customer "section"
+   * the dish rolls up to). Equals category_id for flat sections. Undefined in
+   * the legacy useMenuDishes path — consumers fall back to category_id. */
+  section_id?: string | null
   display_order: number | null
+  staff_code: string | null
   launch_phase: number
+  stock_state: StockState
   tags: MenuTag[]
 }
 
@@ -55,7 +70,7 @@ export interface UseMenuDishesResult {
   subcategories: Map<string, MenuSubcategory[]>
   isLoading: boolean
   error: string | null
-  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'>>) => Promise<{ ok: boolean; error?: string }>
+  updateDish: (id: string, patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'>>) => Promise<{ ok: boolean; error?: string }>
   refetch: () => void
 }
 
@@ -74,10 +89,10 @@ export function useMenuDishes(): UseMenuDishesResult {
       supabase
         .from('nomenclature')
         .select(`
-          id, name, product_code, price, cost_per_unit,
+          id, name, product_code, price, cost_per_unit, cost_source,
           is_available, is_featured, image_url, loyverse_item_id,
           calories, protein, carbs, fat,
-          portion_size, portion_unit, launch_phase,
+          portion_size, portion_unit, launch_phase, stock_state,
           category_id,
           product_categories!category_id(id, code, name, sort_order)
         `)
@@ -142,6 +157,7 @@ export function useMenuDishes(): UseMenuDishesResult {
         product_code: d.product_code,
         price: d.price ? Number(d.price) : null,
         cost_per_unit: d.cost_per_unit ? Number(d.cost_per_unit) : null,
+        cost_source: (d.cost_source as CostSource) ?? 'none',
         is_available: d.is_available,
         is_featured: d.is_featured,
         image_url: d.image_url,
@@ -156,7 +172,9 @@ export function useMenuDishes(): UseMenuDishesResult {
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
         display_order: null,
+        staff_code: null,
         launch_phase: d.launch_phase != null ? Number(d.launch_phase) : 1,
+        stock_state: (d.stock_state as StockState) ?? 'in_stock',
         tags: tagMap.get(d.id) ?? [],
       }
     })
@@ -176,7 +194,7 @@ export function useMenuDishes(): UseMenuDishesResult {
   const updateDish = useCallback(
     async (
       id: string,
-      patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase'>>,
+      patch: Partial<Pick<MenuDish, 'name' | 'description' | 'price' | 'is_available' | 'is_featured' | 'portion_size' | 'portion_unit' | 'launch_phase' | 'stock_state'>>,
     ): Promise<{ ok: boolean; error?: string }> => {
       const updates: Record<string, unknown> = {}
       if (patch.name !== undefined) updates.name = patch.name.trim()
@@ -186,6 +204,7 @@ export function useMenuDishes(): UseMenuDishesResult {
       if (patch.portion_size !== undefined) updates.portion_size = patch.portion_size
       if (patch.portion_unit !== undefined) updates.portion_unit = patch.portion_unit
       if (patch.launch_phase !== undefined) updates.launch_phase = patch.launch_phase
+      if (patch.stock_state !== undefined) updates.stock_state = patch.stock_state
 
       const { error: updateErr } = await supabase
         .from('nomenclature')

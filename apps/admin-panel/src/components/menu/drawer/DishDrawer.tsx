@@ -5,6 +5,7 @@ import { useDishCard } from '../../../hooks/useDishCard'
 import type { DishCardData } from '../../../hooks/useDishCard'
 import { useAllergens } from '../../../hooks/useAllergens'
 import { useModifierOptions } from '../../../hooks/useModifierOptions'
+import type { DishModifierOption } from '../../../hooks/useMenuListEnrichment'
 import { useDishScorecard } from '../../../hooks/useDishScorecard'
 import { useDishCardSave } from '../../../hooks/useDishCardSave'
 import type { MerrychefProgram } from '../../../hooks/useDishCardSave'
@@ -31,6 +32,11 @@ interface DishDrawerProps {
   onClose: () => void
   onSaved?: () => void
   returnFocusToId?: string | null
+  /** Customisation options (with per-portion nutrition + min/max) for the
+   *  customer build-preview. From enrichment.modifierOptionsByDish. */
+  modifierOptions?: DishModifierOption[]
+  /** Toggle website visibility (is_web_visible, mig 263) from the Owner tab. */
+  onToggleWeb?: (id: string, next: boolean) => void | Promise<void>
 }
 
 export function DishDrawer({
@@ -38,6 +44,8 @@ export function DishDrawer({
   onClose,
   onSaved,
   returnFocusToId,
+  modifierOptions = [],
+  onToggleWeb,
 }: DishDrawerProps) {
   const open = item != null
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -65,7 +73,7 @@ export function DishDrawer({
   // Nomenclature-level form state (customer photo URL etc.) — keyed at top level
   // so we can pass it to fn_dish_card_save outside the dish_card sub-object.
   const [formNomen, setFormNomen] = useState<{
-    customer_photo_url?: string | null
+    image_url?: string | null
     merrychef_program?: MerrychefProgram | null
   } | null>(null)
 
@@ -83,7 +91,7 @@ export function DishDrawer({
 
   const onNomenChange = useCallback(
     (patch: {
-      customer_photo_url?: string | null
+      image_url?: string | null
       merrychef_program?: MerrychefProgram | null
     }) => {
       setFormNomen((prev) => ({ ...(prev ?? {}), ...patch }))
@@ -98,11 +106,23 @@ export function DishDrawer({
   const handleSave = useCallback(async () => {
     if (!item || !isSale) return
     const mergedCard = { ...(dishCard.card ?? {}), ...formCard }
+    // Packaging is mandatory for every dish — block save if none attached.
+    // Packaging lines are written immediately (bom_structures), so we check the
+    // live list rather than form state.
+    if (dishCard.packaging.length === 0) {
+      setActiveTab('l2-assembler')
+      setToast({
+        type: 'error',
+        text: 'Packaging is required — add at least one packaging item on the L2 Assembler tab before saving.',
+      })
+      setTimeout(() => setToast(null), 4000)
+      return
+    }
     const result = await saveDishCard(item.id, {
       expected_version: item.card_version,
-      customer_photo_url:
-        formNomen != null && 'customer_photo_url' in formNomen
-          ? (formNomen.customer_photo_url ?? '')
+      image_url:
+        formNomen != null && 'image_url' in formNomen
+          ? (formNomen.image_url ?? null)
           : undefined,
       merrychef_program:
         formNomen != null && 'merrychef_program' in formNomen
@@ -256,15 +276,14 @@ export function DishDrawer({
                 dishCard={dishCard.card}
                 allergens={allergens.allergens}
                 allergensLoading={allergens.isLoading}
-                modifiers={modifiers.modifiers}
-                modifiersLoading={modifiers.isLoading}
+                modifierOptions={modifierOptions}
                 customerPhotoUrl={
-                  formNomen?.customer_photo_url !== undefined
-                    ? formNomen.customer_photo_url
-                    : (item.customer_photo_url ?? item.image_url ?? null)
+                  formNomen?.image_url !== undefined
+                    ? formNomen.image_url
+                    : (item.image_url ?? null)
                 }
                 onCustomerPhotoChange={(url) =>
-                  onNomenChange({ customer_photo_url: url })
+                  onNomenChange({ image_url: url })
                 }
               />
             )}
@@ -302,6 +321,11 @@ export function DishDrawer({
                 onMerrychefChange={(program) =>
                   onNomenChange({ merrychef_program: program })
                 }
+                packaging={dishCard.packaging}
+                packagingCatalog={dishCard.packagingCatalog}
+                onAddPackaging={dishCard.addPackaging}
+                onUpdatePackagingQty={dishCard.updatePackagingQty}
+                onRemovePackaging={dishCard.removePackaging}
               />
             )}
             {resolvedTab === 'owner' && (
@@ -310,7 +334,9 @@ export function DishDrawer({
                 scorecard={scorecard.scorecard}
                 scorecardLoading={scorecard.isLoading}
                 scorecardError={scorecard.error}
+                modifiers={modifiers.modifiers}
                 onSynced={() => onSaved?.()}
+                onToggleWeb={onToggleWeb}
               />
             )}
           </div>

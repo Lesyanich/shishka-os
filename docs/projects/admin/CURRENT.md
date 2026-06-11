@@ -13,6 +13,27 @@
 - **Blockers:** batch-photos storage bucket not yet created. Phase D blocked on WiFi at L1.
 - **Modified files:** (Phase C) src/components/kitchen/FeedbackFAB.tsx (new), src/types/speech.d.ts (new), src/pages/MyTasks.tsx, src/pages/Dashboard.tsx
 
+## In-flight (backend foundation)
+
+- **2026-06-08 — Build-your-own "from ฿X" floor on shishka.health (site).**
+  - Migs **259** (`group_min_select`) + **260** (`group_max_select` — adds `dish_modifier_groups.max_select`, caps Custom Smoothie "Pick Fruits" at 4): view `menu_modifiers` now exposes both min/max select (appended cols — CREATE OR REPLACE can't insert mid-list). Additive; row filter unchanged. Applied to prod.
+  - shishka-health (PRs #6 + #7 + #8): dishes with a required modifier group (`minSelect>0`) price **"from ฿X"** = base + cheapest mandatory add-ons (new `src/lib/modifiers.js` `dishFloor`). Custom Smoothie shows **from ฿109** (89 + 2 cheapest fruits @฿10) on card + dialog. ModifierBuilder opens **empty** (no pre-select), enforces min **and** max per group (Pick Fruits = "pick 2–4"; at cap, unpicked options disabled), and shows the `from ฿X` floor as the total until the min is met. Mirrors the manakish-bundle `from ฿X` floor.
+  - Mig **261** (`menu_modifiers_nutrition`): view now also exposes per-portion calories/protein/carbs/fat of each modifier option (nomenclature nutrition × `quantity_per_unit`, same scaling as admin `v_dish_modifier_options`). shishka-health (PR #9) feeds this into a **live KBJU counter** — DishDialog donut + macros now update as the guest adds fruits (e.g. Custom Smoothie 10 kcal → +Banana 77 → +Avocado 197). Builder reports the selected add-ons' nutrition up via `onNutritionChange`; dialog adds it onto the base. Finishes the web half of MC **389f0d99** (admin + POS still pending).
+  - Mig **262** (`v_dish_modifier_options_min_max`): admin `v_dish_modifier_options` now also exposes `group_min_select`/`group_max_select`. New **admin build-preview** in the `/menu` dish drawer (CustomerTab → `ModifierBuildPreview`): owner toggles options and sees the same live KBJU + price counter customers get, fed by enrichment `modifierOptionsByDish` (no extra fetch). Finishes the **admin half** of MC **389f0d99** (MC **195e54bc**). POS surface dropped as N/A — Loyverse is third-party; printed-nutrition tracked under MC 7927fbf3.
+  - GAP (MC **5a3d4792**): ModifierBuilder selections still don't flow into the cart — `addDish` adds at base price, so build-your-own lines undercharge. Separate task.
+
+- **2026-06-07 — Packaging-as-BOM + L2 availability filter (MC 2385d288, branch `feature/menu/packaging-as-bom`).**
+  - Migs **246** (normalize 9 NF-PKG containers to per-piece cost, base_unit=pcs; pack counts verified via Makro scraper) + **247** (`v_dish_packaging`, `v_dish_cost_split`) + **248** (views match whole **NF-PKG subtree** `code LIKE 'NF-PKG%'` — NF-PKG + NF-PKG-CNT/BAG/CTL, so cup/bottle on ~17 drink dishes count) — all applied to prod.
+  - Packaging now modelled as `bom_structures` lines whose component's category code starts with **NF-PKG**; cost auto-rolls into `cost_per_unit` via existing trigger (migs 137/211). Food-cost % switched to **food-only** (`food_cost` from `v_dish_cost_split`), margin stays on full cost.
+  - Drawer L2 tab: free-text container replaced by a packaging editor (add/remove NF-PKG lines, qty). Save blocked until ≥1 packaging line. L2 list card shows the packaging set; red warning when missing. L2 view gained an **Active/Inactive/All** availability toggle (default Active). L1 ingredient list excludes NF-PKG.
+  - Follow-ups: `get_channel_margins` RPC channel FC% still includes packaging; no dishes have packaging assigned yet (owner data-entry); NF-PKG names still carry OCR garble.
+
+- **2026-06-03 — Modifiers 2-level model (MC 38911fde).**
+  - **Phase 1 SHIPPED** (PR #284, merged): mig 236 (`dish_modifier_groups` + `modifier_option_cost`) + edge fn loyverse-sync **v19** (`pull_modifiers` reconciles dish→group from Loyverse `item.modifier_ids`). Group SSoT = Loyverse lists (not `product_category`).
+  - **Phases 3+4 DONE** (branch `feature/admin/modifiers-2level-editor`): `/menu/modifiers` (ModifiersPage) now has `GroupOptionEditor` (groups→options + option→MOD cost-link editor, computed cost/margin) and `DishGroupAttachEditor` (per-dish group attach/detach). DB-only writes, no Loyverse side-effects.
+  - **Phase 5 PENDING** (separate review gate): single Push-to-Loyverse with fixed order (categories → groups/options/stores → item fields → LAST re-attach via `update_item`) — mutates the live POS.
+  - Spec: `docs/modules/modifiers.md`.
+
 ## Tech Stack
 
 React 19 + Vite 7 + Tailwind v4 + Supabase + TypeScript strict mode.

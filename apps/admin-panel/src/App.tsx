@@ -12,6 +12,10 @@ import { Loader2 } from 'lucide-react'
 import { LoginPage } from './pages/LoginPage'
 import { OpeningRoadmap } from './pages/OpeningRoadmap'
 
+// Public, no-auth staff page (PIN-gated). Kept out of the lazy graph so the
+// shared staff link loads fast and never touches the authenticated bundle.
+import { StockSheetPage } from './pages/StockSheetPage'
+
 // Lazy — loaded on-demand per route
 const BOMHub = lazy(() => import('./pages/BOMHub').then(m => ({ default: m.BOMHub })))
 const KDSBoard = lazy(() => import('./pages/KDSBoard').then(m => ({ default: m.KDSBoard })))
@@ -91,6 +95,8 @@ function App() {
         <Sentry.ErrorBoundary fallback={FallbackError}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            {/* Public staff stock-order sheet — no auth, PIN-gated server-side */}
+            <Route path="/stock" element={<StockSheetPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
                 {/* ── Owner-only routes ── */}

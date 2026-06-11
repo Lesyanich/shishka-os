@@ -6,10 +6,12 @@ import { PurchaseOrderForm } from '../components/procurement/PurchaseOrderForm'
 import { POHistory } from '../components/procurement/POHistory'
 import { PODetail } from '../components/procurement/PODetail'
 import { ReconciliationPanel } from '../components/procurement/ReconciliationPanel'
+import { StockRequestsPanel, type PrefillLine } from '../components/procurement/StockRequestsPanel'
+import { StockSheetCuration } from '../components/procurement/StockSheetCuration'
 import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
 import type { PurchaseOrder } from '../types/procurement'
 
-type Tab = 'purchases' | 'orders'
+type Tab = 'purchases' | 'orders' | 'requests' | 'items'
 type Screen = 'list' | 'detail' | 'reconcile'
 
 export function Procurement() {
@@ -17,6 +19,13 @@ export function Procurement() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [screen, setScreen] = useState<Screen>('list')
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null)
+  const [poPrefill, setPoPrefill] = useState<{ lines: PrefillLine[]; notes: string } | null>(null)
+
+  const handleAddToPO = useCallback((lines: PrefillLine[], notes: string) => {
+    setPoPrefill({ lines, notes })
+    setActiveTab('orders')
+    setScreen('list')
+  }, [])
 
   const {
     orders, isLoading, statusFilter, setStatusFilter,
@@ -63,6 +72,8 @@ export function Procurement() {
         <div className="flex gap-1 rounded-xl bg-slate-800/60 p-1">
           {([
             { key: 'orders' as Tab, label: 'Purchase Orders' },
+            { key: 'requests' as Tab, label: 'Stock Requests' },
+            { key: 'items' as Tab, label: 'Sheet Items' },
             { key: 'purchases' as Tab, label: 'Quick Purchase' },
           ]).map(({ key, label }) => (
             <button
@@ -89,6 +100,8 @@ export function Procurement() {
               createPO={createPO}
               isCreating={isCreating}
               onCreated={handlePOCreated}
+              initialLines={poPrefill?.lines}
+              initialNotes={poPrefill?.notes}
             />
             <SupplierManager />
           </div>
@@ -120,6 +133,20 @@ export function Procurement() {
           onBack={() => { setScreen('detail') }}
           onReconciled={handleReconciled}
         />
+      )}
+
+      {/* === Stock Requests Tab === */}
+      {activeTab === 'requests' && screen === 'list' && (
+        <div className="mx-auto max-w-2xl">
+          <StockRequestsPanel onAddToPO={handleAddToPO} />
+        </div>
+      )}
+
+      {/* === Sheet Items (curation) Tab === */}
+      {activeTab === 'items' && screen === 'list' && (
+        <div className="mx-auto max-w-2xl">
+          <StockSheetCuration />
+        </div>
       )}
 
       {/* === Quick Purchase Tab (legacy) === */}

@@ -32,6 +32,7 @@ import { recordProduction } from "./tools/record-production.js";
 import { listSuppliers } from "./tools/list-suppliers.js";
 import { searchPurchaseHistory } from "./tools/search-purchase-history.js";
 import { makroShoppingList } from "./tools/makro-shopping-list.js";
+import { updateTopsPrices } from "./tools/update-tops-prices.js";
 // Scrapers are loaded lazily — a missing/broken scraper file must NOT crash the entire chef MCP.
 // See lazyScraper() helper below.
 import { storeMemory } from "./tools/store-memory.js";
@@ -232,6 +233,57 @@ server.tool(
     limit: z.number().optional().describe("Max results (default: 20)"),
   },
   lazyScraper("./tools/search-homepro-catalog.js", "searchHomeProCatalog")
+);
+
+server.tool(
+  "search_line_catalog",
+  "Pull a LINE SHOPPING storefront's FULL catalog by @handle — product names, prices (THB), discounts, stock for a single merchant on shop.line.me (e.g. @biovittofficial = Biovitt whey protein & supplements). Use for supplier/brand price lists. NOT a marketplace-wide search: pass the shop's @handle (or full shop.line.me URL). Pulls the complete catalog via the storefront API (paginated), falling back to SSR collection parsing. Optional query filters returned products by name token (Thai or English).",
+  {
+    handle: z.string().describe("Shop handle, e.g. '@biovittofficial' or the full https://shop.line.me/@... URL"),
+    query: z.string().optional().describe("Optional: filter returned products by name token match (Thai or English)"),
+    shop_id: z.number().optional().describe("Optional: numeric shopId to skip handle→id resolution (e.g. 402242 for biovittofficial)"),
+    limit: z.number().optional().describe("Max results (default: 200)"),
+    max_collections: z.number().optional().describe("SSR-fallback only: how many collections to scan (default: 15, max: 30)"),
+  },
+  lazyScraper("./tools/search-line-catalog.js", "searchLineCatalog")
+);
+
+server.tool(
+  "search_line_marketplace",
+  "Search the WHOLE LINE SHOPPING marketplace for a product across ALL sellers and compare prices — returns matching products from many shops with price, discount, stock, shop name + @handle, and a best-effort price-per-100g (parsed from pack size in the name) so powders sold in different sizes are comparable. Use to find suppliers for an ingredient/supplement (e.g. 'ครีเอทีน'/creatine, whey, collagen) and compare. Thai keywords usually yield more results. For a single known shop's full catalog use search_line_catalog instead.",
+  {
+    query: z.string().describe("Product search term, Thai or English (e.g. 'ครีเอทีน', 'creatine', 'whey protein isolate')"),
+    limit: z.number().optional().describe("Max products to fetch (default: 60, max: 100)"),
+    in_stock_only: z.boolean().optional().describe("Only return in-stock products (default: false)"),
+    e_receipt_only: z.boolean().optional().describe("Only return sellers that issue an e-receipt / tax invoice (default: false). Output always includes per-product has_e_receipt + an e_receipt_count summary."),
+    strict: z.boolean().optional().describe("Require the query to appear in the product name, cutting LINE's fuzzy false positives (default: true). Set false to see raw fuzzy matches."),
+  },
+  lazyScraper("./tools/search-line-marketplace.js", "searchLineMarketplace")
+);
+
+server.tool(
+  "search_tops_catalog",
+  "Search/browse the Tops Online supermarket catalog (tops.co.th) — real prices, barcodes, brands, stock, and images for groceries, fresh food, beverages, health & beauty, vitamins & supplements, household. Tops sits behind Cloudflare so this drives a headless browser (requires playwright). PREFER `search` (keyword across all categories, e.g. a brand or product name) — this matches the site's own search box. Use `category` (slug-path) only to browse one section. The optional `query` further filters returned products by name.",
+  {
+    search: z.string().optional().describe("Keyword to search across ALL categories (brand or product name, EN or TH), e.g. 'Biovitt', 'whey protein'. Matches the site's search box. Preferred over category."),
+    category: z.string().optional().describe("Browse one category: URL or slug-path, e.g. 'beverages' or the full https://www.tops.co.th/en/... URL. Ignored if `search` is set."),
+    query: z.string().optional().describe("Optional: further filter returned products by name token match (English or Thai)"),
+    limit: z.number().optional().describe("Max results (default: 40)"),
+    max_pages: z.number().optional().describe("How many pages to fetch, 40 products each (default: 3 for search, 1 for browse; max: 10)"),
+  },
+  lazyScraper("./tools/search-tops-catalog.js", "searchTopsCatalog")
+);
+
+server.tool(
+  "update_tops_prices",
+  "Record live Tops Online prices into supplier_catalog by EAN barcode (pre-purchase pricing — compare Tops vs Makro/etc. before buying). Pass `barcodes` to price specific items, or `sweep: true` to look up every barcode we already track. Writes under a 'Tops' supplier; links nomenclature when the barcode is known. Requires playwright (Tops is behind Cloudflare). Use `dry_run: true` to preview without writing.",
+  {
+    barcodes: z.array(z.string()).optional().describe("Explicit EAN barcodes to price on Tops"),
+    sweep: z.boolean().optional().describe("Look up every distinct barcode already in supplier_catalog (ignored if `barcodes` given)"),
+    limit: z.number().optional().describe("Max barcodes to sweep (default 300, max 2000)"),
+    dry_run: z.boolean().optional().describe("Preview what would be written without touching the DB"),
+  },
+  async (args) => jsonResult(await updateTopsPrices(args))
 );
 
 server.tool(
