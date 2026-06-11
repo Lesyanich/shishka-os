@@ -66,7 +66,7 @@ GRANT SELECT ON public.v_public_menu TO anon, authenticated;
 -- Self-register
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '226_public_menu_view.sql',
+  '224b_public_menu_view.sql',
   'claude-code',
   NULL,
   'Add v_public_menu view (anon SELECT) exposing only customer-safe dish fields; base nomenclature stays locked'

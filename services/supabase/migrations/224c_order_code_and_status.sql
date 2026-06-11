@@ -75,7 +75,7 @@ GRANT EXECUTE ON FUNCTION public.fn_kds_set_order_status(UUID, public.order_stat
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '227_order_code_and_status.sql',
+  '224c_order_code_and_status.sql',
   'claude-code',
   NULL,
   'Add fn_next_order_code (daily reset) + order_code_counters + fn_kds_set_order_status (QR menu MVP)'

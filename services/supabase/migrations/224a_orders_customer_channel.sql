@@ -50,7 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_channel        ON public.orders(channel) W
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '225_orders_customer_channel.sql',
+  '224a_orders_customer_channel.sql',
   'claude-code',
   NULL,
   'Add order_code + payment_status/method + fulfillment_type/table_number + channel to orders (QR menu MVP)'
