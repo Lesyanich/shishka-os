@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
-import { CalendarPlus, Clock, AlertTriangle } from 'lucide-react'
+import { CalendarPlus, Clock, AlertTriangle, CalendarCog } from 'lucide-react'
 import { useStaff } from '../../hooks/useStaff'
 import { useShifts, type Shift } from '../../hooks/useShifts'
 import { useLocations } from '../../hooks/useLocations'
 import { WeekCalendar } from '../../components/schedule/WeekCalendar'
 import { BulkScheduleGenerator } from '../../components/schedule/BulkScheduleGenerator'
+import { ScheduleTemplatePanel } from '../../components/schedule/ScheduleTemplatePanel'
 
 const LPA_MAX_HOURS_WEEK = 48
 const LPA_MIN_DAYS_OFF = 1
@@ -42,6 +43,7 @@ interface WeeklyStats {
 
 export function SchedulePage() {
   const [showBulk, setShowBulk] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
   const [locationFilter, setLocationFilter] = useState<string | null>(null)
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
 
@@ -124,6 +126,19 @@ export function SchedulePage() {
 
         <button
           type="button"
+          onClick={() => setShowTemplates(!showTemplates)}
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+            showTemplates
+              ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+              : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+          }`}
+        >
+          <CalendarCog className="h-3.5 w-3.5" />
+          Templates & Auto-Plan
+        </button>
+
+        <button
+          type="button"
           onClick={() => setShowBulk(!showBulk)}
           className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
             showBulk
@@ -137,6 +152,12 @@ export function SchedulePage() {
       </div>
 
       {/* Bulk generator (collapsible) */}
+      {showTemplates && (
+        <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-4">
+          <ScheduleTemplatePanel />
+        </div>
+      )}
+
       {showBulk && (
         <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-4">
           <BulkScheduleGenerator />

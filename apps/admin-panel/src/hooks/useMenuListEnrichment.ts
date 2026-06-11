@@ -1,12 +1,42 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { DishCardData } from './useDishCard'
+import type { AssemblyComponent, DishCardData, DishPackagingLine } from './useDishCard'
 import type { PfPackCardData } from './usePfPackCard'
 import type { MenuBomChild, MenuItem } from './useMenuData'
 
 export interface RecipeStepStats {
   step_count: number
   ccp_count: number
+}
+
+/** Lightweight recipe step for inline list display (L2 Assembler grid). */
+export interface MenuRecipeStep {
+  step_order: number
+  operation_name: string
+  instruction_text: string | null
+}
+
+/** A dish customisation option (from v_dish_modifier_options), ordered. */
+export interface DishModifierOption {
+  dish_id: string
+  group_name: string | null
+  modifier_name: string
+  modifier_short_name: string | null
+  modifier_emoji: string | null
+  price_delta: number | null
+  is_default: boolean
+  /** Stock state of the underlying modifier (mig 249). 'coming_soon' /
+   *  'out_of_stock' render the option greyed / badged in the picker. */
+  modifier_stock_state: 'in_stock' | 'coming_soon' | 'out_of_stock'
+  /** Per-portion nutrition (nomenclature × quantity_per_unit), for the live
+   *  KBJU build-preview. mig 261/262. */
+  calories: number | null
+  protein: number | null
+  carbs: number | null
+  fat: number | null
+  /** Required min / max picks for the option's group (mig 262). null = unbounded. */
+  group_min_select: number | null
+  group_max_select: number | null
 }
 
 export interface UseMenuListEnrichmentResult {
@@ -16,8 +46,16 @@ export interface UseMenuListEnrichmentResult {
   pfPackCardById: Map<string, PfPackCardData>
   /** Recipe step + HACCP CCP stats per nomenclature (SALE + PF). */
   recipeStatsById: Map<string, RecipeStepStats>
+  /** L2 assembly components keyed by dish_id (SALE-* only, from v_dish_assembly_components). */
+  componentsByDish: Map<string, AssemblyComponent[]>
+  /** Recipe steps (ordered) keyed by nomenclature_id — for inline process display. */
+  recipeStepsByDish: Map<string, MenuRecipeStep[]>
+  /** Customisation options (ordered) keyed by dish_id — from v_dish_modifier_options. */
+  modifierOptionsByDish: Map<string, DishModifierOption[]>
   /** Allergen slugs derived by walking BOM tree + direct tags. SALE-* keyed. */
   allergensByDishId: Map<string, string[]>
+  /** Packaging lines (NF-PKG BOM components) keyed by dish id. SALE-* only. */
+  packagingByDish: Map<string, DishPackagingLine[]>
   isLoading: boolean
   error: string | null
   refetch: () => void
@@ -44,16 +82,34 @@ export function useMenuListEnrichment(
   const [recipeStatsById, setRecipeStatsById] = useState<
     Map<string, RecipeStepStats>
   >(new Map())
+  const [componentsByDish, setComponentsByDish] = useState<
+    Map<string, AssemblyComponent[]>
+  >(new Map())
+  const [recipeStepsByDish, setRecipeStepsByDish] = useState<
+    Map<string, MenuRecipeStep[]>
+  >(new Map())
+  const [modifierOptionsByDish, setModifierOptionsByDish] = useState<
+    Map<string, DishModifierOption[]>
+  >(new Map())
+  const [packagingByDish, setPackagingByDish] = useState<
+    Map<string, DishPackagingLine[]>
+  >(new Map())
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
-    const [dishCardRes, pfPackRes, recipeRes] = await Promise.all([
+    const [dishCardRes, pfPackRes, recipeRes, compRes, modRes, pkgRes] = await Promise.all([
       supabase.from('dish_card').select('*'),
       supabase.from('pf_pack_card').select('*'),
-      supabase.from('recipes_flow').select('nomenclature_id, is_ccp'),
+      supabase
+        .from('recipes_flow')
+        .select('nomenclature_id, step_order, operation_name, instruction_text, is_ccp')
+        .order('step_order', { ascending: true }),
+      supabase.from('v_dish_assembly_components').select('*'),
+      supabase.from('v_dish_modifier_options').select('*'),
+      supabase.from('v_dish_packaging').select('*'),
     ])
     if (dishCardRes.error) {
       setError(dishCardRes.error.message)
@@ -70,6 +126,21 @@ export function useMenuListEnrichment(
       setIsLoading(false)
       return
     }
+    if (compRes.error) {
+      setError(compRes.error.message)
+      setIsLoading(false)
+      return
+    }
+    if (modRes.error) {
+      setError(modRes.error.message)
+      setIsLoading(false)
+      return
+    }
+    if (pkgRes.error) {
+      setError(pkgRes.error.message)
+      setIsLoading(false)
+      return
+    }
     const dc = new Map<string, DishCardData>()
     for (const row of (dishCardRes.data ?? []) as DishCardData[]) {
       dc.set(row.nomenclature_id, row)
@@ -79,18 +150,74 @@ export function useMenuListEnrichment(
       pf.set(row.nomenclature_id, row)
     }
     const rs = new Map<string, RecipeStepStats>()
+    const steps = new Map<string, MenuRecipeStep[]>()
     for (const row of (recipeRes.data ?? []) as Array<{
       nomenclature_id: string
+      step_order: number
+      operation_name: string
+      instruction_text: string | null
       is_ccp: boolean
     }>) {
       const prev = rs.get(row.nomenclature_id) ?? { step_count: 0, ccp_count: 0 }
       prev.step_count += 1
       if (row.is_ccp) prev.ccp_count += 1
       rs.set(row.nomenclature_id, prev)
+      const list = steps.get(row.nomenclature_id) ?? []
+      list.push({
+        step_order: row.step_order,
+        operation_name: row.operation_name,
+        instruction_text: row.instruction_text,
+      })
+      steps.set(row.nomenclature_id, list)
+    }
+    const comps = new Map<string, AssemblyComponent[]>()
+    for (const row of (compRes.data ?? []) as AssemblyComponent[]) {
+      const list = comps.get(row.dish_id) ?? []
+      list.push(row)
+      comps.set(row.dish_id, list)
+    }
+    const mods = new Map<string, DishModifierOption[]>()
+    // Postgres numeric columns can arrive as strings; widen them so Number(...) is sound.
+    for (const row of (modRes.data ?? []) as Array<
+      Omit<DishModifierOption, 'price_delta' | 'protein' | 'carbs' | 'fat'> & {
+        price_delta: number | string | null
+        protein: number | string | null
+        carbs: number | string | null
+        fat: number | string | null
+      }
+    >) {
+      const list = mods.get(row.dish_id) ?? []
+      list.push({
+        dish_id: row.dish_id,
+        group_name: row.group_name,
+        modifier_name: row.modifier_name,
+        modifier_short_name: row.modifier_short_name,
+        modifier_emoji: row.modifier_emoji,
+        price_delta: row.price_delta != null ? Number(row.price_delta) : null,
+        is_default: !!row.is_default,
+        modifier_stock_state: row.modifier_stock_state ?? 'in_stock',
+        calories: row.calories != null ? Number(row.calories) : null,
+        protein: row.protein != null ? Number(row.protein) : null,
+        carbs: row.carbs != null ? Number(row.carbs) : null,
+        fat: row.fat != null ? Number(row.fat) : null,
+        group_min_select: row.group_min_select != null ? Number(row.group_min_select) : null,
+        group_max_select: row.group_max_select != null ? Number(row.group_max_select) : null,
+      })
+      mods.set(row.dish_id, list)
+    }
+    const pkg = new Map<string, DishPackagingLine[]>()
+    for (const row of (pkgRes.data ?? []) as DishPackagingLine[]) {
+      const list = pkg.get(row.dish_id) ?? []
+      list.push(row)
+      pkg.set(row.dish_id, list)
     }
     setDishCardById(dc)
     setPfPackCardById(pf)
     setRecipeStatsById(rs)
+    setRecipeStepsByDish(steps)
+    setComponentsByDish(comps)
+    setModifierOptionsByDish(mods)
+    setPackagingByDish(pkg)
     setIsLoading(false)
   }, [])
 
@@ -133,7 +260,11 @@ export function useMenuListEnrichment(
     dishCardById,
     pfPackCardById,
     recipeStatsById,
+    componentsByDish,
+    recipeStepsByDish,
+    modifierOptionsByDish,
     allergensByDishId,
+    packagingByDish,
     isLoading,
     error,
     refetch: fetchData,

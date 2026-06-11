@@ -15,6 +15,9 @@ export interface MenuFilters {
 export interface FilteredItem {
   id: string
   category_id: string | null
+  /** Section the dish rolls up to (umbrella). Category chips select sections,
+   * so filtering matches on this; falls back to category_id when absent. */
+  section_id?: string | null
   is_available: boolean
   loyverse_item_id: string | null
   image_url: string | null
@@ -57,7 +60,8 @@ export function serializeFilters(f: MenuFilters): Record<string, string | null> 
 export function applyFilters<T extends FilteredItem>(items: T[], f: MenuFilters): T[] {
   return items.filter((item) => {
     if (f.categoryIds.length > 0) {
-      if (!item.category_id || !f.categoryIds.includes(item.category_id)) return false
+      const sec = item.section_id ?? item.category_id
+      if (!sec || !f.categoryIds.includes(sec)) return false
     }
     if (f.available === 'yes' && !item.is_available) return false
     if (f.available === 'no' && item.is_available) return false

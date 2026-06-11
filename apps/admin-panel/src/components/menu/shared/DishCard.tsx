@@ -58,7 +58,10 @@ export function DishCard({
   description,
 }: DishCardProps) {
   const portion = formatPortion(dish.portionSize, dish.portionUnit)
-  const interactive = onClick != null
+  // Coming soon / out of stock: keep the card visible but non-orderable.
+  const unavailable = dish.stockState != null && dish.stockState !== 'in_stock'
+  const stockLabel = dish.stockState === 'out_of_stock' ? 'Out of stock' : 'Coming soon'
+  const interactive = onClick != null && !unavailable
 
   const Wrapper: 'button' | 'div' = interactive ? 'button' : 'div'
   const wrapperProps = interactive
@@ -71,9 +74,16 @@ export function DishCard({
   return (
     <Wrapper
       {...wrapperProps}
-      className={`group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-[var(--color-surface-2)] text-left transition hover:border-slate-700 hover:bg-[var(--color-surface-3)] ${interactive ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60' : ''}`}
+      aria-disabled={unavailable || undefined}
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-[var(--color-surface-2)] text-left transition hover:border-slate-700 hover:bg-[var(--color-surface-3)] ${interactive ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60' : ''} ${unavailable ? 'opacity-60 saturate-50' : ''}`}
     >
       <DishPhotoSlot imageUrl={dish.imageUrl} dishName={dish.name} aspect="photo" />
+
+      {unavailable && (
+        <span className="pointer-events-none absolute right-2 bottom-2 z-10 inline-flex items-center rounded-full bg-slate-900/85 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cream ring-1 ring-white/15 backdrop-blur">
+          {stockLabel}
+        </span>
+      )}
 
       {dish.isFeatured && (
         <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300">
