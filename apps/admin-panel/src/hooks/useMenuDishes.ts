@@ -38,7 +38,6 @@ export interface MenuDish {
    * the legacy useMenuDishes path — consumers fall back to category_id. */
   section_id?: string | null
   display_order: number | null
-  staff_code: string | null
   launch_phase: number
   stock_state: StockState
   tags: MenuTag[]
@@ -174,7 +173,6 @@ export function useMenuDishes(): UseMenuDishesResult {
         category_name: cat?.name ?? null,
         category_code: cat?.code ?? null,
         display_order: null,
-        staff_code: null,
         launch_phase: d.launch_phase != null ? Number(d.launch_phase) : 1,
         stock_state: (d.stock_state as StockState) ?? 'in_stock',
         tags: tagMap.get(d.id) ?? [],
