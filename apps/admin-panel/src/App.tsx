@@ -22,6 +22,7 @@ const KDSBoard = lazy(() => import('./pages/KDSBoard').then(m => ({ default: m.K
 const CookStation = lazy(() => import('./pages/CookStation').then(m => ({ default: m.CookStation })))
 const WasteTracker = lazy(() => import('./pages/WasteTracker').then(m => ({ default: m.WasteTracker })))
 const Procurement = lazy(() => import('./pages/Procurement').then(m => ({ default: m.Procurement })))
+const ShoppingList = lazy(() => import('./pages/ShoppingList').then(m => ({ default: m.ShoppingList })))
 const SkuManagerPage = lazy(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
 const MasterPlanner = lazy(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
 const FinanceLayout = lazy(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
@@ -145,6 +146,7 @@ function App() {
                 <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
                 <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
+                <Route path="/shopping-list" element={<Suspense fallback={<PageLoader />}><ShoppingList /></Suspense>} />
                 <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
               </Route>
             </Route>
