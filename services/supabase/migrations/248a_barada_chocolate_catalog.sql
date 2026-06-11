@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════
--- 249_barada_chocolate_catalog.sql
+-- 248a_barada_chocolate_catalog.sql
 --
 -- Seed the BARADA chocolate retail catalog (partner: Barada, see
 -- vault Thai partner deal). Adds a new L3 retail category
@@ -126,7 +126,7 @@ WHERE n.product_code = v.code AND (n.customer_description IS NULL OR n.customer_
 
 INSERT INTO public.migration_log (filename, applied_by, notes)
 VALUES (
-  '249_barada_chocolate_catalog.sql',
+  '248a_barada_chocolate_catalog.sql',
   'claude-code',
   'Seed Barada chocolate retail catalog: KP-FIN-CHO category + 25 SALE-CHOC_* items (3 active @฿197) with Barada descriptions.'
 ) ON CONFLICT (filename) DO NOTHING;
