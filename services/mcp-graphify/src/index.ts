@@ -56,9 +56,17 @@ interface Graph {
 }
 
 interface Analytics {
+  generated_at?: string;
   summary: { nodes: number; edges: number; communities: number };
   god_nodes: GodNode[];
   top_communities: CommunityInfo[];
+}
+
+interface Freshness {
+  generated_at: string | null;
+  age_days: number | null;
+  stale: boolean;
+  warning?: string;
 }
 
 // ─── Graph Loader (cached, mtime-checked) ───────────────────────
@@ -90,8 +98,37 @@ function loadAnalytics(): Analytics {
 
 // ─── Helpers ────────────────────────────────────────────────────
 
+const STALE_AFTER_DAYS = 14;
+
+function graphFreshness(): Freshness {
+  let generatedAt: string | null = null;
+  try {
+    generatedAt = loadAnalytics().generated_at ?? null;
+  } catch {
+    // analytics file missing — fall through to mtime
+  }
+  if (!generatedAt) {
+    try {
+      generatedAt = new Date(statSync(GRAPH_PATH).mtimeMs).toISOString();
+    } catch {
+      return { generated_at: null, age_days: null, stale: true, warning: "graph.json missing or unreadable" };
+    }
+  }
+  const ageDays = Math.floor((Date.now() - new Date(generatedAt).getTime()) / 86_400_000);
+  const stale = ageDays > STALE_AFTER_DAYS;
+  return {
+    generated_at: generatedAt,
+    age_days: ageDays,
+    stale,
+    ...(stale && {
+      warning: `Graph snapshot is ${ageDays} days old — entities added since then are missing. Regenerate with /graphify . --update`,
+    }),
+  };
+}
+
 function jsonResult(data: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+  const payload = { graph_freshness: graphFreshness(), ...(data as object) };
+  return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
 }
 
 function matchesKeywords(node: GraphNode, keywords: string[]): number {
