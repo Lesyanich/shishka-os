@@ -1,35 +1,31 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAppRole, type AppRole } from '../contexts/AppRoleContext'
+import { hasAccess, landingFor } from '../lib/roles'
 
 interface RoleGuardProps {
-  /** Gate to owners only (legacy behaviour). */
-  minRole?: AppRole
-  /** Explicit allow-list of roles (e.g. owner + task_manager for Staff Tasks). */
-  allow?: AppRole[]
-}
-
-/** Where to send a role that isn't allowed on the requested route. */
-function landingFor(role: AppRole): string {
-  if (role === 'task_manager') return '/staff-tasks'
-  return '/kitchen/my-tasks' // cooks land on their task board
+  /** Minimum role required for the wrapped routes. owner ⊃ task_manager ⊃ cook. */
+  minRole: AppRole
 }
 
 /**
- * Route guard that redirects unauthorized roles to a sensible landing page.
- * Use `allow` for explicit multi-role access, or `minRole="owner"` for owner-only.
+ * Route guard for the 3-tier RBAC model. A user below `minRole` is redirected
+ * to their own role's landing page (never to a route they also can't see).
  */
-export function RoleGuard({ minRole, allow }: RoleGuardProps) {
+export function RoleGuard({ minRole }: RoleGuardProps) {
   const { role, isLoading } = useAppRole()
 
   if (isLoading) return null
 
-  if (allow) {
-    return allow.includes(role) ? <Outlet /> : <Navigate to={landingFor(role)} replace />
-  }
-
-  if (minRole === 'owner' && role !== 'owner') {
+  if (!hasAccess(role, minRole)) {
     return <Navigate to={landingFor(role)} replace />
   }
 
   return <Outlet />
+}
+
+/** Redirects to the current user's role landing — used for the `*` fallback. */
+export function RoleLanding() {
+  const { role, isLoading } = useAppRole()
+  if (isLoading) return null
+  return <Navigate to={landingFor(role)} replace />
 }
