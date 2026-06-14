@@ -1,4 +1,6 @@
--- Migration 273 — fix fn_link_telegram column ambiguity (staff task tracker).
+-- Migration 272a — fix fn_link_telegram column ambiguity (staff task tracker).
+-- Renumbered from 273_ (applied to prod as 267_fix_fn_link_telegram_ambiguous.sql)
+-- to resolve a duplicate-273 collision — see 282_renumber_273_275_collision_log_sync.sql.
 --
 -- The RETURNS TABLE OUT parameter `staff_id` (defined in 264b_telegram_link_codes)
 -- collided with the staff_telegram column `staff_id` referenced in
@@ -49,7 +51,7 @@ $$;
 
 INSERT INTO public.migration_log (filename, applied_by, notes)
 VALUES (
-  '273_fix_fn_link_telegram_ambiguous.sql',
+  '272a_fix_fn_link_telegram_ambiguous.sql',
   'claude-code',
   'Hotfix: rename fn_link_telegram OUT param staff_id -> linked_staff_id to fix 42702 ambiguity that broke Telegram linking.'
 ) ON CONFLICT (filename) DO NOTHING;
