@@ -13,11 +13,28 @@
 
 const DPI = 203
 const DOTS_PER_MM = DPI / 25.4 // ≈ 8
-const LABEL_W_MM = 60
-const LABEL_H_MM = 40
 
-export const LABEL_W_PX = Math.round(LABEL_W_MM * DOTS_PER_MM) // 480
-export const LABEL_H_PX = Math.round(LABEL_H_MM * DOTS_PER_MM) // 320
+/** A selectable thermal label stock size. */
+export interface LabelSize {
+  id: string
+  label: string
+  wMm: number
+  hMm: number
+}
+
+/** Common thermal label sizes for the XP-420B. First entry is the default. */
+export const LABEL_SIZES: LabelSize[] = [
+  { id: '60x40', label: '60 × 40 мм', wMm: 60, hMm: 40 },
+  { id: '58x40', label: '58 × 40 мм', wMm: 58, hMm: 40 },
+  { id: '50x30', label: '50 × 30 мм', wMm: 50, hMm: 30 },
+  { id: '40x30', label: '40 × 30 мм', wMm: 40, hMm: 30 },
+]
+
+export const DEFAULT_LABEL_SIZE: LabelSize = LABEL_SIZES[0]
+
+// Layout was tuned for the 60×40 stock (480×320 px); other sizes scale from it.
+const BASE_W_PX = Math.round(60 * DOTS_PER_MM) // 480
+const BASE_H_PX = Math.round(40 * DOTS_PER_MM) // 320
 
 export interface PrepLabelData {
   name: string
@@ -80,72 +97,77 @@ function fitText(
   return { size: minSize, lines: [text] }
 }
 
-/** Draw the 60×40 prep label and return a PNG data URL. */
-export function renderPrepLabel(data: PrepLabelData): string {
+/** Draw the prep label at the given stock size and return a PNG data URL. */
+export function renderPrepLabel(data: PrepLabelData, size: LabelSize = DEFAULT_LABEL_SIZE): string {
+  const wPx = Math.round(size.wMm * DOTS_PER_MM)
+  const hPx = Math.round(size.hMm * DOTS_PER_MM)
+  // Scale the 60×40 layout to the chosen stock; min() keeps it within both axes.
+  const s = Math.min(wPx / BASE_W_PX, hPx / BASE_H_PX)
+
   const canvas = document.createElement('canvas')
-  canvas.width = LABEL_W_PX
-  canvas.height = LABEL_H_PX
+  canvas.width = wPx
+  canvas.height = hPx
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D context unavailable')
 
-  const PAD = 18
+  const PAD = 18 * s
 
   // Thermal printing is black-on-white.
   ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, LABEL_W_PX, LABEL_H_PX)
+  ctx.fillRect(0, 0, wPx, hPx)
   ctx.fillStyle = '#000000'
   ctx.textBaseline = 'top'
 
   // ── Item name (bold, up to 2 lines, auto-shrink) ──
-  const { size, lines } = fitText(
+  const { size: nameSize, lines } = fitText(
     ctx,
     data.name.toUpperCase(),
-    LABEL_W_PX - PAD * 2,
+    wPx - PAD * 2,
     2,
-    46,
-    26,
+    Math.round(46 * s),
+    Math.round(26 * s),
     '800',
   )
-  ctx.font = `800 ${size}px sans-serif`
-  let y = 16
+  ctx.font = `800 ${nameSize}px sans-serif`
+  let y = 16 * s
   for (const line of lines) {
     ctx.fillText(line, PAD, y)
-    y += size + 4
+    y += nameSize + 4 * s
   }
 
   // ── Divider ──
-  const dividerY = 130
-  ctx.fillRect(PAD, dividerY, LABEL_W_PX - PAD * 2, 3)
+  ctx.fillRect(PAD, 130 * s, wPx - PAD * 2, Math.max(2, 3 * s))
 
-  const VALX = PAD + 160 // x where each row's value starts
-  let row = 144
+  const VALX = PAD + 160 * s // x where each row's value starts
+  let row = 144 * s
+  const F = (n: number) => Math.round(n * s) // scaled font size
 
   // ── Weight / volume (optional) ──
   if (data.weight) {
-    ctx.font = '500 26px sans-serif'
+    ctx.font = `500 ${F(26)}px sans-serif`
     ctx.fillText('QTY', PAD, row)
-    ctx.font = '700 30px sans-serif'
-    ctx.fillText(data.weight, VALX, row - 2)
-    row += 42
+    ctx.font = `700 ${F(30)}px sans-serif`
+    ctx.fillText(data.weight, VALX, row - 2 * s)
+    row += 42 * s
   }
 
   // ── PREP date ──
-  ctx.font = '500 26px sans-serif'
+  ctx.font = `500 ${F(26)}px sans-serif`
   ctx.fillText('PREP', PAD, row)
-  ctx.font = '700 30px sans-serif'
-  ctx.fillText(formatDate(data.prepDate), VALX, row - 2)
-  row += 42
+  ctx.font = `700 ${F(30)}px sans-serif`
+  ctx.fillText(formatDate(data.prepDate), VALX, row - 2 * s)
+  row += 42 * s
 
   // ── USE BY date (emphasized) ──
   const useBy = data.shelfLifeDays != null ? addDays(data.prepDate, data.shelfLifeDays) : null
-  ctx.font = '500 26px sans-serif'
+  ctx.font = `500 ${F(26)}px sans-serif`
   ctx.fillText('USE BY', PAD, row)
-  ctx.font = '800 36px sans-serif'
-  ctx.fillText(useBy ? formatDate(useBy) : '—', VALX, row - 4)
+  ctx.font = `800 ${F(36)}px sans-serif`
+  ctx.fillText(useBy ? formatDate(useBy) : '—', VALX, row - 4 * s)
 
   // ── Product code (bottom, monospace) ──
-  ctx.font = '400 22px monospace'
-  ctx.fillText(data.productCode, PAD, 292)
+  ctx.font = `400 ${F(22)}px monospace`
+  ctx.fillText(data.productCode, PAD, hPx - 28 * s)
 
   return canvas.toDataURL('image/png')
 }
@@ -168,6 +190,6 @@ export function printViaRawBT(dataUrl: string, useIntent = false): void {
 }
 
 /** Render + print a prep label in one call. */
-export function printPrepLabel(data: PrepLabelData): void {
-  printViaRawBT(renderPrepLabel(data))
+export function printPrepLabel(data: PrepLabelData, size: LabelSize = DEFAULT_LABEL_SIZE): void {
+  printViaRawBT(renderPrepLabel(data, size))
 }
