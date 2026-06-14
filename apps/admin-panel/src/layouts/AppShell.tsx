@@ -79,6 +79,7 @@ const NAV_SECTIONS: NavSection[] = [
     minRole: 'cook',
     defaultOpen: true,
     items: [
+      { path: '/kitchen/my-tasks', icon: ListTodo, label: 'My Tasks' },
       { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS' },
       { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station' },
       { path: '/kitchen/waste', icon: Trash2, label: 'Waste' },
@@ -134,6 +135,7 @@ const NAV_SECTIONS: NavSection[] = [
 const ROLE_STYLE: Record<AppRole, string> = {
   owner: 'bg-amber-500/15 text-amber-300',
   cook: 'bg-sky-500/15 text-sky-300',
+  task_manager: 'bg-violet-500/15 text-violet-300',
 }
 
 /* ─── Collapsible section ─── */
@@ -193,9 +195,14 @@ export function AppShell() {
   const { user, signOut } = useAuth()
   const { role, staffName, isLoading: roleLoading } = useAppRole()
 
-  const visibleSections = NAV_SECTIONS.filter(
-    (s) => role === 'owner' || s.minRole === 'cook',
-  )
+  const visibleSections =
+    role === 'task_manager'
+      ? // Task managers see only the Staff Tasks entry
+        NAV_SECTIONS.map((s) => ({
+          ...s,
+          items: s.items.filter((i) => i.path === '/staff-tasks'),
+        })).filter((s) => s.items.length > 0)
+      : NAV_SECTIONS.filter((s) => role === 'owner' || s.minRole === 'cook')
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     () => {

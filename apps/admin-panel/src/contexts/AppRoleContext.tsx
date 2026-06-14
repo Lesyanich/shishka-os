@@ -8,7 +8,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 
-export type AppRole = 'owner' | 'cook'
+export type AppRole = 'owner' | 'cook' | 'task_manager'
 
 interface AppRoleState {
   role: AppRole
