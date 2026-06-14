@@ -846,6 +846,76 @@ async function handlePushModifiers(req: Request) {
   }
 }
 
+// ── Action: pull_items_status ──
+// Pulls all items from Loyverse API and upserts into loyverse_item_sync.
+// The frontend reads v_loyverse_sync_status to show photo/price gaps.
+
+interface LoyverseItemFull {
+  id: string
+  item_name: string
+  image_url?: string | null
+  category_id?: string | null
+  deleted_at?: string | null
+  variants?: Array<{ default_price?: number }>
+}
+
+async function handlePullItemsStatus() {
+  const logId = await logStart("items_pull_status", 0)
+  let items: LoyverseItemFull[]
+  try {
+    items = await loyverseGetAll<LoyverseItemFull>("/items", "items")
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    await logFinish(logId, "error", 0, 0, msg)
+    return json({ ok: false, error: msg }, 502)
+  }
+
+  // Build upsert rows — include deleted items so we know they're gone
+  const rows = items.map((item) => ({
+    loyverse_item_id: item.id,
+    lv_name: item.item_name ?? null,
+    lv_price: item.variants?.[0]?.default_price ?? null,
+    lv_image_url: item.image_url ?? null,
+    lv_category_id: item.category_id ?? null,
+    lv_is_deleted: !!item.deleted_at,
+    pulled_at: new Date().toISOString(),
+  }))
+
+  const CHUNK = 200
+  let failed = 0
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const { error } = await db
+      .from("loyverse_item_sync")
+      .upsert(rows.slice(i, i + CHUNK), { onConflict: "loyverse_item_id" })
+    if (error) { failed++; continue }
+  }
+
+  // Back-fill nomenclature_id for rows that don't have it yet
+  const { data: linked } = await db
+    .from("nomenclature")
+    .select("id, loyverse_item_id")
+    .not("loyverse_item_id", "is", null)
+  for (const n of (linked ?? []) as Array<{ id: string; loyverse_item_id: string }>) {
+    await db
+      .from("loyverse_item_sync")
+      .update({ nomenclature_id: n.id })
+      .eq("loyverse_item_id", n.loyverse_item_id)
+      .is("nomenclature_id", null)
+  }
+
+  const withPhoto = rows.filter((r) => r.lv_image_url).length
+  const deleted   = rows.filter((r) => r.lv_is_deleted).length
+
+  await logFinish(logId, failed > 0 ? "error" : "success", rows.length, 0)
+  return json({
+    ok: true,
+    total: rows.length,
+    with_photo: withPhoto,
+    deleted,
+    failed_chunks: failed,
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
   try {
@@ -907,6 +977,9 @@ Deno.serve(async (req) => {
       case "push_modifiers":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handlePushModifiers(req)
+      case "pull_items_status":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handlePullItemsStatus()
       default:
         return json(
           {

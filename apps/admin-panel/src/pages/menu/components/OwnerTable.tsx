@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
-import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch, PanelRightOpen, Upload, Loader2, CheckCircle2, AlertCircle, Globe, EyeOff } from 'lucide-react'
+import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch, PanelRightOpen, Upload, Loader2, CheckCircle2, AlertCircle, Globe, EyeOff, Image, ImageOff } from 'lucide-react'
 import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useMenuDishes'
 import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
 import { useLoyversePushDish } from '../../../hooks/useLoyversePushDish'
@@ -31,6 +31,8 @@ interface OwnerTableProps {
   /** Called after a successful Loyverse push so the parent can refetch
    * (updates pos_status + loyverse_synced_at in the table). */
   onPushed?: () => void
+  /** Loyverse sync snapshot keyed by nomenclature_id. Populated via pull_items_status. */
+  lvSyncMap?: Map<string, import('../../../hooks/useLoyverseSync').LoyverseSyncRow>
 }
 
 const KIND_BADGE: Record<NomenclatureKind, { label: string; cls: string }> = {
@@ -269,6 +271,7 @@ export function OwnerTable({
   autoExpandId,
   grabMargins,
   onPushed,
+  lvSyncMap,
 }: OwnerTableProps) {
   const filtered = selectedCategory
     ? items.filter((d) => (d.section_id ?? d.category_id) === selectedCategory)
@@ -555,6 +558,8 @@ export function OwnerTable({
             <th role="columnheader" className="px-3 py-2.5 text-center">Version</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Verified</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Loyverse</th>
+            <th role="columnheader" className="px-3 py-2.5 text-center" title="Photo set in Loyverse">LV Photo</th>
+            <th role="columnheader" className="px-3 py-2.5 text-right" title="Price in Loyverse vs our DB">LV Price</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Synced</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">DB Updated</th>
             <th role="columnheader" className="px-3 py-2.5 text-center">Push</th>
@@ -567,7 +572,7 @@ export function OwnerTable({
             if (item.type === 'l2-header') {
               return (
                 <tr key={`l2-${item.subcategory.id}`} className="bg-surface-1/30">
-                  <td colSpan={26} className="px-3 py-2">
+                  <td colSpan={28} className="px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-cream/50">
                       {item.subcategory.name}
                     </span>
@@ -960,6 +965,41 @@ export function OwnerTable({
                   </div>
                 </td>
 
+                {/* LV Photo — from pull_items_status snapshot */}
+                <td className="px-3 py-2 text-center">
+                  {dish.kind === 'SALE' && dish.loyverse_item_id ? (() => {
+                    const lv = lvSyncMap?.get(dish.id)
+                    if (!lv || lv.lv_status === 'not_pulled') return <span className="text-cream/30" title="Not yet pulled from Loyverse">&mdash;</span>
+                    if (lv.lv_status === 'not_in_lv') return <span className="text-cream/30">&mdash;</span>
+                    return lv.lv_has_photo ? (
+                      <span title="Photo set in Loyverse" className="text-forest-soft">
+                        <Image className="inline h-3.5 w-3.5" />
+                      </span>
+                    ) : (
+                      <span title={lv.has_our_photo ? 'No photo in Loyverse — but we have one in DB' : 'No photo anywhere'}>
+                        <ImageOff className={`inline h-3.5 w-3.5 ${lv.has_our_photo ? 'text-amber-watch' : 'text-cream/30'}`} />
+                      </span>
+                    )
+                  })() : <span className="text-cream/30">&mdash;</span>}
+                </td>
+
+                {/* LV Price — mismatch badge if Loyverse price ≠ DB price */}
+                <td className="px-3 py-2 text-right">
+                  {dish.kind === 'SALE' && dish.loyverse_item_id ? (() => {
+                    const lv = lvSyncMap?.get(dish.id)
+                    if (!lv?.lv_price) return <span className="text-cream/30">&mdash;</span>
+                    if (lv.price_mismatch) return (
+                      <span
+                        className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brick-soft ring-1 ring-inset ring-[var(--color-brick-soft)]/40 bg-[var(--color-royal-red)]/15"
+                        title={`Loyverse has ${formatThb(lv.lv_price)} but DB price is ${formatThb(lv.our_price)}`}
+                      >
+                        {formatThb(lv.lv_price)}
+                      </span>
+                    )
+                    return <span className="text-[10px] tabular-nums text-cream/50">{formatThb(lv.lv_price)}</span>
+                  })() : <span className="text-cream/30">&mdash;</span>}
+                </td>
+
                 {/* Last Loyverse sync */}
                 <td className="px-3 py-2 text-center">
                   {(() => {
@@ -1104,7 +1144,7 @@ export function OwnerTable({
               )}
               {isExpanded && (
                 <tr className="bg-surface-1/60">
-                  <td colSpan={26} className="p-0">
+                  <td colSpan={28} className="p-0">
                     <DishExpandedCard dish={dish} />
                     {onOpenDrawer && (
                       <div className="flex justify-end border-t border-surface-3/50 bg-surface-1/40 px-4 py-2">
@@ -1215,6 +1255,8 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
                 </span>
               )}
             </td>
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />
             <td className="px-3 py-1.5" />

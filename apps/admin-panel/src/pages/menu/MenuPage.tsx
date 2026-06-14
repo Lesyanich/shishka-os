@@ -10,6 +10,7 @@ import {
   Plus,
   Package,
   Shield,
+  RefreshCw,
 } from 'lucide-react'
 import { useMenuData } from '../../hooks/useMenuData'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
@@ -27,6 +28,7 @@ import { FilterBar } from '../../components/menu/owner/FilterBar'
 import { DishDrawer } from '../../components/menu/drawer/DishDrawer'
 import { CategoryTabs } from '../../components/menu/shared'
 import { useMenuFilters, applyFilters } from './hooks/useMenuFilters'
+import { useLoyverseSync } from '../../hooks/useLoyverseSync'
 
 type ViewMode = 'owner' | 'l1-cook' | 'l2-assembler' | 'customer'
 type OwnerLayout = 'table' | 'gallery'
@@ -204,6 +206,8 @@ export function MenuPage() {
   const [newDishOpen, setNewDishOpen] = useState(false)
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
 
+  const { syncMap: lvSyncMap, isPulling, lastPulledAt, pullFromLoyverse } = useLoyverseSync()
+
   // Items scoped to current type filter (used for category counts + OwnerTable).
   // Dual-type items appear in BOTH filter buckets per product-design spec.
   const typeFilteredItems = useMemo(() => {
@@ -308,6 +312,19 @@ export function MenuPage() {
             <Plus className="h-3.5 w-3.5" />
             New dish
           </button>
+
+          {/* Pull from Loyverse button */}
+          {view === 'owner' && (
+            <button
+              onClick={() => { void pullFromLoyverse() }}
+              disabled={isPulling}
+              className="flex items-center gap-1.5 rounded-lg border border-surface-3 bg-surface-2 px-3 py-1.5 text-xs font-medium text-cream/70 transition hover:border-surface-3 hover:bg-surface-3 disabled:opacity-50"
+              title={lastPulledAt ? `Last pulled ${new Date(lastPulledAt).toLocaleTimeString()}` : 'Pull Loyverse item status'}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isPulling ? 'animate-spin' : ''}`} />
+              {isPulling ? 'Pulling…' : 'LV Sync'}
+            </button>
+          )}
 
           {/* AI Chef button */}
           <button
@@ -505,6 +522,7 @@ export function MenuPage() {
           autoExpandId={justCreatedId}
           grabMargins={grabMargins}
           onPushed={() => refetch()}
+          lvSyncMap={lvSyncMap}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
         <OwnerGallery
