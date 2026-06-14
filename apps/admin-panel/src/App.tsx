@@ -131,10 +131,14 @@ function App() {
                     <Route path="staff" element={<StaffPage />} />
                     <Route path="schedule" element={<Suspense fallback={<PageLoader />}><SchedulePage /></Suspense>} />
                   </Route>
-                  <Route path="/staff-tasks" element={<Suspense fallback={<PageLoader />}><StaffTasksPage /></Suspense>} />
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                   <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
                   <Route path="/salad-bar" element={<Suspense fallback={<PageLoader />}><SaladBarPage /></Suspense>} />
+                </Route>
+
+                {/* ── Staff Tasks — owner + task_manager (e.g. Mint distributes tasks) ── */}
+                <Route element={<RoleGuard allow={['owner', 'task_manager']} />}>
+                  <Route path="/staff-tasks" element={<Suspense fallback={<PageLoader />}><StaffTasksPage /></Suspense>} />
                 </Route>
 
                 {/* ── Kitchen + Production — accessible to all authenticated ── */}
