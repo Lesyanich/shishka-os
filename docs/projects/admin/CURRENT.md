@@ -15,6 +15,14 @@
 
 ## In-flight (backend foundation)
 
+- **2026-06-11 — Brain revival: Graphify freshness + lightrag cleanup (MC b979c787, branch `claude/elastic-easley-64e0bf`).**
+  - Audit: graph.json was generated **2026-04-25** (graph-analytics.json `generated_at`); mcp-graphify served that static snapshot with no staleness signal. LightRAG embedding-suffixed tables (`lightrag_vdb_*_text_embedding_3_small_1536d`) survived 217a; brain_inbox empty.
+  - `services/mcp-graphify` now returns `graph_freshness {generated_at, age_days, stale (>14d), warning}` in every tool response (source: analytics `generated_at`, fallback file mtime). Test added; 10/10 pass.
+  - Mig **269** drops the 3 lightrag_vdb_* orphans — **written, NOT yet applied to prod** (destructive DROP awaits CEO approval).
+  - Weekly local scheduled task `shishka-brain-maintenance` (Mon ~09:29): graph regen check, MEMORY.md size guard, MC brain-task sweep, brain_inbox check.
+  - Brain v2 epic (b1c255bc) re-scoped: Phase 0 done via 217a+269, Phase 1 = this work, Phases 2-5 → backlog.
+  - **Blocked on approvals:** `pip install graphifyy` (graph regeneration) + applying mig 269 DROPs.
+
 - **2026-06-08 — Build-your-own "from ฿X" floor on shishka.health (site).**
   - Migs **259** (`group_min_select`) + **260** (`group_max_select` — adds `dish_modifier_groups.max_select`, caps Custom Smoothie "Pick Fruits" at 4): view `menu_modifiers` now exposes both min/max select (appended cols — CREATE OR REPLACE can't insert mid-list). Additive; row filter unchanged. Applied to prod.
   - shishka-health (PRs #6 + #7 + #8): dishes with a required modifier group (`minSelect>0`) price **"from ฿X"** = base + cheapest mandatory add-ons (new `src/lib/modifiers.js` `dishFloor`). Custom Smoothie shows **from ฿109** (89 + 2 cheapest fruits @฿10) on card + dialog. ModifierBuilder opens **empty** (no pre-select), enforces min **and** max per group (Pick Fruits = "pick 2–4"; at cap, unpicked options disabled), and shows the `from ฿X` floor as the total until the min is met. Mirrors the manakish-bundle `from ฿X` floor.

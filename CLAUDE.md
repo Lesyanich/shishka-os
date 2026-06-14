@@ -28,6 +28,7 @@ When unsure → ask: "This sounds like [domain]. Should I load [agent]?"
 - **COMPOUND-ENGINEERING:** CEO corrects you → update `docs/` so it never repeats
 - **BACKLOG-FIRST:** found work outside current task → log to MC, don't start it
 - **SOCRATIC-GATE:** new feature/migration → stop, ask 2-3 questions before code
+- **GRAPH-BEFORE-GREP:** for "what connects to / depends on / where does X live" questions, try `graphify_query_topic` first (cheaper than reading files) → see `operational-rules.md` § LK-GRAPH. Grep stays for exact strings & file contents.
 
 ## Rules (enforced)
 - **Commit Gate:** never push until MC task + CURRENT.md updated

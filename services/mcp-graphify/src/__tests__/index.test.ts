@@ -36,4 +36,12 @@ describe("Graphify MCP prerequisites", () => {
     expect(link).toHaveProperty("target");
     expect(link).toHaveProperty("relation");
   });
+
+  it("analytics carries a valid generated_at timestamp (freshness source)", () => {
+    const analytics = JSON.parse(readFileSync(ANALYTICS_PATH, "utf-8"));
+    expect(analytics).toHaveProperty("generated_at");
+    const ts = new Date(analytics.generated_at).getTime();
+    expect(Number.isNaN(ts)).toBe(false);
+    expect(ts).toBeLessThanOrEqual(Date.now());
+  });
 });
