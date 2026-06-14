@@ -14,6 +14,16 @@ export interface MenuRecipeStep {
   step_order: number
   operation_name: string
   instruction_text: string | null
+  /** Short station label for this step: 'L1' (Kitchen prep) | 'L2' (Assembly) | zone name. */
+  location: string | null
+}
+
+/** Map a locations.name (functional zone) to the station label cooks use. */
+function stationLabel(name: string | null | undefined): string | null {
+  if (!name) return null
+  if (name === 'Kitchen') return 'L1'
+  if (name === 'Assembly') return 'L2'
+  return name
 }
 
 /** A dish customisation option (from v_dish_modifier_options), ordered. */
@@ -105,7 +115,9 @@ export function useMenuListEnrichment(
       supabase.from('pf_pack_card').select('*'),
       supabase
         .from('recipes_flow')
-        .select('nomenclature_id, step_order, operation_name, instruction_text, is_ccp')
+        .select(
+          'nomenclature_id, step_order, operation_name, instruction_text, is_ccp, location:locations(name)',
+        )
         .order('step_order', { ascending: true }),
       supabase.from('v_dish_assembly_components').select('*'),
       supabase.from('v_dish_modifier_options').select('*'),
@@ -157,16 +169,19 @@ export function useMenuListEnrichment(
       operation_name: string
       instruction_text: string | null
       is_ccp: boolean
+      location: { name: string | null } | { name: string | null }[] | null
     }>) {
       const prev = rs.get(row.nomenclature_id) ?? { step_count: 0, ccp_count: 0 }
       prev.step_count += 1
       if (row.is_ccp) prev.ccp_count += 1
       rs.set(row.nomenclature_id, prev)
       const list = steps.get(row.nomenclature_id) ?? []
+      const loc = Array.isArray(row.location) ? row.location[0] : row.location
       list.push({
         step_order: row.step_order,
         operation_name: row.operation_name,
         instruction_text: row.instruction_text,
+        location: stationLabel(loc?.name),
       })
       steps.set(row.nomenclature_id, list)
     }
