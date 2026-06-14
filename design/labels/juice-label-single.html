@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Shishka — Juice Label (single)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;0,800;0,900;1,400;1,500;1,700&family=Geist:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* SHISHKA — single juice sticker master · 42.4 × 105 mm · black + yellow · date by hand */
+  :root{
+    --label-w:42.4mm; --label-h:105mm; --pad:3.2mm; --ink:#000;
+    --font-display:'Alegreya', ui-serif, Georgia, serif;
+    --font-sans:'Geist', system-ui, -apple-system, sans-serif;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{ background:#c9ccd1; font-family:var(--font-sans); display:flex; justify-content:center; padding:24px; }
+  .label{ width:var(--label-w); height:var(--label-h); background:#fff; color:var(--ink);
+    padding:var(--pad); display:flex; flex-direction:column; overflow:hidden; }
+  .logo{ display:block; width:30mm; margin:0 auto; }
+  .logo-rule{ width:48%; height:0.3mm; background:var(--ink); margin:1.4mm auto 0; }
+  .pname{ font-family:var(--font-display); font-weight:800; font-size:5.3mm; line-height:1.08;
+    letter-spacing:-0.2px; text-align:center; margin-top:2.0mm; }
+  .tagline{ font-family:var(--font-display); font-style:italic; font-weight:500; font-size:2.6mm;
+    line-height:1.2; text-align:center; margin-top:1.4mm; }
+  .sp{ flex:1 1 0; min-height:1.5mm; }
+  .sp-bottom{ flex:1.4 1 0; }
+  .pricebar{ display:flex; align-items:stretch; border:0.3mm solid var(--ink); margin-top:2.8mm; }
+  .pricebar .cell{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.0mm 0; }
+  .pricebar .cell.vol{ border-right:0.3mm solid var(--ink); }
+  .pricebar .cell.price{ background:var(--ink); color:#fff; }
+  .pricebar .lab{ font-size:1.5mm; font-weight:600; letter-spacing:1px; text-transform:uppercase; margin-bottom:0.4mm; }
+  .pricebar .num{ line-height:1; }
+  .pricebar .cell.vol .num{ font-weight:600; font-size:3.3mm; }
+  .pricebar .cell.price .num{ font-weight:800; font-size:5.6mm; }
+  .hr{ height:0.3mm; background:var(--ink); margin:1.8mm 0 1.6mm; }
+  .ingredients{ font-size:2.4mm; line-height:1.2; text-align:center; }
+  .ingredients b{ font-weight:700; text-transform:uppercase; letter-spacing:1px; font-size:1.95mm; display:block; margin-bottom:0.4mm; }
+  .nutri{ border:0.3mm solid var(--ink); margin-top:1.8mm; }
+  .nutri .nhead{ background:var(--ink); color:#fff; text-align:center; font-weight:700;
+    font-size:1.7mm; letter-spacing:1px; text-transform:uppercase; padding:0.55mm 0; }
+  .nutri .ncells{ display:flex; }
+  .nutri .ncell{ flex:1; text-align:center; padding:0.8mm 0; border-right:0.22mm solid var(--ink); }
+  .nutri .ncell:last-child{ border-right:0; }
+  .nutri .ncell .v{ font-weight:700; font-size:2.5mm; line-height:1; display:block; }
+  .nutri .ncell .k{ font-size:1.5mm; font-weight:500; letter-spacing:0.3px; text-transform:uppercase; }
+  .storage{ font-size:1.85mm; line-height:1.18; font-weight:500; text-align:center; margin-bottom:2.4mm; }
+  .datefield{ margin-top:3.2mm; }
+  .datefield:first-of-type{ margin-top:0; }
+  .datefield .dl{ font-size:1.8mm; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; display:block; }
+  .datefield .line{ display:block; height:0.3mm; background:var(--ink); margin-top:4.2mm; }
+  .site{ font-size:1.8mm; font-weight:600; letter-spacing:0.8px; text-align:center; margin-top:2.6mm; }
+  @media print{ @page{ size:42.4mm 105mm; margin:0; } body{ background:#fff; padding:0; } }
+</style>
+</head>
+<body>
+  <div class="label">
+    <img class="logo" src="shishka-logo-color.png" alt="Shishka Healthy Kitchen">
+    <div class="logo-rule"></div>
+    <div class="pname">🍊 Fresh Orange Juice</div>
+    <div class="tagline">100% cold-pressed · no added sugar</div>
+    <div class="sp"></div>
+    <div class="pricebar">
+      <div class="cell vol"><span class="lab">Volume</span><span class="num">250 ml</span></div>
+      <div class="cell price"><span class="lab">Price</span><span class="num">฿100</span></div>
+    </div>
+    <div class="hr"></div>
+    <div class="ingredients"><b>Ingredients</b>Orange.</div>
+    <div class="nutri">
+      <div class="nhead">Nutrition · per 100 ml</div>
+      <div class="ncells">
+        <div class="ncell"><span class="v">45</span><span class="k">kcal</span></div>
+        <div class="ncell"><span class="v">0.7</span><span class="k">prot·g</span></div>
+        <div class="ncell"><span class="v">10.4</span><span class="k">carb·g</span></div>
+        <div class="ncell"><span class="v">0.2</span><span class="k">fat·g</span></div>
+      </div>
+    </div>
+    <div class="sp sp-bottom"></div>
+    <footer class="footer">
+      <div class="storage">Keep refrigerated 0–4°C · Shake well · Drink fresh</div>
+      <div class="datefield"><span class="dl">Packed</span><span class="line"></span></div>
+      <div class="datefield"><span class="dl">Best before</span><span class="line"></span></div>
+      <div class="site">shishka.health</div>
+    </footer>
+  </div>
+</body>
+</html>
