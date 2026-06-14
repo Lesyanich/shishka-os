@@ -8,8 +8,10 @@ const LABEL_SIZE_KEY = 'kitchen_label_size'
 
 /**
  * Kitchen label station (cook-accessible). An L1 cook picks a prep item, enters
- * the batch weight + shelf life, and prints a 60×40 storage label to the
- * XP-420B via RawBT: name + prep date + weight + use-by.
+ * the batch weight + shelf life, and prints a storage label to the XP-420B via
+ * RawBT: name + prep date + weight + use-by.
+ *
+ * UI copy is English by default (Thai / Burmese to be added later).
  */
 export function KitchenLabels() {
   const { items, isLoading, error } = usePrepLabelItems()
@@ -34,7 +36,7 @@ export function KitchenLabels() {
     <div className="mx-auto max-w-2xl p-4">
       <div className="mb-4 flex items-center gap-2">
         <Tag className="h-5 w-5 text-amber-400" />
-        <h1 className="text-lg font-semibold text-slate-100">Этикетки заготовок</h1>
+        <h1 className="text-lg font-semibold text-slate-100">Prep Labels</h1>
       </div>
 
       <div className="relative mb-4">
@@ -43,25 +45,25 @@ export function KitchenLabels() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Поиск заготовки…"
+          placeholder="Search prep item…"
           className="w-full rounded-xl border border-slate-700 bg-slate-900 py-3 pl-10 pr-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
         />
       </div>
 
       {isLoading && (
         <div className="flex items-center justify-center py-20 text-slate-500">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Загрузка…
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading…
         </div>
       )}
 
       {error && (
         <p className="rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
-          Не удалось загрузить заготовки: {error}
+          Couldn&apos;t load prep items: {error}
         </p>
       )}
 
       {!isLoading && !error && filtered.length === 0 && (
-        <p className="py-20 text-center text-sm text-slate-500">Ничего не найдено.</p>
+        <p className="py-20 text-center text-sm text-slate-500">Nothing found.</p>
       )}
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -109,7 +111,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
 
   const useBy = daysValid && daysNum != null ? addDays(new Date(), daysNum) : null
   const useByLabel = useBy
-    ? useBy.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    ? useBy.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
     : '—'
 
   function handlePrint() {
@@ -129,7 +131,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
         onClick={onBack}
         className="mb-4 flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200"
       >
-        <ChevronLeft className="h-4 w-4" /> Все заготовки
+        <ChevronLeft className="h-4 w-4" /> All prep items
       </button>
 
       <div className="mb-5">
@@ -141,7 +143,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
         {/* Weight / volume */}
         <label className="block">
           <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-            Количество ({unit})
+            Quantity ({unit})
           </span>
           <div className="flex items-center gap-2">
             <input
@@ -151,7 +153,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
               step="0.1"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
-              placeholder="напр. 1.5"
+              placeholder="e.g. 1.5"
               className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-lg text-slate-100 outline-none focus:border-amber-500/60"
             />
             <span className="text-base text-slate-400">{unit}</span>
@@ -161,7 +163,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
         {/* Shelf life */}
         <label className="block">
           <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-            Срок хранения (дней)
+            Shelf life (days)
           </span>
           <input
             type="number"
@@ -170,24 +172,24 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
             max={365}
             value={days}
             onChange={(e) => setDays(e.target.value)}
-            placeholder="напр. 3"
+            placeholder="e.g. 3"
             className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-lg text-slate-100 outline-none focus:border-amber-500/60"
           />
           {!daysValid && (
-            <span className="mt-1 block text-[11px] text-rose-400">Целое число от 1 до 365.</span>
+            <span className="mt-1 block text-[11px] text-rose-400">Whole number, 1–365.</span>
           )}
         </label>
 
         {/* Use-by preview */}
         <div className="flex items-center justify-between rounded-xl bg-slate-950 px-3 py-3 text-sm">
-          <span className="text-slate-400">Годен до (от сегодня)</span>
+          <span className="text-slate-400">Use by (from today)</span>
           <span className="text-base font-semibold text-slate-100">{useByLabel}</span>
         </div>
 
         {/* Paper size */}
         <label className="block">
           <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-            Размер бумаги
+            Paper size
           </span>
           <select
             value={sizeId}
@@ -209,10 +211,10 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           disabled={!qtyValid || !daysValid}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3.5 text-base font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <Printer className="h-5 w-5" /> Печать этикетки
+          <Printer className="h-5 w-5" /> Print label
         </button>
         <p className="text-center text-[11px] text-slate-500">
-          Печатает на планшете через RawBT → XP-420B (60×40 мм)
+          Prints on the tablet via RawBT → XP-420B
         </p>
       </div>
     </div>
