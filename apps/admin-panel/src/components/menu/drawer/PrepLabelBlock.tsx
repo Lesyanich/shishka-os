@@ -1,16 +1,23 @@
 import { useState } from 'react'
 import { Printer, Check, Loader2 } from 'lucide-react'
-import type { MenuItem } from '../../../hooks/useMenuData'
 import type { PfPackCardData } from '../../../hooks/usePfPackCard'
 import { usePfPackCardSave } from '../../../hooks/usePfPackCardSave'
 import { addDays, printPrepLabel } from '../../../lib/labelPrinting'
+
+/** Minimal shape a PF item needs for the storage label (satisfied by MenuItem). */
+export interface PrepLabelItem {
+  id: string
+  name: string
+  product_code: string
+  card_version: number
+}
 
 /**
  * Storage-label block for a PF (prep / semi-finished) item.
  * Lets the cook set a shelf life (persisted to pf_pack_card.shelf_life_days) and
  * print a 60×40 prep label (name + prep date + use-by) to the XP-420B via RawBT.
  */
-export function PrepLabelBlock({ item, card }: { item: MenuItem; card: PfPackCardData | null }) {
+export function PrepLabelBlock({ item, card }: { item: PrepLabelItem; card: PfPackCardData | null }) {
   const { save, saving } = usePfPackCardSave()
 
   const initialDays = card?.shelf_life_days ?? null
