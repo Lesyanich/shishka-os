@@ -199,7 +199,11 @@ function buildCheatSheetHtml(
               (s) =>
                 `<li><span class="num">${s.step_order}</span><span>${escapeHtml(
                   s.instruction_text ?? s.operation_name,
-                )}</span></li>`,
+                )}${
+                  s.location
+                    ? `<b class="loc">${escapeHtml(s.location)}</b>`
+                    : ''
+                }</span></li>`,
             )
             .join('')
         : '<li class="muted">Process pending</li>'
@@ -298,6 +302,7 @@ function buildCheatSheetHtml(
     ul.pkg li { display: flex; justify-content: space-between; gap: .4em; padding: .05em 0; }
     ul.pkg b { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
     ol.proc li { display: flex; gap: .4em; padding: .08em 0; line-height: 1.25; }
+    ol.proc .loc { margin-left: .35em; padding: 0 .3em; border-radius: 3px; background: #1a160f; color: #fff; font-size: .72em; font-weight: 700; vertical-align: baseline; }
     ol.proc .num {
       flex: 0 0 1.35em; height: 1.35em; display: inline-flex; align-items: center; justify-content: center;
       background: #1a160f; color: #fff; border-radius: 50%; font-size: .78em; font-weight: 700;
@@ -534,9 +539,14 @@ function SaleAssemblyCard({
               <span className="font-mono text-[10px] text-cream/40">
                 {s.step_order}.
               </span>
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1">
                 {s.instruction_text ?? s.operation_name}
               </span>
+              {s.location && (
+                <span className="shrink-0 rounded bg-surface-3 px-1 py-0.5 text-[9px] font-bold tracking-wide text-cream/55">
+                  {s.location}
+                </span>
+              )}
             </li>
           ))}
         </ol>
