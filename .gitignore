@@ -93,3 +93,7 @@ services/supabase/supabase/
 
 # Git worktrees for parallel manual sessions
 .worktrees/
+
+# Graphify working directory — keep only the manifest baseline for incremental --update
+/graphify-out/*
+!/graphify-out/manifest.json
