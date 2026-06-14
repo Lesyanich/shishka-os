@@ -67,6 +67,12 @@ function ingredientLabel(c: AssemblyComponent): string {
   return c.component_emoji ? `${c.component_emoji} ${name}` : name
 }
 
+/** Clean packaging label: emoji + short name, falling back to the supplier name. */
+function packagingLabel(p: DishPackagingLine): string {
+  const name = p.packaging_short_name ?? p.packaging_name
+  return p.packaging_emoji ? `${p.packaging_emoji} ${name}` : name
+}
+
 /** Clean modifier label with emoji prefix. */
 function modifierLabel(o: DishModifierOption): string {
   const name = o.modifier_short_name ?? o.modifier_name
@@ -118,6 +124,7 @@ function buildCheatSheetHtml(
   componentsByDish: Map<string, AssemblyComponent[]>,
   recipeStepsByDish: Map<string, MenuRecipeStep[]>,
   modifierOptionsByDish: Map<string, DishModifierOption[]>,
+  packagingByDish: Map<string, DishPackagingLine[]>,
   orientation: 'landscape' | 'portrait',
 ): string {
   const title = items[0]?.category_name
@@ -196,8 +203,22 @@ function buildCheatSheetHtml(
             )
             .join('')
         : '<li class="muted">Process pending</li>'
+      const pkgLines = packagingByDish.get(item.id) ?? []
+      const pkg = pkgLines.length
+        ? `<ul class="pkg">${pkgLines
+            .map(
+              (p) =>
+                `<li><span>${escapeHtml(packagingLabel(p))}</span><b>${
+                  p.qty_per_portion !== 1 ? `${p.qty_per_portion}×` : '1×'
+                }</b></li>`,
+            )
+            .join('')}</ul>`
+        : ''
+      const pkgSection = pkg
+        ? `<section class="pkgwrap"><h3>Packaging</h3>${pkg}</section>`
+        : ''
       body = `<div class="cols">
-        <section><h3>Ingredients</h3><ul class="ing">${ing}</ul></section>
+        <section><h3>Ingredients</h3><ul class="ing">${ing}</ul>${pkgSection}</section>
         <section><h3>Process</h3><ol class="proc">${proc}</ol></section>
       </div>`
     }
@@ -272,6 +293,10 @@ function buildCheatSheetHtml(
     ul.ing b, ul.opts b { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
     ul.ing b { color: #5a5246; }
     ul.opts b { color: #3f7a3f; }
+    .pkgwrap { margin-top: .5em; }
+    ul.pkg { font-size: .92em; line-height: 1.25; color: #6a6253; }
+    ul.pkg li { display: flex; justify-content: space-between; gap: .4em; padding: .05em 0; }
+    ul.pkg b { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
     ol.proc li { display: flex; gap: .4em; padding: .08em 0; line-height: 1.25; }
     ol.proc .num {
       flex: 0 0 1.35em; height: 1.35em; display: inline-flex; align-items: center; justify-content: center;
@@ -472,18 +497,25 @@ function SaleAssemblyCard({
 
       {/* Packaging — always visible; loud warning when missing (required) */}
       {packaging.length > 0 ? (
-        <p className="flex items-start gap-1.5 text-[11px] text-cream/60">
-          <Package className="mt-0.5 h-3 w-3 shrink-0 text-cream/40" />
-          <span className="min-w-0">
-            {packaging
-              .map((p) =>
-                p.qty_per_portion !== 1
-                  ? `${p.qty_per_portion}× ${p.packaging_name}`
-                  : p.packaging_name,
-              )
-              .join(', ')}
-          </span>
-        </p>
+        <div className="space-y-0.5">
+          <h4 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cream/40">
+            <Package className="h-3 w-3" />
+            Packaging
+          </h4>
+          <ul className="space-y-0.5">
+            {packaging.map((p) => (
+              <li
+                key={p.bom_id}
+                className="flex items-center justify-between gap-2 text-[11px] text-cream/70"
+              >
+                <span className="min-w-0 truncate">{packagingLabel(p)}</span>
+                <span className="shrink-0 font-mono text-[10px] text-cream/45">
+                  {p.qty_per_portion !== 1 ? `${p.qty_per_portion}×` : '1×'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : (
         <p className="flex items-center gap-1.5 rounded-md bg-brick-soft/15 px-1.5 py-1 text-[11px] font-medium text-brick-soft">
           <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -693,6 +725,7 @@ export function L2AssemblerView({
       componentsByDish,
       recipeStepsByDish,
       modifierOptionsByDish,
+      packagingByDish,
       orientation,
     )
     const win = window.open('', '_blank')

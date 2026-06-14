@@ -39,6 +39,8 @@ export interface DishPackagingLine {
   packaging_id: string
   packaging_code: string
   packaging_name: string
+  packaging_short_name: string | null
+  packaging_emoji: string | null
   qty_per_portion: number
   base_unit: string | null
   cost_per_unit: number | null
