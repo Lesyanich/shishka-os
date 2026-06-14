@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, ChevronLeft, Loader2, Tag, Printer } from 'lucide-react'
 import { usePrepLabelItems, type PrepItem } from '../hooks/usePrepLabelItems'
 import { usePfPackCard } from '../hooks/usePfPackCard'
-import { addDays, printPrepLabel } from '../lib/labelPrinting'
+import { addDays, printPrepLabel, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib/labelPrinting'
+
+const LABEL_SIZE_KEY = 'kitchen_label_size'
 
 /**
  * Kitchen label station (cook-accessible). An L1 cook picks a prep item, enters
@@ -85,6 +87,15 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
 
   const [qty, setQty] = useState('')
   const [days, setDays] = useState('')
+  const [sizeId, setSizeId] = useState<string>(
+    () => localStorage.getItem(LABEL_SIZE_KEY) ?? DEFAULT_LABEL_SIZE.id,
+  )
+  const size = LABEL_SIZES.find((s) => s.id === sizeId) ?? DEFAULT_LABEL_SIZE
+
+  function chooseSize(id: string) {
+    setSizeId(id)
+    localStorage.setItem(LABEL_SIZE_KEY, id)
+  }
 
   // Prefill shelf life from the recipe card once it loads (if set there).
   useEffect(() => {
@@ -108,7 +119,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       prepDate: new Date(),
       shelfLifeDays: daysValid ? daysNum : null,
       weight: qtyValid ? `${qty.trim()} ${unit}` : null,
-    })
+    }, size)
   }
 
   return (
@@ -172,6 +183,24 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           <span className="text-slate-400">Годен до (от сегодня)</span>
           <span className="text-base font-semibold text-slate-100">{useByLabel}</span>
         </div>
+
+        {/* Paper size */}
+        <label className="block">
+          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
+            Размер бумаги
+          </span>
+          <select
+            value={sizeId}
+            onChange={(e) => chooseSize(e.target.value)}
+            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
+          >
+            {LABEL_SIZES.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {/* Print */}
         <button
