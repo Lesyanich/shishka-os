@@ -24,6 +24,8 @@ export interface PrepLabelData {
   productCode: string
   prepDate: Date
   shelfLifeDays: number | null
+  /** Optional batch weight/volume, preformatted e.g. "1.5 kg". Omitted if null. */
+  weight?: string | null
 }
 
 export function addDays(date: Date, days: number): Date {
@@ -112,25 +114,38 @@ export function renderPrepLabel(data: PrepLabelData): string {
   }
 
   // ── Divider ──
-  const dividerY = 138
+  const dividerY = 130
   ctx.fillRect(PAD, dividerY, LABEL_W_PX - PAD * 2, 3)
 
+  const VALX = PAD + 160 // x where each row's value starts
+  let row = 144
+
+  // ── Weight / volume (optional) ──
+  if (data.weight) {
+    ctx.font = '500 26px sans-serif'
+    ctx.fillText('QTY', PAD, row)
+    ctx.font = '700 30px sans-serif'
+    ctx.fillText(data.weight, VALX, row - 2)
+    row += 42
+  }
+
   // ── PREP date ──
-  ctx.font = '500 28px sans-serif'
-  ctx.fillText('PREP', PAD, 156)
+  ctx.font = '500 26px sans-serif'
+  ctx.fillText('PREP', PAD, row)
   ctx.font = '700 30px sans-serif'
-  ctx.fillText(formatDate(data.prepDate), PAD + 130, 155)
+  ctx.fillText(formatDate(data.prepDate), VALX, row - 2)
+  row += 42
 
   // ── USE BY date (emphasized) ──
   const useBy = data.shelfLifeDays != null ? addDays(data.prepDate, data.shelfLifeDays) : null
-  ctx.font = '500 28px sans-serif'
-  ctx.fillText('USE BY', PAD, 200)
+  ctx.font = '500 26px sans-serif'
+  ctx.fillText('USE BY', PAD, row)
   ctx.font = '800 36px sans-serif'
-  ctx.fillText(useBy ? formatDate(useBy) : '—', PAD + 130, 196)
+  ctx.fillText(useBy ? formatDate(useBy) : '—', VALX, row - 4)
 
   // ── Product code (bottom, monospace) ──
   ctx.font = '400 22px monospace'
-  ctx.fillText(data.productCode, PAD, 288)
+  ctx.fillText(data.productCode, PAD, 292)
 
   return canvas.toDataURL('image/png')
 }
