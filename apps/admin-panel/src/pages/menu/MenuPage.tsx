@@ -27,6 +27,7 @@ import { FilterBar } from '../../components/menu/owner/FilterBar'
 import { DishDrawer } from '../../components/menu/drawer/DishDrawer'
 import { CategoryTabs } from '../../components/menu/shared'
 import { useMenuFilters, applyFilters } from './hooks/useMenuFilters'
+import { DRINK_SECTION_CODE_PREFIX } from './utils/menuStation'
 
 type ViewMode = 'owner' | 'l1-cook' | 'l2-assembler' | 'customer'
 type OwnerLayout = 'table' | 'gallery'
@@ -163,13 +164,15 @@ export function MenuPage() {
     [selectedCategory, subcategories],
   )
 
-  // Availability filter for L1 Cook view (URL-driven: ?available=yes|no)
+  // Availability filter for L1 Cook view (URL-driven). Like L2, defaults to
+  // Active-only — staff stations should never lead with deactivated dishes.
+  // An absent value means "Active"; an explicit `all` shows everything.
   const availableParam = searchParams.get('available')
   const availableFilter: boolean | null =
-    availableParam === 'yes' ? true : availableParam === 'no' ? false : null
+    availableParam === 'all' ? null : availableParam === 'no' ? false : availableParam === 'yes' ? true : true
   const setAvailableFilter = useCallback(
     (v: boolean | null) =>
-      updateParam({ available: v === true ? 'yes' : v === false ? 'no' : null }),
+      updateParam({ available: v === true ? 'yes' : v === false ? 'no' : 'all' }),
     [updateParam],
   )
 
@@ -182,6 +185,23 @@ export function MenuPage() {
     (v: boolean | null) =>
       updateParam({ available: v === true ? 'yes' : v === false ? 'no' : 'all' }),
     [updateParam],
+  )
+
+  // Drink sections roll up to the "Drinks" umbrella (code KP-DRK*). They are
+  // bar work — assembled to order at L2, never prepped at L1 — so we hide them
+  // from the L1 Cook station entirely (content + the section tab strip).
+  const drinkSectionIds = useMemo(
+    () =>
+      new Set(
+        categories
+          .filter((c) => c.code?.startsWith(DRINK_SECTION_CODE_PREFIX))
+          .map((c) => c.id),
+      ),
+    [categories],
+  )
+  const l1Categories = useMemo(
+    () => categories.filter((c) => !drinkSectionIds.has(c.id)),
+    [categories, drinkSectionIds],
   )
 
   const openDrawer = useCallback(
@@ -248,6 +268,21 @@ export function MenuPage() {
     }
     return counts
   }, [typeFilteredItems])
+
+  // L1 Cook counts — same shape, but drinks excluded so the "All" total and the
+  // section tabs match what the prep station actually renders.
+  const l1CategoryCounts = useMemo(() => {
+    const counts = new Map<string | null, number>()
+    let total = 0
+    for (const item of typeFilteredItems) {
+      const sec = item.section_id ?? item.category_id
+      if (sec && drinkSectionIds.has(sec)) continue
+      total += 1
+      if (sec) counts.set(sec, (counts.get(sec) ?? 0) + 1)
+    }
+    counts.set(null, total)
+    return counts
+  }, [typeFilteredItems, drinkSectionIds])
 
   // Counts per type filter bucket (drives pill counters)
   const typeCounts = useMemo(() => {
@@ -411,12 +446,12 @@ export function MenuPage() {
               ))}
             </div>
           </div>
-          {categories.length > 0 && (
+          {l1Categories.length > 0 && (
             <CategoryTabs
-              categories={categories}
+              categories={l1Categories}
               selectedId={selectedCategory}
               onSelect={setSelectedCategory}
-              counts={categoryCounts}
+              counts={l1CategoryCounts}
             />
           )}
           {/* Drill-down strip: subcategories of the selected section. */}
@@ -520,8 +555,10 @@ export function MenuPage() {
           selectedSubcategory={selectedSubcategory}
           typeFilter={typeFilter}
           availableFilter={availableFilter}
+          drinkSectionIds={drinkSectionIds}
           pfPackCardById={enrichment.pfPackCardById}
           recipeStatsById={enrichment.recipeStatsById}
+          recipeStepsByDish={enrichment.recipeStepsByDish}
           dishCardById={enrichment.dishCardById}
           childrenByParent={childrenByParent}
           onOpenDish={openDrawer}

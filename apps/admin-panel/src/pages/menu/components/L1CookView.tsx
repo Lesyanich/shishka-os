@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import type { MenuItem, MenuBomChild } from '../../../hooks/useMenuData'
 import type { PfPackCardData } from '../../../hooks/usePfPackCard'
-import type { RecipeStepStats } from '../../../hooks/useMenuListEnrichment'
+import type { RecipeStepStats, MenuRecipeStep } from '../../../hooks/useMenuListEnrichment'
 import type { DishCardData } from '../../../hooks/useDishCard'
 import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 import { formatDishName } from '../utils/formatDishName'
@@ -25,11 +25,45 @@ interface L1CookViewProps {
   typeFilter: TypeFilterValue
   /** null = show all, true = available only, false = unavailable only */
   availableFilter: boolean | null
+  /** Section ids that roll up to the Drinks umbrella — excluded from L1 (bar work). */
+  drinkSectionIds: Set<string>
   pfPackCardById: Map<string, PfPackCardData>
   recipeStatsById: Map<string, RecipeStepStats>
+  recipeStepsByDish: Map<string, MenuRecipeStep[]>
   dishCardById: Map<string, DishCardData>
   childrenByParent: Map<string, MenuBomChild[]>
   onOpenDish: (id: string) => void
+}
+
+/* ── Prep steps (L1 / Kitchen) ─────────────────────────────── */
+
+/** The prep-station steps to surface on an L1 card, in order.
+ *  Once any step is stationed we show only the L1 ones; until then the whole
+ *  recipe is treated as prep so cooks still see the process. */
+function l1Steps(steps: MenuRecipeStep[] | undefined): MenuRecipeStep[] {
+  if (!steps || steps.length === 0) return []
+  const hasStationed = steps.some((s) => s.location === 'L1' || s.location === 'L2')
+  const list = hasStationed ? steps.filter((s) => s.location === 'L1') : steps
+  return [...list].sort((a, b) => a.step_order - b.step_order)
+}
+
+function StepList({ steps }: { steps: MenuRecipeStep[] }) {
+  if (steps.length === 0) return null
+  return (
+    <ol className="space-y-1 border-t border-surface-3 pt-2">
+      {steps.map((s, idx) => (
+        <li key={s.step_order} className="flex gap-2 text-[11px] leading-snug">
+          <span className="shrink-0 font-mono text-cream/35">{idx + 1}.</span>
+          <span className="min-w-0">
+            <span className="font-medium text-cream/80">{s.operation_name}</span>
+            {s.instruction_text ? (
+              <span className="text-cream/50"> — {s.instruction_text}</span>
+            ) : null}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
 }
 
 /* ── PF card (existing, unchanged) ─────────────────────────── */
@@ -38,10 +72,11 @@ interface PfCardProps {
   item: MenuItem
   card: PfPackCardData | undefined
   stats: RecipeStepStats | undefined
+  steps: MenuRecipeStep[]
   onOpen: () => void
 }
 
-function PfCard({ item, card, stats, onOpen }: PfCardProps) {
+function PfCard({ item, card, stats, steps, onOpen }: PfCardProps) {
   const portionInfo =
     card?.portions_per_batch != null && card?.portion_weight_g != null
       ? `${card.portions_per_batch} × ${card.portion_weight_g} g`
@@ -141,6 +176,8 @@ function PfCard({ item, card, stats, onOpen }: PfCardProps) {
           <span className="italic text-cream/35">No recipe defined</span>
         )}
       </div>
+
+      <StepList steps={steps} />
     </button>
   )
 }
@@ -151,11 +188,12 @@ interface SaleRecipeCardProps {
   item: MenuItem
   card: DishCardData | undefined
   stats: RecipeStepStats | undefined
+  steps: MenuRecipeStep[]
   bomChildren: MenuBomChild[]
   onOpen: () => void
 }
 
-function SaleRecipeCard({ item, stats, bomChildren, onOpen }: SaleRecipeCardProps) {
+function SaleRecipeCard({ item, stats, steps, bomChildren, onOpen }: SaleRecipeCardProps) {
   const [expanded, setExpanded] = useState(false)
   const stepCount = stats?.step_count ?? 0
   const ccpCount = stats?.ccp_count ?? 0
@@ -231,6 +269,8 @@ function SaleRecipeCard({ item, stats, bomChildren, onOpen }: SaleRecipeCardProp
             </span>
           )}
         </div>
+
+        <StepList steps={steps} />
       </button>
 
       {/* BOM tree toggle */}
@@ -312,16 +352,23 @@ export function L1CookView({
   selectedSubcategory,
   typeFilter,
   availableFilter,
+  drinkSectionIds,
   pfPackCardById,
   recipeStatsById,
+  recipeStepsByDish,
   dishCardById,
   childrenByParent,
   onOpenDish,
 }: L1CookViewProps) {
-  // Filter: SALE + PF (exclude MOD), respect category, type, and availability
+  // Filter: SALE + PF (exclude MOD), respect category, type, and availability.
+  // Station gate — bar drinks (coffee / smoothies / juices…) are assembled to
+  // order at L2 and never prepped here, so they are hidden from L1 entirely.
+  // All other food (PF batches + SALE dishes) keeps its prep presence at L1;
+  // the per-step station signal only governs WHICH steps render (see l1Steps).
   const filtered = useMemo(() => {
     return items.filter((i) => {
       if (i.kind === 'MOD') return false
+      if (drinkSectionIds.has(i.section_id ?? i.category_id ?? '')) return false
       if (typeFilter === 'SALE' && i.kind !== 'SALE') return false
       if (typeFilter === 'PF' && i.kind !== 'PF' && !i.isDualType) return false
       if (selectedCategory && (i.section_id ?? i.category_id) !== selectedCategory) return false
@@ -329,7 +376,14 @@ export function L1CookView({
       if (availableFilter !== null && i.is_available !== availableFilter) return false
       return true
     })
-  }, [items, selectedCategory, selectedSubcategory, typeFilter, availableFilter])
+  }, [
+    items,
+    selectedCategory,
+    selectedSubcategory,
+    typeFilter,
+    availableFilter,
+    drinkSectionIds,
+  ])
 
   // Group by category for structured rendering
   const grouped = useMemo(() => {
@@ -372,6 +426,7 @@ export function L1CookView({
           item={item}
           card={dishCardById.get(item.id)}
           stats={recipeStatsById.get(item.id)}
+          steps={l1Steps(recipeStepsByDish.get(item.id))}
           bomChildren={childrenByParent.get(item.id) ?? []}
           onOpen={() => onOpenDish(item.id)}
         />
@@ -383,6 +438,7 @@ export function L1CookView({
         item={item}
         card={pfPackCardById.get(item.id)}
         stats={recipeStatsById.get(item.id)}
+        steps={l1Steps(recipeStepsByDish.get(item.id))}
         onOpen={() => onOpenDish(item.id)}
       />
     )
