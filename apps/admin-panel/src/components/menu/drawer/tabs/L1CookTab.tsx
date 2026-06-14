@@ -11,6 +11,7 @@ import type { DishRecipeStep } from '../../../../hooks/useDishRecipeSteps'
 import type { BomIngredient } from '../../../../hooks/useBomIngredients'
 import type { PfPackCardData } from '../../../../hooks/usePfPackCard'
 import type { DishCardData } from '../../../../hooks/useDishCard'
+import { PrepLabelBlock } from '../PrepLabelBlock'
 
 /* ── emoji helpers ─────────────────────────────────────────────── */
 
@@ -367,6 +368,9 @@ export function L1CookTab({
 
       {/* Storage (PF only) */}
       {pfPackCard && <StorageBlock card={pfPackCard} />}
+
+      {/* Storage label — shelf-life editor + RawBT print (PF only) */}
+      {item.kind === 'PF' && <PrepLabelBlock item={item} card={pfPackCard} />}
 
       {/* L2 Assembly (SALE only) */}
       {dishCard && <L2AssemblyBlock card={dishCard} item={item} />}
