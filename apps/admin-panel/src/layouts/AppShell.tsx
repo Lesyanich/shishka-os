@@ -30,6 +30,7 @@ import {
   CalendarCheck,
   Banknote,
   Users,
+  ListTodo,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAppRole, type AppRole } from '../contexts/AppRoleContext'
@@ -112,6 +113,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'HR & Payroll',
     minRole: 'owner',
     items: [
+      { path: '/staff-tasks', icon: ListTodo, label: 'Staff Tasks' },
       { path: '/hr/attendance', icon: CalendarCheck, label: 'Attendance' },
       { path: '/hr/schedule', icon: CalendarDays, label: 'Schedule' },
       { path: '/hr/payroll', icon: Banknote, label: 'Payroll' },
