@@ -1,4 +1,6 @@
--- Migration 275 — add 'task_manager' app_role tier (staff task tracker).
+-- Migration 279a — add 'task_manager' app_role tier (staff task tracker).
+-- Renumbered from 275_ (applied to prod as 275_staff_app_role_task_manager.sql)
+-- to resolve a duplicate-275 collision — see 282_renumber_273_275_collision_log_sync.sql.
 --
 -- A task_manager logs into the admin panel but sees ONLY the Staff Tasks page
 -- (not finance/menu/etc.). Lets e.g. the cashier (Mint) distribute tasks without
@@ -28,7 +30,7 @@ END $$;
 
 INSERT INTO public.migration_log (filename, applied_by, notes)
 VALUES (
-  '275_staff_app_role_task_manager.sql',
+  '279a_staff_app_role_task_manager.sql',
   'claude-code',
   'Add task_manager to staff.app_role CHECK — scoped admin role that sees only Staff Tasks.'
 ) ON CONFLICT (filename) DO NOTHING;

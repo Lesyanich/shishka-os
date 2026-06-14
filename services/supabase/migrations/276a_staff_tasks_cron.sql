@@ -1,4 +1,6 @@
--- Migration 274 — staff task tracker Phase 3: scheduled pushes via pg_cron.
+-- Migration 276a — staff task tracker Phase 3: scheduled pushes via pg_cron.
+-- Renumbered from 274_ (applied to prod as 268_staff_tasks_cron.sql)
+-- to resolve a duplicate-274 collision — see 282_renumber_273_275_collision_log_sync.sql.
 --
 -- pg_cron runs in UTC. Asia/Bangkok is UTC+7, so 07:30 ICT = 00:30 UTC.
 -- Jobs:
@@ -48,7 +50,7 @@ SELECT cron.schedule('staff-tasks-reminders', '*/15 * * * *',
 
 INSERT INTO public.migration_log (filename, applied_by, notes)
 VALUES (
-  '274_staff_tasks_cron.sql',
+  '276a_staff_tasks_cron.sql',
   'claude-code',
   'Phase 3: pg_cron + pg_net scheduled pushes (materialize 00:25 UTC, morning+schedule 00:30 UTC, reminders */15). fn_staff_tasks_push wrapper.'
 ) ON CONFLICT (filename) DO NOTHING;

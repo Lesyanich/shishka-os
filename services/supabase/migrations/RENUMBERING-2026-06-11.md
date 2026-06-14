@@ -61,3 +61,37 @@ numbers, new migrations strictly above HEAD max.
 | `249_v_dish_modifier_options_nutrition.sql` | `250a_v_dish_modifier_options_nutrition.sql` | renamed by 267 |
 | `250_nutrition_rollup_food_only.sql` | `253a_nutrition_rollup_food_only.sql` | renamed by 267 |
 | `255_visitor_site_public_menu.sql` | `250b_visitor_site_public_menu.sql` | unlogged |
+
+---
+
+## Addendum — 2026-06-14 (duplicate 273/274/275)
+
+> Branch: `feature/db/renumber-273-275`
+> Migration: `282_renumber_273_275_collision_log_sync.sql`
+
+Three more colliding prefixes appeared after parallel branches merged the
+Loyverse-poller and staff-task-tracker work — the pre-commit canary
+(`migration-canary.sh --check-numbering`) flagged duplicate 273/274/275 and
+forced `--no-verify` on unrelated commits. All six files were already applied
+to prod. Same rule as above: the file whose `migration_log` row already carries
+the colliding number keeps its name; the other moves to `<anchor><letter>_`
+where anchor = the latest kept-name migration applied strictly before it
+(by `applied_at`).
+
+The two staff-tracker files had been applied to prod under their **original**
+branch numbers (`267_`/`268_`) before the repo bumped them to `273_`/`274_`, so
+their `migration_log` rows still read `267_`/`268_`; migration 282 reconciles
+those stale rows straight to the new `272a_`/`276a_` names.
+
+Kept (row already matched repo name): `273_recipes_flow_location.sql`,
+`274_loyverse_receipt_enrichment.sql`, `275_loyverse_entities_and_poll_state.sql`.
+
+| Old (repo) | New | migration_log row | log UPDATE by 282 |
+|---|---|---|---|
+| `273_fix_fn_link_telegram_ambiguous.sql` | `272a_fix_fn_link_telegram_ambiguous.sql` | applied as `267_fix_fn_link_telegram_ambiguous.sql` | `267_…` → `272a_…` |
+| `274_staff_tasks_cron.sql` | `276a_staff_tasks_cron.sql` | applied as `268_staff_tasks_cron.sql` | `268_…` → `276a_…` |
+| `275_staff_app_role_task_manager.sql` | `279a_staff_app_role_task_manager.sql` | `275_staff_app_role_task_manager.sql` | `275_…` → `279a_…` |
+
+Note: `280`/`281` are **not free** — `280_dip_serving_modifiers_and_hide_variants.sql`
+and `281_dip_bread_choice_default_bun.sql` are applied to prod from an unmerged
+branch. Hence the log-sync migration takes the next clear number, `282`.
