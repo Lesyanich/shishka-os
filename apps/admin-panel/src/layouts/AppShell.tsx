@@ -79,6 +79,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Kitchen',
     defaultOpen: true,
     items: [
+      { path: '/kitchen/my-tasks', icon: ListTodo, label: 'My Tasks', minRole: 'cook' },
       { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS', minRole: 'cook' },
       { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station', minRole: 'cook' },
       { path: '/kitchen/waste', icon: Trash2, label: 'Waste', minRole: 'cook' },

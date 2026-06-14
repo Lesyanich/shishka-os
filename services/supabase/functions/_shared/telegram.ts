@@ -10,11 +10,24 @@ export interface InlineButton {
 }
 export type InlineKeyboard = InlineButton[][]
 
+// Persistent bottom menu so staff tap buttons instead of typing slash commands.
+export const MENU_TODAY = "📋 My tasks · งานของฉัน"
+export const MENU_ADD = "➕ Add · เพิ่มงาน"
+export const MENU_DONE = "✅ Log done · บันทึกเสร็จ"
+
+export const ADD_PROMPT = "✍️ Type the task to add: · พิมพ์งานที่จะเพิ่ม:"
+export const DONE_PROMPT = "✍️ What did you finish? · ทำอะไรเสร็จแล้ว?"
+
+function mainMenu() {
+  return {
+    keyboard: [[{ text: MENU_TODAY }], [{ text: MENU_ADD }, { text: MENU_DONE }]],
+    resize_keyboard: true,
+    is_persistent: true,
+  }
+}
+
 export function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 }
 
 async function call(method: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -47,6 +60,26 @@ export async function sendMessage(
   return { ok: data.ok === true, messageId: result?.message_id }
 }
 
+/** Send a message that also (re)shows the persistent bottom menu. */
+export async function sendMenu(chatId: string, text: string): Promise<void> {
+  await call("sendMessage", {
+    chat_id: chatId,
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup: mainMenu(),
+  })
+}
+
+/** Prompt the user to reply with free text (force_reply) — used for Add / Done. */
+export async function sendForceReply(chatId: string, prompt: string): Promise<void> {
+  await call("sendMessage", {
+    chat_id: chatId,
+    text: prompt,
+    reply_markup: { force_reply: true, input_field_placeholder: "…" },
+  })
+}
+
 export async function editMessageText(
   chatId: string,
   messageId: string | number,
@@ -60,16 +93,23 @@ export async function editMessageText(
     parse_mode: "HTML",
     disable_web_page_preview: true,
   }
-  // Pass an explicit (possibly empty) keyboard so old buttons are cleared.
   body.reply_markup = { inline_keyboard: keyboard ?? [] }
   const data = await call("editMessageText", body)
   return data.ok === true
 }
 
 export async function answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
-  await call("answerCallbackQuery", {
-    callback_query_id: callbackQueryId,
-    text: text ?? "",
+  await call("answerCallbackQuery", { callback_query_id: callbackQueryId, text: text ?? "" })
+}
+
+/** Register the native command menu (the ☰ button) once. */
+export async function setMyCommands(): Promise<void> {
+  await call("setMyCommands", {
+    commands: [
+      { command: "today", description: "My tasks today · งานวันนี้" },
+      { command: "add", description: "Add a task · เพิ่มงาน" },
+      { command: "done", description: "Log something done · บันทึกงานที่ทำ" },
+    ],
   })
 }
 

@@ -24,7 +24,7 @@ describe('roles — 3-tier RBAC', () => {
 
   it('every role lands on a route it can actually reach', () => {
     // cook lands on a kitchen route, task_manager on its board, owner on root
-    expect(landingFor('cook')).toBe('/kitchen/tasks')
+    expect(landingFor('cook')).toBe('/kitchen/my-tasks')
     expect(landingFor('task_manager')).toBe('/staff-tasks')
     expect(landingFor('owner')).toBe('/')
     // landings are defined for all three roles

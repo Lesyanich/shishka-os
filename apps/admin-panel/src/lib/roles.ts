@@ -26,7 +26,7 @@ export const ROLE_RANK: Record<AppRole, number> = {
 export const ROLE_LANDING: Record<AppRole, string> = {
   owner: '/',
   task_manager: '/staff-tasks',
-  cook: '/kitchen/tasks',
+  cook: '/kitchen/my-tasks',
 }
 
 /** True if `role` is allowed into a route/section gated at `minRole`. */

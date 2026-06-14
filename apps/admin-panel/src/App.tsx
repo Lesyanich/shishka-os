@@ -53,6 +53,7 @@ const StaffPage = lazy(() => import('./pages/hr/StaffPage').then(m => ({ default
 const SchedulePage = lazy(() => import('./pages/hr/SchedulePage').then(m => ({ default: m.SchedulePage })))
 const StaffTasksPage = lazy(() => import('./pages/StaffTasksPage').then(m => ({ default: m.StaffTasksPage })))
 const CashierPage = lazy(() => import('./pages/cashier/CashierPage').then(m => ({ default: m.CashierPage })))
+const CookTasksPage = lazy(() => import('./pages/CookTasksPage').then(m => ({ default: m.CookTasksPage })))
 const KitchenLabels = lazy(() => import('./pages/KitchenLabels').then(m => ({ default: m.KitchenLabels })))
 
 function PageLoader() {
@@ -152,6 +153,7 @@ function App() {
 
                 {/* ── Kitchen floor (cook) — all authenticated roles ── */}
                 <Route element={<RoleGuard minRole="cook" />}>
+                  <Route path="/kitchen/my-tasks" element={<Suspense fallback={<PageLoader />}><CookTasksPage /></Suspense>} />
                   <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
                   <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
                   <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />

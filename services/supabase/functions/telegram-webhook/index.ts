@@ -21,10 +21,19 @@
 
 import { db } from "../_shared/supabase.ts"
 import {
+  ADD_PROMPT,
   answerCallbackQuery,
+  DONE_PROMPT,
   editMessageText,
+  escapeHtml,
   formatTask,
+  MENU_ADD,
+  MENU_DONE,
+  MENU_TODAY,
+  sendForceReply,
+  sendMenu,
   sendMessage,
+  setMyCommands,
   taskKeyboard,
   type FormattableTask,
 } from "../_shared/telegram.ts"
@@ -69,7 +78,7 @@ async function staffForChat(chatId: string): Promise<{ id: string; name: string 
 
 async function handleStart(chatId: string, username: string | null, code: string | null) {
   if (!code) {
-    await sendMessage(
+    await sendMenu(
       chatId,
       "👋 <b>Shishka Kitchen</b>\nAsk the owner for your personal link to connect your tasks.\nขอลิงก์ส่วนตัวจากเจ้าของร้านเพื่อเชื่อมต่องานของคุณ",
     )
@@ -92,9 +101,10 @@ async function handleStart(chatId: string, username: string | null, code: string
   }
 
   const name = (row as { staff_name?: string }).staff_name ?? ""
-  await sendMessage(
+  await setMyCommands()
+  await sendMenu(
     chatId,
-    `✅ Connected, <b>${name}</b>!\nYou'll get your tasks and reminders here.\nเชื่อมต่อแล้ว! คุณจะได้รับงานและการแจ้งเตือนที่นี่\n\nSend /today to see today's tasks · พิมพ์ /today เพื่อดูงานวันนี้`,
+    `✅ Connected, <b>${name}</b>!\nYou'll get your tasks and reminders here.\nเชื่อมต่อแล้ว! คุณจะได้รับงานและการแจ้งเตือนที่นี่\n\nTap a button below 👇 · กดปุ่มด้านล่าง`,
   )
 }
 
@@ -125,6 +135,58 @@ async function handleToday(chatId: string) {
     const done = t.status === "done"
     const body = formatTask(t) + (done ? "\n✅ Done" : "")
     await sendMessage(chatId, body, done ? undefined : taskKeyboard(t.id))
+  }
+}
+
+// Staff self-service: /add <task> (todo) and /done <text> (logged as done).
+async function createSelfTask(chatId: string, rawText: string, markDone: boolean) {
+  const staff = await staffForChat(chatId)
+  if (!staff) {
+    await sendMessage(chatId, "You're not connected yet. Ask the owner for your link. · ยังไม่ได้เชื่อมต่อ")
+    return
+  }
+  const title = rawText.trim()
+  if (!title) {
+    await sendMessage(
+      chatId,
+      markDone
+        ? "Usage: <code>/done what you did</code> · เช่น /done ล้างตู้เย็น"
+        : "Usage: <code>/add task</code> · เช่น /add เติมกระดาษทิชชู่",
+    )
+    return
+  }
+
+  const row: Record<string, unknown> = {
+    title,
+    assigned_to: staff.id,
+    created_by: staff.name,
+    category: "general",
+    priority: "medium",
+    due_date: todayICT(),
+    status: markDone ? "done" : "todo",
+  }
+  if (markDone) {
+    row.completed_at = new Date().toISOString()
+    row.completed_via = "telegram"
+  }
+
+  const { data, error } = await db
+    .from("staff_tasks")
+    .insert(row)
+    .select("id, title, title_th, description, due_time, category, priority")
+    .single()
+
+  if (error || !data) {
+    console.error("[telegram-webhook] createSelfTask insert error:", error)
+    await sendMessage(chatId, "⚠️ Could not save. Try again. · บันทึกไม่สำเร็จ")
+    return
+  }
+
+  if (markDone) {
+    await sendMessage(chatId, `✅ Logged: <b>${escapeHtml(title)}</b> · บันทึกแล้ว`)
+  } else {
+    const task = data as FormattableTask & { id: string }
+    await sendMessage(chatId, `➕ Added · เพิ่มแล้ว\n${formatTask(task)}`, taskKeyboard(task.id))
   }
 }
 
@@ -220,21 +282,40 @@ Deno.serve(async (req) => {
     }
 
     const message = update.message as
-      | { text?: string; chat?: { id?: number }; from?: { username?: string } }
+      | {
+          text?: string
+          chat?: { id?: number }
+          from?: { username?: string }
+          reply_to_message?: { text?: string }
+        }
       | undefined
     const text = message?.text?.trim() ?? ""
     const chatId = message?.chat?.id != null ? String(message.chat.id) : null
     const username = message?.from?.username ?? null
+    const replyTo = message?.reply_to_message?.text ?? ""
 
     if (!chatId) return ok()
 
-    if (text.startsWith("/start")) {
+    // Free-text reply to the Add / Done button prompts (no slash typing needed)
+    if (replyTo.startsWith("✍️ Type the task")) {
+      await createSelfTask(chatId, text, false)
+    } else if (replyTo.startsWith("✍️ What did you")) {
+      await createSelfTask(chatId, text, true)
+    } else if (text.startsWith("/start")) {
       const code = text.split(/\s+/)[1] ?? null
       await handleStart(chatId, username, code)
-    } else if (text.startsWith("/today")) {
+    } else if (text === MENU_TODAY || text.startsWith("/today")) {
       await handleToday(chatId)
+    } else if (text === MENU_ADD) {
+      await sendForceReply(chatId, ADD_PROMPT)
+    } else if (text === MENU_DONE) {
+      await sendForceReply(chatId, DONE_PROMPT)
+    } else if (text.startsWith("/add")) {
+      await createSelfTask(chatId, text.slice("/add".length), false)
+    } else if (text.startsWith("/done")) {
+      await createSelfTask(chatId, text.slice("/done".length), true)
     } else {
-      await sendMessage(chatId, "Send /today to see your tasks. · พิมพ์ /today เพื่อดูงาน")
+      await sendMenu(chatId, "Tap a button below 👇 · กดปุ่มด้านล่าง")
     }
     return ok()
   } catch (e) {
