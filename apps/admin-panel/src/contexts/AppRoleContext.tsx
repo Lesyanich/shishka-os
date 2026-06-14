@@ -8,7 +8,14 @@ import {
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 
-export type AppRole = 'owner' | 'cook'
+export type AppRole = 'owner' | 'task_manager' | 'cook'
+
+const VALID_ROLES: readonly AppRole[] = ['owner', 'task_manager', 'cook']
+
+/** Coerce an unknown DB value to a known role; unknown → safest tier (cook). */
+function normalizeRole(value: unknown): AppRole {
+  return VALID_ROLES.includes(value as AppRole) ? (value as AppRole) : 'cook'
+}
 
 interface AppRoleState {
   role: AppRole
@@ -51,7 +58,7 @@ export function AppRoleProvider({ children }: { children: ReactNode }) {
       }
       const row = data[0]
       setState({
-        role: row.app_role as AppRole,
+        role: normalizeRole(row.app_role),
         staffId: row.staff_id,
         staffName: row.staff_name,
         isLoading: false,

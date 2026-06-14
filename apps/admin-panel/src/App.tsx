@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-
 import { AuthProvider } from './contexts/AuthContext'
 import { AppRoleProvider } from './contexts/AppRoleContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { RoleGuard } from './components/RoleGuard'
+import { RoleGuard, RoleLanding } from './components/RoleGuard'
 import { AppShell } from './layouts/AppShell'
 import { Loader2 } from 'lucide-react'
 
@@ -130,30 +130,36 @@ function App() {
                     <Route path="staff" element={<StaffPage />} />
                     <Route path="schedule" element={<Suspense fallback={<PageLoader />}><SchedulePage /></Suspense>} />
                   </Route>
-                  <Route path="/staff-tasks" element={<Suspense fallback={<PageLoader />}><StaffTasksPage /></Suspense>} />
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                   <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
-                  <Route path="/salad-bar" element={<Suspense fallback={<PageLoader />}><SaladBarPage /></Suspense>} />
+                  <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
                 </Route>
 
-                {/* ── Kitchen + Production — accessible to all authenticated ── */}
-                <Route path="/cashier" element={<Suspense fallback={<PageLoader />}><CashierPage /></Suspense>} />
-                <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
-                <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
-                <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
-                <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
-                <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
-                <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
-                <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
-                <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
-                <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
-                <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
-                <Route path="/shopping-list" element={<Suspense fallback={<PageLoader />}><ShoppingList /></Suspense>} />
-                <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
+                {/* ── Task-manager tier (Mint / L2 assembly admin) + owner ── */}
+                <Route element={<RoleGuard minRole="task_manager" />}>
+                  <Route path="/staff-tasks" element={<Suspense fallback={<PageLoader />}><StaffTasksPage /></Suspense>} />
+                  <Route path="/salad-bar" element={<Suspense fallback={<PageLoader />}><SaladBarPage /></Suspense>} />
+                  <Route path="/cashier" element={<Suspense fallback={<PageLoader />}><CashierPage /></Suspense>} />
+                  <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
+                  <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
+                  <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
+                  <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
+                  <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
+                  <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
+                  <Route path="/shopping-list" element={<Suspense fallback={<PageLoader />}><ShoppingList /></Suspense>} />
+                </Route>
+
+                {/* ── Kitchen floor (cook) — all authenticated roles ── */}
+                <Route element={<RoleGuard minRole="cook" />}>
+                  <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
+                  <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
+                  <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
+                  <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
+                </Route>
               </Route>
             </Route>
-            {/* Fallback: redirect unknown routes to Control Center */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Fallback: send unknown routes to the user's role landing */}
+            <Route path="*" element={<RoleLanding />} />
           </Routes>
         </Sentry.ErrorBoundary>
         </AppRoleProvider>

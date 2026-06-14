@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAppRole, type AppRole } from '../contexts/AppRoleContext'
+import { hasAccess } from '../lib/roles'
 
 /* ─── Types ─── */
 
@@ -41,11 +42,12 @@ interface NavItem {
   path: string
   icon: typeof LayoutDashboard
   label: string
+  /** Minimum role to see this link. owner ⊃ task_manager ⊃ cook. */
+  minRole: AppRole
 }
 
 interface NavSection {
   title: string
-  minRole: AppRole
   items: NavItem[]
   defaultOpen?: boolean
 }
@@ -55,76 +57,63 @@ interface NavSection {
 const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Operations',
-    minRole: 'owner',
     defaultOpen: true,
     items: [
-      { path: '/', icon: Rocket, label: 'Opening Roadmap' },
-      { path: '/mission', icon: Rocket, label: 'Mission Control' },
-      { path: '/brain', icon: Brain, label: 'Brain' },
+      { path: '/', icon: Rocket, label: 'Opening Roadmap', minRole: 'owner' },
+      { path: '/mission', icon: Rocket, label: 'Mission Control', minRole: 'owner' },
+      { path: '/brain', icon: Brain, label: 'Brain', minRole: 'owner' },
     ],
   },
   {
     title: 'Menu & Products',
-    minRole: 'owner',
     items: [
-      { path: '/menu', icon: LayoutGrid, label: 'Menu' },
-      { path: '/menu/modifiers', icon: SlidersHorizontal, label: 'Modifiers' },
-      { path: '/bom', icon: GitBranch, label: 'BOM Hub' },
-      { path: '/sku', icon: Package, label: 'SKU Manager' },
-      { path: '/salad-bar', icon: LayoutGrid, label: 'Salad Bar' },
+      { path: '/menu', icon: LayoutGrid, label: 'Menu', minRole: 'owner' },
+      { path: '/menu/modifiers', icon: SlidersHorizontal, label: 'Modifiers', minRole: 'owner' },
+      { path: '/bom', icon: GitBranch, label: 'BOM Hub', minRole: 'owner' },
+      { path: '/sku', icon: Package, label: 'SKU Manager', minRole: 'owner' },
+      { path: '/salad-bar', icon: LayoutGrid, label: 'Salad Bar', minRole: 'task_manager' },
     ],
   },
   {
     title: 'Kitchen',
-    minRole: 'cook',
     defaultOpen: true,
     items: [
-      { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS' },
-      { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station' },
-      { path: '/kitchen/waste', icon: Trash2, label: 'Waste' },
-      { path: '/schedule', icon: CalendarClock, label: 'Schedule' },
+      { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS', minRole: 'cook' },
+      { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station', minRole: 'cook' },
+      { path: '/kitchen/waste', icon: Trash2, label: 'Waste', minRole: 'cook' },
+      { path: '/receive', icon: ClipboardCheck, label: 'Receiving', minRole: 'cook' },
     ],
   },
   {
-    title: 'Production',
-    minRole: 'cook',
+    title: 'Production & Planning',
     items: [
-      { path: '/planner', icon: CalendarDays, label: 'Planner' },
-      { path: '/planner/batch', icon: Rewind, label: 'Batch Plan' },
-      { path: '/production', icon: Factory, label: 'Production' },
-      { path: '/targets', icon: Target, label: 'Targets' },
-      { path: '/receive', icon: ClipboardCheck, label: 'Receiving' },
-      { path: '/procurement', icon: Truck, label: 'Procurement' },
-      { path: '/shopping-list', icon: ShoppingCart, label: 'Shopping List' },
+      { path: '/schedule', icon: CalendarClock, label: 'Schedule', minRole: 'task_manager' },
+      { path: '/planner', icon: CalendarDays, label: 'Planner', minRole: 'task_manager' },
+      { path: '/planner/batch', icon: Rewind, label: 'Batch Plan', minRole: 'task_manager' },
+      { path: '/production', icon: Factory, label: 'Production', minRole: 'task_manager' },
+      { path: '/targets', icon: Target, label: 'Targets', minRole: 'task_manager' },
+      { path: '/procurement', icon: Truck, label: 'Procurement', minRole: 'task_manager' },
+      { path: '/shopping-list', icon: ShoppingCart, label: 'Shopping List', minRole: 'task_manager' },
+      { path: '/staff-tasks', icon: ListTodo, label: 'Staff Tasks', minRole: 'task_manager' },
     ],
   },
   {
     title: 'Finance',
-    minRole: 'owner',
     items: [
-      { path: '/finance/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { path: '/finance/ledger', icon: Table2, label: 'Ledger' },
-      { path: '/finance/analytics', icon: BarChart3, label: 'Analytics' },
-      { path: '/receipts', icon: Inbox, label: 'Receipt Inbox' },
-      { path: '/api-costs', icon: DollarSign, label: 'API Costs' },
+      { path: '/finance/dashboard', icon: LayoutDashboard, label: 'Dashboard', minRole: 'owner' },
+      { path: '/finance/ledger', icon: Table2, label: 'Ledger', minRole: 'owner' },
+      { path: '/finance/analytics', icon: BarChart3, label: 'Analytics', minRole: 'owner' },
+      { path: '/receipts', icon: Inbox, label: 'Receipt Inbox', minRole: 'owner' },
+      { path: '/api-costs', icon: DollarSign, label: 'API Costs', minRole: 'owner' },
     ],
   },
   {
     title: 'HR & Payroll',
-    minRole: 'owner',
     items: [
-      { path: '/staff-tasks', icon: ListTodo, label: 'Staff Tasks' },
-      { path: '/hr/attendance', icon: CalendarCheck, label: 'Attendance' },
-      { path: '/hr/schedule', icon: CalendarDays, label: 'Schedule' },
-      { path: '/hr/payroll', icon: Banknote, label: 'Payroll' },
-      { path: '/hr/staff', icon: Users, label: 'Staff' },
-    ],
-  },
-  {
-    title: 'Settings',
-    minRole: 'owner',
-    items: [
-      { path: '/settings', icon: Settings, label: 'Settings' },
+      { path: '/hr/attendance', icon: CalendarCheck, label: 'Attendance', minRole: 'owner' },
+      { path: '/hr/schedule', icon: CalendarDays, label: 'Schedule', minRole: 'owner' },
+      { path: '/hr/payroll', icon: Banknote, label: 'Payroll', minRole: 'owner' },
+      { path: '/hr/staff', icon: Users, label: 'Staff', minRole: 'owner' },
     ],
   },
 ]
@@ -133,7 +122,14 @@ const NAV_SECTIONS: NavSection[] = [
 
 const ROLE_STYLE: Record<AppRole, string> = {
   owner: 'bg-amber-500/15 text-amber-300',
+  task_manager: 'bg-violet-500/15 text-violet-300',
   cook: 'bg-sky-500/15 text-sky-300',
+}
+
+const ROLE_LABEL: Record<AppRole, string> = {
+  owner: 'owner',
+  task_manager: 'admin',
+  cook: 'cook',
 }
 
 /* ─── Collapsible section ─── */
@@ -193,9 +189,12 @@ export function AppShell() {
   const { user, signOut } = useAuth()
   const { role, staffName, isLoading: roleLoading } = useAppRole()
 
-  const visibleSections = NAV_SECTIONS.filter(
-    (s) => role === 'owner' || s.minRole === 'cook',
-  )
+  const visibleSections = NAV_SECTIONS
+    .map((s) => ({
+      ...s,
+      items: s.items.filter((i) => hasAccess(role, i.minRole)),
+    }))
+    .filter((s) => s.items.length > 0)
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     () => {
@@ -245,7 +244,7 @@ export function AppShell() {
                 ROLE_STYLE[role],
               ].join(' ')}
             >
-              {role}
+              {ROLE_LABEL[role]}
             </span>
           </div>
         )}
@@ -261,23 +260,25 @@ export function AppShell() {
             />
           ))}
 
-          {/* Settings — always visible, outside sections */}
-          <div className="mt-auto">
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                [
-                  'flex items-center gap-3 rounded-lg px-2 py-2 text-xs font-medium transition',
-                  isActive
-                    ? 'bg-emerald-500/15 text-emerald-300'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100',
-                ].join(' ')
-              }
-            >
-              <Settings className="h-4 w-4 shrink-0" />
-              <span className="hidden lg:block">Settings</span>
-            </NavLink>
-          </div>
+          {/* Settings — owner only, pinned to bottom */}
+          {hasAccess(role, 'owner') && (
+            <div className="mt-auto">
+              <NavLink
+                to="/settings"
+                className={({ isActive }) =>
+                  [
+                    'flex items-center gap-3 rounded-lg px-2 py-2 text-xs font-medium transition',
+                    isActive
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100',
+                  ].join(' ')
+                }
+              >
+                <Settings className="h-4 w-4 shrink-0" />
+                <span className="hidden lg:block">Settings</span>
+              </NavLink>
+            </div>
+          )}
         </nav>
 
         {/* Footer */}
