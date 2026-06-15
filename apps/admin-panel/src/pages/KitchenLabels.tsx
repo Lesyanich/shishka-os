@@ -5,7 +5,8 @@ import { usePfPackCard } from '../hooks/usePfPackCard'
 import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
 import { useLocations } from '../hooks/useLocations'
 import { useAppRole } from '../contexts/AppRoleContext'
-import { addDays, printPrepLabel, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib/labelPrinting'
+import { addDays, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib/labelPrinting'
+import { printPrepLabelTSPL } from '../lib/labelTspl'
 
 const LABEL_SIZE_KEY = 'kitchen_label_size'
 const LABEL_LOCATION_KEY = 'kitchen_label_location'
@@ -146,10 +147,9 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const canPrint = qtyValid && daysValid && !!locationId && !printing
 
   function printBatch(b: PrepBatch) {
-    printPrepLabel(
+    printPrepLabelTSPL(
       {
         name: item.name,
-        productCode: item.product_code,
         prepDate: new Date(b.produced_at),
         shelfLifeDays: shelfDaysOf(b),
         weight: `${b.weight} ${unit}`,
