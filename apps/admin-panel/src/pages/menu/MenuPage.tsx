@@ -76,7 +76,12 @@ export function MenuPage() {
   // Derived state from URL query — shareable, refresh-safe.
   const view = pickParam<ViewMode>(searchParams, 'view', VIEW_MODES, 'owner')
   const ownerLayout = pickParam<OwnerLayout>(searchParams, 'layout', OWNER_LAYOUTS, 'table')
-  const typeFilter = pickParam<TypeFilterValue>(searchParams, 'type', TYPE_FILTERS, 'SALE')
+  // L1 Cook is the kitchen prep station — default its type filter to PF so cooks
+  // land on semi-finished prep items, not customer SALE dishes. Other views keep
+  // SALE as the default. The switcher stays in every view, so a cook can still
+  // flip to SALE/All on demand.
+  const defaultType: TypeFilterValue = view === 'l1-cook' ? 'PF' : 'SALE'
+  const typeFilter = pickParam<TypeFilterValue>(searchParams, 'type', TYPE_FILTERS, defaultType)
 
   // Owner view: full multi-filter state (categories, available, loyverse, flags)
   const { filters, setFilters } = useMenuFilters()
@@ -143,8 +148,8 @@ export function MenuPage() {
     [updateParam],
   )
   const setTypeFilter = useCallback(
-    (t: TypeFilterValue) => updateParam({ type: t === 'SALE' ? null : t }),
-    [updateParam],
+    (t: TypeFilterValue) => updateParam({ type: t === defaultType ? null : t }),
+    [updateParam, defaultType],
   )
   const setSelectedSubcategory = useCallback(
     (id: string | null) => updateParam({ subcat: id }),
