@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   Utensils,
+  Pause,
 } from 'lucide-react'
 import type { MenuItem, MenuBomChild } from '../../../hooks/useMenuData'
 import type { PfPackCardData } from '../../../hooks/usePfPackCard'
@@ -15,6 +16,8 @@ import type { RecipeStepStats } from '../../../hooks/useMenuListEnrichment'
 import type { DishCardData } from '../../../hooks/useDishCard'
 import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 import { formatDishName } from '../utils/formatDishName'
+import { useBomIngredients } from '../../../hooks/useBomIngredients'
+import { useDishRecipeSteps } from '../../../hooks/useDishRecipeSteps'
 
 interface L1CookViewProps {
   items: MenuItem[]
@@ -32,7 +35,131 @@ interface L1CookViewProps {
   onOpenDish: (id: string) => void
 }
 
-/* ── PF card (existing, unchanged) ─────────────────────────── */
+/* ── PF recipe detail (lazy-loaded on expand) ──────────────── */
+
+/** Full L1 cooking recipe — ingredients with proportions + process steps.
+ * Lazy-loaded: mounted only when the card is expanded, so the BOM + recipe
+ * queries fire on demand (same data path as the drawer's L1CookTab). */
+function PfRecipeDetail({ itemId }: { itemId: string }) {
+  const { ingredients, isLoading: ingLoading } = useBomIngredients(itemId)
+  const { steps, isLoading: stepLoading } = useDishRecipeSteps(itemId)
+
+  return (
+    <div className="space-y-3 px-4 pb-3">
+      {/* Ingredients with proportions */}
+      <div>
+        <h4 className="mb-1.5 text-[9px] uppercase tracking-widest text-cream/45">
+          🧂 Ingredients
+        </h4>
+        {ingLoading ? (
+          <p className="text-[11px] text-cream/40">Loading…</p>
+        ) : ingredients.length === 0 ? (
+          <p className="text-[11px] italic text-cream/35">No ingredients defined</p>
+        ) : (
+          <ul className="space-y-1">
+            {ingredients.map((ing) => {
+              const isPf = ing.product_code.startsWith('PF-')
+              const isMod = ing.product_code.startsWith('MOD-')
+              const badgeColor = isPf
+                ? 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)]'
+                : isMod
+                  ? 'bg-violet-900/40 text-violet-300'
+                  : 'bg-slate-700 text-slate-300'
+              const badgeLabel = isPf ? 'PF' : isMod ? 'MOD' : 'RAW'
+              return (
+                <li
+                  key={ing.ingredient_id}
+                  className="flex items-center gap-2 text-[11px]"
+                >
+                  <span
+                    className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider ${badgeColor}`}
+                  >
+                    {badgeLabel}
+                  </span>
+                  <span className="min-w-0 truncate text-cream/70">{ing.name}</span>
+                  <span className="ml-auto shrink-0 font-mono text-[10px] text-cream/50">
+                    {ing.quantity}
+                    {ing.base_unit ? ` ${ing.base_unit}` : ''}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* Process steps */}
+      <div>
+        <h4 className="mb-1.5 flex items-center gap-1 text-[9px] uppercase tracking-widest text-cream/45">
+          <ChefHat className="h-2.5 w-2.5" />
+          Steps
+        </h4>
+        {stepLoading ? (
+          <p className="text-[11px] text-cream/40">Loading…</p>
+        ) : steps.length === 0 ? (
+          <p className="text-[11px] italic text-cream/35">No recipe steps defined</p>
+        ) : (
+          <ol className="space-y-1.5">
+            {steps.map((s) => (
+              <li
+                key={s.id}
+                className={`rounded-lg border px-2.5 py-1.5 ${
+                  s.is_ccp
+                    ? 'border-amber-500/40 bg-amber-950/20'
+                    : 'border-surface-3 bg-surface-2/50'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[9px] font-bold text-cream/70">
+                    {s.step_number}
+                  </span>
+                  <span className="text-[11px] font-semibold text-cream/85">
+                    {s.operation_name}
+                  </span>
+                  {s.is_ccp && (
+                    <span className="flex items-center gap-0.5 rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[8px] font-bold text-amber-400">
+                      <AlertTriangle className="h-2 w-2" /> CCP
+                    </span>
+                  )}
+                  {s.is_passive && (
+                    <span className="flex items-center gap-0.5 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[8px] font-medium text-sky-400">
+                      <Pause className="h-2 w-2" /> passive
+                    </span>
+                  )}
+                  {s.duration_min != null && (
+                    <span className="ml-auto shrink-0 text-[10px] text-cream/50">
+                      ⏱️ {s.duration_min}m
+                    </span>
+                  )}
+                </div>
+                {s.instruction_text && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-cream/65">
+                    {s.instruction_text}
+                  </p>
+                )}
+                {(s.temperature_c != null || s.internal_temp_c != null) && (
+                  <div className="mt-1 flex gap-3 text-[10px] text-cream/55">
+                    {s.temperature_c != null && <span>🔥 {s.temperature_c}°C</span>}
+                    {s.internal_temp_c != null && (
+                      <span>🌡️ {s.internal_temp_c}°C</span>
+                    )}
+                  </div>
+                )}
+                {s.is_ccp && s.ccp_check_text && (
+                  <p className="mt-1 rounded bg-amber-500/10 px-1.5 py-1 text-[10px] font-medium text-amber-300">
+                    ⚠️ {s.ccp_check_text}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── PF card (L1 cook — expandable full recipe) ────────────── */
 
 interface PfCardProps {
   item: MenuItem
@@ -42,6 +169,7 @@ interface PfCardProps {
 }
 
 function PfCard({ item, card, stats, onOpen }: PfCardProps) {
+  const [expanded, setExpanded] = useState(false)
   const portionInfo =
     card?.portions_per_batch != null && card?.portion_weight_g != null
       ? `${card.portions_per_batch} × ${card.portion_weight_g} g`
@@ -58,90 +186,105 @@ function PfCard({ item, card, stats, onOpen }: PfCardProps) {
   const hasPhoto = !!card?.kitchen_photo_url
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group flex flex-col gap-3 rounded-xl border border-surface-3 bg-surface-2 p-4 text-left transition hover:border-amber-watch/40 hover:bg-surface-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-amber-watch)]/60"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-[var(--color-amber-watch)]/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[color:var(--color-amber-watch)]">
-              PF
-            </span>
-            <h3 className="truncate text-sm font-medium text-cream">
-              {item.name}
-            </h3>
+    <div className="flex flex-col rounded-xl border border-surface-3 bg-surface-2 text-left transition hover:border-amber-watch/40 hover:bg-surface-3">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group flex flex-col gap-3 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-amber-watch)]/60"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-[var(--color-amber-watch)]/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[color:var(--color-amber-watch)]">
+                PF
+              </span>
+              <h3 className="truncate text-sm font-medium text-cream">
+                {item.name}
+              </h3>
+            </div>
+            <p className="mt-0.5 font-mono text-[10px] text-cream/40">
+              {item.product_code}
+            </p>
           </div>
-          <p className="mt-0.5 font-mono text-[10px] text-cream/40">
-            {item.product_code}
-          </p>
+          {hasPhoto && (
+            <img
+              src={card!.kitchen_photo_url!}
+              alt={`${item.name} kitchen reference`}
+              className="h-12 w-12 shrink-0 rounded-md object-cover"
+              loading="lazy"
+            />
+          )}
         </div>
-        {hasPhoto && (
-          <img
-            src={card!.kitchen_photo_url!}
-            alt={`${item.name} kitchen reference`}
-            className="h-12 w-12 shrink-0 rounded-md object-cover"
-            loading="lazy"
-          />
-        )}
-      </div>
 
-      {item.kitchen_note ? (
-        <p className="line-clamp-2 text-xs text-cream/65">{item.kitchen_note}</p>
-      ) : (
-        <p className="text-xs italic text-cream/35">No kitchen note</p>
-      )}
+        {item.kitchen_note ? (
+          <p className="line-clamp-2 text-xs text-cream/65">{item.kitchen_note}</p>
+        ) : (
+          <p className="text-xs italic text-cream/35">No kitchen note</p>
+        )}
 
-      <dl className="grid grid-cols-2 gap-2 text-[11px]">
-        {portionInfo && (
-          <div className="flex items-center gap-1.5 text-cream/65">
-            <Package className="h-3 w-3 text-cream/40" />
-            <span>{portionInfo}</span>
-          </div>
-        )}
-        {packInfo && (
-          <div className="flex items-center gap-1.5 text-cream/65">
-            <Package className="h-3 w-3 text-cream/40" />
-            <span className="truncate">{packInfo}</span>
-          </div>
-        )}
-        {card?.shelf_life_days != null && (
-          <div className="flex items-center gap-1.5 text-cream/65">
-            <Clock className="h-3 w-3 text-cream/40" />
-            <span>{card.shelf_life_days} d shelf</span>
-          </div>
-        )}
-        {tempRange && (
-          <div className="flex items-center gap-1.5 text-cream/65">
-            <Snowflake className="h-3 w-3 text-cream/40" />
-            <span>{tempRange}</span>
-          </div>
-        )}
-        {card?.storage_zone && (
-          <div className="col-span-2 flex items-center gap-1.5 text-cream/65">
-            <Snowflake className="h-3 w-3 text-cream/40" />
-            <span className="truncate">{card.storage_zone}</span>
-          </div>
-        )}
-      </dl>
+        <dl className="grid grid-cols-2 gap-2 text-[11px]">
+          {portionInfo && (
+            <div className="flex items-center gap-1.5 text-cream/65">
+              <Package className="h-3 w-3 text-cream/40" />
+              <span>{portionInfo}</span>
+            </div>
+          )}
+          {packInfo && (
+            <div className="flex items-center gap-1.5 text-cream/65">
+              <Package className="h-3 w-3 text-cream/40" />
+              <span className="truncate">{packInfo}</span>
+            </div>
+          )}
+          {card?.shelf_life_days != null && (
+            <div className="flex items-center gap-1.5 text-cream/65">
+              <Clock className="h-3 w-3 text-cream/40" />
+              <span>{card.shelf_life_days} d shelf</span>
+            </div>
+          )}
+          {tempRange && (
+            <div className="flex items-center gap-1.5 text-cream/65">
+              <Snowflake className="h-3 w-3 text-cream/40" />
+              <span>{tempRange}</span>
+            </div>
+          )}
+          {card?.storage_zone && (
+            <div className="col-span-2 flex items-center gap-1.5 text-cream/65">
+              <Snowflake className="h-3 w-3 text-cream/40" />
+              <span className="truncate">{card.storage_zone}</span>
+            </div>
+          )}
+        </dl>
+      </button>
 
-      <div className="flex items-center gap-2 border-t border-surface-3 pt-2 text-[11px]">
-        <span className="flex items-center gap-1 text-cream/55">
+      {/* Recipe toggle — full L1 cooking instruction inline */}
+      <div className="border-t border-surface-3">
+        <button
+          type="button"
+          onClick={() => setExpanded((p) => !p)}
+          className="flex w-full items-center gap-1.5 px-4 py-2 text-[11px] text-cream/55 transition hover:text-cream/80"
+        >
+          {expanded ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
           <ChefHat className="h-3 w-3" />
-          {stepCount} {stepCount === 1 ? 'step' : 'steps'}
-        </span>
-        {ccpCount > 0 && (
-          <span className="flex items-center gap-1 text-amber-400">
-            <AlertTriangle className="h-3 w-3" />
-            {ccpCount} CCP
+          {stepCount > 0
+            ? `${stepCount} ${stepCount === 1 ? 'step' : 'steps'}`
+            : 'Recipe'}
+          {ccpCount > 0 && (
+            <span className="flex items-center gap-1 text-amber-400">
+              <AlertTriangle className="h-3 w-3" />
+              {ccpCount} CCP
+            </span>
+          )}
+          <span className="ml-auto text-[10px] text-cream/40">
+            {expanded ? 'hide' : 'view recipe'}
           </span>
-        )}
-        {stepCount === 0 && (
-          <span className="italic text-cream/35">No recipe defined</span>
-        )}
+        </button>
+        {expanded && <PfRecipeDetail itemId={item.id} />}
       </div>
-    </button>
+    </div>
   )
 }
 
