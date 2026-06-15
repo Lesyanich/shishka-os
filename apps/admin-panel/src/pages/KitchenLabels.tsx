@@ -1,15 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, ChevronLeft, Loader2, Tag, Printer } from 'lucide-react'
+import { Search, ChevronLeft, Loader2, Tag, Printer, Trash2 } from 'lucide-react'
 import { usePrepLabelItems, type PrepItem } from '../hooks/usePrepLabelItems'
 import { usePfPackCard } from '../hooks/usePfPackCard'
+import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
+import { useLocations } from '../hooks/useLocations'
+import { useAppRole } from '../contexts/AppRoleContext'
 import { addDays, printPrepLabel, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib/labelPrinting'
 
 const LABEL_SIZE_KEY = 'kitchen_label_size'
+const LABEL_LOCATION_KEY = 'kitchen_label_location'
+
+const DAY_MS = 86_400_000
+const shortDate = (iso: string | Date) =>
+  new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
+const shelfDaysOf = (b: PrepBatch) =>
+  Math.max(1, Math.round((new Date(b.expires_at).getTime() - new Date(b.produced_at).getTime()) / DAY_MS))
 
 /**
  * Kitchen label station (cook-accessible). An L1 cook picks a prep item, enters
  * the batch weight + shelf life, and prints a storage label to the XP-420B via
- * RawBT: name + prep date + weight + use-by.
+ * RawBT. Each print records a batch in inventory_batches (with its own ID + QR
+ * barcode), and the recorded batches are listed below for delete / reprint.
  *
  * UI copy is English by default (Thai / Burmese to be added later).
  */
@@ -85,18 +96,38 @@ export function KitchenLabels() {
 
 function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const { card } = usePfPackCard(item.id)
+  const { staffId } = useAppRole()
+  const { locations } = useLocations()
+  const { batches, create, remove } = usePrepBatches(item.id)
   const unit = item.base_unit ?? 'kg'
 
   const [qty, setQty] = useState('')
   const [days, setDays] = useState('')
+  const [printing, setPrinting] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+
   const [sizeId, setSizeId] = useState<string>(
     () => localStorage.getItem(LABEL_SIZE_KEY) ?? DEFAULT_LABEL_SIZE.id,
   )
   const size = LABEL_SIZES.find((s) => s.id === sizeId) ?? DEFAULT_LABEL_SIZE
 
+  const [locationId, setLocationId] = useState<string>(
+    () => localStorage.getItem(LABEL_LOCATION_KEY) ?? '',
+  )
+  // Default to the L1 kitchen location once locations load (if none chosen yet).
+  useEffect(() => {
+    if (locationId || locations.length === 0) return
+    const kitchen = locations.find((l) => l.type === 'kitchen') ?? locations[0]
+    setLocationId(kitchen.id)
+  }, [locations, locationId])
+
   function chooseSize(id: string) {
     setSizeId(id)
     localStorage.setItem(LABEL_SIZE_KEY, id)
+  }
+  function chooseLocation(id: string) {
+    setLocationId(id)
+    localStorage.setItem(LABEL_LOCATION_KEY, id)
   }
 
   // Prefill shelf life from the recipe card once it loads (if set there).
@@ -107,21 +138,53 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const qtyNum = qty.trim() === '' ? null : Number(qty)
   const qtyValid = qtyNum != null && Number.isFinite(qtyNum) && qtyNum > 0
   const daysNum = days.trim() === '' ? null : Number(days)
-  const daysValid = daysNum == null || (Number.isInteger(daysNum) && daysNum > 0 && daysNum <= 365)
+  const daysValid = daysNum != null && Number.isInteger(daysNum) && daysNum > 0 && daysNum <= 365
 
-  const useBy = daysValid && daysNum != null ? addDays(new Date(), daysNum) : null
-  const useByLabel = useBy
-    ? useBy.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
-    : '—'
+  const useBy = daysValid ? addDays(new Date(), daysNum) : null
+  const useByLabel = useBy ? shortDate(useBy) : '—'
 
-  function handlePrint() {
-    printPrepLabel({
-      name: item.name,
+  const canPrint = qtyValid && daysValid && !!locationId && !printing
+
+  function printBatch(b: PrepBatch) {
+    printPrepLabel(
+      {
+        name: item.name,
+        productCode: item.product_code,
+        prepDate: new Date(b.produced_at),
+        shelfLifeDays: shelfDaysOf(b),
+        weight: `${b.weight} ${unit}`,
+        qr: b.barcode,
+        batchCode: b.batch_code ?? b.barcode,
+      },
+      size,
+    )
+  }
+
+  async function handlePrint() {
+    if (!canPrint || qtyNum == null || daysNum == null) return
+    setPrinting(true)
+    setActionError(null)
+    const res = await create({
+      nomenclatureId: item.id,
       productCode: item.product_code,
-      prepDate: new Date(),
-      shelfLifeDays: daysValid ? daysNum : null,
-      weight: qtyValid ? `${qty.trim()} ${unit}` : null,
-    }, size)
+      weight: qtyNum,
+      shelfLifeDays: daysNum,
+      locationId,
+      producedBy: staffId,
+    })
+    setPrinting(false)
+    if (!res.ok || !res.batch) {
+      setActionError(res.error ?? 'Could not record batch')
+      return
+    }
+    printBatch(res.batch)
+    setQty('')
+  }
+
+  async function handleDelete(b: PrepBatch) {
+    setActionError(null)
+    const res = await remove(b.id)
+    if (!res.ok) setActionError(res.error ?? 'Could not delete batch')
   }
 
   return (
@@ -175,9 +238,6 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
             placeholder="e.g. 3"
             className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-lg text-slate-100 outline-none focus:border-amber-500/60"
           />
-          {!daysValid && (
-            <span className="mt-1 block text-[11px] text-rose-400">Whole number, 1–365.</span>
-          )}
         </label>
 
         {/* Use-by preview */}
@@ -185,6 +245,24 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           <span className="text-slate-400">Use by (from today)</span>
           <span className="text-base font-semibold text-slate-100">{useByLabel}</span>
         </div>
+
+        {/* Location */}
+        <label className="block">
+          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
+            Location
+          </span>
+          <select
+            value={locationId}
+            onChange={(e) => chooseLocation(e.target.value)}
+            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
+          >
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {/* Paper size */}
         <label className="block">
@@ -204,18 +282,81 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           </select>
         </label>
 
-        {/* Print */}
+        {actionError && <p className="text-sm text-rose-400">{actionError}</p>}
+
+        {/* Print + record */}
         <button
           type="button"
           onClick={handlePrint}
-          disabled={!qtyValid || !daysValid}
+          disabled={!canPrint}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3.5 text-base font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <Printer className="h-5 w-5" /> Print label
+          {printing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />}
+          Print &amp; record batch
         </button>
         <p className="text-center text-[11px] text-slate-500">
-          Prints on the tablet via RawBT → XP-420B
+          Records the batch + prints a QR label via RawBT → XP-420B
         </p>
+      </div>
+
+      {/* Recorded batches */}
+      <RecordedBatches batches={batches} unit={unit} onReprint={printBatch} onDelete={handleDelete} />
+    </div>
+  )
+}
+
+function RecordedBatches({
+  batches,
+  unit,
+  onReprint,
+  onDelete,
+}: {
+  batches: PrepBatch[]
+  unit: string
+  onReprint: (b: PrepBatch) => void
+  onDelete: (b: PrepBatch) => void
+}) {
+  if (batches.length === 0) {
+    return (
+      <p className="mt-6 text-center text-xs text-slate-600">No batches recorded yet.</p>
+    )
+  }
+
+  return (
+    <div className="mt-6">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        Recorded batches ({batches.length})
+      </h2>
+      <div className="space-y-2">
+        {batches.map((b) => (
+          <div
+            key={b.id}
+            className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-mono text-xs text-slate-200">{b.batch_code ?? b.barcode}</p>
+              <p className="text-[11px] text-slate-500">
+                {b.weight} {unit} · made {shortDate(b.produced_at)} · use by {shortDate(b.expires_at)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onReprint(b)}
+              title="Reprint label"
+              className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:border-amber-500/50 hover:text-amber-300"
+            >
+              <Printer className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(b)}
+              title="Delete batch"
+              className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:border-rose-500/50 hover:text-rose-400"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   )
