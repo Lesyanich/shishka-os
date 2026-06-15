@@ -29,6 +29,7 @@ export const LABEL_SIZES: LabelSize[] = [
   { id: '60x40', label: '60 × 40 мм', wMm: 60, hMm: 40 },
   { id: '58x40', label: '58 × 40 мм', wMm: 58, hMm: 40 },
   { id: '50x30', label: '50 × 30 мм', wMm: 50, hMm: 30 },
+  { id: '50x25', label: '50 × 25 мм', wMm: 50, hMm: 25 },
   { id: '40x30', label: '40 × 30 мм', wMm: 40, hMm: 30 },
 ]
 
