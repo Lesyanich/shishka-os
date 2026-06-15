@@ -9,11 +9,6 @@ import { addDays, printPrepLabel, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib
 
 const LABEL_SIZE_KEY = 'kitchen_label_size'
 const LABEL_LOCATION_KEY = 'kitchen_label_location'
-const LABEL_GAP_KEY = 'kitchen_label_gap_mm'
-
-/** Inter-label gap options (mm) added below the content to stop label drift. */
-const GAP_OPTIONS = ['0', '2', '3', '4']
-const DEFAULT_GAP = '3'
 
 const DAY_MS = 86_400_000
 const shortDate = (iso: string | Date) =>
@@ -126,17 +121,9 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
     setLocationId(kitchen.id)
   }, [locations, locationId])
 
-  const [gapMm, setGapMm] = useState<string>(
-    () => localStorage.getItem(LABEL_GAP_KEY) ?? DEFAULT_GAP,
-  )
-
   function chooseSize(id: string) {
     setSizeId(id)
     localStorage.setItem(LABEL_SIZE_KEY, id)
-  }
-  function chooseGap(mm: string) {
-    setGapMm(mm)
-    localStorage.setItem(LABEL_GAP_KEY, mm)
   }
   function chooseLocation(id: string) {
     setLocationId(id)
@@ -171,7 +158,6 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       },
       size,
       true, // launch RawBT via intent each job (fixes "only first print works")
-      Number(gapMm) || 0, // pad image to full label pitch → no drift
     )
   }
 
@@ -292,24 +278,6 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
             {LABEL_SIZES.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {/* Gap (drift fix): extra feed below the content = inter-label gap */}
-        <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-            Gap (mm) — increase if labels drift down
-          </span>
-          <select
-            value={gapMm}
-            onChange={(e) => chooseGap(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
-          >
-            {GAP_OPTIONS.map((g) => (
-              <option key={g} value={g}>
-                {g} mm
               </option>
             ))}
           </select>
