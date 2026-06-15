@@ -1,6 +1,43 @@
 import { useEffect, useMemo } from 'react'
 import { Clock, Loader2, Pause, Play, Thermometer, Wrench } from 'lucide-react'
-import { useRecipeSteps, type RecipeStep } from '../../hooks/useRecipeSteps'
+import { useRecipeSteps, type RecipeStep, type StationLabel } from '../../hooks/useRecipeSteps'
+
+/** L1 (Kitchen prep) / L2 (Assembly) station picker for a single step.
+ *  Clicking the active station again clears it (back to unassigned). */
+function StationToggle({
+  value,
+  onChange,
+}: {
+  value: StationLabel | null
+  onChange: (next: StationLabel | null) => void
+}) {
+  const opts: { label: StationLabel; title: string; active: string }[] = [
+    { label: 'L1', title: 'Kitchen prep (заготовка)', active: 'border-emerald-500/60 bg-emerald-500/20 text-emerald-200' },
+    { label: 'L2', title: 'Assembly / bar (сборка)', active: 'border-sky-500/60 bg-sky-500/20 text-sky-200' },
+  ]
+  return (
+    <div className="inline-flex overflow-hidden rounded-md border border-slate-700">
+      {opts.map((o, i) => {
+        const isActive = value === o.label
+        return (
+          <button
+            key={o.label}
+            type="button"
+            title={o.title}
+            onClick={() => onChange(isActive ? null : o.label)}
+            className={[
+              'px-2 py-0.5 text-[10px] font-semibold transition',
+              i > 0 ? 'border-l border-slate-700' : '',
+              isActive ? o.active : 'text-slate-500 hover:bg-slate-800 hover:text-slate-300',
+            ].join(' ')}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes}m`
@@ -9,7 +46,15 @@ function formatDuration(minutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`
 }
 
-function StepRow({ step, isLast }: { step: RecipeStep; isLast: boolean }) {
+function StepRow({
+  step,
+  isLast,
+  onSetStation,
+}: {
+  step: RecipeStep
+  isLast: boolean
+  onSetStation: (station: StationLabel | null) => void
+}) {
   const hasTemp = step.temperature_c !== null || step.internal_temp_c !== null
 
   return (
@@ -41,6 +86,7 @@ function StepRow({ step, isLast }: { step: RecipeStep; isLast: boolean }) {
             {step.operation_name}
           </span>
           <div className="flex items-center gap-2">
+            <StationToggle value={step.station} onChange={onSetStation} />
             {step.is_passive ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] text-sky-300">
                 <Pause className="h-2.5 w-2.5" />
@@ -95,7 +141,7 @@ function StepRow({ step, isLast }: { step: RecipeStep; isLast: boolean }) {
 }
 
 export function ProcessTab({ nomenclatureId }: { nomenclatureId: string }) {
-  const { steps, isLoading, error, fetchSteps } = useRecipeSteps()
+  const { steps, isLoading, error, fetchSteps, setStepStation } = useRecipeSteps()
 
   useEffect(() => {
     fetchSteps(nomenclatureId)
@@ -113,7 +159,11 @@ export function ProcessTab({ nomenclatureId }: { nomenclatureId: string }) {
       if (st.equipment_name) equipmentSet.add(st.equipment_name)
     }
 
-    return { totalMin, activeMin, passiveMin, equipment: [...equipmentSet] }
+    const l1 = steps.filter((st) => st.station === 'L1').length
+    const l2 = steps.filter((st) => st.station === 'L2').length
+    const unassigned = steps.length - l1 - l2
+
+    return { totalMin, activeMin, passiveMin, equipment: [...equipmentSet], l1, l2, unassigned }
   }, [steps])
 
   if (isLoading) {
@@ -188,12 +238,31 @@ export function ProcessTab({ nomenclatureId }: { nomenclatureId: string }) {
       {/* Timeline */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {steps.map((step, i) => (
-          <StepRow key={step.id} step={step} isLast={i === steps.length - 1} />
+          <StepRow
+            key={step.id}
+            step={step}
+            isLast={i === steps.length - 1}
+            onSetStation={(station) => {
+              void setStepStation(step.id, station)
+            }}
+          />
         ))}
       </div>
 
-      <div className="border-t border-slate-800 px-4 py-2 text-[10px] text-slate-500">
-        {steps.length} steps
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-800 px-4 py-2 text-[10px] text-slate-500">
+        <span>{steps.length} steps</span>
+        {summary && (
+          <>
+            <span className="text-emerald-400">L1 prep: {summary.l1}</span>
+            <span className="text-sky-400">L2 assembly: {summary.l2}</span>
+            {summary.unassigned > 0 && (
+              <span className="text-amber-400">unassigned: {summary.unassigned}</span>
+            )}
+            <span className="ml-auto italic text-slate-600">
+              Tap L1/L2 on a step to set its station
+            </span>
+          </>
+        )}
       </div>
     </div>
   )
