@@ -103,24 +103,35 @@ function fitText(
   return { size: minSize, lines: [text] }
 }
 
-/** Draw the prep label at the given stock size and return a PNG data URL. */
-export function renderPrepLabel(data: PrepLabelData, size: LabelSize = DEFAULT_LABEL_SIZE): string {
+/**
+ * Draw the prep label at the given stock size and return a PNG data URL.
+ *
+ * `gapMm` adds white space below the content so the total image height equals
+ * the label pitch (label + inter-label gap). When the printer feeds by image
+ * height (no gap calibration), this stops each successive label from drifting.
+ */
+export function renderPrepLabel(
+  data: PrepLabelData,
+  size: LabelSize = DEFAULT_LABEL_SIZE,
+  gapMm = 0,
+): string {
   const wPx = Math.round(size.wMm * DOTS_PER_MM)
-  const hPx = Math.round(size.hMm * DOTS_PER_MM)
+  const hPx = Math.round(size.hMm * DOTS_PER_MM) // label content area
+  const gapPx = Math.round(gapMm * DOTS_PER_MM)
   // Scale the 60×40 layout to the chosen stock; min() keeps it within both axes.
   const s = Math.min(wPx / BASE_W_PX, hPx / BASE_H_PX)
 
   const canvas = document.createElement('canvas')
   canvas.width = wPx
-  canvas.height = hPx
+  canvas.height = hPx + gapPx // feed one full pitch: label + gap
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D context unavailable')
 
   const PAD = 18 * s
 
-  // Thermal printing is black-on-white.
+  // Thermal printing is black-on-white. Fill the whole canvas (incl. gap) white.
   ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, wPx, hPx)
+  ctx.fillRect(0, 0, wPx, hPx + gapPx)
   ctx.fillStyle = '#000000'
   ctx.textBaseline = 'top'
 
@@ -235,6 +246,7 @@ export function printPrepLabel(
   data: PrepLabelData,
   size: LabelSize = DEFAULT_LABEL_SIZE,
   useIntent = false,
+  gapMm = 0,
 ): void {
-  printViaRawBT(renderPrepLabel(data, size), useIntent)
+  printViaRawBT(renderPrepLabel(data, size, gapMm), useIntent)
 }
