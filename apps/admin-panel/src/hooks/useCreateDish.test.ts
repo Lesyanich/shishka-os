@@ -8,7 +8,8 @@ describe('useCreateDish', () => {
 
   it('generates SALE- product codes from mixed-alphabet names', () => {
     expect(productCodeFromName('Borsch Bio-Active')).toBe('SALE-BORSCH_BIO_ACTIVE')
-    expect(productCodeFromName('Борщ с говядиной')).toBe('SALE-BORSCH_S_GOVYADINOY')
+    // щ → "shch" (standard Russian romanization, matches CYRILLIC_MAP)
+    expect(productCodeFromName('Борщ с говядиной')).toBe('SALE-BORSHCH_S_GOVYADINOY')
     expect(productCodeFromName('  Poke  Salmon  ')).toBe('SALE-POKE_SALMON')
     expect(productCodeFromName('')).toBe('SALE-')
   })
