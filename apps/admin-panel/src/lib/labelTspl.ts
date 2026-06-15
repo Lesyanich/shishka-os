@@ -55,6 +55,10 @@ function wrapName(name: string, max1: number, max2: number): [string, string] {
   return [l1, l2]
 }
 
+const DOTS_PER_MM = 203 / 25.4 // ≈ 8 dots/mm at 203 dpi
+// Approx heights (dots) of the TSPL built-in bitmap fonts at x1/y1.
+const FONT_H: Record<string, number> = { '1': 12, '2': 20, '3': 24, '4': 32 }
+
 /** Build a TSPL program (string) for one prep label at the given stock size. */
 export function renderPrepLabelTSPL(
   data: TsplLabelData,
@@ -67,30 +71,75 @@ export function renderPrepLabelTSPL(
     'CLS',
   ]
 
-  const [n1, n2] = wrapName(data.name.toUpperCase(), 18, 30)
-  let y = 18
-  cmds.push(`TEXT 24,${y},"4",0,1,1,"${esc(n1)}"`)
-  y += 44
-  if (n2) {
-    cmds.push(`TEXT 24,${y},"2",0,1,1,"${esc(n2)}"`)
-    y += 34
-  }
-
-  cmds.push(`BAR 24,${y + 4},300,3`)
-  let ry = y + 20
-
-  if (data.weight) {
-    cmds.push(`TEXT 24,${ry},"3",0,1,1,"QTY    ${esc(data.weight)}"`)
-    ry += 42
-  }
-  cmds.push(`TEXT 24,${ry},"3",0,1,1,"PREP   ${fmtDate(data.prepDate)}"`)
-  ry += 42
   const useBy = data.shelfLifeDays != null ? addDays(data.prepDate, data.shelfLifeDays) : null
-  cmds.push(`TEXT 24,${ry},"4",0,1,1,"USE BY ${useBy ? fmtDate(useBy) : '--'}"`)
-
+  const useByStr = useBy ? fmtDate(useBy) : '--'
   const bottom = data.batchCode ?? data.qr ?? ''
-  if (bottom) cmds.push(`TEXT 24,288,"1",0,1,1,"${esc(bottom)}"`)
-  if (data.qr) cmds.push(`QRCODE 348,104,M,4,A,0,"${esc(data.qr)}"`)
+
+  const wDots = Math.round(size.wMm * DOTS_PER_MM)
+  const hDots = Math.round(size.hMm * DOTS_PER_MM)
+  // Scale vs the proven 60×40 baseline (480×320). min() keeps within both axes.
+  const s = Math.min(wDots / 480, hDots / 320)
+
+  if (s >= 0.92) {
+    // Big stock (60×40 / 58×40): use the proven, hardware-verified fixed layout.
+    const [n1, n2] = wrapName(data.name.toUpperCase(), 18, 30)
+    let y = 18
+    cmds.push(`TEXT 24,${y},"4",0,1,1,"${esc(n1)}"`)
+    y += 44
+    if (n2) {
+      cmds.push(`TEXT 24,${y},"2",0,1,1,"${esc(n2)}"`)
+      y += 34
+    }
+    cmds.push(`BAR 24,${y + 4},300,3`)
+    let ry = y + 20
+    if (data.weight) {
+      cmds.push(`TEXT 24,${ry},"3",0,1,1,"QTY    ${esc(data.weight)}"`)
+      ry += 42
+    }
+    cmds.push(`TEXT 24,${ry},"3",0,1,1,"PREP   ${fmtDate(data.prepDate)}"`)
+    ry += 42
+    cmds.push(`TEXT 24,${ry},"4",0,1,1,"USE BY ${useByStr}"`)
+    if (bottom) cmds.push(`TEXT 24,288,"1",0,1,1,"${esc(bottom)}"`)
+    if (data.qr) cmds.push(`QRCODE 348,104,M,4,A,0,"${esc(data.qr)}"`)
+    cmds.push('PRINT 1,1')
+    return cmds.join('\r\n') + '\r\n'
+  }
+
+  // Smaller stock (50×30, 50×25, 40×30): adaptive layout scaled to the label.
+  const big = s >= 0.72
+  const fName = big ? '3' : '2'
+  const fRow = big ? '2' : '1'
+  const fUse = big ? '3' : '2'
+  const PAD = Math.max(12, Math.round(20 * s))
+  const gap = Math.max(4, Math.round(8 * s))
+  const cell = Math.max(2, Math.round(4 * s))
+
+  const [n1, n2] = wrapName(data.name.toUpperCase(), big ? 16 : 14, big ? 24 : 18)
+  let y = Math.max(8, Math.round(12 * s))
+  cmds.push(`TEXT ${PAD},${y},"${fName}",0,1,1,"${esc(n1)}"`)
+  y += FONT_H[fName] + gap
+  if (n2) {
+    cmds.push(`TEXT ${PAD},${y},"${fRow}",0,1,1,"${esc(n2)}"`)
+    y += FONT_H[fRow] + gap
+  }
+  cmds.push(`BAR ${PAD},${y},${Math.round(wDots * 0.6)},2`)
+  y += gap + 4
+  if (data.weight) {
+    cmds.push(`TEXT ${PAD},${y},"${fRow}",0,1,1,"QTY ${esc(data.weight)}"`)
+    y += FONT_H[fRow] + gap
+  }
+  cmds.push(`TEXT ${PAD},${y},"${fRow}",0,1,1,"PREP ${fmtDate(data.prepDate)}"`)
+  y += FONT_H[fRow] + gap
+  cmds.push(`TEXT ${PAD},${y},"${fUse}",0,1,1,"USE BY ${useByStr}"`)
+
+  // Bottom batch code only if there's vertical room.
+  if (bottom && hDots >= 200) {
+    cmds.push(`TEXT ${PAD},${hDots - FONT_H['1'] - Math.round(6 * s)},"1",0,1,1,"${esc(bottom)}"`)
+  }
+  // QR on the right; smaller cell on smaller stock.
+  if (data.qr) {
+    cmds.push(`QRCODE ${Math.round(wDots * 0.66)},${Math.round(hDots * 0.28)},M,${cell},A,0,"${esc(data.qr)}"`)
+  }
 
   cmds.push('PRINT 1,1')
   return cmds.join('\r\n') + '\r\n'

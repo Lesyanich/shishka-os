@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, ChevronLeft, Loader2, Tag, Printer, Trash2, Usb } from 'lucide-react'
+import { Search, ChevronLeft, Loader2, Tag, Printer, Trash2, Usb, Plus } from 'lucide-react'
 import { usePrepLabelItems, type PrepItem } from '../hooks/usePrepLabelItems'
 import { usePfPackCard } from '../hooks/usePfPackCard'
 import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
 import { useLocations } from '../hooks/useLocations'
 import { useAppRole } from '../contexts/AppRoleContext'
-import { addDays, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib/labelPrinting'
+import { addDays, printPrepLabel, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib/labelPrinting'
 import { renderPrepLabelTSPL } from '../lib/labelTspl'
 import {
   isWebUsbSupported,
@@ -17,6 +17,9 @@ import {
 
 const LABEL_SIZE_KEY = 'kitchen_label_size'
 const LABEL_LOCATION_KEY = 'kitchen_label_location'
+const LABEL_TRANSPORT_KEY = 'kitchen_label_transport'
+
+type Transport = 'usb' | 'bluetooth'
 
 const DAY_MS = 86_400_000
 const shortDate = (iso: string | Date) =>
@@ -127,6 +130,14 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
     else setActionError('Printer not selected.')
   }
 
+  const [transport, setTransport] = useState<Transport>(
+    () => (localStorage.getItem(LABEL_TRANSPORT_KEY) as Transport | null) ?? 'usb',
+  )
+  function chooseTransport(t: Transport) {
+    setTransport(t)
+    localStorage.setItem(LABEL_TRANSPORT_KEY, t)
+  }
+
   const [sizeId, setSizeId] = useState<string>(
     () => localStorage.getItem(LABEL_SIZE_KEY) ?? DEFAULT_LABEL_SIZE.id,
   )
@@ -167,6 +178,25 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const canPrint = qtyValid && daysValid && !!locationId && !printing
 
   async function printBatch(b: PrepBatch) {
+    // Bluetooth fallback: RawBT can only rasterize a PNG (ESC/POS) — may drift.
+    if (transport === 'bluetooth') {
+      printPrepLabel(
+        {
+          name: item.name,
+          productCode: item.product_code,
+          prepDate: new Date(b.produced_at),
+          shelfLifeDays: shelfDaysOf(b),
+          weight: `${b.weight} ${unit}`,
+          qr: b.barcode,
+          batchCode: b.batch_code ?? b.barcode,
+        },
+        size,
+        true, // launch RawBT via intent each job
+      )
+      return
+    }
+
+    // USB (recommended): native TSPL, self-registers to the gap, no drift.
     const bytes = new TextEncoder().encode(
       renderPrepLabelTSPL(
         {
@@ -212,6 +242,27 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       return
     }
     await printBatch(res.batch)
+    setQty('')
+  }
+
+  // Record a batch WITHOUT printing — it lands in the list below; print later.
+  async function handleAddBatch() {
+    if (!canPrint || qtyNum == null || daysNum == null) return
+    setPrinting(true)
+    setActionError(null)
+    const res = await create({
+      nomenclatureId: item.id,
+      productCode: item.product_code,
+      weight: qtyNum,
+      shelfLifeDays: daysNum,
+      locationId,
+      producedBy: staffId,
+    })
+    setPrinting(false)
+    if (!res.ok) {
+      setActionError(res.error ?? 'Could not record batch')
+      return
+    }
     setQty('')
   }
 
@@ -316,24 +367,40 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           </select>
         </label>
 
-        {/* Printer connection (WebUSB) */}
-        {!isWebUsbSupported() ? (
-          <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[12px] text-amber-300">
-            This browser can&apos;t reach the USB printer. Open the panel in Chrome on the tablet.
-          </p>
-        ) : usbDevice ? (
-          <p className="flex items-center gap-1.5 text-[12px] text-emerald-400">
-            <Usb className="h-4 w-4" /> Printer connected
-          </p>
-        ) : (
-          <button
-            type="button"
-            onClick={connectPrinter}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-600 py-2.5 text-sm font-medium text-slate-200 hover:border-amber-500/50"
+        {/* Transport: USB (TSPL, perfect) or Bluetooth (RawBT, may drift) */}
+        <label className="block">
+          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
+            Print via
+          </span>
+          <select
+            value={transport}
+            onChange={(e) => chooseTransport(e.target.value as Transport)}
+            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
           >
-            <Usb className="h-4 w-4" /> Connect printer (USB)
-          </button>
-        )}
+            <option value="usb">USB (recommended)</option>
+            <option value="bluetooth">Bluetooth (RawBT, may misalign)</option>
+          </select>
+        </label>
+
+        {/* USB connection — only relevant for the USB transport */}
+        {transport === 'usb' &&
+          (!isWebUsbSupported() ? (
+            <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[12px] text-amber-300">
+              This browser can&apos;t reach the USB printer. Open the panel in Chrome on the tablet.
+            </p>
+          ) : usbDevice ? (
+            <p className="flex items-center gap-1.5 text-[12px] text-emerald-400">
+              <Usb className="h-4 w-4" /> Printer connected
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={connectPrinter}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-600 py-2.5 text-sm font-medium text-slate-200 hover:border-amber-500/50"
+            >
+              <Usb className="h-4 w-4" /> Connect printer (USB)
+            </button>
+          ))}
 
         {actionError && <p className="text-sm text-rose-400">{actionError}</p>}
 
@@ -347,8 +414,20 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           {printing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />}
           Print &amp; record batch
         </button>
+
+        <button
+          type="button"
+          onClick={handleAddBatch}
+          disabled={!canPrint}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-600 py-3 text-sm font-medium text-slate-200 transition hover:border-amber-500/50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Plus className="h-4 w-4" /> Add batch (no print)
+        </button>
+
         <p className="text-center text-[11px] text-slate-500">
-          Records the batch + prints a native TSPL label over USB
+          {transport === 'usb'
+            ? 'Records the batch + prints a native TSPL label over USB'
+            : 'Records the batch + prints via RawBT over Bluetooth (may misalign)'}
         </p>
       </div>
 
