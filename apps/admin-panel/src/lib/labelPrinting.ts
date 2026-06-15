@@ -224,7 +224,17 @@ export function printViaRawBT(dataUrl: string, useIntent = false): void {
   }
 }
 
-/** Render + print a prep label in one call. */
-export function printPrepLabel(data: PrepLabelData, size: LabelSize = DEFAULT_LABEL_SIZE): void {
-  printViaRawBT(renderPrepLabel(data, size))
+/**
+ * Render + print a prep label in one call.
+ *
+ * `useIntent` launches RawBT via an Android intent (a fresh print context each
+ * time) instead of the `rawbt:` URI that reuses an open connection — this works
+ * around printers/RawBT that only accept the first job after connecting.
+ */
+export function printPrepLabel(
+  data: PrepLabelData,
+  size: LabelSize = DEFAULT_LABEL_SIZE,
+  useIntent = false,
+): void {
+  printViaRawBT(renderPrepLabel(data, size), useIntent)
 }
