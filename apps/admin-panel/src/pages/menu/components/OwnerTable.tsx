@@ -1149,13 +1149,12 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
       {children.map((c, idx) => {
         const isLast = idx === children.length - 1
         const prefix = isLast ? '└─' : '├─'
-        const child = c.child
-        const kind = child?.kind ?? null
-        const unit = child?.base_unit ?? ''
+        const kind = c.childKind
+        const unit = c.childBaseUnit ?? ''
         const costContribution =
-          child?.cost_per_unit != null
+          c.childCostPerUnit != null
             ? c.quantityPerUnit *
-              child.cost_per_unit *
+              c.childCostPerUnit *
               (1 + (c.yieldLossPct ?? 0) / 100)
             : null
         return (
@@ -1179,7 +1178,7 @@ function BomChildRows({ parentId, parentName, children }: BomChildRowsProps) {
                   className="italic"
                   style={{ fontFamily: 'var(--font-display)' }}
                 >
-                  {child?.name ?? <span className="text-brick-soft">missing</span>}
+                  {c.childName ?? <span className="text-brick-soft">missing</span>}
                 </span>
               </span>
             </td>
