@@ -60,15 +60,22 @@ export async function getGrantedPrinter(): Promise<UsbDevice | null> {
   const api = usb()
   if (!api) return null
   const devices = await api.getDevices()
-  return devices.find((d) => d.vendorId === XPRINTER_VENDOR_ID) ?? null
+  // Prefer the known Xprinter VID, else fall back to any granted device — over
+  // an OTG hub/adapter the printer can enumerate with a different VID/PID.
+  return devices.find((d) => d.vendorId === XPRINTER_VENDOR_ID) ?? devices[0] ?? null
 }
 
-/** Prompts the user to pick + grant the printer. Must be called from a click. */
+/**
+ * Prompts the user to pick + grant the printer. Must be called from a click.
+ * Shows ALL USB devices (no VID filter) — the XP-420B can present a different
+ * VID/PID over the tablet's OTG port than it does over the Mac, so a strict
+ * filter hid it ("no compatible devices found").
+ */
 export async function requestPrinter(): Promise<UsbDevice | null> {
   const api = usb()
   if (!api) throw new Error('WebUSB not supported in this browser')
   try {
-    return await api.requestDevice({ filters: [{ vendorId: XPRINTER_VENDOR_ID }] })
+    return await api.requestDevice({ filters: [] })
   } catch {
     // User dismissed the chooser.
     return null
