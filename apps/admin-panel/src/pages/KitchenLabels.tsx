@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, ChevronLeft, Loader2, Tag, Printer, Trash2 } from 'lucide-react'
+import { Search, ChevronLeft, Loader2, Tag, Printer, Trash2, Usb } from 'lucide-react'
 import { usePrepLabelItems, type PrepItem } from '../hooks/usePrepLabelItems'
 import { usePfPackCard } from '../hooks/usePfPackCard'
 import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
 import { useLocations } from '../hooks/useLocations'
 import { useAppRole } from '../contexts/AppRoleContext'
 import { addDays, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib/labelPrinting'
-import { printPrepLabelTSPL } from '../lib/labelTspl'
+import { renderPrepLabelTSPL } from '../lib/labelTspl'
+import {
+  isWebUsbSupported,
+  getGrantedPrinter,
+  requestPrinter,
+  sendRawViaUSB,
+  type UsbDevice,
+} from '../lib/webusbPrint'
 
 const LABEL_SIZE_KEY = 'kitchen_label_size'
 const LABEL_LOCATION_KEY = 'kitchen_label_location'
@@ -106,6 +113,19 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const [days, setDays] = useState('')
   const [printing, setPrinting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [usbDevice, setUsbDevice] = useState<UsbDevice | null>(null)
+
+  // Pick up an already-granted printer on mount (no chooser needed).
+  useEffect(() => {
+    getGrantedPrinter().then(setUsbDevice).catch(() => {})
+  }, [])
+
+  async function connectPrinter() {
+    setActionError(null)
+    const d = await requestPrinter()
+    if (d) setUsbDevice(d)
+    else setActionError('Printer not selected.')
+  }
 
   const [sizeId, setSizeId] = useState<string>(
     () => localStorage.getItem(LABEL_SIZE_KEY) ?? DEFAULT_LABEL_SIZE.id,
@@ -146,19 +166,32 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
 
   const canPrint = qtyValid && daysValid && !!locationId && !printing
 
-  function printBatch(b: PrepBatch) {
-    printPrepLabelTSPL(
-      {
-        name: item.name,
-        prepDate: new Date(b.produced_at),
-        shelfLifeDays: shelfDaysOf(b),
-        weight: `${b.weight} ${unit}`,
-        qr: b.barcode,
-        batchCode: b.batch_code ?? b.barcode,
-      },
-      size,
-      true, // launch RawBT via intent each job (fixes "only first print works")
+  async function printBatch(b: PrepBatch) {
+    const bytes = new TextEncoder().encode(
+      renderPrepLabelTSPL(
+        {
+          name: item.name,
+          prepDate: new Date(b.produced_at),
+          shelfLifeDays: shelfDaysOf(b),
+          weight: `${b.weight} ${unit}`,
+          qr: b.barcode,
+          batchCode: b.batch_code ?? b.barcode,
+        },
+        size,
+      ),
     )
+    const device = usbDevice ?? (await getGrantedPrinter())
+    if (!device) {
+      setActionError('Connect the USB printer first (button below).')
+      return
+    }
+    setUsbDevice(device)
+    try {
+      await sendRawViaUSB(device, bytes)
+    } catch (e) {
+      setUsbDevice(null)
+      setActionError(`USB print failed: ${(e as Error).message} — reconnect the printer.`)
+    }
   }
 
   async function handlePrint() {
@@ -178,7 +211,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       setActionError(res.error ?? 'Could not record batch')
       return
     }
-    printBatch(res.batch)
+    await printBatch(res.batch)
     setQty('')
   }
 
@@ -283,6 +316,25 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           </select>
         </label>
 
+        {/* Printer connection (WebUSB) */}
+        {!isWebUsbSupported() ? (
+          <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[12px] text-amber-300">
+            This browser can&apos;t reach the USB printer. Open the panel in Chrome on the tablet.
+          </p>
+        ) : usbDevice ? (
+          <p className="flex items-center gap-1.5 text-[12px] text-emerald-400">
+            <Usb className="h-4 w-4" /> Printer connected
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={connectPrinter}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-600 py-2.5 text-sm font-medium text-slate-200 hover:border-amber-500/50"
+          >
+            <Usb className="h-4 w-4" /> Connect printer (USB)
+          </button>
+        )}
+
         {actionError && <p className="text-sm text-rose-400">{actionError}</p>}
 
         {/* Print + record */}
@@ -296,7 +348,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           Print &amp; record batch
         </button>
         <p className="text-center text-[11px] text-slate-500">
-          Records the batch + prints a QR label via RawBT → XP-420B
+          Records the batch + prints a native TSPL label over USB
         </p>
       </div>
 
