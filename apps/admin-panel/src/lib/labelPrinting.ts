@@ -11,6 +11,8 @@
 //   - run the printer's gap calibration once (power off → hold FEED → power on →
 //     release after it feeds 1–2 labels) so prints align to each label.
 
+import QRCode from 'qrcode'
+
 const DPI = 203
 const DOTS_PER_MM = DPI / 25.4 // ≈ 8
 
@@ -43,6 +45,10 @@ export interface PrepLabelData {
   shelfLifeDays: number | null
   /** Optional batch weight/volume, preformatted e.g. "1.5 kg". Omitted if null. */
   weight?: string | null
+  /** Optional QR payload (the batch barcode). When set, a QR is drawn. */
+  qr?: string | null
+  /** Optional human batch code shown at the bottom; falls back to productCode. */
+  batchCode?: string | null
 }
 
 export function addDays(date: Date, days: number): Date {
@@ -165,11 +171,40 @@ export function renderPrepLabel(data: PrepLabelData, size: LabelSize = DEFAULT_L
   ctx.font = `800 ${F(36)}px sans-serif`
   ctx.fillText(useBy ? formatDate(useBy) : '—', VALX, row - 4 * s)
 
-  // ── Product code (bottom, monospace) ──
+  // ── QR (optional, bottom-right) encoding the batch barcode ──
+  if (data.qr) {
+    const qrPx = Math.round(Math.min(118 * s, hPx - 130 * s, wPx * 0.32))
+    drawQr(ctx, data.qr, wPx - qrPx - PAD, hPx - qrPx - PAD, qrPx)
+  }
+
+  // ── Batch code / product code (bottom-left, monospace) ──
   ctx.font = `400 ${F(22)}px monospace`
-  ctx.fillText(data.productCode, PAD, hPx - 28 * s)
+  ctx.fillText(data.batchCode ?? data.productCode, PAD, hPx - 28 * s)
 
   return canvas.toDataURL('image/png')
+}
+
+/** Draw a QR code for `text` as black modules at (x, y) within a `box` px square. */
+function drawQr(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  box: number,
+): void {
+  const qr = QRCode.create(text, { errorCorrectionLevel: 'M' })
+  const count = qr.modules.size
+  const data = qr.modules.data
+  const cell = box / count
+  ctx.fillStyle = '#000000'
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (data[r * count + c]) {
+        // +1px overdraw avoids hairline gaps between modules when rasterized.
+        ctx.fillRect(x + c * cell, y + r * cell, cell + 1, cell + 1)
+      }
+    }
+  }
 }
 
 /**
