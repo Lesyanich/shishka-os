@@ -167,7 +167,8 @@ interface PfCardProps {
 }
 
 function PfCard({ item, card, stats, onOpen }: PfCardProps) {
-  const [expanded, setExpanded] = useState(false)
+  // Default expanded: the cook station shows recipes like a prep sheet.
+  const [expanded, setExpanded] = useState(true)
   const portionInfo =
     card?.portions_per_batch != null && card?.portion_weight_g != null
       ? `${card.portions_per_batch} × ${card.portion_weight_g} g`
@@ -297,7 +298,8 @@ interface SaleRecipeCardProps {
 }
 
 function SaleRecipeCard({ item, stats, bomChildren, onOpen }: SaleRecipeCardProps) {
-  const [expanded, setExpanded] = useState(false)
+  // Default expanded: the cook station shows recipes like a prep sheet.
+  const [expanded, setExpanded] = useState(true)
   const stepCount = stats?.step_count ?? 0
   const ccpCount = stats?.ccp_count ?? 0
   const hasPhoto = !!item.image_url
