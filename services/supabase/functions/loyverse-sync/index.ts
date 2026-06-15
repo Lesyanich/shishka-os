@@ -36,6 +36,16 @@ function posItemName(staffCode: string | null | undefined, base: string): string
   return staffCode ? `${staffCode} ${base}` : base
 }
 
+// Loyverse modifier-list ids are always UUIDs. Some dish_modifier_groups rows
+// are WEB-ONLY sentinels (e.g. "WEB-DIP-BREAD") that drive the website
+// "Served with" add-on but must NEVER be pushed to Loyverse — Loyverse rejects
+// non-UUID modifier_ids with HTTP 400 INVALID_VALUE_TYPE, blocking ALL
+// reattachment. Filter every dish→Loyverse modifier_ids list through this.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isLoyverseModifierId(id: string | null | undefined): boolean {
+  return typeof id === "string" && UUID_RE.test(id.trim())
+}
+
 async function loyverseGet(path: string) {
   const res = await fetch(`${LOYVERSE_BASE}${path}`, {
     headers: { Authorization: `Bearer ${LOYVERSE_TOKEN}` },
@@ -187,7 +197,10 @@ async function handleRecreateItem(req: Request) {
   if (d.customer_description) itemBody.description = d.customer_description
   const img = d.image_url ?? d.customer_photo_url
   if (img) itemBody.image_url = img
-  if (body.modifier_ids && body.modifier_ids.length > 0) itemBody.modifier_ids = body.modifier_ids
+  if (body.modifier_ids && body.modifier_ids.length > 0) {
+    const validMods = (body.modifier_ids as string[]).filter(isLoyverseModifierId)
+    if (validMods.length > 0) itemBody.modifier_ids = validMods
+  }
 
   try {
     const created = await loyversePost("/items", itemBody)
@@ -222,8 +235,6 @@ async function handleUpdateItem(req: Request) {
 
   const current = await loyverseGet(`/items/${d.loyverse_item_id}`)
 
-  // Sync the DB price into every variant/store, preserving the rest of the
-  // variant structure (ids, sku, barcode, etc.) so the update stays in place.
   const newPrice = d.price ?? 0
   // deno-lint-ignore no-explicit-any
   const syncedVariants = (current.variants ?? []).map((v: any) => ({
@@ -245,7 +256,7 @@ async function handleUpdateItem(req: Request) {
   else if (current.description) itemBody.description = current.description
   const img = d.image_url ?? d.customer_photo_url ?? current.image_url
   if (img) itemBody.image_url = img
-  if (Array.isArray(body.modifier_ids)) itemBody.modifier_ids = body.modifier_ids
+  if (Array.isArray(body.modifier_ids)) itemBody.modifier_ids = (body.modifier_ids as string[]).filter(isLoyverseModifierId)
   else if (current.modifier_ids) itemBody.modifier_ids = current.modifier_ids
 
   try {
@@ -346,9 +357,6 @@ async function handlePushDish(dishId: string) {
     }
 
     if (loyverseItemId) {
-      // RE-PUSH: the item already exists in Loyverse. Fetch it and reuse its
-      // variant structure + attached modifier_ids, rebasing ONLY the price, so
-      // a price re-sync never strips modifiers/variants (e.g. smoothie add-ons).
       itemBody.id = loyverseItemId
       const current = await loyverseGet(`/items/${loyverseItemId}`)
       // deno-lint-ignore no-explicit-any
@@ -378,7 +386,6 @@ async function handlePushDish(dishId: string) {
       const img = rpc.payload.image_url ?? current.image_url
       if (img) itemBody.image_url = img
     } else {
-      // FIRST PUSH: create a fresh single-variant item.
       itemBody.variants = [{
         variant_name: "Regular",
         default_pricing_type: "FIXED",
@@ -403,8 +410,6 @@ async function handlePushDish(dishId: string) {
   }
 }
 
-// Reconcile loyverse_price with the live Loyverse price for every synced dish.
-// Read-only against Loyverse (GET /items); writes only nomenclature.loyverse_price.
 async function handleReconcilePrices() {
   const { data: dishes, error } = await db
     .from("nomenclature")
@@ -650,6 +655,8 @@ async function reattachAllDishes(): Promise<number> {
     .select("dish_id, loyverse_modifier_list_id")
   const groupsByDish = new Map<string, string[]>()
   for (const r of (dmgRows ?? []) as { dish_id: string; loyverse_modifier_list_id: string }[]) {
+    // Skip WEB-ONLY sentinels (non-UUID ids) — Loyverse rejects them with 400.
+    if (!isLoyverseModifierId(r.loyverse_modifier_list_id)) continue
     const arr = groupsByDish.get(r.dish_id) ?? []
     arr.push(r.loyverse_modifier_list_id)
     groupsByDish.set(r.dish_id, arr)
@@ -685,6 +692,8 @@ async function handleResyncNames() {
     .select("dish_id, loyverse_modifier_list_id")
   const groupsByDish = new Map<string, string[]>()
   for (const r of (dmgRows ?? []) as { dish_id: string; loyverse_modifier_list_id: string }[]) {
+    // Skip WEB-ONLY sentinels (non-UUID ids) — Loyverse rejects them with 400.
+    if (!isLoyverseModifierId(r.loyverse_modifier_list_id)) continue
     const arr = groupsByDish.get(r.dish_id) ?? []
     arr.push(r.loyverse_modifier_list_id)
     groupsByDish.set(r.dish_id, arr)
@@ -777,6 +786,8 @@ async function handlePushModifiers(req: Request) {
     .select("dish_id, loyverse_modifier_list_id")
   const groupsByDish = new Map<string, string[]>()
   for (const r of (dmgRows ?? []) as { dish_id: string; loyverse_modifier_list_id: string }[]) {
+    // Skip WEB-ONLY sentinels (non-UUID ids) — Loyverse rejects them with 400.
+    if (!isLoyverseModifierId(r.loyverse_modifier_list_id)) continue
     const arr = groupsByDish.get(r.dish_id) ?? []
     arr.push(r.loyverse_modifier_list_id)
     groupsByDish.set(r.dish_id, arr)
@@ -846,6 +857,69 @@ async function handlePushModifiers(req: Request) {
   }
 }
 
+// ── Action: pull_items_status ──
+// Pulls all items from Loyverse API and upserts into loyverse_item_sync.
+// The frontend reads v_loyverse_sync_status to show photo/price gaps.
+
+interface LoyverseItemFull {
+  id: string
+  item_name: string
+  image_url?: string | null
+  category_id?: string | null
+  deleted_at?: string | null
+  variants?: Array<{ default_price?: number }>
+}
+
+async function handlePullItemsStatus() {
+  const logId = await logStart("items_pull_status", 0)
+  let items: LoyverseItemFull[]
+  try {
+    items = await loyverseGetAll<LoyverseItemFull>("/items", "items")
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    await logFinish(logId, "error", 0, 0, msg)
+    return json({ ok: false, error: msg }, 502)
+  }
+
+  const rows = items.map((item) => ({
+    loyverse_item_id: item.id,
+    lv_name: item.item_name ?? null,
+    lv_price: item.variants?.[0]?.default_price ?? null,
+    lv_image_url: item.image_url ?? null,
+    lv_category_id: item.category_id ?? null,
+    lv_is_deleted: !!item.deleted_at,
+    pulled_at: new Date().toISOString(),
+  }))
+
+  const CHUNK = 200
+  let failedChunks = 0
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const { error } = await db
+      .from("loyverse_item_sync")
+      .upsert(rows.slice(i, i + CHUNK), { onConflict: "loyverse_item_id" })
+    if (error) failedChunks++
+  }
+
+  // Back-fill nomenclature_id where missing
+  const { data: linked } = await db
+    .from("nomenclature")
+    .select("id, loyverse_item_id")
+    .not("loyverse_item_id", "is", null)
+  for (const n of (linked ?? []) as Array<{ id: string; loyverse_item_id: string }>) {
+    await db
+      .from("loyverse_item_sync")
+      .update({ nomenclature_id: n.id })
+      .eq("loyverse_item_id", n.loyverse_item_id)
+      .is("nomenclature_id", null)
+  }
+
+  const withPhoto = rows.filter((r) => r.lv_image_url).length
+  const deleted   = rows.filter((r) => r.lv_is_deleted).length
+
+  await logFinish(logId, failedChunks > 0 ? "error" : "success", rows.length, 0)
+  return json({ ok: true, total: rows.length, with_photo: withPhoto, deleted, failed_chunks: failedChunks })
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
   try {
@@ -907,12 +981,14 @@ Deno.serve(async (req) => {
       case "push_modifiers":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handlePushModifiers(req)
+      case "pull_items_status":
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handlePullItemsStatus()
       default:
         return json(
           {
             ok: false,
-            error:
-              "Unknown action. Use: status, categories, push_dish, reconcile_prices, pull_modifiers, create_modifier, get_item, delete_item, recreate_item, update_item, resync_names, add_modifier_option, remove_modifier_option, ensure_modifier_stores, item_modifiers, push_modifiers",
+            error: "Unknown action. Use: status, categories, push_dish, reconcile_prices, pull_modifiers, create_modifier, get_item, delete_item, recreate_item, update_item, resync_names, add_modifier_option, remove_modifier_option, ensure_modifier_stores, item_modifiers, push_modifiers, pull_items_status",
           },
           400,
         )
