@@ -157,6 +157,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
         batchCode: b.batch_code ?? b.barcode,
       },
       size,
+      true, // launch RawBT via intent each job (fixes "only first print works")
     )
   }
 
