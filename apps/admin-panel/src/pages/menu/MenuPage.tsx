@@ -206,10 +206,15 @@ export function MenuPage() {
 
   // Items scoped to current type filter (used for category counts + OwnerTable).
   // Dual-type items appear in BOTH filter buckets per product-design spec.
+  // L1 Cook is a kitchen station, not an owner taxonomy view: a cook prepares
+  // everything (the full PF recipe AND the SALE portioned items), so the
+  // SALE/PF distinction is irrelevant there — show all preparable items
+  // (SALE + PF, exclude MOD) regardless of the type filter.
   const typeFilteredItems = useMemo(() => {
+    if (view === 'l1-cook') return items.filter((i) => i.kind !== 'MOD')
     if (typeFilter === 'all') return items
     return items.filter((i) => i.kind === typeFilter || (i.isDualType && typeFilter === 'PF'))
-  }, [items, typeFilter])
+  }, [items, typeFilter, view])
 
   // Pre-compute hasBom per item id (for `no-bom` flag filter)
   const hasBomById = useMemo(() => {
@@ -389,7 +394,9 @@ export function MenuPage() {
       {view === 'l1-cook' && (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-3">
-            <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
+            {/* No SALE/PF type filter here: a cook prepares everything in the
+                category (full PF recipe + SALE portioned items), so the owner
+                type taxonomy is hidden in this station view. */}
             <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
               {([
                 { value: null, label: 'All' },
@@ -518,7 +525,6 @@ export function MenuPage() {
           items={items}
           selectedCategory={selectedCategory}
           selectedSubcategory={selectedSubcategory}
-          typeFilter={typeFilter}
           availableFilter={availableFilter}
           pfPackCardById={enrichment.pfPackCardById}
           recipeStatsById={enrichment.recipeStatsById}
