@@ -58,7 +58,17 @@ export interface MenuBomChild {
   childId: string
   quantityPerUnit: number
   yieldLossPct: number | null
+  /** Full SALE/PF/MOD item when the child is in the menu index; null for RAW
+   * children (raw ingredients + packaging) which the index never loads. Use
+   * the resolved `child*` fields below for display — they are populated for
+   * RAW children too, straight from the BOM-edge nomenclature join. */
   child: MenuItem | null
+  childName: string | null
+  childCode: string | null
+  /** 'RAW' covers any non-SALE/PF/MOD child (raw ingredients + packaging). */
+  childKind: NomenclatureKind | 'RAW'
+  childBaseUnit: string | null
+  childCostPerUnit: number | null
 }
 
 export interface UseMenuDataResult {
@@ -148,6 +158,12 @@ interface RawBomRow {
   ingredient_id: string
   quantity_per_unit: number | string
   yield_loss_pct: number | string | null
+  nomenclature: {
+    name: string
+    product_code: string
+    base_unit: string | null
+    cost_per_unit: number | string | null
+  } | null
 }
 
 export function useMenuData(): UseMenuDataResult {
@@ -191,7 +207,10 @@ export function useMenuData(): UseMenuDataResult {
         .order('sort_order', { ascending: true }),
       supabase
         .from('bom_structures')
-        .select('id, parent_id, ingredient_id, quantity_per_unit, yield_loss_pct'),
+        .select(
+          'id, parent_id, ingredient_id, quantity_per_unit, yield_loss_pct, ' +
+            'nomenclature!bom_structures_ingredient_id_fkey(name, product_code, base_unit, cost_per_unit)',
+        ),
       supabase
         .from('v_dish_cost_split')
         .select('dish_id, food_cost, packaging_cost'),
@@ -351,6 +370,8 @@ export function useMenuData(): UseMenuDataResult {
     const usedAsIngredient = new Set<string>()
     for (const raw of (bomResult.data ?? []) as unknown as RawBomRow[]) {
       usedAsIngredient.add(raw.ingredient_id)
+      const childNomen = raw.nomenclature
+      const childCode = childNomen?.product_code ?? null
       const child: MenuBomChild = {
         id: raw.id,
         parentId: raw.parent_id,
@@ -358,6 +379,12 @@ export function useMenuData(): UseMenuDataResult {
         quantityPerUnit: Number(raw.quantity_per_unit),
         yieldLossPct: raw.yield_loss_pct != null ? Number(raw.yield_loss_pct) : null,
         child: itemsById.get(raw.ingredient_id) ?? null,
+        childName: childNomen?.name ?? null,
+        childCode,
+        childKind: (childCode ? kindFromCode(childCode) : null) ?? 'RAW',
+        childBaseUnit: childNomen?.base_unit ?? null,
+        childCostPerUnit:
+          childNomen?.cost_per_unit != null ? Number(childNomen.cost_per_unit) : null,
       }
       const arr = childMap.get(raw.parent_id) ?? []
       arr.push(child)

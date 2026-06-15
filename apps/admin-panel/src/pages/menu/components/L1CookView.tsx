@@ -393,8 +393,7 @@ function SaleRecipeCard({ item, stats, bomChildren, onOpen }: SaleRecipeCardProp
           {expanded && (
             <ul className="space-y-1 px-4 pb-3">
               {bomChildren.map((bom) => {
-                const child = bom.child
-                const kindBadge = child?.kind ?? 'RAW'
+                const kindBadge = bom.childKind
                 const badgeColor =
                   kindBadge === 'PF'
                     ? 'bg-[var(--color-amber-watch)]/20 text-[color:var(--color-amber-watch)]'
@@ -412,10 +411,11 @@ function SaleRecipeCard({ item, stats, bomChildren, onOpen }: SaleRecipeCardProp
                       {kindBadge}
                     </span>
                     <span className="min-w-0 truncate text-cream/70">
-                      {child?.name ?? bom.childId}
+                      {bom.childName ?? bom.childId}
                     </span>
                     <span className="ml-auto shrink-0 font-mono text-[10px] text-cream/40">
                       ×{bom.quantityPerUnit}
+                      {bom.childBaseUnit ? ` ${bom.childBaseUnit}` : ''}
                       {bom.yieldLossPct ? ` (−${bom.yieldLossPct}%)` : ''}
                     </span>
                   </li>
