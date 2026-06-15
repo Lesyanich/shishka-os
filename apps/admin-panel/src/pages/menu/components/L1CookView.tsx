@@ -14,7 +14,6 @@ import type { MenuItem, MenuBomChild } from '../../../hooks/useMenuData'
 import type { PfPackCardData } from '../../../hooks/usePfPackCard'
 import type { RecipeStepStats } from '../../../hooks/useMenuListEnrichment'
 import type { DishCardData } from '../../../hooks/useDishCard'
-import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 import { formatDishName } from '../utils/formatDishName'
 import { useBomIngredients } from '../../../hooks/useBomIngredients'
 import { useDishRecipeSteps } from '../../../hooks/useDishRecipeSteps'
@@ -25,7 +24,6 @@ interface L1CookViewProps {
   /** Leaf subcategory drill-down within the selected section (matches on the
    *  dish's own category_id). null = whole section. */
   selectedSubcategory: string | null
-  typeFilter: TypeFilterValue
   /** null = show all, true = available only, false = unavailable only */
   availableFilter: boolean | null
   pfPackCardById: Map<string, PfPackCardData>
@@ -453,7 +451,6 @@ export function L1CookView({
   items,
   selectedCategory,
   selectedSubcategory,
-  typeFilter,
   availableFilter,
   pfPackCardById,
   recipeStatsById,
@@ -461,18 +458,18 @@ export function L1CookView({
   childrenByParent,
   onOpenDish,
 }: L1CookViewProps) {
-  // Filter: SALE + PF (exclude MOD), respect category, type, and availability
+  // A cook prepares everything in the category, so show ALL preparable items
+  // (SALE + PF, exclude MOD) — no SALE/PF type split here. Respect category,
+  // subcategory drill-down, and availability.
   const filtered = useMemo(() => {
     return items.filter((i) => {
       if (i.kind === 'MOD') return false
-      if (typeFilter === 'SALE' && i.kind !== 'SALE') return false
-      if (typeFilter === 'PF' && i.kind !== 'PF' && !i.isDualType) return false
       if (selectedCategory && (i.section_id ?? i.category_id) !== selectedCategory) return false
       if (selectedSubcategory && i.category_id !== selectedSubcategory) return false
       if (availableFilter !== null && i.is_available !== availableFilter) return false
       return true
     })
-  }, [items, selectedCategory, selectedSubcategory, typeFilter, availableFilter])
+  }, [items, selectedCategory, selectedSubcategory, availableFilter])
 
   // Group by category for structured rendering
   const grouped = useMemo(() => {
