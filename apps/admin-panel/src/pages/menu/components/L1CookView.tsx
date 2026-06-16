@@ -17,9 +17,13 @@ import type { DishCardData } from '../../../hooks/useDishCard'
 import { formatDishName } from '../utils/formatDishName'
 import { useBomIngredients } from '../../../hooks/useBomIngredients'
 import { useDishRecipeSteps } from '../../../hooks/useDishRecipeSteps'
+import { matchesType, type TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 
 interface L1CookViewProps {
   items: MenuItem[]
+  /** Product-type filter. L1 is the kitchen prep station, so this defaults to
+   *  PF (заготовки) upstream; the cook can still flip to SALE/All. */
+  typeFilter: TypeFilterValue
   selectedCategory: string | null
   /** Leaf subcategory drill-down within the selected section (matches on the
    *  dish's own category_id). null = whole section. */
@@ -451,6 +455,7 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
 
 export function L1CookView({
   items,
+  typeFilter,
   selectedCategory,
   selectedSubcategory,
   availableFilter,
@@ -460,18 +465,17 @@ export function L1CookView({
   childrenByParent,
   onOpenDish,
 }: L1CookViewProps) {
-  // A cook prepares everything in the category, so show ALL preparable items
-  // (SALE + PF, exclude MOD) — no SALE/PF type split here. Respect category,
-  // subcategory drill-down, and availability.
+  // L1 = kitchen prep station. Honor the type filter (defaults to PF upstream,
+  // so заготовки lead) plus category, subcategory drill-down, and availability.
   const filtered = useMemo(() => {
     return items.filter((i) => {
-      if (i.kind === 'MOD') return false
+      if (!matchesType(i, typeFilter)) return false
       if (selectedCategory && (i.section_id ?? i.category_id) !== selectedCategory) return false
       if (selectedSubcategory && i.category_id !== selectedSubcategory) return false
       if (availableFilter !== null && i.is_available !== availableFilter) return false
       return true
     })
-  }, [items, selectedCategory, selectedSubcategory, availableFilter])
+  }, [items, typeFilter, selectedCategory, selectedSubcategory, availableFilter])
 
   // Group by category for structured rendering
   const grouped = useMemo(() => {
