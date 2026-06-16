@@ -77,6 +77,10 @@ export interface UseMenuDataResult {
   /** SALE subset — backward-compat shape for OwnerGallery / CustomerPreview. */
   dishes: MenuDish[]
   categories: MenuCategory[]
+  /** Every category by id (all levels, not just menu sections) — lets callers
+   *  resolve a section_id to its display name when building data-driven filter
+   *  chips from the items actually present (e.g. PF prep categories in L1). */
+  categoriesById: Map<string, MenuCategory>
   subcategories: Map<string, MenuSubcategory[]>
   /** parent_id → direct BOM children (PF + RAW + MOD, typed). */
   childrenByParent: Map<string, MenuBomChild[]>
@@ -169,6 +173,7 @@ interface RawBomRow {
 export function useMenuData(): UseMenuDataResult {
   const [items, setItems] = useState<MenuItem[]>([])
   const [categories, setCategories] = useState<MenuCategory[]>([])
+  const [categoriesById, setCategoriesById] = useState<Map<string, MenuCategory>>(new Map())
   const [subcategories, setSubcategories] = useState<Map<string, MenuSubcategory[]>>(new Map())
   const [childrenByParent, setChildrenByParent] = useState<Map<string, MenuBomChild[]>>(new Map())
   const [dualTypeIds, setDualTypeIds] = useState<Set<string>>(new Set())
@@ -409,6 +414,12 @@ export function useMenuData(): UseMenuDataResult {
 
     setItems(itemList)
     setCategories(Array.from(catMap.values()).sort((a, b) => a.sort_order - b.sort_order))
+    // Full id→category map (all levels) for data-driven chip resolution.
+    const fullCatMap = new Map<string, MenuCategory>()
+    for (const c of catById.values()) {
+      fullCatMap.set(c.id, { id: c.id, code: c.code, name: c.name, sort_order: c.sort_order })
+    }
+    setCategoriesById(fullCatMap)
     setSubcategories(subcatMap)
     setChildrenByParent(childMap)
     setDualTypeIds(dualIds)
@@ -474,6 +485,7 @@ export function useMenuData(): UseMenuDataResult {
     items,
     dishes,
     categories,
+    categoriesById,
     subcategories,
     childrenByParent,
     dualTypeIds,

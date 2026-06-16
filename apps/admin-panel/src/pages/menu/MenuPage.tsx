@@ -12,6 +12,7 @@ import {
   Shield,
 } from 'lucide-react'
 import { useMenuData } from '../../hooks/useMenuData'
+import type { MenuCategory } from '../../hooks/useMenuDishes'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
 import { useMenuListEnrichment } from '../../hooks/useMenuListEnrichment'
 import { useChannelMargins } from '../../hooks/useChannelMargins'
@@ -57,6 +58,7 @@ export function MenuPage() {
     items,
     dishes,
     categories,
+    categoriesById,
     subcategories,
     childrenByParent,
     dualTypeIds,
@@ -258,6 +260,31 @@ export function MenuPage() {
     return counts
   }, [typeFilteredItems])
 
+  // Data-driven category chips: the sections the currently type-filtered items
+  // actually roll up to (section_id), resolved to their display category. Used
+  // by the L1 prep station so its chips track PF prep categories (Doughs &
+  // Bread, Cooked Components, …) instead of the SALE menu sections — empty
+  // SALE-only chips drop out, and PF/MOD groups that had no chip now appear.
+  // Self-correcting per type filter (flip L1→SALE and it shows SALE sections).
+  const presentCategories = useMemo<MenuCategory[]>(() => {
+    const seen = new Set<string>()
+    const out: MenuCategory[] = []
+    for (const item of typeFilteredItems) {
+      const secId = item.section_id ?? item.category_id
+      if (!secId || seen.has(secId)) continue
+      seen.add(secId)
+      out.push(
+        categoriesById.get(secId) ?? {
+          id: secId,
+          code: '',
+          name: item.category_name ?? 'Uncategorized',
+          sort_order: 9999,
+        },
+      )
+    }
+    return out.sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+  }, [typeFilteredItems, categoriesById])
+
   // Counts per type filter bucket (drives pill counters)
   const typeCounts = useMemo(() => {
     let all = 0
@@ -423,9 +450,9 @@ export function MenuPage() {
               ))}
             </div>
           </div>
-          {categories.length > 0 && (
+          {presentCategories.length > 0 && (
             <CategoryTabs
-              categories={categories}
+              categories={presentCategories}
               selectedId={selectedCategory}
               onSelect={setSelectedCategory}
               counts={categoryCounts}
