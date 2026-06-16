@@ -94,12 +94,24 @@ function StepRow({ step, isLast }: { step: RecipeStep; isLast: boolean }) {
   )
 }
 
-export function ProcessTab({ nomenclatureId }: { nomenclatureId: string }) {
-  const { steps, isLoading, error, fetchSteps } = useRecipeSteps()
+interface ProcessTabProps {
+  /** Self-fetch mode: load this dish's full recipe flow. */
+  nomenclatureId?: string
+  /** Controlled mode: render exactly these steps (e.g. a station-filtered
+   *  subset). When provided, `nomenclatureId` is ignored and no fetch runs. */
+  steps?: RecipeStep[]
+}
+
+export function ProcessTab({ nomenclatureId, steps: controlledSteps }: ProcessTabProps) {
+  const { steps: fetchedSteps, isLoading: fetchLoading, error, fetchSteps } = useRecipeSteps()
+  const controlled = controlledSteps !== undefined
 
   useEffect(() => {
-    fetchSteps(nomenclatureId)
-  }, [nomenclatureId, fetchSteps])
+    if (!controlled && nomenclatureId) fetchSteps(nomenclatureId)
+  }, [controlled, nomenclatureId, fetchSteps])
+
+  const steps = controlled ? controlledSteps : fetchedSteps
+  const isLoading = controlled ? false : fetchLoading
 
   const summary = useMemo(() => {
     if (steps.length === 0) return null
