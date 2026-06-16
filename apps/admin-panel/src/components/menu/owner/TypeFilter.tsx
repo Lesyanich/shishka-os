@@ -2,6 +2,19 @@ import type { NomenclatureKind } from '../../../hooks/useMenuData'
 
 export type TypeFilterValue = 'all' | NomenclatureKind
 
+/** Does an item belong in the given type-filter bucket? Single source of truth
+ * shared by the Owner table, L1 Cook, and L2 Assembler so every menu view
+ * filters identically. Dual-type items (a dish that is both a PF prep base and
+ * a SALE item) count as PF so they surface in the kitchen-prep bucket. */
+export function matchesType(
+  item: { kind: NomenclatureKind; isDualType?: boolean },
+  filter: TypeFilterValue,
+): boolean {
+  if (filter === 'all') return true
+  if (filter === 'PF') return item.kind === 'PF' || !!item.isDualType
+  return item.kind === filter
+}
+
 interface TypeFilterProps {
   value: TypeFilterValue
   onChange: (value: TypeFilterValue) => void

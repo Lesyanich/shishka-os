@@ -22,7 +22,7 @@ import { L1CookView } from './components/L1CookView'
 import { L2AssemblerView } from './components/L2AssemblerView'
 import { NewDishModal } from './components/NewDishModal'
 import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
-import { TypeFilter, type TypeFilterValue } from '../../components/menu/owner/TypeFilter'
+import { TypeFilter, matchesType, type TypeFilterValue } from '../../components/menu/owner/TypeFilter'
 import { FilterBar } from '../../components/menu/owner/FilterBar'
 import { DishDrawer } from '../../components/menu/drawer/DishDrawer'
 import { CategoryTabs } from '../../components/menu/shared'
@@ -210,16 +210,15 @@ export function MenuPage() {
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
 
   // Items scoped to current type filter (used for category counts + OwnerTable).
-  // Dual-type items appear in BOTH filter buckets per product-design spec.
-  // L1 Cook is a kitchen station, not an owner taxonomy view: a cook prepares
-  // everything (the full PF recipe AND the SALE portioned items), so the
-  // SALE/PF distinction is irrelevant there — show all preparable items
-  // (SALE + PF, exclude MOD) regardless of the type filter.
-  const typeFilteredItems = useMemo(() => {
-    if (view === 'l1-cook') return items.filter((i) => i.kind !== 'MOD')
-    if (typeFilter === 'all') return items
-    return items.filter((i) => i.kind === typeFilter || (i.isDualType && typeFilter === 'PF'))
-  }, [items, typeFilter, view])
+  // Applied uniformly across every view via the shared `matchesType` predicate
+  // so the type filter behaves identically in Owner, L1 Cook, and L2 Assembler.
+  // L1 Cook = the kitchen PREP station (заготовки) and defaults to PF; L2 =
+  // the store ASSEMBLY station and defaults to SALE. The cook can still flip
+  // the filter, but the two stations stay conceptually distinct.
+  const typeFilteredItems = useMemo(
+    () => items.filter((i) => matchesType(i, typeFilter)),
+    [items, typeFilter],
+  )
 
   // Pre-compute hasBom per item id (for `no-bom` flag filter)
   const hasBomById = useMemo(() => {
@@ -399,9 +398,10 @@ export function MenuPage() {
       {view === 'l1-cook' && (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-3">
-            {/* No SALE/PF type filter here: a cook prepares everything in the
-                category (full PF recipe + SALE portioned items), so the owner
-                type taxonomy is hidden in this station view. */}
+            {/* L1 = kitchen PREP station: defaults to PF (заготовки), Sale not
+                needed day-to-day. The switcher stays so a cook can flip to
+                SALE/All on demand, but the prep view is the home base. */}
+            <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
             <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
               {([
                 { value: null, label: 'All' },
@@ -441,9 +441,13 @@ export function MenuPage() {
           )}
         </div>
       )}
-      {/* L2: availability toggle (default Active-only) + single-category strip */}
+      {/* L2: TypeFilter + availability toggle (default Active-only) + category strip */}
       {view === 'l2-assembler' && (
         <div className="space-y-2">
+          {/* L2 = store ASSEMBLY station: defaults to SALE (final dishes the
+              assembler builds from prepped заготовки). Switcher kept for parity
+              with the other stations. */}
+          <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
           <div className="flex w-fit rounded-lg border border-surface-3 bg-surface-1 p-0.5">
             {([
               { value: true, label: 'Active' },
@@ -528,6 +532,7 @@ export function MenuPage() {
       ) : view === 'l1-cook' ? (
         <L1CookView
           items={items}
+          typeFilter={typeFilter}
           selectedCategory={selectedCategory}
           selectedSubcategory={selectedSubcategory}
           availableFilter={availableFilter}
@@ -540,6 +545,7 @@ export function MenuPage() {
       ) : view === 'l2-assembler' ? (
         <L2AssemblerView
           items={items}
+          typeFilter={typeFilter}
           selectedCategory={selectedCategory}
           selectedSubcategory={selectedSubcategory}
           availableFilter={l2AvailableFilter}

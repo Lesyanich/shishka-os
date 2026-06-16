@@ -25,9 +25,13 @@ import type {
   MenuRecipeStep,
   DishModifierOption,
 } from '../../../hooks/useMenuListEnrichment'
+import { matchesType, type TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 
 interface L2AssemblerViewProps {
   items: MenuItem[]
+  /** Product-type filter. L2 is the store assembly station, so this defaults to
+   *  SALE (final dishes) upstream; kept for parity with the other stations. */
+  typeFilter: TypeFilterValue
   selectedCategory: string | null
   /** Leaf subcategory drill-down within the selected section. When set, only
    *  dishes whose own category_id matches are shown. null = whole section. */
@@ -454,6 +458,19 @@ function SaleAssemblyCard({
         onClick={onOpen}
         className="group flex items-center justify-between gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
       >
+        {/* Final-dish photo — the assembler plates to match this reference. */}
+        {item.image_url ? (
+          <img
+            src={item.image_url}
+            alt={item.name}
+            className="h-11 w-11 shrink-0 rounded-md object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-surface-3 text-cream/25">
+            <Package className="h-5 w-5" />
+          </div>
+        )}
         {item.staff_code && (
           <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-forest-soft">
             {item.staff_code}
@@ -638,6 +655,7 @@ function SaleAssemblyCard({
 
 export function L2AssemblerView({
   items,
+  typeFilter,
   selectedCategory,
   selectedSubcategory,
   availableFilter,
@@ -649,17 +667,18 @@ export function L2AssemblerView({
   onOpenDish,
   onReorder,
 }: L2AssemblerViewProps) {
-  // SALE items in this category ignoring availability — lets us tell "nothing
-  // here" apart from "everything hidden by the availability filter".
+  // Items in this category matching the type filter, ignoring availability —
+  // lets us tell "nothing here" apart from "everything hidden by the
+  // availability filter".
   const categorySaleCount = useMemo(
     () =>
       items.filter(
         (i) =>
-          i.kind === 'SALE' &&
+          matchesType(i, typeFilter) &&
           (!selectedCategory || (i.section_id ?? i.category_id) === selectedCategory) &&
           (!selectedSubcategory || i.category_id === selectedSubcategory),
       ).length,
-    [items, selectedCategory, selectedSubcategory],
+    [items, typeFilter, selectedCategory, selectedSubcategory],
   )
 
   // Seed order: persisted display_order first, then build-your-own dishes (no
@@ -667,7 +686,7 @@ export function L2AssemblerView({
   const seed = useMemo(() => {
     const filtered = items.filter(
       (i) =>
-        i.kind === 'SALE' &&
+        matchesType(i, typeFilter) &&
         (!selectedCategory || (i.section_id ?? i.category_id) === selectedCategory) &&
         (!selectedSubcategory || i.category_id === selectedSubcategory) &&
         (availableFilter === null || i.is_available === availableFilter),
@@ -683,7 +702,7 @@ export function L2AssemblerView({
         return aByo - bByo || a.idx - b.idx
       })
       .map((x) => x.item)
-  }, [items, selectedCategory, selectedSubcategory, availableFilter, componentsByDish])
+  }, [items, typeFilter, selectedCategory, selectedSubcategory, availableFilter, componentsByDish])
 
   // Local order drives instant drag feedback; it re-syncs whenever the seed
   // (item set or persisted order) changes — e.g. category switch or saved drop.
@@ -755,7 +774,7 @@ export function L2AssemblerView({
             ? availableFilter === true
               ? 'All dishes in this category are deactivated. Switch to "All" or "Inactive" to see them.'
               : 'No deactivated dishes in this category.'
-            : 'No SALE items in this category.'}
+            : `No ${typeFilter === 'all' ? '' : `${typeFilter} `}items in this category.`}
         </p>
       </div>
     )
