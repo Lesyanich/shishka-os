@@ -14,6 +14,7 @@ import {
   RectangleVertical,
   AlertTriangle,
   X,
+  MessageCircle,
 } from 'lucide-react'
 import type { MenuItem } from '../../../hooks/useMenuData'
 import type {
@@ -43,9 +44,15 @@ interface L2AssemblerViewProps {
   recipeStepsByDish: Map<string, MenuRecipeStep[]>
   modifierOptionsByDish: Map<string, DishModifierOption[]>
   packagingByDish: Map<string, DishPackagingLine[]>
-  onOpenDish: (id: string) => void
+  onOpenDish?: (id: string) => void
   /** Persist a reordered set of cards (writes display_order per id). */
   onReorder: (orderedIds: string[]) => Promise<{ ok: boolean; error?: string }>
+  /** When true: hides cost/food-cost data; shows comment button. */
+  staffMode?: boolean
+  /** Per-dish comment count — shown as badge on the comment button. */
+  feedbackCountById?: Map<string, number>
+  /** Called when the comment button is clicked. */
+  onComment?: (dishId: string) => void
 }
 
 interface SaleAssemblyCardProps {
@@ -55,7 +62,10 @@ interface SaleAssemblyCardProps {
   steps: MenuRecipeStep[]
   options: DishModifierOption[]
   packaging: DishPackagingLine[]
-  onOpen: () => void
+  onOpen?: () => void
+  staffMode?: boolean
+  feedbackCount?: number
+  onComment?: () => void
 }
 
 /** Format a per-portion qty for kitchen readability: kg→g, L→ml, else raw. */
@@ -419,6 +429,9 @@ function SaleAssemblyCard({
   options,
   packaging,
   onOpen,
+  staffMode,
+  feedbackCount,
+  onComment,
 }: SaleAssemblyCardProps) {
   // Compact card: composition + a short process show by default;
   // add-ons + meta live in a collapsed "Details".
@@ -431,10 +444,10 @@ function SaleAssemblyCard({
     program?.temp_c != null && program?.time_sec != null
       ? `${program.temp_c}°C / ${program.time_sec}s${program.preset ? ` (${program.preset})` : ''}`
       : null
-  // Food-cost % excludes packaging (owner decision) — use food_cost when present.
+  // Food-cost % — hidden in staff mode (sensitive owner data).
   const foodCostBasis = item.food_cost ?? item.cost_per_unit
   const foodCostPct =
-    item.price && foodCostBasis
+    !staffMode && item.price && foodCostBasis
       ? Math.round((Number(foodCostBasis) / Number(item.price)) * 100)
       : null
   // Build-your-own: no fixed BOM, value is the customisation menu.
@@ -447,47 +460,59 @@ function SaleAssemblyCard({
     !!card?.has_lid_sticker ||
     !!card?.pre_merrychef_prep ||
     !!card?.post_merrychef_check ||
-    foodCostPct != null
+    (!staffMode && foodCostPct != null)
   const hasDetails = hasAddons || hasMeta
+
+  const headerRow = (
+    <>
+      {/* Final-dish photo — the assembler plates to match this reference. */}
+      {item.image_url ? (
+        <img
+          src={item.image_url}
+          alt={item.name}
+          className="h-11 w-11 shrink-0 rounded-md object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-surface-3 text-cream/25">
+          <Package className="h-5 w-5" />
+        </div>
+      )}
+      {item.staff_code && (
+        <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-forest-soft">
+          {item.staff_code}
+        </span>
+      )}
+      <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-cream group-hover:text-forest-soft">
+        {item.name}
+      </h3>
+      {item.price != null && (
+        <span className="shrink-0 text-xs font-semibold text-cream/80">
+          ฿{Math.round(Number(item.price))}
+          {isBuildYourOwn && (
+            <span className="font-normal text-cream/40"> base</span>
+          )}
+        </span>
+      )}
+    </>
+  )
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-surface-3 bg-surface-2 p-3 transition hover:border-forest-soft/40">
-      {/* Header — click opens the full drawer */}
-      <button
-        type="button"
-        onClick={onOpen}
-        className="group flex items-center justify-between gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
-      >
-        {/* Final-dish photo — the assembler plates to match this reference. */}
-        {item.image_url ? (
-          <img
-            src={item.image_url}
-            alt={item.name}
-            className="h-11 w-11 shrink-0 rounded-md object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-surface-3 text-cream/25">
-            <Package className="h-5 w-5" />
-          </div>
-        )}
-        {item.staff_code && (
-          <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-forest-soft">
-            {item.staff_code}
-          </span>
-        )}
-        <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-cream group-hover:text-forest-soft">
-          {item.name}
-        </h3>
-        {item.price != null && (
-          <span className="shrink-0 text-xs font-semibold text-cream/80">
-            ฿{Math.round(Number(item.price))}
-            {isBuildYourOwn && (
-              <span className="font-normal text-cream/40"> base</span>
-            )}
-          </span>
-        )}
-      </button>
+      {/* Header */}
+      {onOpen && !staffMode ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="group flex items-center justify-between gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
+        >
+          {headerRow}
+        </button>
+      ) : (
+        <div className="group flex items-center justify-between gap-2">
+          {headerRow}
+        </div>
+      )}
 
       {/* Note — only when present AND not superseded by structured steps */}
       {item.assembler_note && steps.length === 0 && (
@@ -649,6 +674,26 @@ function SaleAssemblyCard({
           )}
         </div>
       )}
+
+      {/* Staff comment button */}
+      {staffMode && onComment && (
+        <div className="border-t border-surface-3 pt-2">
+          <button
+            type="button"
+            onClick={onComment}
+            className="flex items-center gap-1.5 text-[11px] text-cream/50 transition hover:text-forest-soft"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            {feedbackCount ? (
+              <span className="font-medium text-forest-soft">
+                {feedbackCount} comment{feedbackCount !== 1 ? 's' : ''}
+              </span>
+            ) : (
+              'Add comment'
+            )}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -666,6 +711,9 @@ export function L2AssemblerView({
   packagingByDish,
   onOpenDish,
   onReorder,
+  staffMode,
+  feedbackCountById,
+  onComment,
 }: L2AssemblerViewProps) {
   // Items in this category matching the type filter, ignoring availability —
   // lets us tell "nothing here" apart from "everything hidden by the
@@ -837,7 +885,10 @@ export function L2AssemblerView({
                 steps={recipeStepsByDish.get(item.id) ?? []}
                 options={modifierOptionsByDish.get(item.id) ?? []}
                 packaging={packagingByDish.get(item.id) ?? []}
-                onOpen={() => onOpenDish(item.id)}
+                onOpen={onOpenDish ? () => onOpenDish(item.id) : undefined}
+                staffMode={staffMode}
+                feedbackCount={feedbackCountById?.get(item.id)}
+                onComment={onComment ? () => onComment(item.id) : undefined}
               />
             </div>
           )

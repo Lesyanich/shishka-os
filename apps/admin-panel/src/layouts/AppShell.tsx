@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   BarChart3,
+  BookOpen,
   CalendarClock,
   CalendarDays,
   ChefHat,
@@ -80,6 +81,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { path: '/kitchen/my-tasks', icon: ListTodo, label: 'My Tasks', minRole: 'cook' },
+      { path: '/kitchen/recipes', icon: BookOpen, label: 'Recipes', minRole: 'cook' },
       { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS', minRole: 'cook' },
       { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station', minRole: 'cook' },
       { path: '/kitchen/waste', icon: Trash2, label: 'Waste', minRole: 'cook' },
