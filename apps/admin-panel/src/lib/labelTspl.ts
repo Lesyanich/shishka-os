@@ -51,7 +51,9 @@ function wrapName(name: string, max1: number, max2: number): [string, string] {
     l1 = cand
   }
   let l2 = words.slice(i).join(' ')
-  if (l2.length > max2) l2 = `${l2.slice(0, max2 - 1)}…`
+  // ASCII-only truncation — the printer codepage renders multibyte chars
+  // (e.g. the "…" ellipsis) as garbage.
+  if (l2.length > max2) l2 = l2.slice(0, max2)
   return [l1, l2]
 }
 
@@ -110,7 +112,9 @@ export function renderPrepLabelTSPL(
   const fName = big ? '3' : '2'
   const fRow = big ? '2' : '1'
   const fUse = big ? '3' : '2'
-  const PAD = Math.max(12, Math.round(20 * s))
+  // Fixed left margin (dots): the printer's left dead-zone is ~physical, so it
+  // must NOT shrink with the label — 24 is the value proven on 60×40.
+  const PAD = 24
   const gap = Math.max(4, Math.round(8 * s))
   const cell = Math.max(2, Math.round(4 * s))
 
