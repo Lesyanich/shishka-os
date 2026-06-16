@@ -150,7 +150,7 @@ export function KitchenRecipesPage() {
           typeFilter={typeFilter}
           selectedCategory={selectedCategory}
           selectedSubcategory={selectedSubcategory}
-          availableFilter={null}
+          availableFilter={true}
           pfPackCardById={enrichment.pfPackCardById}
           recipeStatsById={enrichment.recipeStatsById}
           dishCardById={enrichment.dishCardById}
@@ -167,7 +167,7 @@ export function KitchenRecipesPage() {
           typeFilter={typeFilter}
           selectedCategory={selectedCategory}
           selectedSubcategory={selectedSubcategory}
-          availableFilter={null}
+          availableFilter={true}
           dishCardById={enrichment.dishCardById}
           componentsByDish={enrichment.componentsByDish}
           recipeStepsByDish={enrichment.recipeStepsByDish}
