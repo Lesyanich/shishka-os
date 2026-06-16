@@ -1,32 +1,32 @@
 import { describe, it, expect } from 'vitest'
-import { stationForLocation, bucketStepsByStation } from './recipeStation'
+import { stationForLocationType, bucketStepsByStation } from './recipeStation'
 
-describe('stationForLocation', () => {
-  it('maps Kitchen and Storage to L1', () => {
-    expect(stationForLocation('Kitchen')).toBe('L1')
-    expect(stationForLocation('Storage')).toBe('L1')
+describe('stationForLocationType', () => {
+  it('maps kitchen and storage to L1', () => {
+    expect(stationForLocationType('kitchen')).toBe('L1')
+    expect(stationForLocationType('storage')).toBe('L1')
   })
-  it('maps Assembly to L2', () => {
-    expect(stationForLocation('Assembly')).toBe('L2')
+  it('maps assembly to L2', () => {
+    expect(stationForLocationType('assembly')).toBe('L2')
   })
-  it('returns null for null/unknown locations', () => {
-    expect(stationForLocation(null)).toBeNull()
-    expect(stationForLocation(undefined)).toBeNull()
-    expect(stationForLocation('Bar')).toBeNull()
+  it('returns null for null/unknown types', () => {
+    expect(stationForLocationType(null)).toBeNull()
+    expect(stationForLocationType(undefined)).toBeNull()
+    expect(stationForLocationType('bar')).toBeNull()
   })
 })
 
 describe('bucketStepsByStation', () => {
-  const step = (location_name: string | null) => ({ location_name })
+  const step = (location_type: string | null) => ({ location_type })
 
-  it('splits a station-tagged manakish into L1 (Kitchen+Storage) and L2 (Assembly)', () => {
+  it('splits a station-tagged manakish into L1 (kitchen+storage) and L2 (assembly)', () => {
     const steps = [
-      step('Kitchen'), // press
-      step('Kitchen'), // pre-bake
-      step('Kitchen'), // assemble topping
-      step('Kitchen'), // blast freeze
-      step('Storage'), // store
-      step('Assembly'), // Merrychef bake
+      step('kitchen'), // press
+      step('kitchen'), // pre-bake
+      step('kitchen'), // assemble topping
+      step('kitchen'), // blast freeze
+      step('storage'), // store
+      step('assembly'), // Merrychef bake
     ]
     const { l1, l2, tagged } = bucketStepsByStation(steps)
     expect(tagged).toBe(true)
@@ -44,9 +44,9 @@ describe('bucketStepsByStation', () => {
 
   it('never drops a null/unknown step in a partially-tagged dish (buckets to L1)', () => {
     const { l1, l2, tagged } = bucketStepsByStation([
-      step('Assembly'),
+      step('assembly'),
       step(null),
-      step('Mystery'),
+      step('mystery'),
     ])
     expect(tagged).toBe(true)
     expect(l2).toHaveLength(1)
