@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Utensils,
   Pause,
+  MessageCircle,
 } from 'lucide-react'
 import type { MenuItem, MenuBomChild } from '../../../hooks/useMenuData'
 import type { PfPackCardData } from '../../../hooks/usePfPackCard'
@@ -34,7 +35,13 @@ interface L1CookViewProps {
   recipeStatsById: Map<string, RecipeStepStats>
   dishCardById: Map<string, DishCardData>
   childrenByParent: Map<string, MenuBomChild[]>
-  onOpenDish: (id: string) => void
+  onOpenDish?: (id: string) => void
+  /** When true: hides cost/price/food-cost data; shows comment button. */
+  staffMode?: boolean
+  /** Per-dish comment count — shown as badge on the comment button. */
+  feedbackCountById?: Map<string, number>
+  /** Called when the comment button is clicked. */
+  onComment?: (dishId: string) => void
 }
 
 /* ── PF recipe detail (lazy-loaded on expand) ──────────────── */
@@ -167,10 +174,13 @@ interface PfCardProps {
   item: MenuItem
   card: PfPackCardData | undefined
   stats: RecipeStepStats | undefined
-  onOpen: () => void
+  onOpen?: () => void
+  staffMode?: boolean
+  feedbackCount?: number
+  onComment?: () => void
 }
 
-function PfCard({ item, card, stats, onOpen }: PfCardProps) {
+function PfCard({ item, card, stats, onOpen, staffMode, feedbackCount, onComment }: PfCardProps) {
   // Default expanded: the cook station shows recipes like a prep sheet.
   const [expanded, setExpanded] = useState(true)
   const portionInfo =
@@ -188,76 +198,86 @@ function PfCard({ item, card, stats, onOpen }: PfCardProps) {
   const ccpCount = stats?.ccp_count ?? 0
   const hasPhoto = !!card?.kitchen_photo_url
 
+  const headerContent = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-[var(--color-amber-watch)]/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[color:var(--color-amber-watch)]">
+              PF
+            </span>
+            <h3 className="truncate text-sm font-medium text-cream">
+              {item.name}
+            </h3>
+          </div>
+          <p className="mt-0.5 font-mono text-[10px] text-cream/40">
+            {item.product_code}
+          </p>
+        </div>
+        {hasPhoto && (
+          <img
+            src={card!.kitchen_photo_url!}
+            alt={`${item.name} kitchen reference`}
+            className="h-12 w-12 shrink-0 rounded-md object-cover"
+            loading="lazy"
+          />
+        )}
+      </div>
+
+      {item.kitchen_note ? (
+        <p className="line-clamp-2 text-xs text-cream/65">{item.kitchen_note}</p>
+      ) : (
+        <p className="text-xs italic text-cream/35">No kitchen note</p>
+      )}
+
+      <dl className="grid grid-cols-2 gap-2 text-[11px]">
+        {portionInfo && (
+          <div className="flex items-center gap-1.5 text-cream/65">
+            <Package className="h-3 w-3 text-cream/40" />
+            <span>{portionInfo}</span>
+          </div>
+        )}
+        {packInfo && (
+          <div className="flex items-center gap-1.5 text-cream/65">
+            <Package className="h-3 w-3 text-cream/40" />
+            <span className="truncate">{packInfo}</span>
+          </div>
+        )}
+        {card?.shelf_life_days != null && (
+          <div className="flex items-center gap-1.5 text-cream/65">
+            <Clock className="h-3 w-3 text-cream/40" />
+            <span>{card.shelf_life_days} d shelf</span>
+          </div>
+        )}
+        {tempRange && (
+          <div className="flex items-center gap-1.5 text-cream/65">
+            <Snowflake className="h-3 w-3 text-cream/40" />
+            <span>{tempRange}</span>
+          </div>
+        )}
+        {card?.storage_zone && (
+          <div className="col-span-2 flex items-center gap-1.5 text-cream/65">
+            <Snowflake className="h-3 w-3 text-cream/40" />
+            <span className="truncate">{card.storage_zone}</span>
+          </div>
+        )}
+      </dl>
+    </>
+  )
+
   return (
     <div className="flex flex-col rounded-xl border border-surface-3 bg-surface-2 text-left transition hover:border-amber-watch/40 hover:bg-surface-3">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="group flex flex-col gap-3 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-amber-watch)]/60"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-[var(--color-amber-watch)]/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[color:var(--color-amber-watch)]">
-                PF
-              </span>
-              <h3 className="truncate text-sm font-medium text-cream">
-                {item.name}
-              </h3>
-            </div>
-            <p className="mt-0.5 font-mono text-[10px] text-cream/40">
-              {item.product_code}
-            </p>
-          </div>
-          {hasPhoto && (
-            <img
-              src={card!.kitchen_photo_url!}
-              alt={`${item.name} kitchen reference`}
-              className="h-12 w-12 shrink-0 rounded-md object-cover"
-              loading="lazy"
-            />
-          )}
-        </div>
-
-        {item.kitchen_note ? (
-          <p className="line-clamp-2 text-xs text-cream/65">{item.kitchen_note}</p>
-        ) : (
-          <p className="text-xs italic text-cream/35">No kitchen note</p>
-        )}
-
-        <dl className="grid grid-cols-2 gap-2 text-[11px]">
-          {portionInfo && (
-            <div className="flex items-center gap-1.5 text-cream/65">
-              <Package className="h-3 w-3 text-cream/40" />
-              <span>{portionInfo}</span>
-            </div>
-          )}
-          {packInfo && (
-            <div className="flex items-center gap-1.5 text-cream/65">
-              <Package className="h-3 w-3 text-cream/40" />
-              <span className="truncate">{packInfo}</span>
-            </div>
-          )}
-          {card?.shelf_life_days != null && (
-            <div className="flex items-center gap-1.5 text-cream/65">
-              <Clock className="h-3 w-3 text-cream/40" />
-              <span>{card.shelf_life_days} d shelf</span>
-            </div>
-          )}
-          {tempRange && (
-            <div className="flex items-center gap-1.5 text-cream/65">
-              <Snowflake className="h-3 w-3 text-cream/40" />
-              <span>{tempRange}</span>
-            </div>
-          )}
-          {card?.storage_zone && (
-            <div className="col-span-2 flex items-center gap-1.5 text-cream/65">
-              <Snowflake className="h-3 w-3 text-cream/40" />
-              <span className="truncate">{card.storage_zone}</span>
-            </div>
-          )}
-        </dl>
-      </button>
+      {onOpen && !staffMode ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="group flex flex-col gap-3 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-amber-watch)]/60"
+        >
+          {headerContent}
+        </button>
+      ) : (
+        <div className="flex flex-col gap-3 p-4">{headerContent}</div>
+      )}
 
       {/* Recipe toggle — full L1 cooking instruction inline */}
       <div className="border-t border-surface-3">
@@ -287,6 +307,26 @@ function PfCard({ item, card, stats, onOpen }: PfCardProps) {
         </button>
         {expanded && <PfRecipeDetail itemId={item.id} />}
       </div>
+
+      {/* Staff comment button */}
+      {staffMode && onComment && (
+        <div className="border-t border-surface-3 px-4 py-2">
+          <button
+            type="button"
+            onClick={onComment}
+            className="flex items-center gap-1.5 text-[11px] text-cream/50 transition hover:text-forest-soft"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            {feedbackCount ? (
+              <span className="font-medium text-forest-soft">
+                {feedbackCount} comment{feedbackCount !== 1 ? 's' : ''}
+              </span>
+            ) : (
+              'Add comment'
+            )}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -298,10 +338,13 @@ interface SaleRecipeCardProps {
   card: DishCardData | undefined
   stats: RecipeStepStats | undefined
   bomChildren: MenuBomChild[]
-  onOpen: () => void
+  onOpen?: () => void
+  staffMode?: boolean
+  feedbackCount?: number
+  onComment?: () => void
 }
 
-function SaleRecipeCard({ item, stats, bomChildren, onOpen }: SaleRecipeCardProps) {
+function SaleRecipeCard({ item, stats, bomChildren, onOpen, staffMode, feedbackCount, onComment }: SaleRecipeCardProps) {
   // Default expanded: the cook station shows recipes like a prep sheet.
   const [expanded, setExpanded] = useState(true)
   const stepCount = stats?.step_count ?? 0
@@ -309,76 +352,88 @@ function SaleRecipeCard({ item, stats, bomChildren, onOpen }: SaleRecipeCardProp
   const hasPhoto = !!item.image_url
 
   const costDisplay =
-    item.cost_per_unit != null ? `฿${item.cost_per_unit.toFixed(0)}` : null
+    !staffMode && item.cost_per_unit != null
+      ? `฿${item.cost_per_unit.toFixed(0)}`
+      : null
   const priceDisplay = item.price != null ? `฿${item.price}` : null
   const foodCostPct =
-    item.price && item.cost_per_unit
+    !staffMode && item.price && item.cost_per_unit
       ? ((item.cost_per_unit / item.price) * 100).toFixed(0)
       : null
 
+  const headerContent = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-[var(--color-royal-green)]/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[color:var(--color-forest-soft)]">
+              SALE
+            </span>
+            <h3 className="truncate text-sm font-medium text-cream">
+              {formatDishName(item.staff_code, item.name)}
+            </h3>
+          </div>
+          <p className="mt-0.5 font-mono text-[10px] text-cream/40">
+            {item.product_code}
+          </p>
+        </div>
+        {hasPhoto && (
+          <img
+            src={item.image_url!}
+            alt={item.name}
+            className="h-12 w-12 shrink-0 rounded-md object-cover"
+            loading="lazy"
+          />
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        {priceDisplay && (
+          <span className="text-cream/70">{priceDisplay}</span>
+        )}
+        {costDisplay && (
+          <span className="text-cream/50">cost {costDisplay}</span>
+        )}
+        {foodCostPct && (
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
+              Number(foodCostPct) < 30
+                ? 'bg-emerald-900/40 text-emerald-300'
+                : Number(foodCostPct) <= 45
+                  ? 'bg-amber-900/40 text-amber-300'
+                  : 'bg-red-900/40 text-red-300'
+            }`}
+          >
+            FC {foodCostPct}%
+          </span>
+        )}
+        <span className="flex items-center gap-1 text-cream/55">
+          <ChefHat className="h-3 w-3" />
+          {stepCount} {stepCount === 1 ? 'step' : 'steps'}
+        </span>
+        {ccpCount > 0 && (
+          <span className="flex items-center gap-1 text-amber-400">
+            <AlertTriangle className="h-3 w-3" />
+            {ccpCount} CCP
+          </span>
+        )}
+      </div>
+    </>
+  )
+
   return (
     <div className="flex flex-col rounded-xl border border-surface-3 bg-surface-2 text-left transition hover:border-forest-soft/40 hover:bg-surface-3">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex flex-col gap-3 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-[var(--color-royal-green)]/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[color:var(--color-forest-soft)]">
-                SALE
-              </span>
-              <h3 className="truncate text-sm font-medium text-cream">
-                {formatDishName(item.staff_code, item.name)}
-              </h3>
-            </div>
-            <p className="mt-0.5 font-mono text-[10px] text-cream/40">
-              {item.product_code}
-            </p>
-          </div>
-          {hasPhoto && (
-            <img
-              src={item.image_url!}
-              alt={item.name}
-              className="h-12 w-12 shrink-0 rounded-md object-cover"
-              loading="lazy"
-            />
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 text-[11px]">
-          {priceDisplay && (
-            <span className="text-cream/70">{priceDisplay}</span>
-          )}
-          {costDisplay && (
-            <span className="text-cream/50">cost {costDisplay}</span>
-          )}
-          {foodCostPct && (
-            <span
-              className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
-                Number(foodCostPct) < 30
-                  ? 'bg-emerald-900/40 text-emerald-300'
-                  : Number(foodCostPct) <= 45
-                    ? 'bg-amber-900/40 text-amber-300'
-                    : 'bg-red-900/40 text-red-300'
-              }`}
-            >
-              FC {foodCostPct}%
-            </span>
-          )}
-          <span className="flex items-center gap-1 text-cream/55">
-            <ChefHat className="h-3 w-3" />
-            {stepCount} {stepCount === 1 ? 'step' : 'steps'}
-          </span>
-          {ccpCount > 0 && (
-            <span className="flex items-center gap-1 text-amber-400">
-              <AlertTriangle className="h-3 w-3" />
-              {ccpCount} CCP
-            </span>
-          )}
-        </div>
-      </button>
+      {onOpen && !staffMode ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex flex-col gap-3 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60"
+        >
+          {headerContent}
+        </button>
+      ) : (
+        <div className="flex flex-col gap-3 p-4">{headerContent}</div>
+      )}
 
       {/* BOM tree toggle */}
       {bomChildren.length > 0 && (
@@ -431,6 +486,26 @@ function SaleRecipeCard({ item, stats, bomChildren, onOpen }: SaleRecipeCardProp
           )}
         </div>
       )}
+
+      {/* Staff comment button */}
+      {staffMode && onComment && (
+        <div className="border-t border-surface-3 px-4 py-2">
+          <button
+            type="button"
+            onClick={onComment}
+            className="flex items-center gap-1.5 text-[11px] text-cream/50 transition hover:text-forest-soft"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            {feedbackCount ? (
+              <span className="font-medium text-forest-soft">
+                {feedbackCount} comment{feedbackCount !== 1 ? 's' : ''}
+              </span>
+            ) : (
+              'Add comment'
+            )}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -464,6 +539,9 @@ export function L1CookView({
   dishCardById,
   childrenByParent,
   onOpenDish,
+  staffMode,
+  feedbackCountById,
+  onComment,
 }: L1CookViewProps) {
   // L1 = kitchen prep station. Honor the type filter (defaults to PF upstream,
   // so заготовки lead) plus category, subcategory drill-down, and availability.
@@ -519,7 +597,10 @@ export function L1CookView({
           card={dishCardById.get(item.id)}
           stats={recipeStatsById.get(item.id)}
           bomChildren={childrenByParent.get(item.id) ?? []}
-          onOpen={() => onOpenDish(item.id)}
+          onOpen={onOpenDish ? () => onOpenDish(item.id) : undefined}
+          staffMode={staffMode}
+          feedbackCount={feedbackCountById?.get(item.id)}
+          onComment={onComment ? () => onComment(item.id) : undefined}
         />
       )
     }
@@ -529,7 +610,10 @@ export function L1CookView({
         item={item}
         card={pfPackCardById.get(item.id)}
         stats={recipeStatsById.get(item.id)}
-        onOpen={() => onOpenDish(item.id)}
+        onOpen={onOpenDish ? () => onOpenDish(item.id) : undefined}
+        staffMode={staffMode}
+        feedbackCount={feedbackCountById?.get(item.id)}
+        onComment={onComment ? () => onComment(item.id) : undefined}
       />
     )
   }

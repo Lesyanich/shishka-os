@@ -55,6 +55,7 @@ const StaffTasksPage = lazy(() => import('./pages/StaffTasksPage').then(m => ({ 
 const CashierPage = lazy(() => import('./pages/cashier/CashierPage').then(m => ({ default: m.CashierPage })))
 const CookTasksPage = lazy(() => import('./pages/CookTasksPage').then(m => ({ default: m.CookTasksPage })))
 const KitchenLabels = lazy(() => import('./pages/KitchenLabels').then(m => ({ default: m.KitchenLabels })))
+const KitchenRecipesPage = lazy(() => import('./pages/KitchenRecipesPage').then(m => ({ default: m.KitchenRecipesPage })))
 
 function PageLoader() {
   return (
@@ -158,6 +159,7 @@ function App() {
                   <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
                   <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
                   <Route path="/kitchen/labels" element={<Suspense fallback={<PageLoader />}><KitchenLabels /></Suspense>} />
+                  <Route path="/kitchen/recipes" element={<Suspense fallback={<PageLoader />}><KitchenRecipesPage /></Suspense>} />
                   <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 </Route>
               </Route>
