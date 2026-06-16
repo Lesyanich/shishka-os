@@ -13,6 +13,9 @@ export interface RecipeStep {
   internal_temp_c: number | null
   is_passive: boolean
   notes: string | null
+  location_id: string | null
+  location_name: string | null
+  location_type: string | null
 }
 
 export interface UseRecipeStepsResult {
@@ -41,9 +44,12 @@ export function useRecipeSteps(): UseRecipeStepsResult {
       internal_temp_c: row.internal_temp_c as number | null,
       is_passive: (row.is_passive as boolean) ?? false,
       notes: row.notes as string | null,
+      location_id: (row.location_id as string | null) ?? null,
+      location_name: (row.location as { name: string; type: string } | null)?.name ?? null,
+      location_type: (row.location as { name: string; type: string } | null)?.type ?? null,
     }))
 
-  const SELECT_COLS = 'id, step_order, operation_name, instruction_text, duration_min, equipment_id, equipment(name), temperature_c, internal_temp_c, is_passive, notes'
+  const SELECT_COLS = 'id, step_order, operation_name, instruction_text, duration_min, equipment_id, equipment(name), temperature_c, internal_temp_c, is_passive, notes, location_id, location:locations(name, type)'
 
   /** Fetch recipe steps by nomenclature UUID (preferred) */
   const fetchSteps = useCallback(async (nomenclatureId: string): Promise<RecipeStep[]> => {

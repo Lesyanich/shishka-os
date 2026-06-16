@@ -11,6 +11,7 @@ import type { DishRecipeStep } from '../../../../hooks/useDishRecipeSteps'
 import type { BomIngredient } from '../../../../hooks/useBomIngredients'
 import type { PfPackCardData } from '../../../../hooks/usePfPackCard'
 import type { DishCardData } from '../../../../hooks/useDishCard'
+import { bucketStepsByStation } from '../../../../lib/recipeStation'
 import { PrepLabelBlock } from '../PrepLabelBlock'
 
 /* ── emoji helpers ─────────────────────────────────────────────── */
@@ -257,8 +258,31 @@ function StorageBlock({ card }: { card: PfPackCardData }) {
   )
 }
 
+function formatSec(sec: number): string {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 function L2AssemblyBlock({ card, item }: { card: DishCardData; item: MenuItem }) {
-  const program = item.merrychef_program as { temp_c?: number; time_sec?: number; notes?: string } | null
+  const program = item.merrychef_program as {
+    temp_c?: number
+    time_sec?: number
+    fan_pct?: number
+    microwave_pct?: number
+    notes?: string
+  } | null
+
+  const merrychefSummary = program
+    ? [
+        program.temp_c != null ? `${program.temp_c}°C` : null,
+        program.time_sec != null ? formatSec(program.time_sec) : null,
+        program.fan_pct != null ? `Fan ${program.fan_pct}%` : null,
+        program.microwave_pct != null ? `MW ${program.microwave_pct}%` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null
 
   return (
     <section className="space-y-2">
@@ -273,12 +297,10 @@ function L2AssemblyBlock({ card, item }: { card: DishCardData; item: MenuItem })
             {card.assembly_order.map((s) => s.text).join(' → ')}
           </div>
         )}
-        {program && (
+        {merrychefSummary && (
           <div>
-            <span className="text-cream/40">Merrychef:</span>{' '}
-            {program.temp_c != null && `${program.temp_c}°C`}
-            {program.time_sec != null && ` / ${program.time_sec}s`}
-            {program.notes && ` — ${program.notes}`}
+            <span className="text-cream/40">🔥 Merrychef:</span> {merrychefSummary}
+            {program?.notes && <span className="text-cream/50"> — {program.notes}</span>}
           </div>
         )}
         {card.pre_merrychef_prep && (
@@ -316,6 +338,12 @@ export function L1CookTab({
   pfPackCard,
   dishCard,
 }: L1CookTabProps) {
+  // L1 Cook station shows only prep-kitchen steps (Kitchen + Storage). The L2
+  // service step (Merrychef bake) is surfaced separately via L2AssemblyBlock.
+  // Untagged dishes (no location_id) fall back to the full step list.
+  const { l1, tagged } = bucketStepsByStation(recipeSteps)
+  const processSteps = tagged ? l1 : recipeSteps
+
   return (
     <div className="space-y-6">
       {/* Compact recipe header */}
@@ -335,8 +363,8 @@ export function L1CookTab({
       </div>
 
       {/* Summary bar */}
-      {!recipeStepsLoading && recipeSteps.length > 0 && (
-        <SummaryBar steps={recipeSteps} />
+      {!recipeStepsLoading && processSteps.length > 0 && (
+        <SummaryBar steps={processSteps} />
       )}
 
       {/* Ingredients */}
@@ -347,7 +375,7 @@ export function L1CookTab({
         <h4 className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-cream/50">
           <ChefHat className="h-3 w-3" />
           Process
-          {recipeSteps.some((s) => s.is_ccp) && (
+          {processSteps.some((s) => s.is_ccp) && (
             <span className="ml-1 flex items-center gap-0.5 text-amber-400">
               <AlertTriangle className="h-2.5 w-2.5" /> HACCP
             </span>
@@ -355,11 +383,11 @@ export function L1CookTab({
         </h4>
         {recipeStepsLoading ? (
           <span className="text-xs text-cream/40">Loading...</span>
-        ) : recipeSteps.length === 0 ? (
+        ) : processSteps.length === 0 ? (
           <span className="text-xs italic text-cream/40">No recipe steps defined</span>
         ) : (
           <div className="space-y-2">
-            {recipeSteps.map((s) => (
+            {processSteps.map((s) => (
               <StepCard key={s.id} step={s} />
             ))}
           </div>

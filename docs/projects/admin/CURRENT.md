@@ -15,6 +15,16 @@
 
 ## In-flight (backend foundation)
 
+- **2026-06-16 — Recipe-step station split in /menu drawer + inline-expand (MC acde9cc5, branch `feature/menu/recipe-step-station-split`).**
+  - Fixes the acde9cc5 label-swap bug: the Owner-table inline-expand "L2 ASSEMBLY — Dish plating" block was rendering ALL of a SALE dish's recipe steps (incl. L1 press/pre-bake/blast-freeze each tagged "L1 production") under an L2 header.
+  - New `src/lib/recipeStation.ts` (`stationForLocation`, `bucketStepsByStation`): Kitchen+Storage → L1, Assembly → L2; null/unknown → L1 bucket; `tagged=false` when no step carries a station so callers fall back to legacy "show all" (no regression for untagged smoothies/salads/etc.).
+  - Hooks `useRecipeSteps` + `useDishRecipeSteps` now select `location_id, location:locations(name)` (FK `recipes_flow_location_id_fkey`).
+  - `ProcessTab` gained a controlled `steps?` prop (render a station-filtered subset; keeps self-fetch `nomenclatureId` mode for RecipeBuilder + PF children).
+  - `DishExpandedCard`: L2 Assembly section → Assembly-location steps only; the SALE dish's own Kitchen/Storage steps move to a "THIS SKU — cook-station steps" block inside L1 Production. Drawer `L1CookTab` Process list now shows L1-only (Merrychef step surfaced via L2AssemblyBlock, which now renders fan%/MW% + m:ss).
+  - Data (mig 292/293, prod): 4 active manakish (Za'atar, Za'atar&Cheese, 6 Cheese, Salami) tagged 4 Kitchen / 1 Storage / 1 Assembly + `merrychef_program {260°C,100s,fan100,mw15}`. Other manakish/smoothies still NULL → fallback path.
+  - Verified live on prod (os#369): #1 "🫓 Doughs & Bread" L1 section + Potato Manakish Dough 6 steps inline; #2 Merrychef card on manakish. #3 after-state pending prod deploy (login is password-gated for the agent).
+  - Typecheck + 11 unit tests (incl. new `recipeStation.test.ts`) + eslint green.
+
 - **2026-06-11 — Brain revival: Graphify freshness + lightrag cleanup (MC b979c787, branch `claude/elastic-easley-64e0bf`).**
   - Audit: graph.json was generated **2026-04-25** (graph-analytics.json `generated_at`); mcp-graphify served that static snapshot with no staleness signal. LightRAG embedding-suffixed tables (`lightrag_vdb_*_text_embedding_3_small_1536d`) survived 217a; brain_inbox empty.
   - `services/mcp-graphify` now returns `graph_freshness {generated_at, age_days, stale (>14d), warning}` in every tool response (source: analytics `generated_at`, fallback file mtime). Test added; 10/10 pass.

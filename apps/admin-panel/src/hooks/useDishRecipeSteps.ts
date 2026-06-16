@@ -15,6 +15,9 @@ export interface DishRecipeStep {
   notes: string | null
   is_ccp: boolean
   ccp_check_text: string | null
+  location_id: string | null
+  location_name: string | null
+  location_type: string | null
 }
 
 export interface UseDishRecipeStepsResult {
@@ -43,7 +46,7 @@ export function useDishRecipeSteps(
     const { data, error: err } = await supabase
       .from('recipes_flow')
       .select(
-        'id, step_order, operation_name, duration_min, instruction_text, temperature_c, internal_temp_c, equipment(name, category), notes, is_ccp, ccp_check_text, is_passive',
+        'id, step_order, operation_name, duration_min, instruction_text, temperature_c, internal_temp_c, equipment(name, category), notes, is_ccp, ccp_check_text, is_passive, location_id, location:locations(name, type)',
       )
       .eq('nomenclature_id', nomenclatureId)
       .order('step_order', { ascending: true })
@@ -66,6 +69,9 @@ export function useDishRecipeSteps(
       notes: r.notes as string | null,
       is_ccp: (r.is_ccp as boolean) ?? false,
       ccp_check_text: r.ccp_check_text as string | null,
+      location_id: (r.location_id as string | null) ?? null,
+      location_name: (r.location as { name: string; type: string } | null)?.name ?? null,
+      location_type: (r.location as { name: string; type: string } | null)?.type ?? null,
     }))
     setSteps(mapped)
     setIsLoading(false)

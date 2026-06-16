@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Camera, ChefHat, ChevronDown, ChevronRight, Flame, FileText, Soup } from 'lucide-react'
 import type { MenuDish } from '../../../hooks/useMenuDishes'
 import { useDishDetail } from '../../../hooks/useDishDetail'
 import { useNomenclatureImages } from '../../../hooks/useNomenclatureImages'
+import { useRecipeSteps } from '../../../hooks/useRecipeSteps'
+import { bucketStepsByStation } from '../../../lib/recipeStation'
 import { BomTreeEditor } from './BomTreeEditor'
 import { NutritionBadges } from './NutritionBadge'
 import { ImageGallery } from '../../../components/gallery/ImageGallery'
@@ -22,10 +24,24 @@ function formatThb(v: number | null): string {
 export function DishExpandedCard({ dish }: DishExpandedCardProps) {
   const detail = useDishDetail(dish.id)
   const gallery = useNomenclatureImages(dish.id)
+  const recipe = useRecipeSteps()
   const [openSections, setOpenSections] = useState<Set<Section>>(
     new Set(['bom', 'assembly']),
   )
   const [expandedPfIds, setExpandedPfIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    recipe.fetchSteps(dish.id)
+    // recipe.fetchSteps is a stable useCallback; dish.id is the only real dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dish.id])
+
+  // Split this dish's own recipe flow by station. When the dish is untagged
+  // (no location_id on any step — e.g. smoothies/salads), `tagged` is false and
+  // we fall back to showing every step under L2 Assembly (legacy behaviour).
+  const { l1: l1Steps, l2: l2Steps, tagged } = bucketStepsByStation(recipe.steps)
+  const assemblyDisplaySteps = tagged ? l2Steps : recipe.steps
+  const showOwnL1Block = tagged && l1Steps.length > 0
 
   const toggle = (section: Section) => {
     setOpenSections((prev) => {
@@ -144,32 +160,65 @@ export function DishExpandedCard({ dish }: DishExpandedCardProps) {
         />
       </Section>
 
-      {/* Section: L2 Assembly */}
+      {/* Section: L2 Assembly — service-bar steps only (Merrychef / plating).
+          When the dish is station-tagged, only Assembly-location steps show here;
+          untagged dishes fall back to the full step list. */}
       <Section
-        title="L2 Assembly — Dish plating / final steps"
+        title="L2 Assembly — Service bar (Merrychef / plating)"
         icon={<ChefHat className="h-3.5 w-3.5" />}
+        count={tagged ? l2Steps.length : undefined}
         isOpen={openSections.has('assembly')}
         onToggle={() => toggle('assembly')}
       >
         <div className="flex max-h-96 flex-col overflow-hidden rounded-lg border border-surface-3">
-          <ProcessTab nomenclatureId={dish.id} />
+          {assemblyDisplaySteps.length === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-cream/50">
+              No L2 assembly steps — this dish is finished at the prep kitchen (L1).
+            </div>
+          ) : (
+            <ProcessTab steps={assemblyDisplaySteps} />
+          )}
         </div>
       </Section>
 
-      {/* Section: L1 Production */}
+      {/* Section: L1 Production — prep-kitchen steps. Covers BOTH this SKU's own
+          cook/freeze/store steps (when station-tagged) and its semi-finished
+          (PF) sub-processes. */}
       <Section
-        title="L1 Production — Semi-finished (PF) processes"
+        title="L1 Production — Prep kitchen (cook · freeze · store)"
         icon={<Flame className="h-3.5 w-3.5" />}
-        count={detail.pfChildren.length}
+        count={(showOwnL1Block ? 1 : 0) + detail.pfChildren.length}
         isOpen={openSections.has('production')}
         onToggle={() => toggle('production')}
       >
-        {detail.pfChildren.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-surface-3 bg-surface-1/30 px-4 py-6 text-center text-xs text-cream/50">
-            No PF ingredients — this dish is assembled directly from RAW.
+        {/* This SKU's own L1 steps (e.g. manakish press / pre-bake / blast-freeze) */}
+        {showOwnL1Block && (
+          <div className="mb-3 space-y-1.5">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-cream/45">
+              <span className="rounded bg-[var(--color-royal-green)]/25 px-1.5 py-0.5 text-[9px] font-bold text-[color:var(--color-forest-soft)]">
+                THIS SKU
+              </span>
+              Cook-station steps
+            </div>
+            <div className="flex max-h-80 flex-col overflow-hidden rounded-lg border border-surface-3">
+              <ProcessTab steps={l1Steps} />
+            </div>
           </div>
+        )}
+
+        {detail.pfChildren.length === 0 ? (
+          showOwnL1Block ? null : (
+            <div className="rounded-lg border border-dashed border-surface-3 bg-surface-1/30 px-4 py-6 text-center text-xs text-cream/50">
+              No PF ingredients — this dish is assembled directly from RAW.
+            </div>
+          )
         ) : (
           <div className="space-y-2">
+            {showOwnL1Block && (
+              <div className="text-[10px] uppercase tracking-wider text-cream/45">
+                Semi-finished (PF) sub-processes
+              </div>
+            )}
             {detail.pfChildren.map((pf) => {
               const isOpen = expandedPfIds.has(pf.id)
               return (
