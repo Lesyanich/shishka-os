@@ -13,12 +13,21 @@ import {
 } from 'lucide-react'
 import type { MenuItem, MenuBomChild } from '../../../hooks/useMenuData'
 import type { PfPackCardData } from '../../../hooks/usePfPackCard'
-import type { RecipeStepStats } from '../../../hooks/useMenuListEnrichment'
+import type { RecipeStepStats, MenuRecipeStep } from '../../../hooks/useMenuListEnrichment'
 import type { DishCardData } from '../../../hooks/useDishCard'
 import { formatDishName } from '../utils/formatDishName'
 import { useBomIngredients } from '../../../hooks/useBomIngredients'
 import { useDishRecipeSteps } from '../../../hooks/useDishRecipeSteps'
 import { matchesType, type TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
+import { bucketStepsByStation } from '../../../lib/recipeStation'
+
+/** L1 prep steps for a dish. When the recipe is station-tagged (manakish), the
+ *  prep cook only needs the L1 production flow — press dough → top → blast-freeze
+ *  → store — not the L2 service bake. Untagged dishes show every step. */
+function prepSteps(steps: MenuRecipeStep[]): MenuRecipeStep[] {
+  const { l1, tagged } = bucketStepsByStation(steps)
+  return tagged ? l1 : steps
+}
 
 interface L1CookViewProps {
   items: MenuItem[]
@@ -35,6 +44,8 @@ interface L1CookViewProps {
   recipeStatsById: Map<string, RecipeStepStats>
   dishCardById: Map<string, DishCardData>
   childrenByParent: Map<string, MenuBomChild[]>
+  /** Inline recipe steps per dish — SALE cards show their L1 prep flow. */
+  recipeStepsByDish?: Map<string, MenuRecipeStep[]>
   onOpenDish?: (id: string) => void
   /** When true: hides cost/price/food-cost data; shows comment button. */
   staffMode?: boolean
@@ -338,15 +349,20 @@ interface SaleRecipeCardProps {
   card: DishCardData | undefined
   stats: RecipeStepStats | undefined
   bomChildren: MenuBomChild[]
+  steps?: MenuRecipeStep[]
   onOpen?: () => void
   staffMode?: boolean
   feedbackCount?: number
   onComment?: () => void
 }
 
-function SaleRecipeCard({ item, stats, bomChildren, onOpen, staffMode, feedbackCount, onComment }: SaleRecipeCardProps) {
+function SaleRecipeCard({ item, stats, bomChildren, steps, onOpen, staffMode, feedbackCount, onComment }: SaleRecipeCardProps) {
   // Default expanded: the cook station shows recipes like a prep sheet.
   const [expanded, setExpanded] = useState(true)
+  // L1 production flow: for a station-tagged manakish this is the prep half
+  // (press → pre-bake → top → blast-freeze → store) — the L2 service bake is
+  // hidden here, it lives on the L2 Assembly station.
+  const l1Steps = prepSteps(steps ?? [])
   const stepCount = stats?.step_count ?? 0
   const ccpCount = stats?.ccp_count ?? 0
   const hasPhoto = !!item.image_url
@@ -487,6 +503,26 @@ function SaleRecipeCard({ item, stats, bomChildren, onOpen, staffMode, feedbackC
         </div>
       )}
 
+      {/* L1 production flow (press → pre-bake → top → blast-freeze → store).
+          For station-tagged manakish the L2 service bake is intentionally hidden. */}
+      {l1Steps.length > 0 && (
+        <div className="border-t border-surface-3 px-4 py-2">
+          <ol className="space-y-0.5">
+            {l1Steps.map((s) => (
+              <li
+                key={s.step_order}
+                className="flex gap-1.5 text-[11px] leading-snug text-cream/65"
+              >
+                <span className="font-mono text-[10px] text-cream/40">{s.step_order}.</span>
+                <span className="min-w-0 flex-1">
+                  {s.instruction_text ?? s.operation_name}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       {/* Staff comment button */}
       {staffMode && onComment && (
         <div className="border-t border-surface-3 px-4 py-2">
@@ -538,6 +574,7 @@ export function L1CookView({
   recipeStatsById,
   dishCardById,
   childrenByParent,
+  recipeStepsByDish,
   onOpenDish,
   staffMode,
   feedbackCountById,
@@ -597,6 +634,7 @@ export function L1CookView({
           card={dishCardById.get(item.id)}
           stats={recipeStatsById.get(item.id)}
           bomChildren={childrenByParent.get(item.id) ?? []}
+          steps={recipeStepsByDish?.get(item.id)}
           onOpen={onOpenDish ? () => onOpenDish(item.id) : undefined}
           staffMode={staffMode}
           feedbackCount={feedbackCountById?.get(item.id)}
