@@ -127,7 +127,7 @@ export const FACTORY_LAYOUT: Record<1 | 2, FactoryPan[]> = {
     { s: '1/3', c: 6, r: 0, n: 'Quinoa', p: 'PF-COOKED_QUINOA', g: 'topping' },
     { s: '1/3', c: 8, r: 0, n: 'Beetroot', p: 'PF-BAKED_BEETROOT', g: 'vegetable' },
     { s: '1/3', c: 10, r: 0 },
-    { s: '1/6', c: 12, r: 0, n: 'Red Beans', p: 'MOD-RED_BEANS', g: 'protein' },
+    { s: '1/6', c: 12, r: 0, n: 'Red Beans', p: 'PF-RED_BEANS', g: 'protein' },
     { s: '1/6', c: 12, r: 3, n: 'Edamame', p: 'RAW-FROZEN-EDAMAME', g: 'protein' },
     { s: '1/6', c: 14, r: 0, n: 'Pomegranate', p: 'RAW-POMEGRANATE-SEEDS', g: 'accent' },
     { s: '1/6', c: 14, r: 3 },
