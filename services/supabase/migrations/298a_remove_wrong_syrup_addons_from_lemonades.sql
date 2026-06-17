@@ -1,4 +1,7 @@
--- 298_remove_wrong_syrup_addons_from_lemonades.sql
+-- 298a_remove_wrong_syrup_addons_from_lemonades.sql
+-- (Renumbered 298 -> 298a 2026-06-17 to resolve a cross-branch collision with
+--  298_manakish_station_tagging_and_pf_filling_categories.sql from a concurrent
+--  session; both were already applied to prod. migration_log row reconciled to 298a.)
 -- Remove the caramel/hazelnut/mint/vanilla syrup add-ons wrongly attached to the
 -- 4 lemonades. CEO (2026-06-17): lemonades already contain honey syrup as part of
 -- the recipe; offering nut/caramel syrups on a lemonade is not wanted.
@@ -27,7 +30,7 @@ WHERE o.dish_id = d.id
   AND o.loyverse_modifier_list_name = 'Syrups';
 
 INSERT INTO migration_log (filename, status)
-VALUES ('298_remove_wrong_syrup_addons_from_lemonades.sql', 'success')
+VALUES ('298a_remove_wrong_syrup_addons_from_lemonades.sql', 'success')
 ON CONFLICT (filename) DO NOTHING;
 
 COMMIT;
