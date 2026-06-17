@@ -20,6 +20,8 @@
 
 ## Culinary Preferences
 <!-- e.g., "Shishka is a healthy kitchen — minimize sugar, maximize whole ingredients" -->
+7. **Always present recipes by gram.** When giving any recipe or dressing/sauce formula, list every ingredient in grams (not tbsp/tsp/cups). Include the total yield in grams and, where useful, a weight ratio / baker's percentage so the recipe scales cleanly. Volume units may appear only as a secondary note, and only if explicitly requested. (Added: 2026-06-17)
+8. **No optional/suggested ingredients.** Stick to the core recipe only — do not add "Optional", "to taste", or substitution-suggestion items. List only the ingredients that are actually in the recipe. (Added: 2026-06-17)
 
 ## Learned Corrections
 <!-- Rules added after mistakes. Like engineering rules but for the chef agent. -->
