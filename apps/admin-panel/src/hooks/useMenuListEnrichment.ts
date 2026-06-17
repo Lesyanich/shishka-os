@@ -16,6 +16,9 @@ export interface MenuRecipeStep {
   instruction_text: string | null
   /** Short station label for this step: 'L1' (Kitchen prep) | 'L2' (Assembly) | zone name. */
   location: string | null
+  /** Raw locations.type enum ('kitchen' | 'storage' | 'assembly' | null) —
+   *  rename-proof key for station bucketing (see lib/recipeStation.ts). */
+  location_type: string | null
 }
 
 /** Map a locations.name (functional zone) to the station label cooks use. */
@@ -116,7 +119,7 @@ export function useMenuListEnrichment(
       supabase
         .from('recipes_flow')
         .select(
-          'nomenclature_id, step_order, operation_name, instruction_text, is_ccp, location:locations(name)',
+          'nomenclature_id, step_order, operation_name, instruction_text, is_ccp, location:locations(name, type)',
         )
         .order('step_order', { ascending: true }),
       supabase.from('v_dish_assembly_components').select('*'),
@@ -169,7 +172,10 @@ export function useMenuListEnrichment(
       operation_name: string
       instruction_text: string | null
       is_ccp: boolean
-      location: { name: string | null } | { name: string | null }[] | null
+      location:
+        | { name: string | null; type: string | null }
+        | { name: string | null; type: string | null }[]
+        | null
     }>) {
       const prev = rs.get(row.nomenclature_id) ?? { step_count: 0, ccp_count: 0 }
       prev.step_count += 1
@@ -182,6 +188,7 @@ export function useMenuListEnrichment(
         operation_name: row.operation_name,
         instruction_text: row.instruction_text,
         location: stationLabel(loc?.name),
+        location_type: loc?.type ?? null,
       })
       steps.set(row.nomenclature_id, list)
     }

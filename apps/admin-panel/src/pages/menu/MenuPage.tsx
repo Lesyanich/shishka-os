@@ -12,21 +12,18 @@ import {
   Shield,
 } from 'lucide-react'
 import { useMenuData } from '../../hooks/useMenuData'
-import type { MenuCategory } from '../../hooks/useMenuDishes'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
 import { useMenuListEnrichment } from '../../hooks/useMenuListEnrichment'
 import { useChannelMargins } from '../../hooks/useChannelMargins'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
-import { L1CookView } from './components/L1CookView'
-import { L2AssemblerView } from './components/L2AssemblerView'
+import { RecipeStationPanel } from './components/RecipeStationPanel'
 import { NewDishModal } from './components/NewDishModal'
 import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
 import { TypeFilter, matchesType, type TypeFilterValue } from '../../components/menu/owner/TypeFilter'
 import { FilterBar } from '../../components/menu/owner/FilterBar'
 import { DishDrawer } from '../../components/menu/drawer/DishDrawer'
-import { CategoryTabs } from '../../components/menu/shared'
 import { useMenuFilters, applyFilters } from './hooks/useMenuFilters'
 
 type ViewMode = 'owner' | 'l1-cook' | 'l2-assembler' | 'customer'
@@ -158,18 +155,6 @@ export function MenuPage() {
     [updateParam],
   )
 
-  // Subcategories of the currently-selected section, shaped for CategoryTabs.
-  // Drives the L1/L2 drill-down strip; empty when the section has no children.
-  const selectedSubcats = useMemo(
-    () =>
-      (selectedCategory ? subcategories.get(selectedCategory) ?? [] : []).map((s) => ({
-        id: s.id,
-        code: '',
-        name: s.name,
-      })),
-    [selectedCategory, subcategories],
-  )
-
   // Availability filter for L1 Cook view (URL-driven: ?available=yes|no)
   const availableParam = searchParams.get('available')
   const availableFilter: boolean | null =
@@ -259,31 +244,6 @@ export function MenuPage() {
     }
     return counts
   }, [typeFilteredItems])
-
-  // Data-driven category chips: the sections the currently type-filtered items
-  // actually roll up to (section_id), resolved to their display category. Used
-  // by the L1 prep station so its chips track PF prep categories (Doughs &
-  // Bread, Cooked Components, …) instead of the SALE menu sections — empty
-  // SALE-only chips drop out, and PF/MOD groups that had no chip now appear.
-  // Self-correcting per type filter (flip L1→SALE and it shows SALE sections).
-  const presentCategories = useMemo<MenuCategory[]>(() => {
-    const seen = new Set<string>()
-    const out: MenuCategory[] = []
-    for (const item of typeFilteredItems) {
-      const secId = item.section_id ?? item.category_id
-      if (!secId || seen.has(secId)) continue
-      seen.add(secId)
-      out.push(
-        categoriesById.get(secId) ?? {
-          id: secId,
-          code: '',
-          name: item.category_name ?? 'Uncategorized',
-          sort_order: 9999,
-        },
-      )
-    }
-    return out.sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
-  }, [typeFilteredItems, categoriesById])
 
   // Counts per type filter bucket (drives pill counters)
   const typeCounts = useMemo(() => {
@@ -421,99 +381,8 @@ export function MenuPage() {
           />
         </div>
       )}
-      {/* L1 Cook: TypeFilter + AvailabilityFilter + CategoryTabs with counts */}
-      {view === 'l1-cook' && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* L1 = kitchen PREP station: defaults to PF (заготовки), Sale not
-                needed day-to-day. The switcher stays so a cook can flip to
-                SALE/All on demand, but the prep view is the home base. */}
-            <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
-            <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
-              {([
-                { value: null, label: 'All' },
-                { value: true, label: 'Active' },
-                { value: false, label: 'Inactive' },
-              ] as const).map(({ value, label }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setAvailableFilter(value)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                    availableFilter === value
-                      ? 'bg-surface-3 text-cream'
-                      : 'text-cream/50 hover:text-cream/80'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {presentCategories.length > 0 && (
-            <CategoryTabs
-              categories={presentCategories}
-              selectedId={selectedCategory}
-              onSelect={setSelectedCategory}
-              counts={categoryCounts}
-            />
-          )}
-          {/* Drill-down strip: subcategories of the selected section. */}
-          {selectedSubcats.length > 0 && (
-            <CategoryTabs
-              categories={selectedSubcats}
-              selectedId={selectedSubcategory}
-              onSelect={setSelectedSubcategory}
-            />
-          )}
-        </div>
-      )}
-      {/* L2: TypeFilter + availability toggle (default Active-only) + category strip */}
-      {view === 'l2-assembler' && (
-        <div className="space-y-2">
-          {/* L2 = store ASSEMBLY station: defaults to SALE (final dishes the
-              assembler builds from prepped заготовки). Switcher kept for parity
-              with the other stations. */}
-          <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
-          <div className="flex w-fit rounded-lg border border-surface-3 bg-surface-1 p-0.5">
-            {([
-              { value: true, label: 'Active' },
-              { value: false, label: 'Inactive' },
-              { value: null, label: 'All' },
-            ] as const).map(({ value, label }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => setL2AvailableFilter(value)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  l2AvailableFilter === value
-                    ? 'bg-surface-3 text-cream'
-                    : 'text-cream/50 hover:text-cream/80'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {categories.length > 0 && (
-            <CategoryTabs
-              categories={categories}
-              selectedId={selectedCategory}
-              onSelect={setSelectedCategory}
-            />
-          )}
-          {/* Drill-down strip: subcategories of the selected section (e.g. Coffee
-              / Smoothies / Lemonades under Drinks). Hidden until a section with
-              children is selected. */}
-          {selectedSubcats.length > 0 && (
-            <CategoryTabs
-              categories={selectedSubcats}
-              selectedId={selectedSubcategory}
-              onSelect={setSelectedSubcategory}
-            />
-          )}
-        </div>
-      )}
+      {/* L1/L2 station controls (type filter, availability, data-driven chips)
+          render inside RecipeStationPanel below, alongside the cards. */}
 
       {/* Content */}
       {isLoading ? (
@@ -557,30 +426,42 @@ export function MenuPage() {
           onOpenDrawer={openDrawer}
         />
       ) : view === 'l1-cook' ? (
-        <L1CookView
+        <RecipeStationPanel
+          station="l1-cook"
           items={items}
-          typeFilter={typeFilter}
-          selectedCategory={selectedCategory}
-          selectedSubcategory={selectedSubcategory}
-          availableFilter={availableFilter}
-          pfPackCardById={enrichment.pfPackCardById}
-          recipeStatsById={enrichment.recipeStatsById}
-          dishCardById={enrichment.dishCardById}
+          categoriesById={categoriesById}
+          subcategories={subcategories}
           childrenByParent={childrenByParent}
+          enrichment={enrichment}
+          typeFilter={typeFilter}
+          onTypeFilter={setTypeFilter}
+          typeCounts={typeCounts}
+          availableFilter={availableFilter}
+          onAvailableFilter={setAvailableFilter}
+          selectedCategory={selectedCategory}
+          onSelectCategory={setSelectedCategory}
+          selectedSubcategory={selectedSubcategory}
+          onSelectSubcategory={setSelectedSubcategory}
           onOpenDish={openDrawer}
+          onReorder={reorderItems}
         />
       ) : view === 'l2-assembler' ? (
-        <L2AssemblerView
+        <RecipeStationPanel
+          station="l2-assembler"
           items={items}
+          categoriesById={categoriesById}
+          subcategories={subcategories}
+          childrenByParent={childrenByParent}
+          enrichment={enrichment}
           typeFilter={typeFilter}
-          selectedCategory={selectedCategory}
-          selectedSubcategory={selectedSubcategory}
+          onTypeFilter={setTypeFilter}
+          typeCounts={typeCounts}
           availableFilter={l2AvailableFilter}
-          dishCardById={enrichment.dishCardById}
-          componentsByDish={enrichment.componentsByDish}
-          recipeStepsByDish={enrichment.recipeStepsByDish}
-          modifierOptionsByDish={enrichment.modifierOptionsByDish}
-          packagingByDish={enrichment.packagingByDish}
+          onAvailableFilter={setL2AvailableFilter}
+          selectedCategory={selectedCategory}
+          onSelectCategory={setSelectedCategory}
+          selectedSubcategory={selectedSubcategory}
+          onSelectSubcategory={setSelectedSubcategory}
           onOpenDish={openDrawer}
           onReorder={reorderItems}
         />

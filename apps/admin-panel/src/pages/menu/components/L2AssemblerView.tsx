@@ -27,6 +27,17 @@ import type {
   DishModifierOption,
 } from '../../../hooks/useMenuListEnrichment'
 import { matchesType, type TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
+import { bucketStepsByStation } from '../../../lib/recipeStation'
+
+/** L2 service-bar steps for a dish. When the recipe is station-tagged (manakish
+ *  et al.), the assembler only needs the Assembly steps — pull from frozen +
+ *  Merrychef + plate — not the L1 prep history (pressing, blast-freeze, …).
+ *  Untagged dishes (smoothies, salads) have no station split, so fall back to
+ *  the full list and nothing disappears. */
+function assemblySteps(steps: MenuRecipeStep[]): MenuRecipeStep[] {
+  const { l2, tagged } = bucketStepsByStation(steps)
+  return tagged ? l2 : steps
+}
 
 interface L2AssemblerViewProps {
   items: MenuItem[]
@@ -171,7 +182,8 @@ function buildCheatSheetHtml(
 
   function cardHtml(item: MenuItem): string {
     const comps = componentsByDish.get(item.id) ?? []
-    const steps = recipeStepsByDish.get(item.id) ?? []
+    // L2 cheat-sheet shows only the assembly/service steps, not L1 prep history.
+    const steps = assemblySteps(recipeStepsByDish.get(item.id) ?? [])
     const options = modifierOptionsByDish.get(item.id) ?? []
     const price = item.price != null ? `฿${Math.round(Number(item.price))}` : ''
     const note = item.assembler_note
@@ -437,12 +449,33 @@ function SaleAssemblyCard({
   // add-ons + meta live in a collapsed "Details".
   const [showDetails, setShowDetails] = useState(false)
 
+  // Station split: the assembler only sees the L2 (service-bar) steps. For a
+  // station-tagged manakish that means just "pull from frozen + Merrychef",
+  // not the full L1 prep history. Untagged dishes show every step (fallback).
+  const { l2: l2Steps, tagged } = bucketStepsByStation(steps)
+  const procSteps = tagged ? l2Steps : steps
+
   const program = item.merrychef_program as
-    | { temp_c?: number; time_sec?: number; preset?: string }
+    | {
+        temp_c?: number
+        time_sec?: number
+        fan_pct?: number
+        microwave_pct?: number
+        preset?: string
+        notes?: string
+      }
     | null
   const merrychefSummary =
     program?.temp_c != null && program?.time_sec != null
-      ? `${program.temp_c}°C / ${program.time_sec}s${program.preset ? ` (${program.preset})` : ''}`
+      ? [
+          `${program.temp_c}°C`,
+          `${program.time_sec}s`,
+          program.fan_pct != null ? `Fan ${program.fan_pct}%` : null,
+          program.microwave_pct != null ? `MW ${program.microwave_pct}%` : null,
+          program.preset ? `(${program.preset})` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
       : null
   // Food-cost % — hidden in staff mode (sensitive owner data).
   const foodCostBasis = item.food_cost ?? item.cost_per_unit
@@ -454,7 +487,8 @@ function SaleAssemblyCard({
   const isBuildYourOwn = components.length === 0 && options.length > 0
   const hasAddons = !isBuildYourOwn && options.length > 0
   const hasMeta =
-    !!merrychefSummary ||
+    // When tagged, the Merrychef line shows in the prominent banner, not Details.
+    (!tagged && !!merrychefSummary) ||
     card?.customer_eta_min != null ||
     !!card?.has_cutlery ||
     !!card?.has_lid_sticker ||
@@ -515,7 +549,7 @@ function SaleAssemblyCard({
       )}
 
       {/* Note — only when present AND not superseded by structured steps */}
-      {item.assembler_note && steps.length === 0 && (
+      {item.assembler_note && procSteps.length === 0 && (
         <p className="line-clamp-2 text-[11px] text-cream/55">
           {item.assembler_note}
         </p>
@@ -570,10 +604,24 @@ function SaleAssemblyCard({
         </p>
       )}
 
+      {/* Merrychef cue — the assembler's core action for station-tagged dishes:
+          pull from frozen + reheat. Surfaced prominently, not buried in Details. */}
+      {tagged && merrychefSummary && (
+        <div className="flex items-start gap-1.5 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-200">
+          <Flame className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+          <div className="min-w-0">
+            <div className="font-semibold">Merrychef · {merrychefSummary}</div>
+            {program?.notes && (
+              <div className="text-amber-200/70">{program.notes}</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Process — short instructions, always visible for fixed dishes */}
-      {!isBuildYourOwn && steps.length > 0 && (
+      {!isBuildYourOwn && procSteps.length > 0 && (
         <ol className="space-y-0.5 border-t border-surface-3 pt-1.5">
-          {steps.map((s) => (
+          {procSteps.map((s) => (
             <li
               key={s.step_order}
               className="flex gap-1.5 text-[11px] leading-snug text-cream/65"
@@ -619,7 +667,7 @@ function SaleAssemblyCard({
               {/* Meta */}
               {hasMeta && (
                 <dl className="grid grid-cols-2 gap-1.5 text-[10px]">
-                  {merrychefSummary && (
+                  {!tagged && merrychefSummary && (
                     <div className="flex items-center gap-1.5 text-cream/55">
                       <Flame className="h-3 w-3 text-amber-400" />
                       <span className="truncate">{merrychefSummary}</span>

@@ -3,23 +3,37 @@ import { ChefHat, Package, Loader2 } from 'lucide-react'
 import { useMenuData } from '../hooks/useMenuData'
 import { useMenuListEnrichment } from '../hooks/useMenuListEnrichment'
 import { useFeedbackCounts } from '../hooks/useRecipeFeedback'
-import { L1CookView } from './menu/components/L1CookView'
-import { L2AssemblerView } from './menu/components/L2AssemblerView'
+import {
+  RecipeStationPanel,
+  type RecipeStation,
+} from './menu/components/RecipeStationPanel'
 import { RecipeFeedbackPanel } from '../components/kitchen/RecipeFeedbackPanel'
-import { CategoryTabs } from '../components/menu/shared'
-import { TypeFilter, type TypeFilterValue } from '../components/menu/owner/TypeFilter'
+import type { TypeFilterValue } from '../components/menu/owner/TypeFilter'
 
-type StationTab = 'l1-cook' | 'l2-assembler'
-
-const STATION_TABS: { id: StationTab; label: string; icon: typeof ChefHat }[] = [
+const STATION_TABS: { id: RecipeStation; label: string; icon: typeof ChefHat }[] = [
   { id: 'l1-cook', label: 'L1 Kitchen', icon: ChefHat },
   { id: 'l2-assembler', label: 'L2 Assembly', icon: Package },
 ]
 
+// Sensible per-station defaults (match the owner's /menu views):
+//   L1 prep station → PF (заготовки), show All availability
+//   L2 assembly station → SALE (final dishes), Active-only
+function defaultType(station: RecipeStation): TypeFilterValue {
+  return station === 'l1-cook' ? 'PF' : 'SALE'
+}
+function defaultAvailable(station: RecipeStation): boolean | null {
+  return station === 'l1-cook' ? null : true
+}
+
+/**
+ * Cook-facing recipe stations (`/kitchen/recipes`, role: cook). Renders the same
+ * {@link RecipeStationPanel} as the owner's `/menu` L1/L2 views, but in
+ * `staffMode` — no cost/margin, read-only, with a per-dish feedback button.
+ */
 export function KitchenRecipesPage() {
   const {
     items,
-    categories,
+    categoriesById,
     subcategories,
     childrenByParent,
     isLoading,
@@ -30,52 +44,40 @@ export function KitchenRecipesPage() {
   const enrichment = useMenuListEnrichment(items, childrenByParent)
 
   // Station tab (L1 / L2)
-  const [tab, setTab] = useState<StationTab>('l1-cook')
+  const [station, setStation] = useState<RecipeStation>('l1-cook')
 
-  // Category nav
+  // Filters
+  const [typeFilter, setTypeFilter] = useState<TypeFilterValue>(defaultType('l1-cook'))
+  const [availableFilter, setAvailableFilter] = useState<boolean | null>(
+    defaultAvailable('l1-cook'),
+  )
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null)
 
-  // Type filter — L1 defaults to PF (заготовки), L2 defaults to SALE
-  const [typeFilter, setTypeFilter] = useState<TypeFilterValue>(
-    tab === 'l1-cook' ? 'PF' : 'SALE',
-  )
-
-  // Reset type filter to sensible default on tab switch
-  function handleTabChange(next: StationTab) {
-    setTab(next)
-    setTypeFilter(next === 'l1-cook' ? 'PF' : 'SALE')
+  // Reset filters to station-appropriate defaults on tab switch.
+  function handleStationChange(next: RecipeStation) {
+    setStation(next)
+    setTypeFilter(defaultType(next))
+    setAvailableFilter(defaultAvailable(next))
     setSelectedCategory(null)
     setSelectedSubcategory(null)
   }
-
-  // Feedback panel state
-  const [commentDishId, setCommentDishId] = useState<string | null>(null)
-
-  const commentDishName = useMemo(
-    () => (commentDishId ? (items.find((i) => i.id === commentDishId)?.name ?? '') : ''),
-    [commentDishId, items],
-  )
-
-  // Fetch comment counts for all visible items
-  const dishIds = useMemo(() => items.map((i) => i.id), [items])
-  const { counts: feedbackCounts, refetch: refetchCounts } = useFeedbackCounts(dishIds)
-
-  // Subcategories of the currently-selected section
-  const selectedSubcats = useMemo(
-    () =>
-      (selectedCategory ? subcategories.get(selectedCategory) ?? [] : []).map((s) => ({
-        id: s.id,
-        code: '',
-        name: s.name,
-      })),
-    [selectedCategory, subcategories],
-  )
 
   const handleCategorySelect = useCallback((id: string | null) => {
     setSelectedCategory(id)
     setSelectedSubcategory(null)
   }, [])
+
+  // Feedback panel state
+  const [commentDishId, setCommentDishId] = useState<string | null>(null)
+  const commentDishName = useMemo(
+    () => (commentDishId ? (items.find((i) => i.id === commentDishId)?.name ?? '') : ''),
+    [commentDishId, items],
+  )
+
+  // Fetch comment counts for all items
+  const dishIds = useMemo(() => items.map((i) => i.id), [items])
+  const { counts: feedbackCounts, refetch: refetchCounts } = useFeedbackCounts(dishIds)
 
   if (isLoading) {
     return (
@@ -101,10 +103,10 @@ export function KitchenRecipesPage() {
           <button
             key={id}
             type="button"
-            onClick={() => handleTabChange(id)}
+            onClick={() => handleStationChange(id)}
             className={[
               'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition',
-              tab === id
+              station === id
                 ? 'bg-surface-3 text-cream'
                 : 'text-cream/50 hover:bg-surface-2 hover:text-cream/75',
             ].join(' ')}
@@ -115,70 +117,27 @@ export function KitchenRecipesPage() {
         ))}
       </div>
 
-      {/* Type filter + category nav */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <TypeFilter value={typeFilter} onChange={setTypeFilter} />
-        </div>
-
-        {categories.length > 0 && (
-          <CategoryTabs
-            categories={categories.map((c) => ({
-              id: c.id,
-              code: c.code,
-              name: c.name,
-            }))}
-            selectedId={selectedCategory}
-            onSelect={handleCategorySelect}
-          />
-        )}
-
-        {selectedSubcats.length > 0 && (
-          <CategoryTabs
-            categories={selectedSubcats}
-            selectedId={selectedSubcategory}
-            onSelect={setSelectedSubcategory}
-            allLabel="All subcategories"
-          />
-        )}
-      </div>
-
-      {/* Recipe view */}
-      {tab === 'l1-cook' && (
-        <L1CookView
-          items={items}
-          typeFilter={typeFilter}
-          selectedCategory={selectedCategory}
-          selectedSubcategory={selectedSubcategory}
-          availableFilter={true}
-          pfPackCardById={enrichment.pfPackCardById}
-          recipeStatsById={enrichment.recipeStatsById}
-          dishCardById={enrichment.dishCardById}
-          childrenByParent={childrenByParent}
-          staffMode
-          feedbackCountById={feedbackCounts}
-          onComment={setCommentDishId}
-        />
-      )}
-
-      {tab === 'l2-assembler' && (
-        <L2AssemblerView
-          items={items}
-          typeFilter={typeFilter}
-          selectedCategory={selectedCategory}
-          selectedSubcategory={selectedSubcategory}
-          availableFilter={true}
-          dishCardById={enrichment.dishCardById}
-          componentsByDish={enrichment.componentsByDish}
-          recipeStepsByDish={enrichment.recipeStepsByDish}
-          modifierOptionsByDish={enrichment.modifierOptionsByDish}
-          packagingByDish={enrichment.packagingByDish}
-          onReorder={reorderItems}
-          staffMode
-          feedbackCountById={feedbackCounts}
-          onComment={setCommentDishId}
-        />
-      )}
+      {/* Shared station panel (cook mode) */}
+      <RecipeStationPanel
+        station={station}
+        items={items}
+        categoriesById={categoriesById}
+        subcategories={subcategories}
+        childrenByParent={childrenByParent}
+        enrichment={enrichment}
+        typeFilter={typeFilter}
+        onTypeFilter={setTypeFilter}
+        availableFilter={availableFilter}
+        onAvailableFilter={setAvailableFilter}
+        selectedCategory={selectedCategory}
+        onSelectCategory={handleCategorySelect}
+        selectedSubcategory={selectedSubcategory}
+        onSelectSubcategory={setSelectedSubcategory}
+        onReorder={reorderItems}
+        staffMode
+        feedbackCountById={feedbackCounts}
+        onComment={setCommentDishId}
+      />
 
       {/* Feedback panel (slide-in) */}
       {commentDishId && (
