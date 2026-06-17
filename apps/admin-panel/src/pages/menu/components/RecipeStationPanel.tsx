@@ -185,6 +185,7 @@ export function RecipeStationPanel({
           recipeStatsById={enrichment.recipeStatsById}
           dishCardById={enrichment.dishCardById}
           childrenByParent={childrenByParent}
+          recipeStepsByDish={enrichment.recipeStepsByDish}
           onOpenDish={onOpenDish}
           staffMode={staffMode}
           feedbackCountById={feedbackCountById}
