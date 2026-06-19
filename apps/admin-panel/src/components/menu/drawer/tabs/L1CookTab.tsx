@@ -103,7 +103,7 @@ function IngredientsBlock({
                       {badge.label}
                     </span>
                   )}
-                  <span className="truncate text-xs text-cream/80">{ing.name}</span>
+                  <span className="truncate text-xs text-cream/80">{ing.customer_short_name ?? ing.name}</span>
                 </div>
                 <div className="mt-1">
                   <span className="text-base font-semibold text-cream">{ing.quantity}</span>
