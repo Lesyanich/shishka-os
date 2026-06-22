@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import * as Sentry from '@sentry/react'
+import { isChunkLoadError, lazyWithReload, RELOAD_KEY } from './lib/lazyWithReload'
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { AppRoleProvider } from './contexts/AppRoleContext'
@@ -17,45 +18,45 @@ import { OpeningRoadmap } from './pages/OpeningRoadmap'
 import { StockSheetPage } from './pages/StockSheetPage'
 
 // Lazy — loaded on-demand per route
-const BOMHub = lazy(() => import('./pages/BOMHub').then(m => ({ default: m.BOMHub })))
-const KDSBoard = lazy(() => import('./pages/KDSBoard').then(m => ({ default: m.KDSBoard })))
-const CookStation = lazy(() => import('./pages/CookStation').then(m => ({ default: m.CookStation })))
-const WasteTracker = lazy(() => import('./pages/WasteTracker').then(m => ({ default: m.WasteTracker })))
-const Procurement = lazy(() => import('./pages/Procurement').then(m => ({ default: m.Procurement })))
-const ShoppingList = lazy(() => import('./pages/ShoppingList').then(m => ({ default: m.ShoppingList })))
-const SkuManagerPage = lazy(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
-const MasterPlanner = lazy(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
-const FinanceLayout = lazy(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
-const FinanceLedger = lazy(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
-const FinanceAnalytics = lazy(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
-const FinanceDashboard = lazy(() => import('./pages/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })))
-const ReceivingStation = lazy(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
-const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
-const ScheduleManager = lazy(() => import('./pages/ScheduleManager').then(m => ({ default: m.ScheduleManager })))
-const BatchPlanner = lazy(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
-const ProductionOrdersPage = lazy(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
-const ReceiptInbox = lazy(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
-const MissionControl = lazy(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
-const MenuPage = lazy(() => import('./pages/menu/MenuPage').then(m => ({ default: m.MenuPage })))
-const ModifiersPage = lazy(() => import('./pages/menu/ModifiersPage').then(m => ({ default: m.ModifiersPage })))
-const SaladBarPage = lazy(() => import('./pages/SaladBarPage').then(m => ({ default: m.SaladBarPage })))
-const BrainPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
-const BrainWikiPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainWikiPage })))
-const BrainDriveMapPage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainDriveMapPage })))
-const BrainExplorePage = lazy(() => import('./pages/brain').then(m => ({ default: m.BrainExplorePage })))
-const BrainKnowledgePage = lazy(() => import('./pages/brain/BrainKnowledgePage').then(m => ({ default: m.BrainKnowledgePage })))
-const ProductionTargets = lazy(() => import('./pages/ProductionTargets').then(m => ({ default: m.ProductionTargets })))
-const ApiCostPage = lazy(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
-const HRLayout = lazy(() => import('./pages/hr/HRLayout').then(m => ({ default: m.HRLayout })))
-const AttendancePage = lazy(() => import('./pages/hr/AttendancePage').then(m => ({ default: m.AttendancePage })))
-const PayrollPage = lazy(() => import('./pages/hr/PayrollPage').then(m => ({ default: m.PayrollPage })))
-const StaffPage = lazy(() => import('./pages/hr/StaffPage').then(m => ({ default: m.StaffPage })))
-const SchedulePage = lazy(() => import('./pages/hr/SchedulePage').then(m => ({ default: m.SchedulePage })))
-const StaffTasksPage = lazy(() => import('./pages/StaffTasksPage').then(m => ({ default: m.StaffTasksPage })))
-const CashierPage = lazy(() => import('./pages/cashier/CashierPage').then(m => ({ default: m.CashierPage })))
-const CookTasksPage = lazy(() => import('./pages/CookTasksPage').then(m => ({ default: m.CookTasksPage })))
-const KitchenLabels = lazy(() => import('./pages/KitchenLabels').then(m => ({ default: m.KitchenLabels })))
-const KitchenRecipesPage = lazy(() => import('./pages/KitchenRecipesPage').then(m => ({ default: m.KitchenRecipesPage })))
+const BOMHub = lazyWithReload(() => import('./pages/BOMHub').then(m => ({ default: m.BOMHub })))
+const KDSBoard = lazyWithReload(() => import('./pages/KDSBoard').then(m => ({ default: m.KDSBoard })))
+const CookStation = lazyWithReload(() => import('./pages/CookStation').then(m => ({ default: m.CookStation })))
+const WasteTracker = lazyWithReload(() => import('./pages/WasteTracker').then(m => ({ default: m.WasteTracker })))
+const Procurement = lazyWithReload(() => import('./pages/Procurement').then(m => ({ default: m.Procurement })))
+const ShoppingList = lazyWithReload(() => import('./pages/ShoppingList').then(m => ({ default: m.ShoppingList })))
+const SkuManagerPage = lazyWithReload(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
+const MasterPlanner = lazyWithReload(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
+const FinanceLayout = lazyWithReload(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
+const FinanceLedger = lazyWithReload(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
+const FinanceAnalytics = lazyWithReload(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
+const FinanceDashboard = lazyWithReload(() => import('./pages/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })))
+const ReceivingStation = lazyWithReload(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
+const Settings = lazyWithReload(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
+const ScheduleManager = lazyWithReload(() => import('./pages/ScheduleManager').then(m => ({ default: m.ScheduleManager })))
+const BatchPlanner = lazyWithReload(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
+const ProductionOrdersPage = lazyWithReload(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
+const ReceiptInbox = lazyWithReload(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
+const MissionControl = lazyWithReload(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
+const MenuPage = lazyWithReload(() => import('./pages/menu/MenuPage').then(m => ({ default: m.MenuPage })))
+const ModifiersPage = lazyWithReload(() => import('./pages/menu/ModifiersPage').then(m => ({ default: m.ModifiersPage })))
+const SaladBarPage = lazyWithReload(() => import('./pages/SaladBarPage').then(m => ({ default: m.SaladBarPage })))
+const BrainPage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
+const BrainWikiPage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainWikiPage })))
+const BrainDriveMapPage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainDriveMapPage })))
+const BrainExplorePage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainExplorePage })))
+const BrainKnowledgePage = lazyWithReload(() => import('./pages/brain/BrainKnowledgePage').then(m => ({ default: m.BrainKnowledgePage })))
+const ProductionTargets = lazyWithReload(() => import('./pages/ProductionTargets').then(m => ({ default: m.ProductionTargets })))
+const ApiCostPage = lazyWithReload(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
+const HRLayout = lazyWithReload(() => import('./pages/hr/HRLayout').then(m => ({ default: m.HRLayout })))
+const AttendancePage = lazyWithReload(() => import('./pages/hr/AttendancePage').then(m => ({ default: m.AttendancePage })))
+const PayrollPage = lazyWithReload(() => import('./pages/hr/PayrollPage').then(m => ({ default: m.PayrollPage })))
+const StaffPage = lazyWithReload(() => import('./pages/hr/StaffPage').then(m => ({ default: m.StaffPage })))
+const SchedulePage = lazyWithReload(() => import('./pages/hr/SchedulePage').then(m => ({ default: m.SchedulePage })))
+const StaffTasksPage = lazyWithReload(() => import('./pages/StaffTasksPage').then(m => ({ default: m.StaffTasksPage })))
+const CashierPage = lazyWithReload(() => import('./pages/cashier/CashierPage').then(m => ({ default: m.CashierPage })))
+const CookTasksPage = lazyWithReload(() => import('./pages/CookTasksPage').then(m => ({ default: m.CookTasksPage })))
+const KitchenLabels = lazyWithReload(() => import('./pages/KitchenLabels').then(m => ({ default: m.KitchenLabels })))
+const KitchenRecipesPage = lazyWithReload(() => import('./pages/KitchenRecipesPage').then(m => ({ default: m.KitchenRecipesPage })))
 
 function PageLoader() {
   return (
@@ -75,7 +76,15 @@ function NomenclatureRedirect() {
   return <Navigate to={`/menu/dish/${encodeURIComponent(productCode)}`} replace />
 }
 
-function FallbackError() {
+function FallbackError({ error }: { error: unknown }) {
+  // Defense-in-depth: if a stale-chunk error bubbled past the lazyWithReload
+  // catch (e.g. it surfaced during render rather than the import promise),
+  // recover with a single guarded reload instead of showing the error card.
+  if (isChunkLoadError(error) && !sessionStorage.getItem(RELOAD_KEY)) {
+    sessionStorage.setItem(RELOAD_KEY, String(performance.now()))
+    window.location.reload()
+    return <PageLoader />
+  }
   return (
     <div className="flex h-screen items-center justify-center bg-zinc-950 text-white">
       <div className="text-center space-y-4">
@@ -97,7 +106,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoleProvider>
-        <Sentry.ErrorBoundary fallback={FallbackError}>
+        <Sentry.ErrorBoundary fallback={({ error }) => <FallbackError error={error} />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             {/* Public staff stock-order sheet — no auth, PIN-gated server-side */}
