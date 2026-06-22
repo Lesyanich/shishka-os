@@ -21,6 +21,7 @@ import {
   formatLocalDate,
   shortTime,
 } from '../components/tasks/taskMeta'
+import { useTabParam } from '../hooks/useTabParam'
 
 type Tab = 'today' | 'all' | 'recurring' | 'team'
 type StationFilter = 'all' | 'L1' | 'L2' | 'mine'
@@ -68,7 +69,7 @@ export function KitchenTasksPage() {
       ),
   )
 
-  const [tab, setTab] = useState<Tab>('today')
+  const [tab, setTab] = useTabParam(['today', 'all', 'recurring', 'team'] as const, 'today')
   const [stationFilter, setStationFilter] = useState<StationFilter>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<StaffTask | null>(null)

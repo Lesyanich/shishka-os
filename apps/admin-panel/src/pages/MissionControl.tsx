@@ -14,6 +14,7 @@ import { QuickAddForm } from '../components/mission-control/QuickAddForm'
 import { KanbanBoard } from '../components/mission-control/KanbanBoard'
 import { TaskDetailPanel } from '../components/mission-control/TaskDetailPanel'
 import { DataHealthTab } from '../components/mission-control/DataHealthTab'
+import { useTabParam } from '../hooks/useTabParam'
 
 // ── Constants ──
 
@@ -29,7 +30,7 @@ export function MissionControl() {
   const isCEO = role === 'owner'
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [activeTab, setActiveTab] = useState<TopTab>('planning')
+  const [activeTab, setActiveTab] = useTabParam(['planning', 'kanban', 'data-health'] as const, 'planning')
   const [segment, setSegment] = useState<Segment>('team')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [selectedTask, setSelectedTask] = useState<BusinessTask | null>(null)
@@ -66,13 +67,16 @@ export function MissionControl() {
 
   const handleUpdateTask = async (id: string, updates: Partial<BusinessTask>): Promise<boolean> => {
     const ok = await updateTask(id, updates)
-    if (ok) { setSelectedTask(null); setSearchParams({}, { replace: true }) }
+    if (ok) {
+      setSelectedTask(null)
+      setSearchParams((prev) => { const p = new URLSearchParams(prev); p.delete('taskId'); return p }, { replace: true })
+    }
     return ok
   }
 
   const handleOpenDetail = (task: BusinessTask) => {
     setSelectedTask(task)
-    setSearchParams({ taskId: task.id }, { replace: true })
+    setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('taskId', task.id); return p }, { replace: true })
   }
 
   // ── Derived data ──
@@ -293,7 +297,7 @@ export function MissionControl() {
       {selectedTask && (
         <TaskDetailPanel
           task={selectedTask}
-          onClose={() => { setSelectedTask(null); setSearchParams({}, { replace: true }) }}
+          onClose={() => { setSelectedTask(null); setSearchParams((prev) => { const p = new URLSearchParams(prev); p.delete('taskId'); return p }, { replace: true }) }}
           onUpdate={handleUpdateTask}
         />
       )}
