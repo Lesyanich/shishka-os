@@ -59,11 +59,13 @@ export interface PrepLabelData {
   /** Optional human batch code shown at the bottom; falls back to productCode. */
   batchCode?: string | null
   /**
-   * SALE consumer-label extras. When either is set, a consumer layout is used
-   * (name + nutrition + ingredients + dates) instead of the storage layout.
+   * SALE consumer-label extras. When any is set, a consumer layout is used
+   * (name + price + nutrition + ingredients + dates) instead of the storage one.
    */
   nutrition?: LabelNutrition | null
   ingredients?: string | null
+  /** Preformatted price, e.g. "฿111". Shown top-right on the consumer label. */
+  price?: string | null
 }
 
 /** "343 kcal · P14 · F18 · C36" for the canvas (image) label. */
@@ -174,8 +176,8 @@ export function renderPrepLabel(
   ctx.fillStyle = '#000000'
   ctx.textBaseline = 'top'
 
-  // SALE consumer label: name + nutrition + ingredients + dates.
-  if (data.nutrition || data.ingredients) {
+  // SALE consumer label: name + price + nutrition + ingredients + dates.
+  if (data.nutrition || data.ingredients || data.price) {
     drawSaleLabel(ctx, data, wPx, hPx, s)
     return canvas.toDataURL('image/png')
   }
@@ -267,14 +269,21 @@ function drawSaleLabel(
   const useByY = batchY - F(22) - 4 * s
   const prepY = useByY - F(20) - 2 * s
 
-  // ── Name (bold, up to 2 lines, auto-shrink) ──
+  // ── Price (bold, top-right) — reserve its width so the name doesn't collide ──
+  let priceW = 0
+  if (data.price) {
+    ctx.font = `800 ${F(30)}px sans-serif`
+    priceW = ctx.measureText(data.price).width + 8 * s
+  }
+
+  // ── Name (bold, up to 2 lines, auto-shrink), left of the price ──
   const { size: nameSize, lines } = fitText(
     ctx,
     data.name.toUpperCase(),
-    maxW,
+    maxW - priceW,
     2,
-    Math.round(38 * s),
-    Math.round(22 * s),
+    Math.round(34 * s),
+    Math.round(20 * s),
     '800',
   )
   ctx.font = `800 ${nameSize}px sans-serif`
@@ -282,6 +291,12 @@ function drawSaleLabel(
   for (const line of lines) {
     ctx.fillText(line, PAD, y)
     y += nameSize + 4 * s
+  }
+  if (data.price) {
+    ctx.font = `800 ${F(30)}px sans-serif`
+    ctx.textAlign = 'right'
+    ctx.fillText(data.price, wPx - PAD, 14 * s)
+    ctx.textAlign = 'left'
   }
   y += 4 * s
 

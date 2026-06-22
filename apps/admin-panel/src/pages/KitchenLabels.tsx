@@ -436,9 +436,10 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const { batches, create, remove } = usePrepBatches(item.id)
   const unit = item.base_unit ?? 'kg'
 
-  // SALE dishes are fixed portions — default to one portion so the cook doesn't
-  // have to type it (and won't mistake the pcs count for a kg/gram weight).
-  const [qty, setQty] = useState(isSale ? '1' : '')
+  // Two inputs: per-label weight (grams) + number of labels to print. SALE
+  // portions are fixed, so the weight auto-fills from portion_size below.
+  const [grams, setGrams] = useState('')
+  const [count, setCount] = useState('1')
   const [days, setDays] = useState('')
   const [printing, setPrinting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -494,35 +495,51 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
     if (item.shelfLifeDays != null) setDays(String(item.shelfLifeDays))
   }, [item.shelfLifeDays])
 
-  const qtyNum = qty.trim() === '' ? null : Number(qty)
-  const qtyValid = qtyNum != null && Number.isFinite(qtyNum) && qtyNum > 0
+  // SALE portions are fixed — auto-fill the per-label weight from portion_size.
+  useEffect(() => {
+    if (isSale && saleInfo?.portionSize != null) setGrams(String(saleInfo.portionSize))
+  }, [isSale, saleInfo])
+
+  const hasPortion = isSale && saleInfo?.portionSize != null && !!saleInfo.portionUnit
+  const portionUnit = saleInfo?.portionUnit ?? 'g'
+
+  const gramsNum = grams.trim() === '' ? null : Number(grams)
+  const gramsValid = gramsNum != null && Number.isFinite(gramsNum) && gramsNum > 0
+  const countNum = count.trim() === '' ? null : Number(count)
+  const countValid = countNum != null && Number.isInteger(countNum) && countNum >= 1 && countNum <= 50
   const daysNum = days.trim() === '' ? null : Number(days)
   const daysValid = daysNum != null && Number.isInteger(daysNum) && daysNum > 0 && daysNum <= 365
 
   const useBy = daysValid ? addDays(new Date(), daysNum) : null
   const useByLabel = useBy ? shortDate(useBy) : '—'
 
-  // SALE labels show the physical portion weight (portion_size × qty), not the
-  // raw pcs count; PF labels show the entered amount in its base unit.
-  const hasPortion = isSale && saleInfo?.portionSize != null && !!saleInfo.portionUnit
-  function weightLabelFor(amount: number): string {
-    if (hasPortion && saleInfo) {
-      return `${Math.round(saleInfo.portionSize! * amount)} ${saleInfo.portionUnit}`
-    }
-    return `${amount} ${unit}`
+  // What a batch row stores in its base_unit: a mass (kg) base keeps kilograms;
+  // a pcs/portion base counts one portion per label.
+  const batchWeight = unit === 'kg' && gramsNum != null ? gramsNum / 1000 : 1
+
+  function formatGrams(g: number): string {
+    return g >= 1000 ? `${(g / 1000).toFixed(g % 1000 === 0 ? 0 : 2)} kg` : `${Math.round(g)} g`
+  }
+  // Per-label weight string for a recorded batch: SALE = the fixed portion,
+  // mass base = stored kg → g, otherwise the raw amount in its base unit.
+  function weightLabelFor(b: PrepBatch): string {
+    if (hasPortion && saleInfo?.portionSize != null) return formatGrams(saleInfo.portionSize)
+    if (unit === 'kg') return formatGrams(b.weight * 1000)
+    return `${b.weight} ${unit}`
   }
 
-  // Preview the consumer-label nutrition for the entered qty (defaults to 1).
-  const previewQty = qtyValid && qtyNum != null ? qtyNum : 1
-  const saleNutritionPreview = isSale ? saleNutritionFor(saleInfo, previewQty) : null
-  const showSaleExtras = isSale && !!saleInfo && (saleNutritionPreview != null || !!saleInfo.ingredients)
+  // One label = one portion → per-portion КБЖУ (not scaled by count) + price.
+  const saleNutrition = isSale ? saleNutritionFor(saleInfo, 1) : null
+  const priceLabel = isSale && saleInfo?.price != null ? `฿${saleInfo.price}` : null
+  const showSaleExtras =
+    isSale && !!saleInfo && (saleNutrition != null || !!saleInfo.ingredients || priceLabel != null)
 
-  const canPrint = qtyValid && daysValid && !!locationId && !printing
+  const canPrint = gramsValid && countValid && daysValid && !!locationId && !printing
 
   async function printBatch(b: PrepBatch) {
-    // SALE dishes get a consumer label: per-portion КБЖУ (× the batch qty) +
-    // состав. PF preps print the plain storage label (extras stay undefined).
-    const nutrition = isSale ? saleNutritionFor(saleInfo, b.weight) : null
+    // SALE dishes get a consumer label: per-portion КБЖУ + состав + price. PF
+    // preps print the plain storage label (extras stay undefined).
+    const nutrition = saleNutrition
     const ingredients = isSale ? saleInfo?.ingredients ?? null : null
 
     // Bluetooth fallback: RawBT can only rasterize a PNG (ESC/POS) — may drift.
@@ -533,11 +550,12 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           productCode: item.product_code,
           prepDate: new Date(b.produced_at),
           shelfLifeDays: shelfDaysOf(b),
-          weight: weightLabelFor(b.weight),
+          weight: weightLabelFor(b),
           qr: b.barcode,
           batchCode: b.batch_code ?? b.barcode,
           nutrition,
           ingredients,
+          price: priceLabel,
         },
         size,
         true, // launch RawBT via intent each job
@@ -552,11 +570,12 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           name: item.name,
           prepDate: new Date(b.produced_at),
           shelfLifeDays: shelfDaysOf(b),
-          weight: weightLabelFor(b.weight),
+          weight: weightLabelFor(b),
           qr: b.barcode,
           batchCode: b.batch_code ?? b.barcode,
           nutrition,
           ingredients,
+          price: priceLabel,
         },
         size,
       ),
@@ -575,47 +594,35 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
     }
   }
 
-  async function handlePrint() {
-    if (!canPrint || qtyNum == null || daysNum == null) return
+  // Make `count` batches in one run — each its own row + unique code/QR — and
+  // optionally print each. `count` > 1 adds a "-N" suffix so codes stay unique.
+  async function runBatches(print: boolean) {
+    if (!canPrint || daysNum == null || countNum == null) return
     setPrinting(true)
     setActionError(null)
-    const res = await create({
-      nomenclatureId: item.id,
-      productCode: item.product_code,
-      weight: qtyNum,
-      shelfLifeDays: daysNum,
-      locationId,
-      producedBy: staffId,
-    })
-    setPrinting(false)
-    if (!res.ok || !res.batch) {
-      setActionError(res.error ?? 'Could not record batch')
-      return
+    const multi = countNum > 1
+    for (let i = 1; i <= countNum; i++) {
+      const res = await create({
+        nomenclatureId: item.id,
+        productCode: item.product_code,
+        weight: batchWeight,
+        shelfLifeDays: daysNum,
+        locationId,
+        producedBy: staffId,
+        seq: multi ? i : undefined,
+      })
+      if (!res.ok || !res.batch) {
+        setPrinting(false)
+        setActionError(res.error ?? 'Could not record batch')
+        return
+      }
+      if (print) await printBatch(res.batch)
     }
-    await printBatch(res.batch)
-    setQty('')
+    setPrinting(false)
   }
 
-  // Record a batch WITHOUT printing — it lands in the list below; print later.
-  async function handleAddBatch() {
-    if (!canPrint || qtyNum == null || daysNum == null) return
-    setPrinting(true)
-    setActionError(null)
-    const res = await create({
-      nomenclatureId: item.id,
-      productCode: item.product_code,
-      weight: qtyNum,
-      shelfLifeDays: daysNum,
-      locationId,
-      producedBy: staffId,
-    })
-    setPrinting(false)
-    if (!res.ok) {
-      setActionError(res.error ?? 'Could not record batch')
-      return
-    }
-    setQty('')
-  }
+  const handlePrint = () => runBatches(true)
+  const handleAddBatch = () => runBatches(false)
 
   async function handleDelete(b: PrepBatch) {
     setActionError(null)
@@ -639,26 +646,52 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       </div>
 
       <div className="space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
-        {/* Weight / volume (SALE: portions, with the resolved gram weight) */}
+        {/* Per-label weight — SALE auto-fills from portion size (one per label) */}
         <label className="block">
           <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-            {isSale ? 'Portions' : `Quantity (${unit})`}
+            Weight per label
           </span>
           <div className="flex items-center gap-2">
             <input
               type="number"
               inputMode="decimal"
-              min={isSale ? 1 : 0}
-              step={isSale ? '1' : '0.1'}
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              placeholder={isSale ? '1' : 'e.g. 1.5'}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-lg text-slate-100 outline-none focus:border-amber-500/60"
+              min={0}
+              step="1"
+              value={grams}
+              onChange={(e) => setGrams(e.target.value)}
+              readOnly={hasPortion}
+              placeholder="e.g. 100"
+              className={`w-full rounded-xl border px-3 py-3 text-lg outline-none ${
+                hasPortion
+                  ? 'border-slate-800 bg-slate-900 text-slate-300'
+                  : 'border-slate-700 bg-slate-950 text-slate-100 focus:border-amber-500/60'
+              }`}
             />
-            <span className="whitespace-nowrap text-base text-slate-400">
-              {hasPortion && qtyValid && qtyNum != null ? `= ${weightLabelFor(qtyNum)}` : unit}
-            </span>
+            <span className="whitespace-nowrap text-base text-slate-400">{hasPortion ? portionUnit : 'g'}</span>
           </div>
+          {hasPortion && (
+            <span className="mt-1 block text-[11px] text-slate-500">
+              Auto from portion size — one portion per label
+            </span>
+          )}
+        </label>
+
+        {/* How many labels to print (each is its own batch + QR) */}
+        <label className="block">
+          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
+            Labels to print
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={50}
+            step="1"
+            value={count}
+            onChange={(e) => setCount(e.target.value)}
+            placeholder="1"
+            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-lg text-slate-100 outline-none focus:border-amber-500/60"
+          />
         </label>
 
         {/* Shelf life */}
@@ -684,22 +717,24 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           <span className="text-base font-semibold text-slate-100">{useByLabel}</span>
         </div>
 
-        {/* SALE consumer-label preview: per-portion КБЖУ + состав */}
+        {/* SALE consumer-label preview: price + per-portion КБЖУ + состав */}
         {showSaleExtras && saleInfo && (
           <div className="space-y-1.5 rounded-xl border border-emerald-800/40 bg-emerald-950/20 px-3 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300/80">
-              Sale label also prints
-            </p>
-            {saleNutritionPreview ? (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300/80">
+                Sale label also prints
+              </p>
+              {priceLabel && <p className="text-base font-semibold text-slate-100">{priceLabel}</p>}
+            </div>
+            {saleNutrition ? (
               <p className="text-sm text-slate-200">
-                {Math.round(saleNutritionPreview.kcal)} kcal · P
-                {Math.round(saleNutritionPreview.protein)} · F{Math.round(saleNutritionPreview.fat)} · C
-                {Math.round(saleNutritionPreview.carbs)}
-                <span className="ml-1.5 text-[11px] text-slate-500">
-                  {qtyValid && qtyNum != null && qtyNum !== 1
-                    ? `for ${qtyNum} portions${hasPortion ? ` (${weightLabelFor(qtyNum)})` : ''}`
-                    : `per portion${hasPortion ? ` (${weightLabelFor(1)})` : ''}`}
-                </span>
+                {Math.round(saleNutrition.kcal)} kcal · P{Math.round(saleNutrition.protein)} · F
+                {Math.round(saleNutrition.fat)} · C{Math.round(saleNutrition.carbs)}
+                {hasPortion && saleInfo.portionSize != null && (
+                  <span className="ml-1.5 text-[11px] text-slate-500">
+                    per portion ({formatGrams(saleInfo.portionSize)})
+                  </span>
+                )}
               </p>
             ) : (
               <p className="text-xs text-amber-400/80">No КБЖУ set on this dish.</p>
@@ -793,7 +828,9 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3.5 text-base font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {printing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />}
-          Print &amp; record batch
+          {countValid && countNum != null && countNum > 1
+            ? `Print ${countNum} labels`
+            : 'Print & record batch'}
         </button>
 
         <button
@@ -802,7 +839,10 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           disabled={!canPrint}
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-600 py-3 text-sm font-medium text-slate-200 transition hover:border-amber-500/50 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <Plus className="h-4 w-4" /> Add batch (no print)
+          <Plus className="h-4 w-4" />
+          {countValid && countNum != null && countNum > 1
+            ? `Add ${countNum} batches (no print)`
+            : 'Add batch (no print)'}
         </button>
 
         <p className="text-center text-[11px] text-slate-500">

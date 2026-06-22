@@ -30,6 +30,8 @@ export interface TsplLabelData {
   /** SALE consumer-label extras — when set, the consumer layout is used. */
   nutrition?: LabelNutrition | null
   ingredients?: string | null
+  /** Preformatted price, e.g. "฿111". Shown top-right on the consumer label. */
+  price?: string | null
 }
 
 /** Drop non-ASCII so the printer's default codepage doesn't render garbage. */
@@ -115,11 +117,16 @@ export function renderPrepLabelTSPL(
   // Scale vs the proven 60×40 baseline (480×320). min() keeps within both axes.
   const s = Math.min(wDots / 480, hDots / 320)
 
-  // SALE consumer label: name + per-portion nutrition + ingredients + QR + dates.
-  if (data.nutrition || data.ingredients) {
+  // SALE consumer label: name + price + per-portion nutrition + ingredients + QR + dates.
+  if (data.nutrition || data.ingredients || data.price) {
     const PAD = 24
     const usable = wDots - PAD * 2
-    const charsName = Math.max(8, Math.floor(usable / 16)) // font "3" ≈ 16 dots/char
+    // Price top-right (ASCII "THB 111" — the printer codepage has no ฿ glyph).
+    const priceTxt = data.price ? ascii(data.price.replace(/฿/g, 'THB ')) : ''
+    const priceW = priceTxt.length * 24 // font "4" ≈ 24 dots/char
+    const priceX = priceTxt ? Math.max(PAD, wDots - PAD - priceW) : wDots - PAD
+    const nameRight = priceTxt ? priceX - 12 : wDots - PAD
+    const charsName = Math.max(8, Math.floor((nameRight - PAD) / 16)) // font "3" ≈ 16 dots/char
 
     // QR (batch barcode) sits bottom-right; ingredients wrap to clear its column.
     const qrCell = Math.max(3, Math.round(4 * s))
@@ -137,6 +144,7 @@ export function renderPrepLabelTSPL(
     let y = 12
     const [n1, n2] = wrapName(data.name.toUpperCase(), charsName, charsName + 6)
     cmds.push(`TEXT ${PAD},${y},"3",0,1,1,"${esc(ascii(n1))}"`)
+    if (priceTxt) cmds.push(`TEXT ${priceX},12,"4",0,1,1,"${esc(priceTxt)}"`)
     y += FONT_H['3'] + 8
     if (n2) {
       cmds.push(`TEXT ${PAD},${y},"2",0,1,1,"${esc(ascii(n2))}"`)

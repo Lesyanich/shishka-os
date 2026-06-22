@@ -22,21 +22,24 @@ export interface CreatePrepBatchInput {
   shelfLifeDays: number
   locationId: string
   producedBy: string | null
+  /** Sequence suffix for multi-label runs, so each bag gets a unique code/QR. */
+  seq?: number
 }
 
 const SELECT =
   'id, nomenclature_id, barcode, batch_code, weight, location_id, produced_at, expires_at, status'
 
-/** Human + scannable batch code, e.g. "HUMMUS-260614-143022". */
-function genBatchCode(productCode: string): string {
+/** Human + scannable batch code, e.g. "HUMMUS-260614-143022" (+"-2" for run #2). */
+function genBatchCode(productCode: string, seq?: number): string {
   const prefix =
-    productCode.replace(/^PF-/, '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase() ||
+    productCode.replace(/^(PF|SALE|MOD|RAW)-/, '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase() ||
     'BATCH'
   const d = new Date()
   const p = (n: number) => String(n).padStart(2, '0')
   const date = `${String(d.getFullYear()).slice(-2)}${p(d.getMonth() + 1)}${p(d.getDate())}`
   const time = `${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
-  return `${prefix}-${date}-${time}`
+  const suffix = seq != null ? `-${seq}` : ''
+  return `${prefix}-${date}-${time}${suffix}`
 }
 
 /**
@@ -72,7 +75,7 @@ export function usePrepBatches(nomenclatureId: string | null) {
 
   const create = useCallback(
     async (input: CreatePrepBatchInput): Promise<{ ok: boolean; batch?: PrepBatch; error?: string }> => {
-      const code = genBatchCode(input.productCode)
+      const code = genBatchCode(input.productCode, input.seq)
       const { data, error: err } = await supabase
         .from('inventory_batches')
         .insert({
