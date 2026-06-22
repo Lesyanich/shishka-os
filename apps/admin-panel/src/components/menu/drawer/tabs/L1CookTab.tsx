@@ -213,7 +213,7 @@ function StepCard({ step }: { step: DishRecipeStep }) {
   )
 }
 
-function StorageBlock({ card }: { card: PfPackCardData }) {
+function StorageBlock({ card, item }: { card: PfPackCardData; item: MenuItem }) {
   const tempRange =
     card.storage_temp_min_c != null && card.storage_temp_max_c != null
       ? `${card.storage_temp_min_c}..${card.storage_temp_max_c}°C`
@@ -232,9 +232,9 @@ function StorageBlock({ card }: { card: PfPackCardData }) {
             <Snowflake className="h-3 w-3 text-sky-400" /> {tempRange}
           </span>
         )}
-        {card.shelf_life_days != null && (
+        {item.shelf_life_days != null && (
           <span className="inline-flex items-center gap-1.5 rounded-lg border border-surface-3 bg-surface-2/60 px-3 py-1.5 text-xs text-cream/70">
-            <Clock className="h-3 w-3 text-cream/40" /> {card.shelf_life_days}d shelf
+            <Clock className="h-3 w-3 text-cream/40" /> {item.shelf_life_days}d shelf
           </span>
         )}
         {card.vacuum_bag_size && (
@@ -395,10 +395,10 @@ export function L1CookTab({
       </section>
 
       {/* Storage (PF only) */}
-      {pfPackCard && <StorageBlock card={pfPackCard} />}
+      {pfPackCard && <StorageBlock card={pfPackCard} item={item} />}
 
       {/* Storage label — shelf-life editor + RawBT print (PF only) */}
-      {item.kind === 'PF' && <PrepLabelBlock item={item} card={pfPackCard} />}
+      {item.kind === 'PF' && <PrepLabelBlock item={item} />}
 
       {/* L2 Assembly (SALE only) */}
       {dishCard && <L2AssemblyBlock card={dishCard} item={item} />}

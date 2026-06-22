@@ -14,6 +14,9 @@ export interface PrepItem {
   kind: PrepItemKind
   /** `is_available` — drives the "Active only" default filter. */
   isAvailable: boolean
+  /** Shelf life in days from nomenclature (single source of truth, mig 307) —
+   * prefills the label's use-by; same value drives batch expiry. */
+  shelfLifeDays: number | null
   categoryId: string | null
   /** Leaf category name (with emoji), used as the section header. */
   categoryName: string | null
@@ -28,6 +31,7 @@ interface RawItemRow {
   product_code: string
   base_unit: string | null
   is_available: boolean | null
+  shelf_life_days: number | null
   category_id: string | null
   category: {
     name: string | null
@@ -59,7 +63,7 @@ export function usePrepLabelItems() {
     supabase
       .from('nomenclature')
       .select(
-        'id, name, product_code, base_unit, is_available, category_id, category:category_id(name, sort_order, parent:parent_id(sort_order))',
+        'id, name, product_code, base_unit, is_available, shelf_life_days, category_id, category:category_id(name, sort_order, parent:parent_id(sort_order))',
       )
       .or('product_code.like.PF-%,product_code.like.SALE-%')
       .not('is_deleted', 'is', true)
@@ -83,6 +87,7 @@ export function usePrepLabelItems() {
             base_unit: row.base_unit,
             kind: row.product_code.startsWith('SALE-') ? 'SALE' : 'PF',
             isAvailable: row.is_available ?? false,
+            shelfLifeDays: row.shelf_life_days ?? null,
             categoryId: row.category_id,
             categoryName: cat?.name ?? null,
             categorySort: parentSort * 1000 + ownSort,

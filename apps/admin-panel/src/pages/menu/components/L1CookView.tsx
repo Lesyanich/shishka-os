@@ -254,10 +254,10 @@ function PfCard({ item, card, stats, onOpen, staffMode, feedbackCount, onComment
             <span className="truncate">{packInfo}</span>
           </div>
         )}
-        {card?.shelf_life_days != null && (
+        {item.shelf_life_days != null && (
           <div className="flex items-center gap-1.5 text-cream/65">
             <Clock className="h-3 w-3 text-cream/40" />
-            <span>{card.shelf_life_days} d shelf</span>
+            <span>{item.shelf_life_days} d shelf</span>
           </div>
         )}
         {tempRange && (

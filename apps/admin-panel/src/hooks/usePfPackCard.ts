@@ -11,7 +11,6 @@ export interface PfPackCardData {
   fill_weight_per_bag_g: number | null
   portions_per_bag: number | null
   label_template: { fields: string[] } | null
-  shelf_life_days: number | null
   storage_zone: string | null
   storage_temp_min_c: number | null
   storage_temp_max_c: number | null
