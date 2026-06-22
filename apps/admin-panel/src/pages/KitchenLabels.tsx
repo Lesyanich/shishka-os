@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Search,
   ChevronLeft,
@@ -85,10 +86,35 @@ function KindBadge({ kind }: { kind: PrepItemKind }) {
  */
 export function KitchenLabels() {
   const { items, isLoading, error } = usePrepLabelItems()
-  const [view, setView] = useState<'items' | 'log'>('items')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<KindFilter>('all')
-  const [selected, setSelected] = useState<PrepItem | null>(null)
+
+  // Selection + view live in the URL so the link reflects the open item, the
+  // back button works, and a label page can be deep-linked / refreshed.
+  const itemCode = searchParams.get('item')
+  const view: 'items' | 'log' = searchParams.get('view') === 'log' ? 'log' : 'items'
+  const selected = useMemo(
+    () => (itemCode ? items.find((i) => i.product_code === itemCode) ?? null : null),
+    [items, itemCode],
+  )
+
+  function openItem(it: PrepItem) {
+    const next = new URLSearchParams(searchParams)
+    next.set('item', it.product_code)
+    setSearchParams(next)
+  }
+  function closeItem() {
+    const next = new URLSearchParams(searchParams)
+    next.delete('item')
+    setSearchParams(next)
+  }
+  function setView(v: 'items' | 'log') {
+    const next = new URLSearchParams(searchParams)
+    if (v === 'log') next.set('view', 'log')
+    else next.delete('view')
+    setSearchParams(next, { replace: true })
+  }
 
   const counts = useMemo(
     () => ({
@@ -112,7 +138,19 @@ export function KitchenLabels() {
   }, [items, query, kind])
 
   if (selected) {
-    return <LabelEditor item={selected} onBack={() => setSelected(null)} />
+    return <LabelEditor item={selected} onBack={closeItem} />
+  }
+
+  // Deep link to ?item=… while the list is still loading: hold for resolution
+  // rather than flashing the picker.
+  if (itemCode && isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl p-4">
+        <div className="flex items-center justify-center py-20 text-slate-500">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading…
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -149,7 +187,7 @@ export function KitchenLabels() {
       </div>
 
       {view === 'log' ? (
-        <AllBatchesLog onOpen={setSelected} />
+        <AllBatchesLog onOpen={openItem} />
       ) : (
         <>
           <div className="relative mb-3">
@@ -205,7 +243,7 @@ export function KitchenLabels() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setSelected(item)}
+                onClick={() => openItem(item)}
                 className="flex flex-col items-start gap-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-left transition hover:border-amber-500/50 hover:bg-slate-800"
               >
                 <div className="flex w-full items-center justify-between gap-2">
