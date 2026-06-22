@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useOptimistic, useRef, useState, startTransition } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Plus, RefreshCw, CalendarDays, ListTodo, Repeat, Users, Send,
 } from 'lucide-react'
@@ -115,6 +116,7 @@ export function KitchenTasksPage() {
       ),
   )
 
+  const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState<Tab>('today')
   const [stationFilter, setStationFilter] = useState<StationFilter>('all')
   const [personFilter, setPersonFilter] = useState<string>('all') // 'all' | 'unassigned' | staffId
@@ -162,14 +164,47 @@ export function KitchenTasksPage() {
     materializeToday()
   }, [materializeToday])
 
+  // Each task gets a shareable URL via ?task=<id>. Opening that URL opens the
+  // task; opening/closing the modal keeps the URL in sync.
+  const syncTaskParam = (id: string | null) => {
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev)
+        if (id) p.set('task', id)
+        else p.delete('task')
+        return p
+      },
+      { replace: true },
+    )
+  }
+
+  const openTask = (task: StaffTask) => {
+    setEditing(task)
+    setModalOpen(true)
+    syncTaskParam(task.id)
+  }
   const openNew = () => {
     setEditing(null)
     setModalOpen(true)
+    syncTaskParam(null)
   }
-  const openEdit = (task: StaffTask) => {
-    setEditing(task)
-    setModalOpen(true)
+  const closeModal = () => {
+    setModalOpen(false)
+    setEditing(null)
+    syncTaskParam(null)
   }
+
+  // Open a task from a shared ?task=<id> link once the data is loaded.
+  const taskParam = searchParams.get('task')
+  useEffect(() => {
+    if (!taskParam || modalOpen) return
+    const found = [...tasks, ...templates].find((t) => t.id === taskParam)
+    if (found) {
+      setEditing(found)
+      setModalOpen(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskParam, tasks, templates])
 
   const pushToTelegram = async (taskId: string): Promise<{ ok: boolean; error?: string }> => {
     const { data, error } = await supabase.functions.invoke(
@@ -196,8 +231,7 @@ export function KitchenTasksPage() {
         }
       }
     }
-    setModalOpen(false)
-    setEditing(null)
+    closeModal()
   }
 
   const handlePush = async (task: StaffTask) => {
@@ -427,8 +461,9 @@ export function KitchenTasksPage() {
                     <TaskRow
                       key={t.id}
                       task={t}
+                      onOpen={openTask}
                       onToggleDone={toggleDone}
-                      onEdit={openEdit}
+                      onEdit={openTask}
                       onDelete={handleDelete}
                       onPhotosChange={handlePhotosChange}
                       onPush={isManager ? handlePush : undefined}
@@ -469,8 +504,9 @@ export function KitchenTasksPage() {
                   key={t.id}
                   task={t}
                   showDate
+                  onOpen={openTask}
                   onToggleDone={toggleDone}
-                  onEdit={openEdit}
+                  onEdit={openTask}
                   onDelete={handleDelete}
                   onPhotosChange={handlePhotosChange}
                   onPush={isManager ? handlePush : undefined}
@@ -490,7 +526,7 @@ export function KitchenTasksPage() {
             </p>
           ) : (
             filteredTemplates.map((t) => (
-              <TaskRow key={t.id} task={t} onEdit={openEdit} onDelete={handleDelete} />
+              <TaskRow key={t.id} task={t} onOpen={openTask} onEdit={openTask} onDelete={handleDelete} />
             ))
           )}
           {filteredTemplates.length > 0 && (
@@ -504,16 +540,17 @@ export function KitchenTasksPage() {
       {/* ── TELEGRAM (managers) ── */}
       {tab === 'team' && isManager && <TelegramLinkPanel staff={activeStaff} />}
 
-      <TaskFormModal
-        open={modalOpen}
-        initial={editing}
-        staff={activeStaff}
-        onClose={() => {
-          setModalOpen(false)
-          setEditing(null)
-        }}
-        onSubmit={handleSubmit}
-      />
+      {/* Mounted only while open so the form re-reads `initial` each time it
+          opens (a persistently-mounted modal keeps stale empty state). */}
+      {modalOpen && (
+        <TaskFormModal
+          open
+          initial={editing}
+          staff={activeStaff}
+          onClose={closeModal}
+          onSubmit={handleSubmit}
+        />
+      )}
     </div>
   )
 }
