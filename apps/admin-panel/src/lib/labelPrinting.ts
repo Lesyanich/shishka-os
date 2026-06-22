@@ -257,6 +257,11 @@ function drawSaleLabel(
   const F = (n: number) => Math.round(n * s)
   const maxW = wPx - PAD * 2
 
+  // QR (batch barcode) sits bottom-right; ingredients wrap to clear its column.
+  const qrPx = data.qr ? Math.round(Math.min(118 * s, wPx * 0.3, hPx * 0.4)) : 0
+  const qrX = wPx - qrPx - PAD
+  const ingrMaxW = data.qr ? qrX - 8 * s - PAD : maxW
+
   // Footer rows pinned to the bottom (computed first so ingredients can fill up to them).
   const batchY = hPx - F(16) - 6 * s
   const useByY = batchY - F(22) - 4 * s
@@ -306,12 +311,12 @@ function drawSaleLabel(
     const isize = F(19)
     ctx.font = `400 ${isize}px sans-serif`
     const lineH = isize + 3 * s
-    const allLines = wrapToWidth(ctx, data.ingredients, maxW)
+    const allLines = wrapToWidth(ctx, data.ingredients, ingrMaxW)
     const maxLines = Math.max(1, Math.floor((prepY - 4 * s - y) / lineH))
     const shown = allLines.slice(0, maxLines)
     if (allLines.length > maxLines && shown.length > 0) {
       let last = shown[shown.length - 1]
-      while (last.length > 1 && ctx.measureText(`${last}…`).width > maxW) {
+      while (last.length > 1 && ctx.measureText(`${last}…`).width > ingrMaxW) {
         last = last.slice(0, -1)
       }
       shown[shown.length - 1] = `${last}…`
@@ -333,6 +338,11 @@ function drawSaleLabel(
 
   ctx.font = `400 ${F(16)}px monospace`
   ctx.fillText(data.batchCode ?? data.productCode, PAD, batchY)
+
+  // ── QR (batch barcode), bottom-right ──
+  if (data.qr && qrPx > 0) {
+    drawQr(ctx, data.qr, qrX, hPx - qrPx - 6 * s, qrPx)
+  }
 }
 
 /** Draw a QR code for `text` as black modules at (x, y) within a `box` px square. */

@@ -438,7 +438,9 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const { batches, create, remove } = usePrepBatches(item.id)
   const unit = item.base_unit ?? 'kg'
 
-  const [qty, setQty] = useState('')
+  // SALE dishes are fixed portions — default to one portion so the cook doesn't
+  // have to type it (and won't mistake the pcs count for a kg/gram weight).
+  const [qty, setQty] = useState(isSale ? '1' : '')
   const [days, setDays] = useState('')
   const [printing, setPrinting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -501,6 +503,16 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const useBy = daysValid ? addDays(new Date(), daysNum) : null
   const useByLabel = useBy ? shortDate(useBy) : '—'
 
+  // SALE labels show the physical portion weight (portion_size × qty), not the
+  // raw pcs count; PF labels show the entered amount in its base unit.
+  const hasPortion = isSale && saleInfo?.portionSize != null && !!saleInfo.portionUnit
+  function weightLabelFor(amount: number): string {
+    if (hasPortion && saleInfo) {
+      return `${Math.round(saleInfo.portionSize! * amount)} ${saleInfo.portionUnit}`
+    }
+    return `${amount} ${unit}`
+  }
+
   // Preview the consumer-label nutrition for the entered qty (defaults to 1).
   const previewQty = qtyValid && qtyNum != null ? qtyNum : 1
   const saleNutritionPreview = isSale ? saleNutritionFor(saleInfo, previewQty) : null
@@ -522,7 +534,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           productCode: item.product_code,
           prepDate: new Date(b.produced_at),
           shelfLifeDays: shelfDaysOf(b),
-          weight: `${b.weight} ${unit}`,
+          weight: weightLabelFor(b.weight),
           qr: b.barcode,
           batchCode: b.batch_code ?? b.barcode,
           nutrition,
@@ -541,7 +553,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           name: item.name,
           prepDate: new Date(b.produced_at),
           shelfLifeDays: shelfDaysOf(b),
-          weight: `${b.weight} ${unit}`,
+          weight: weightLabelFor(b.weight),
           qr: b.barcode,
           batchCode: b.batch_code ?? b.barcode,
           nutrition,
@@ -628,23 +640,25 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       </div>
 
       <div className="space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
-        {/* Weight / volume */}
+        {/* Weight / volume (SALE: portions, with the resolved gram weight) */}
         <label className="block">
           <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-            Quantity ({unit})
+            {isSale ? 'Portions' : `Quantity (${unit})`}
           </span>
           <div className="flex items-center gap-2">
             <input
               type="number"
               inputMode="decimal"
-              min={0}
-              step="0.1"
+              min={isSale ? 1 : 0}
+              step={isSale ? '1' : '0.1'}
               value={qty}
               onChange={(e) => setQty(e.target.value)}
-              placeholder="e.g. 1.5"
+              placeholder={isSale ? '1' : 'e.g. 1.5'}
               className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-lg text-slate-100 outline-none focus:border-amber-500/60"
             />
-            <span className="text-base text-slate-400">{unit}</span>
+            <span className="whitespace-nowrap text-base text-slate-400">
+              {hasPortion && qtyValid && qtyNum != null ? `= ${weightLabelFor(qtyNum)}` : unit}
+            </span>
           </div>
         </label>
 
@@ -683,7 +697,9 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
                 {Math.round(saleNutritionPreview.protein)} · F{Math.round(saleNutritionPreview.fat)} · C
                 {Math.round(saleNutritionPreview.carbs)}
                 <span className="ml-1.5 text-[11px] text-slate-500">
-                  {qtyValid && qtyNum !== 1 ? `for ${qtyNum} ${unit}` : 'per portion'}
+                  {qtyValid && qtyNum != null && qtyNum !== 1
+                    ? `for ${qtyNum} portions${hasPortion ? ` (${weightLabelFor(qtyNum)})` : ''}`
+                    : `per portion${hasPortion ? ` (${weightLabelFor(1)})` : ''}`}
                 </span>
               </p>
             ) : (
