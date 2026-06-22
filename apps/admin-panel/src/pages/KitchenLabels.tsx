@@ -15,9 +15,16 @@ import { usePrepLabelItems, type PrepItem, type PrepItemKind } from '../hooks/us
 import { usePfPackCard } from '../hooks/usePfPackCard'
 import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
 import { useAllPrepBatches, type AllPrepBatch } from '../hooks/useAllPrepBatches'
+import { useSaleLabelInfo, type SaleLabelInfo } from '../hooks/useSaleLabelInfo'
 import { useLocations } from '../hooks/useLocations'
 import { useAppRole } from '../contexts/AppRoleContext'
-import { addDays, printPrepLabel, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib/labelPrinting'
+import {
+  addDays,
+  printPrepLabel,
+  LABEL_SIZES,
+  DEFAULT_LABEL_SIZE,
+  type LabelNutrition,
+} from '../lib/labelPrinting'
 import { renderPrepLabelTSPL } from '../lib/labelTspl'
 import {
   isWebUsbSupported,
@@ -305,8 +312,26 @@ function AllBatchesLog({ onOpen }: { onOpen: (item: PrepItem) => void }) {
   )
 }
 
+/**
+ * Per-portion nutrition for a SALE label. КБЖУ is stored per base_unit (for a
+ * SALE dish that's per piece / portion), so scaling by the labeled quantity
+ * gives the macros for what's in the container. Returns null when there's no
+ * calorie data to print.
+ */
+function saleNutritionFor(info: SaleLabelInfo | null, qty: number): LabelNutrition | null {
+  if (!info || info.calories == null) return null
+  return {
+    kcal: info.calories * qty,
+    protein: (info.protein ?? 0) * qty,
+    fat: (info.fat ?? 0) * qty,
+    carbs: (info.carbs ?? 0) * qty,
+  }
+}
+
 function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
+  const isSale = item.kind === 'SALE'
   const { card } = usePfPackCard(item.id)
+  const { info: saleInfo } = useSaleLabelInfo(item.id, isSale)
   const { staffId } = useAppRole()
   const { locations } = useLocations()
   const { batches, create, remove } = usePrepBatches(item.id)
@@ -375,9 +400,19 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const useBy = daysValid ? addDays(new Date(), daysNum) : null
   const useByLabel = useBy ? shortDate(useBy) : '—'
 
+  // Preview the consumer-label nutrition for the entered qty (defaults to 1).
+  const previewQty = qtyValid && qtyNum != null ? qtyNum : 1
+  const saleNutritionPreview = isSale ? saleNutritionFor(saleInfo, previewQty) : null
+  const showSaleExtras = isSale && !!saleInfo && (saleNutritionPreview != null || !!saleInfo.ingredients)
+
   const canPrint = qtyValid && daysValid && !!locationId && !printing
 
   async function printBatch(b: PrepBatch) {
+    // SALE dishes get a consumer label: per-portion КБЖУ (× the batch qty) +
+    // состав. PF preps print the plain storage label (extras stay undefined).
+    const nutrition = isSale ? saleNutritionFor(saleInfo, b.weight) : null
+    const ingredients = isSale ? saleInfo?.ingredients ?? null : null
+
     // Bluetooth fallback: RawBT can only rasterize a PNG (ESC/POS) — may drift.
     if (transport === 'bluetooth') {
       printPrepLabel(
@@ -389,6 +424,8 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           weight: `${b.weight} ${unit}`,
           qr: b.barcode,
           batchCode: b.batch_code ?? b.barcode,
+          nutrition,
+          ingredients,
         },
         size,
         true, // launch RawBT via intent each job
@@ -406,6 +443,8 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           weight: `${b.weight} ${unit}`,
           qr: b.barcode,
           batchCode: b.batch_code ?? b.barcode,
+          nutrition,
+          ingredients,
         },
         size,
       ),
@@ -479,7 +518,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
         onClick={onBack}
         className="mb-4 flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200"
       >
-        <ChevronLeft className="h-4 w-4" /> All prep items
+        <ChevronLeft className="h-4 w-4" /> All items
       </button>
 
       <div className="mb-5">
@@ -530,6 +569,32 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           <span className="text-slate-400">Use by (from today)</span>
           <span className="text-base font-semibold text-slate-100">{useByLabel}</span>
         </div>
+
+        {/* SALE consumer-label preview: per-portion КБЖУ + состав */}
+        {showSaleExtras && saleInfo && (
+          <div className="space-y-1.5 rounded-xl border border-emerald-800/40 bg-emerald-950/20 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300/80">
+              Sale label also prints
+            </p>
+            {saleNutritionPreview ? (
+              <p className="text-sm text-slate-200">
+                {Math.round(saleNutritionPreview.kcal)} kcal · P
+                {Math.round(saleNutritionPreview.protein)} · F{Math.round(saleNutritionPreview.fat)} · C
+                {Math.round(saleNutritionPreview.carbs)}
+                <span className="ml-1.5 text-[11px] text-slate-500">
+                  {qtyValid && qtyNum !== 1 ? `for ${qtyNum} ${unit}` : 'per portion'}
+                </span>
+              </p>
+            ) : (
+              <p className="text-xs text-amber-400/80">No КБЖУ set on this dish.</p>
+            )}
+            {saleInfo.ingredients ? (
+              <p className="text-xs leading-relaxed text-slate-400">{saleInfo.ingredients}</p>
+            ) : (
+              <p className="text-xs text-amber-400/80">No composition set — add it on the dish card.</p>
+            )}
+          </div>
+        )}
 
         {/* Location */}
         <label className="block">

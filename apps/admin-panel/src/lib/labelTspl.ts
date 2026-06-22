@@ -3,6 +3,7 @@ import {
   printViaRawBT,
   DEFAULT_LABEL_SIZE,
   type LabelSize,
+  type LabelNutrition,
 } from './labelPrinting'
 
 /**
@@ -26,6 +27,38 @@ export interface TsplLabelData {
   /** QR payload + bottom text (the batch barcode). */
   qr?: string | null
   batchCode?: string | null
+  /** SALE consumer-label extras — when set, the consumer layout is used. */
+  nutrition?: LabelNutrition | null
+  ingredients?: string | null
+}
+
+/** Drop non-ASCII so the printer's default codepage doesn't render garbage. */
+function ascii(s: string): string {
+  return s.replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/** "343kcal P14 F18 C36" — compact, ASCII-only for TSPL TEXT. */
+function nutritionAscii(n: LabelNutrition): string {
+  const r = (v: number) => String(Math.round(v))
+  return `${r(n.kcal)}kcal P${r(n.protein)} F${r(n.fat)} C${r(n.carbs)}`
+}
+
+/** Greedy word-wrap into lines of at most `maxChars` characters. */
+function wrapChars(text: string, maxChars: number): string[] {
+  const words = ascii(text).split(' ').filter(Boolean)
+  const lines: string[] = []
+  let cur = ''
+  for (const w of words) {
+    const cand = cur ? `${cur} ${w}` : w
+    if (cur && cand.length > maxChars) {
+      lines.push(cur)
+      cur = w
+    } else {
+      cur = cand
+    }
+  }
+  if (cur) lines.push(cur)
+  return lines
 }
 
 function fmtDate(d: Date): string {
@@ -81,6 +114,64 @@ export function renderPrepLabelTSPL(
   const hDots = Math.round(size.hMm * DOTS_PER_MM)
   // Scale vs the proven 60×40 baseline (480×320). min() keeps within both axes.
   const s = Math.min(wDots / 480, hDots / 320)
+
+  // SALE consumer label: name + per-portion nutrition + ingredients + dates.
+  if (data.nutrition || data.ingredients) {
+    const PAD = 24
+    const usable = wDots - PAD * 2
+    const charsName = Math.max(8, Math.floor(usable / 16)) // font "3" ≈ 16 dots/char
+    const chars1 = Math.max(12, Math.floor(usable / 8)) // font "1" ≈ 8 dots/char
+
+    // Footer stacked from the bottom: batch (f1), USE BY (f3), PREP (f2).
+    const batchY = hDots - FONT_H['1'] - 6
+    const useByY = batchY - FONT_H['3'] - 4
+    const prepY = useByY - FONT_H['2'] - 2
+    const footerTop = prepY - 6
+
+    let y = 12
+    const [n1, n2] = wrapName(data.name.toUpperCase(), charsName, charsName + 6)
+    cmds.push(`TEXT ${PAD},${y},"3",0,1,1,"${esc(ascii(n1))}"`)
+    y += FONT_H['3'] + 8
+    if (n2) {
+      cmds.push(`TEXT ${PAD},${y},"2",0,1,1,"${esc(ascii(n2))}"`)
+      y += FONT_H['2'] + 6
+    }
+
+    if (data.nutrition) {
+      cmds.push(`TEXT ${PAD},${y},"2",0,1,1,"${esc(nutritionAscii(data.nutrition))}"`)
+      y += FONT_H['2'] + 6
+    }
+
+    cmds.push(`BAR ${PAD},${y},${Math.round(wDots * 0.6)},2`)
+    y += 8
+
+    if (data.ingredients) {
+      cmds.push(`TEXT ${PAD},${y},"1",0,1,1,"INGREDIENTS:"`)
+      y += FONT_H['1'] + 4
+      const lineH = FONT_H['1'] + 4
+      const maxLines = Math.max(1, Math.floor((footerTop - y) / lineH))
+      const all = wrapChars(data.ingredients, chars1)
+      const shown = all.slice(0, maxLines)
+      if (all.length > maxLines && shown.length > 0) {
+        // ASCII truncation marker — the codepage has no multibyte ellipsis.
+        const last = shown[shown.length - 1]
+        shown[shown.length - 1] = last.slice(0, Math.max(0, chars1 - 3)) + '...'
+      }
+      for (const l of shown) {
+        cmds.push(`TEXT ${PAD},${y},"1",0,1,1,"${esc(l)}"`)
+        y += lineH
+      }
+    }
+
+    const prep = data.weight
+      ? `PREP ${fmtDate(data.prepDate)} ${esc(ascii(data.weight))}`
+      : `PREP ${fmtDate(data.prepDate)}`
+    cmds.push(`TEXT ${PAD},${prepY},"2",0,1,1,"${prep}"`)
+    cmds.push(`TEXT ${PAD},${useByY},"3",0,1,1,"USE BY ${useByStr}"`)
+    if (bottom) cmds.push(`TEXT ${PAD},${batchY},"1",0,1,1,"${esc(bottom)}"`)
+    cmds.push('PRINT 1,1')
+    return cmds.join('\r\n') + '\r\n'
+  }
 
   if (s >= 0.92) {
     // Big stock (60×40 / 58×40): use the proven, hardware-verified fixed layout.

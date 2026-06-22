@@ -35,4 +35,40 @@ describe('renderPrepLabelTSPL', () => {
     const out = renderPrepLabelTSPL({ ...data, name: 'A "weird" name' })
     expect(out).not.toContain('"weird"')
   })
+
+  describe('SALE consumer label (nutrition + ingredients)', () => {
+    const sale = {
+      name: 'Beetroot Hummus',
+      prepDate: new Date('2026-06-15T00:00:00'),
+      shelfLifeDays: 3,
+      weight: '1 pcs',
+      qr: 'BEETRO-260615-101010',
+      batchCode: 'BEETRO-260615-101010',
+      nutrition: { kcal: 343, protein: 14.3, fat: 18.4, carbs: 35.6 },
+      ingredients: 'Chickpeas, beetroot, tahini, lemon, garlic, olive oil',
+    }
+
+    it('prints compact per-portion nutrition (ASCII)', () => {
+      const out = renderPrepLabelTSPL(sale)
+      expect(out).toContain('343kcal P14 F18 C36')
+    })
+
+    it('prints the ingredient list under an INGREDIENTS heading', () => {
+      const out = renderPrepLabelTSPL(sale)
+      expect(out).toContain('INGREDIENTS:')
+      expect(out).toContain('Chickpeas')
+    })
+
+    it('keeps PREP / USE BY dates and batch code', () => {
+      const out = renderPrepLabelTSPL(sale)
+      expect(out).toContain('USE BY 18/06/26')
+      expect(out).toContain('BEETRO-260615-101010')
+      expect(out.trimEnd().endsWith('PRINT 1,1')).toBe(true)
+    })
+
+    it('omits the QR on the consumer label', () => {
+      const out = renderPrepLabelTSPL(sale)
+      expect(out).not.toContain('QRCODE')
+    })
+  })
 })

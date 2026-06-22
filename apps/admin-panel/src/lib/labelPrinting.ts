@@ -39,6 +39,14 @@ export const DEFAULT_LABEL_SIZE: LabelSize = LABEL_SIZES[0]
 const BASE_W_PX = Math.round(60 * DOTS_PER_MM) // 480
 const BASE_H_PX = Math.round(40 * DOTS_PER_MM) // 320
 
+/** Per-portion macros for a consumer (SALE) label. */
+export interface LabelNutrition {
+  kcal: number
+  protein: number
+  fat: number
+  carbs: number
+}
+
 export interface PrepLabelData {
   name: string
   productCode: string
@@ -50,6 +58,36 @@ export interface PrepLabelData {
   qr?: string | null
   /** Optional human batch code shown at the bottom; falls back to productCode. */
   batchCode?: string | null
+  /**
+   * SALE consumer-label extras. When either is set, a consumer layout is used
+   * (name + nutrition + ingredients + dates) instead of the storage layout.
+   */
+  nutrition?: LabelNutrition | null
+  ingredients?: string | null
+}
+
+/** "343 kcal · P14 · F18 · C36" for the canvas (image) label. */
+function nutritionLine(n: LabelNutrition): string {
+  const r = (v: number) => String(Math.round(v))
+  return `${r(n.kcal)} kcal · P${r(n.protein)} · F${r(n.fat)} · C${r(n.carbs)}`
+}
+
+/** Greedy word-wrap `text` into lines that fit `maxWidth` at the current font. */
+function wrapToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (current && ctx.measureText(candidate).width > maxWidth) {
+      lines.push(current)
+      current = word
+    } else {
+      current = candidate
+    }
+  }
+  if (current) lines.push(current)
+  return lines
 }
 
 export function addDays(date: Date, days: number): Date {
@@ -136,6 +174,12 @@ export function renderPrepLabel(
   ctx.fillStyle = '#000000'
   ctx.textBaseline = 'top'
 
+  // SALE consumer label: name + nutrition + ingredients + dates.
+  if (data.nutrition || data.ingredients) {
+    drawSaleLabel(ctx, data, wPx, hPx, s)
+    return canvas.toDataURL('image/png')
+  }
+
   // ── Item name (bold, up to 2 lines, auto-shrink) ──
   const { size: nameSize, lines } = fitText(
     ctx,
@@ -194,6 +238,101 @@ export function renderPrepLabel(
   ctx.fillText(data.batchCode ?? data.productCode, PAD, hPx - 28 * s)
 
   return canvas.toDataURL('image/png')
+}
+
+/**
+ * Draw the SALE consumer label: bold name, per-portion nutrition line, a thin
+ * divider, the ingredient list (wrapped, filling the space above the footer),
+ * then PREP / USE BY dates and the batch code pinned to the bottom. Auto-shrinks
+ * and clamps ingredient lines so everything stays on the chosen stock.
+ */
+function drawSaleLabel(
+  ctx: CanvasRenderingContext2D,
+  data: PrepLabelData,
+  wPx: number,
+  hPx: number,
+  s: number,
+): void {
+  const PAD = 18 * s
+  const F = (n: number) => Math.round(n * s)
+  const maxW = wPx - PAD * 2
+
+  // Footer rows pinned to the bottom (computed first so ingredients can fill up to them).
+  const batchY = hPx - F(16) - 6 * s
+  const useByY = batchY - F(22) - 4 * s
+  const prepY = useByY - F(20) - 2 * s
+
+  // ── Name (bold, up to 2 lines, auto-shrink) ──
+  const { size: nameSize, lines } = fitText(
+    ctx,
+    data.name.toUpperCase(),
+    maxW,
+    2,
+    Math.round(38 * s),
+    Math.round(22 * s),
+    '800',
+  )
+  ctx.font = `800 ${nameSize}px sans-serif`
+  let y = 14 * s
+  for (const line of lines) {
+    ctx.fillText(line, PAD, y)
+    y += nameSize + 4 * s
+  }
+  y += 4 * s
+
+  // ── Nutrition (per portion), shrink to fit one line ──
+  if (data.nutrition) {
+    const str = nutritionLine(data.nutrition)
+    let ns = F(24)
+    ctx.font = `700 ${ns}px sans-serif`
+    while (ns > F(15) && ctx.measureText(str).width > maxW) {
+      ns -= 1
+      ctx.font = `700 ${ns}px sans-serif`
+    }
+    ctx.fillText(str, PAD, y)
+    y += ns + 6 * s
+  }
+
+  // ── Divider ──
+  ctx.fillRect(PAD, y, maxW, Math.max(2, 2 * s))
+  y += 8 * s
+
+  // ── Ingredients (wrapped, clamped to the room above the footer) ──
+  if (data.ingredients) {
+    ctx.font = `600 ${F(15)}px sans-serif`
+    ctx.fillText('INGREDIENTS', PAD, y)
+    y += F(15) + 3 * s
+
+    const isize = F(19)
+    ctx.font = `400 ${isize}px sans-serif`
+    const lineH = isize + 3 * s
+    const allLines = wrapToWidth(ctx, data.ingredients, maxW)
+    const maxLines = Math.max(1, Math.floor((prepY - 4 * s - y) / lineH))
+    const shown = allLines.slice(0, maxLines)
+    if (allLines.length > maxLines && shown.length > 0) {
+      let last = shown[shown.length - 1]
+      while (last.length > 1 && ctx.measureText(`${last}…`).width > maxW) {
+        last = last.slice(0, -1)
+      }
+      shown[shown.length - 1] = `${last}…`
+    }
+    for (const l of shown) {
+      ctx.fillText(l, PAD, y)
+      y += lineH
+    }
+  }
+
+  // ── Footer: PREP, USE BY (emphasized), batch code ──
+  const prep = data.weight ? `PREP ${formatDate(data.prepDate)} · ${data.weight}` : `PREP ${formatDate(data.prepDate)}`
+  ctx.font = `500 ${F(20)}px sans-serif`
+  ctx.fillText(prep, PAD, prepY)
+
+  const useBy = data.shelfLifeDays != null ? addDays(data.prepDate, data.shelfLifeDays) : null
+  ctx.font = `800 ${F(22)}px sans-serif`
+  ctx.fillText(`USE BY ${useBy ? formatDate(useBy) : '—'}`, PAD, useByY)
+
+  ctx.font = `400 ${F(16)}px monospace`
+  ctx.fillText(data.batchCode ?? data.productCode, PAD, batchY)
 }
 
 /** Draw a QR code for `text` as black modules at (x, y) within a `box` px square. */
