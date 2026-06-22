@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { friendlyStaffError } from '../lib/staffErrors'
 
 export interface Staff {
   id: string
@@ -56,7 +57,7 @@ export function useStaff(): UseStaffResult {
 
     if (fetchError) {
       console.error('[useStaff] fetch error', fetchError)
-      setError(fetchError.message)
+      setError(friendlyStaffError(fetchError))
       setIsLoading(false)
       return
     }
@@ -69,6 +70,20 @@ export function useStaff(): UseStaffResult {
     fetchData()
   }, [fetchData])
 
+  // Stale-page guard: refetch when the tab regains focus / becomes visible, so
+  // edits are never made against a list that's been sitting open for hours.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') fetchData()
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [fetchData])
+
   const createStaff = useCallback(async (input: StaffInsert): Promise<Staff | null> => {
     const { data, error: insertError } = await supabase
       .from('staff')
@@ -78,7 +93,7 @@ export function useStaff(): UseStaffResult {
 
     if (insertError) {
       console.error('[useStaff] insert error', insertError)
-      setError(insertError.message)
+      setError(friendlyStaffError(insertError))
       return null
     }
 
@@ -96,7 +111,7 @@ export function useStaff(): UseStaffResult {
 
     if (updateError) {
       console.error('[useStaff] update error', updateError)
-      setError(updateError.message)
+      setError(friendlyStaffError(updateError))
       return null
     }
 
@@ -112,7 +127,7 @@ export function useStaff(): UseStaffResult {
 
     if (deleteError) {
       console.error('[useStaff] delete error', deleteError)
-      setError(deleteError.message)
+      setError(friendlyStaffError(deleteError))
       return false
     }
 
