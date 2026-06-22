@@ -12,6 +12,28 @@ export interface PrepItem {
   base_unit: string | null
   /** Derived from the product_code prefix — used for the PF / Sale filter. */
   kind: PrepItemKind
+  /** `is_available` — drives the "Active only" default filter. */
+  isAvailable: boolean
+  categoryId: string | null
+  /** Leaf category name (with emoji), used as the section header. */
+  categoryName: string | null
+  /** Composite sort key (parent sort × 1000 + own sort) for ordering sections. */
+  categorySort: number
+}
+
+/** Shape of the embedded category join (untyped supabase client). */
+interface RawItemRow {
+  id: string
+  name: string
+  product_code: string
+  base_unit: string | null
+  is_available: boolean | null
+  category_id: string | null
+  category: {
+    name: string | null
+    sort_order: number | null
+    parent: { sort_order: number | null } | null
+  } | null
 }
 
 /**
@@ -36,7 +58,9 @@ export function usePrepLabelItems() {
 
     supabase
       .from('nomenclature')
-      .select('id, name, product_code, base_unit')
+      .select(
+        'id, name, product_code, base_unit, is_available, category_id, category:category_id(name, sort_order, parent:parent_id(sort_order))',
+      )
       .or('product_code.like.PF-%,product_code.like.SALE-%')
       .not('is_deleted', 'is', true)
       .order('name', { ascending: true })
@@ -47,13 +71,23 @@ export function usePrepLabelItems() {
           setIsLoading(false)
           return
         }
-        const mapped: PrepItem[] = (data ?? []).map((row) => ({
-          id: row.id,
-          name: row.name,
-          product_code: row.product_code,
-          base_unit: row.base_unit,
-          kind: row.product_code.startsWith('SALE-') ? 'SALE' : 'PF',
-        }))
+        const rows = (data ?? []) as unknown as RawItemRow[]
+        const mapped: PrepItem[] = rows.map((row) => {
+          const cat = row.category
+          const parentSort = cat?.parent?.sort_order ?? 999
+          const ownSort = cat?.sort_order ?? 999
+          return {
+            id: row.id,
+            name: row.name,
+            product_code: row.product_code,
+            base_unit: row.base_unit,
+            kind: row.product_code.startsWith('SALE-') ? 'SALE' : 'PF',
+            isAvailable: row.is_available ?? false,
+            categoryId: row.category_id,
+            categoryName: cat?.name ?? null,
+            categorySort: parentSort * 1000 + ownSort,
+          }
+        })
         setItems(mapped)
         setIsLoading(false)
       })

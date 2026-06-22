@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Search,
   ChevronLeft,
@@ -75,6 +76,34 @@ function KindBadge({ kind }: { kind: PrepItemKind }) {
   )
 }
 
+/** One category section in the picker (leaf category + its items). */
+interface CatGroup {
+  key: string
+  name: string
+  sort: number
+  items: PrepItem[]
+}
+
+/** Bucket items by their leaf category, ordered by category sort then name. */
+function groupByCategory(list: PrepItem[]): CatGroup[] {
+  const map = new Map<string, CatGroup>()
+  for (const it of list) {
+    const key = it.categoryId ?? 'uncategorized'
+    let g = map.get(key)
+    if (!g) {
+      g = {
+        key,
+        name: it.categoryName ?? 'Uncategorized',
+        sort: it.categoryId ? it.categorySort : Number.MAX_SAFE_INTEGER,
+        items: [],
+      }
+      map.set(key, g)
+    }
+    g.items.push(it)
+  }
+  return [...map.values()].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name))
+}
+
 /**
  * Kitchen label station (cook-accessible). An L1 cook picks a prep item, enters
  * the batch weight + shelf life, and prints a storage label to the XP-420B via
@@ -85,23 +114,56 @@ function KindBadge({ kind }: { kind: PrepItemKind }) {
  */
 export function KitchenLabels() {
   const { items, isLoading, error } = usePrepLabelItems()
-  const [view, setView] = useState<'items' | 'log'>('items')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<KindFilter>('all')
-  const [selected, setSelected] = useState<PrepItem | null>(null)
+  // Active-only by default — hide archived / discontinued items.
+  const [activeOnly, setActiveOnly] = useState(true)
+
+  // Selection + view live in the URL so the link reflects the open item, the
+  // back button works, and a label page can be deep-linked / refreshed.
+  const itemCode = searchParams.get('item')
+  const view: 'items' | 'log' = searchParams.get('view') === 'log' ? 'log' : 'items'
+  const selected = useMemo(
+    () => (itemCode ? items.find((i) => i.product_code === itemCode) ?? null : null),
+    [items, itemCode],
+  )
+
+  function openItem(productCode: string) {
+    const next = new URLSearchParams(searchParams)
+    next.set('item', productCode)
+    setSearchParams(next)
+  }
+  function closeItem() {
+    const next = new URLSearchParams(searchParams)
+    next.delete('item')
+    setSearchParams(next)
+  }
+  function setView(v: 'items' | 'log') {
+    const next = new URLSearchParams(searchParams)
+    if (v === 'log') next.set('view', 'log')
+    else next.delete('view')
+    setSearchParams(next, { replace: true })
+  }
+
+  // Active filter applies before the kind counts so the chips match what shows.
+  const visible = useMemo(
+    () => (activeOnly ? items.filter((i) => i.isAvailable) : items),
+    [items, activeOnly],
+  )
 
   const counts = useMemo(
     () => ({
-      all: items.length,
-      PF: items.filter((i) => i.kind === 'PF').length,
-      SALE: items.filter((i) => i.kind === 'SALE').length,
+      all: visible.length,
+      PF: visible.filter((i) => i.kind === 'PF').length,
+      SALE: visible.filter((i) => i.kind === 'SALE').length,
     }),
-    [items],
+    [visible],
   )
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return items.filter((i) => {
+    return visible.filter((i) => {
       if (kind !== 'all' && i.kind !== kind) return false
       if (!q) return true
       return (
@@ -109,10 +171,26 @@ export function KitchenLabels() {
         i.product_code.toLowerCase().includes(q)
       )
     })
-  }, [items, query, kind])
+  }, [visible, query, kind])
+
+  // Group the filtered items into category sections, ordered by category sort.
+  const sections = useMemo(() => groupByCategory(filtered), [filtered])
+  const inactiveCount = items.length - items.filter((i) => i.isAvailable).length
 
   if (selected) {
-    return <LabelEditor item={selected} onBack={() => setSelected(null)} />
+    return <LabelEditor item={selected} onBack={closeItem} />
+  }
+
+  // Deep link to ?item=… while the list is still loading: hold for resolution
+  // rather than flashing the picker.
+  if (itemCode && isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl p-4">
+        <div className="flex items-center justify-center py-20 text-slate-500">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading…
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -149,7 +227,7 @@ export function KitchenLabels() {
       </div>
 
       {view === 'log' ? (
-        <AllBatchesLog onOpen={setSelected} />
+        <AllBatchesLog onOpen={openItem} />
       ) : (
         <>
           <div className="relative mb-3">
@@ -163,7 +241,7 @@ export function KitchenLabels() {
             />
           </div>
 
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             {KIND_FILTERS.map((f) => {
               const active = kind === f.id
               return (
@@ -182,6 +260,25 @@ export function KitchenLabels() {
                 </button>
               )
             })}
+            <button
+              type="button"
+              onClick={() => setActiveOnly((v) => !v)}
+              title={
+                activeOnly
+                  ? `Showing active only — ${inactiveCount} hidden`
+                  : 'Showing all statuses'
+              }
+              className={`ml-auto rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                activeOnly
+                  ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                  : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+              }`}
+            >
+              {activeOnly ? 'Active only' : 'All statuses'}
+              {activeOnly && inactiveCount > 0 && (
+                <span className="ml-1.5 text-xs text-emerald-400/60">{inactiveCount} hidden</span>
+              )}
+            </button>
           </div>
 
           {isLoading && (
@@ -200,20 +297,32 @@ export function KitchenLabels() {
             <p className="py-20 text-center text-sm text-slate-500">Nothing found.</p>
           )}
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {filtered.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelected(item)}
-                className="flex flex-col items-start gap-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-left transition hover:border-amber-500/50 hover:bg-slate-800"
-              >
-                <div className="flex w-full items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-slate-100">{item.name}</span>
-                  <KindBadge kind={item.kind} />
+          <div className="space-y-5">
+            {sections.map((sec) => (
+              <section key={sec.key}>
+                <div className="mb-2 flex items-baseline gap-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    {sec.name}
+                  </h2>
+                  <span className="text-[11px] text-slate-600">{sec.items.length}</span>
                 </div>
-                <span className="text-[11px] text-slate-500">{item.product_code}</span>
-              </button>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {sec.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => openItem(item.product_code)}
+                      className="flex flex-col items-start gap-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-left transition hover:border-amber-500/50 hover:bg-slate-800"
+                    >
+                      <div className="flex w-full items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-slate-100">{item.name}</span>
+                        <KindBadge kind={item.kind} />
+                      </div>
+                      <span className="text-[11px] text-slate-500">{item.product_code}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </>
@@ -228,7 +337,7 @@ export function KitchenLabels() {
  * printed. Tapping a row opens that item's editor (to reprint); the trash
  * button removes a mistaken record.
  */
-function AllBatchesLog({ onOpen }: { onOpen: (item: PrepItem) => void }) {
+function AllBatchesLog({ onOpen }: { onOpen: (productCode: string) => void }) {
   const { batches, isLoading, error, remove } = useAllPrepBatches()
 
   async function handleDelete(b: AllPrepBatch) {
@@ -270,15 +379,7 @@ function AllBatchesLog({ onOpen }: { onOpen: (item: PrepItem) => void }) {
           >
             <button
               type="button"
-              onClick={() =>
-                onOpen({
-                  id: b.nomenclature_id,
-                  name: b.name,
-                  product_code: b.product_code,
-                  base_unit: b.base_unit,
-                  kind: b.kind,
-                })
-              }
+              onClick={() => onOpen(b.product_code)}
               className="min-w-0 flex-1 text-left"
               title="Open item to reprint"
             >
