@@ -15,6 +15,7 @@ import {
 } from '../hooks/useStaffTasks'
 import { TaskRow } from '../components/tasks/TaskRow'
 import { TaskFormModal } from '../components/tasks/TaskFormModal'
+import { TaskDetailModal } from '../components/tasks/TaskDetailModal'
 import { TelegramLinkPanel } from '../components/tasks/TelegramLinkPanel'
 import {
   STATUS_OPTIONS,
@@ -127,6 +128,7 @@ export function KitchenTasksPage() {
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<StaffTask | null>(null)
+  const [viewingId, setViewingId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'open' | 'all'>('open')
 
   const activeStaff = useMemo(() => staff.filter((s) => s.is_active), [staff])
@@ -182,12 +184,25 @@ export function KitchenTasksPage() {
     )
   }
 
-  const openTask = (task: StaffTask) => {
+  // Read-only detail (tapping a card) resolves the *current* task by id, so it
+  // reflects live edits and done-toggles.
+  const viewing = useMemo(
+    () => (viewingId ? [...optimisticTasks, ...templates].find((t) => t.id === viewingId) ?? null : null),
+    [viewingId, optimisticTasks, templates],
+  )
+
+  const openView = (task: StaffTask) => {
+    setViewingId(task.id)
+    syncTaskParam(task.id)
+  }
+  const openEdit = (task: StaffTask) => {
+    setViewingId(null)
     setEditing(task)
     setModalOpen(true)
     syncTaskParam(task.id)
   }
   const openNew = () => {
+    setViewingId(null)
     setEditing(null)
     setModalOpen(true)
     syncTaskParam(null)
@@ -197,16 +212,17 @@ export function KitchenTasksPage() {
     setEditing(null)
     syncTaskParam(null)
   }
+  const closeView = () => {
+    setViewingId(null)
+    syncTaskParam(null)
+  }
 
-  // Open a task from a shared ?task=<id> link once the data is loaded.
+  // Open a task from a shared ?task=<id> link (read-only) once data is loaded.
   const taskParam = searchParams.get('task')
   useEffect(() => {
-    if (!taskParam || modalOpen) return
+    if (!taskParam || modalOpen || viewingId) return
     const found = [...tasks, ...templates].find((t) => t.id === taskParam)
-    if (found) {
-      setEditing(found)
-      setModalOpen(true)
-    }
+    if (found) setViewingId(found.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskParam, tasks, templates])
 
@@ -465,9 +481,9 @@ export function KitchenTasksPage() {
                     <TaskRow
                       key={t.id}
                       task={t}
-                      onOpen={openTask}
+                      onOpen={openView}
                       onToggleDone={toggleDone}
-                      onEdit={openTask}
+                      onEdit={openEdit}
                       onDelete={handleDelete}
                       onPhotosChange={handlePhotosChange}
                       onPush={isManager ? handlePush : undefined}
@@ -508,9 +524,9 @@ export function KitchenTasksPage() {
                   key={t.id}
                   task={t}
                   showDate
-                  onOpen={openTask}
+                  onOpen={openView}
                   onToggleDone={toggleDone}
-                  onEdit={openTask}
+                  onEdit={openEdit}
                   onDelete={handleDelete}
                   onPhotosChange={handlePhotosChange}
                   onPush={isManager ? handlePush : undefined}
@@ -530,7 +546,7 @@ export function KitchenTasksPage() {
             </p>
           ) : (
             filteredTemplates.map((t) => (
-              <TaskRow key={t.id} task={t} onOpen={openTask} onEdit={openTask} onDelete={handleDelete} />
+              <TaskRow key={t.id} task={t} onOpen={openView} onEdit={openEdit} onDelete={handleDelete} />
             ))
           )}
           {filteredTemplates.length > 0 && (
@@ -543,6 +559,16 @@ export function KitchenTasksPage() {
 
       {/* ── TELEGRAM (managers) ── */}
       {tab === 'team' && isManager && <TelegramLinkPanel staff={activeStaff} />}
+
+      {/* Read-only detail first — tap a card to read; Edit switches to the form. */}
+      {viewing && (
+        <TaskDetailModal
+          task={viewing}
+          onClose={closeView}
+          onEdit={openEdit}
+          onToggleDone={toggleDone}
+        />
+      )}
 
       {/* Mounted only while open so the form re-reads `initial` each time it
           opens (a persistently-mounted modal keeps stale empty state). */}
