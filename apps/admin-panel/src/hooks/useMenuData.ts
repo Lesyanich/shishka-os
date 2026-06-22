@@ -44,6 +44,10 @@ export interface MenuItem extends MenuDish {
   kitchen_note: string | null
   ttc_source_url: string | null
   merrychef_program: Record<string, unknown> | null
+  /** Shelf life in days — single source of truth (nomenclature.shelf_life_days).
+   * Drives the storage-label use-by AND batch expiry (fn_create_batches_from_task).
+   * Was previously duplicated on pf_pack_card; consolidated in mig 307. */
+  shelf_life_days: number | null
   hasBom?: boolean
   /** Food-only cost (cost_per_unit minus packaging) — from v_dish_cost_split.
    * Falls back to cost_per_unit when no split row exists. SALE-* only. */
@@ -148,6 +152,7 @@ interface RawNomenclatureRow {
   kitchen_note: string | null
   ttc_source_url: string | null
   merrychef_program: Record<string, unknown> | null
+  shelf_life_days: number | string | null
   product_categories: {
     id: string
     code: string
@@ -197,7 +202,7 @@ export function useMenuData(): UseMenuDataResult {
           is_web_visible, web_published_at, loyverse_price,
           customer_description, customer_short_name, customer_photo_url,
           assembler_note, kitchen_note,
-          ttc_source_url, merrychef_program,
+          ttc_source_url, merrychef_program, shelf_life_days,
           product_categories!category_id(id, code, name, sort_order)
         `)
         .or('product_code.like.SALE-%,product_code.like.PF-%,product_code.like.MOD-%')
@@ -361,6 +366,7 @@ export function useMenuData(): UseMenuDataResult {
         kitchen_note: raw.kitchen_note,
         ttc_source_url: raw.ttc_source_url,
         merrychef_program: raw.merrychef_program,
+        shelf_life_days: raw.shelf_life_days != null ? Number(raw.shelf_life_days) : null,
         food_cost:
           costSplitMap.get(raw.id)?.food_cost ??
           (raw.cost_per_unit != null ? Number(raw.cost_per_unit) : null),

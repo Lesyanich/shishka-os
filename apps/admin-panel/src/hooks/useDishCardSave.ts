@@ -37,6 +37,9 @@ export interface PfPackCardSavePayload {
   expected_version: number
   kitchen_note?: string
   ttc_source_url?: string
+  /** Single source of truth on nomenclature (mig 307) — top-level, NOT under
+   * pf_pack_card. The storage label and batch expiry both read it. */
+  shelf_life_days?: number
   pf_pack_card?: {
     batch_input_qty?: number
     batch_input_uom?: string
@@ -46,7 +49,6 @@ export interface PfPackCardSavePayload {
     fill_weight_per_bag_g?: number
     portions_per_bag?: number
     label_template?: { fields: string[] }
-    shelf_life_days?: number
     storage_zone?: string
     storage_temp_min_c?: number
     storage_temp_max_c?: number

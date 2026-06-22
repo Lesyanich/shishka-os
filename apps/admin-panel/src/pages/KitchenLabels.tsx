@@ -13,7 +13,6 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import { usePrepLabelItems, type PrepItem, type PrepItemKind } from '../hooks/usePrepLabelItems'
-import { usePfPackCard } from '../hooks/usePfPackCard'
 import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
 import { useAllPrepBatches, type AllPrepBatch } from '../hooks/useAllPrepBatches'
 import { useSaleLabelInfo, type SaleLabelInfo } from '../hooks/useSaleLabelInfo'
@@ -431,7 +430,6 @@ function saleNutritionFor(info: SaleLabelInfo | null, qty: number): LabelNutriti
 
 function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const isSale = item.kind === 'SALE'
-  const { card } = usePfPackCard(item.id)
   const { info: saleInfo } = useSaleLabelInfo(item.id, isSale)
   const { staffId } = useAppRole()
   const { locations } = useLocations()
@@ -490,10 +488,11 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
     localStorage.setItem(LABEL_LOCATION_KEY, id)
   }
 
-  // Prefill shelf life from the recipe card once it loads (if set there).
+  // Prefill shelf life from nomenclature (single source of truth, mig 307) — the
+  // same value drives batch expiry, so the printed use-by can't drift from it.
   useEffect(() => {
-    if (card?.shelf_life_days != null) setDays(String(card.shelf_life_days))
-  }, [card])
+    if (item.shelfLifeDays != null) setDays(String(item.shelfLifeDays))
+  }, [item.shelfLifeDays])
 
   const qtyNum = qty.trim() === '' ? null : Number(qty)
   const qtyValid = qtyNum != null && Number.isFinite(qtyNum) && qtyNum > 0

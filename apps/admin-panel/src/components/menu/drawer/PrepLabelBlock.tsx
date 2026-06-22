@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Printer, Check, Loader2 } from 'lucide-react'
-import type { PfPackCardData } from '../../../hooks/usePfPackCard'
 import { usePfPackCardSave } from '../../../hooks/usePfPackCardSave'
 import { addDays, printPrepLabel } from '../../../lib/labelPrinting'
 
@@ -10,17 +9,20 @@ export interface PrepLabelItem {
   name: string
   product_code: string
   card_version: number
+  /** Shelf life in days from nomenclature (single source of truth, mig 307). */
+  shelf_life_days: number | null
 }
 
 /**
  * Storage-label block for a PF (prep / semi-finished) item.
- * Lets the cook set a shelf life (persisted to pf_pack_card.shelf_life_days) and
- * print a 60×40 prep label (name + prep date + use-by) to the XP-420B via RawBT.
+ * Lets the cook set a shelf life (persisted to nomenclature.shelf_life_days — the
+ * single source of truth that also drives batch expiry) and print a 60×40 prep
+ * label (name + prep date + use-by) to the XP-420B via RawBT.
  */
-export function PrepLabelBlock({ item, card }: { item: PrepLabelItem; card: PfPackCardData | null }) {
+export function PrepLabelBlock({ item }: { item: PrepLabelItem }) {
   const { save, saving } = usePfPackCardSave()
 
-  const initialDays = card?.shelf_life_days ?? null
+  const initialDays = item.shelf_life_days ?? null
   const [value, setValue] = useState<string>(initialDays != null ? String(initialDays) : '')
   const [savedDays, setSavedDays] = useState<number | null>(initialDays)
   const [version, setVersion] = useState<number>(item.card_version)
