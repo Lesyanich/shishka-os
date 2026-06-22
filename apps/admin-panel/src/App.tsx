@@ -53,6 +53,7 @@ const StaffPage = lazy(() => import('./pages/hr/StaffPage').then(m => ({ default
 const SchedulePage = lazy(() => import('./pages/hr/SchedulePage').then(m => ({ default: m.SchedulePage })))
 const StaffTasksPage = lazy(() => import('./pages/StaffTasksPage').then(m => ({ default: m.StaffTasksPage })))
 const CashierPage = lazy(() => import('./pages/cashier/CashierPage').then(m => ({ default: m.CashierPage })))
+const OrderManager = lazy(() => import('./pages/OrderManager').then(m => ({ default: m.OrderManager })))
 const CookTasksPage = lazy(() => import('./pages/CookTasksPage').then(m => ({ default: m.CookTasksPage })))
 const KitchenLabels = lazy(() => import('./pages/KitchenLabels').then(m => ({ default: m.KitchenLabels })))
 const KitchenRecipesPage = lazy(() => import('./pages/KitchenRecipesPage').then(m => ({ default: m.KitchenRecipesPage })))
@@ -143,6 +144,7 @@ function App() {
                   <Route path="/staff-tasks" element={<Suspense fallback={<PageLoader />}><StaffTasksPage /></Suspense>} />
                   <Route path="/salad-bar" element={<Suspense fallback={<PageLoader />}><SaladBarPage /></Suspense>} />
                   <Route path="/cashier" element={<Suspense fallback={<PageLoader />}><CashierPage /></Suspense>} />
+                  <Route path="/orders" element={<Suspense fallback={<PageLoader />}><OrderManager /></Suspense>} />
                   <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
                   <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
                   <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />

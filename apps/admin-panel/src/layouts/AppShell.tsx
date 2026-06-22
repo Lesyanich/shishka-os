@@ -8,6 +8,7 @@ import {
   ChefHat,
   ChevronDown,
   ClipboardCheck,
+  ConciergeBell,
   DollarSign,
   Factory,
   GitBranch,
@@ -64,6 +65,14 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/', icon: Rocket, label: 'Opening Roadmap', minRole: 'owner' },
       { path: '/mission', icon: Rocket, label: 'Mission Control', minRole: 'owner' },
       { path: '/brain', icon: Brain, label: 'Brain', minRole: 'owner' },
+    ],
+  },
+  {
+    title: 'Orders',
+    defaultOpen: true,
+    items: [
+      { path: '/orders', icon: ConciergeBell, label: 'Orders', minRole: 'task_manager' },
+      { path: '/cashier', icon: Banknote, label: 'Cashier', minRole: 'task_manager' },
     ],
   },
   {
