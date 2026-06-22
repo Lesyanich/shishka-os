@@ -1,10 +1,10 @@
-import { useState } from 'react'
 import { RefreshCw, AlertTriangle, Layers, UtensilsCrossed, UploadCloud, CheckCircle2, CircleAlert } from 'lucide-react'
 import { useLoyverseModifierPull } from '../../hooks/useLoyverseModifierPull'
 import { useDishModifierGroups } from '../../hooks/useDishModifierGroups'
 import { useModifierSync } from '../../hooks/useModifierSync'
 import { ModifierGroupsTab } from '../../components/menu/modifiers/ModifierGroupsTab'
 import { ModifierDishesTab } from '../../components/menu/modifiers/ModifierDishesTab'
+import { useTabParam } from '../../hooks/useTabParam'
 
 function formatPulledAt(iso: string | null): string {
   if (!iso) return 'never'
@@ -17,15 +17,13 @@ function formatPulledAt(iso: string | null): string {
   return new Date(iso).toLocaleDateString()
 }
 
-type TabKey = 'groups' | 'dishes'
-
 export function ModifiersPage() {
   const { lists, options, lastPulledAt, lastWarnings, isPulling, error: pullError, pull, reload: reloadPull } =
     useLoyverseModifierPull()
   const { dishes, attachmentsByDish, error: dmgError, attach, detach, reload: reloadDmg } = useDishModifierGroups()
   const { lastPushedAt, pending, priceDraftCount, attachmentsDirty, isPushing, error: syncError, push } =
     useModifierSync()
-  const [tab, setTab] = useState<TabKey>('groups')
+  const [tab, setTab] = useTabParam(['groups', 'dishes'] as const, 'groups')
 
   const error = pullError ?? dmgError ?? syncError
 

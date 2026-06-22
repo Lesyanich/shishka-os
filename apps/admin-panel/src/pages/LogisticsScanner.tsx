@@ -1,14 +1,14 @@
-import { useState } from 'react'
 import { ScanLine } from 'lucide-react'
 import { useBatches } from '../hooks/useBatches'
 import { useStockTransfer } from '../hooks/useStockTransfer'
 import { TransferTab } from '../components/logistics/TransferTab'
 import { UnpackTab } from '../components/logistics/UnpackTab'
+import { useTabParam } from '../hooks/useTabParam'
 
 type Tab = 'transfer' | 'unpack'
 
 export function LogisticsScanner() {
-  const [activeTab, setActiveTab] = useState<Tab>('transfer')
+  const [activeTab, setActiveTab] = useTabParam(['transfer', 'unpack'] as const, 'transfer')
   const { batches, isLoading, error, openBatch } = useBatches()
   const { transferBatch, isTransferring, lastTransfer } = useStockTransfer()
 

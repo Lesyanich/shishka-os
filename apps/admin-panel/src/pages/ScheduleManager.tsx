@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { CalendarDays, Users, LayoutTemplate } from 'lucide-react'
 import { StaffList } from '../components/schedule/StaffList'
 import { WeekCalendar } from '../components/schedule/WeekCalendar'
 import { BulkScheduleGenerator } from '../components/schedule/BulkScheduleGenerator'
 import { KitchenNav } from '../components/KitchenNav'
+import { useTabParam } from '../hooks/useTabParam'
 
 type Tab = 'schedule' | 'staff' | 'templates'
 
@@ -14,7 +14,12 @@ const TABS: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
 ]
 
 export function ScheduleManager() {
-  const [activeTab, setActiveTab] = useState<Tab>('schedule')
+  // Tab lives in the URL (?tab=staff) so each tab is linkable, refresh-stable,
+  // and reachable via the back button — not trapped in component state.
+  const [activeTab, setActiveTab] = useTabParam(
+    TABS.map((t) => t.id),
+    'schedule',
+  )
 
   return (
     <div className="space-y-4">

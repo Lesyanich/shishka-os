@@ -22,6 +22,7 @@ import {
   formatLocalDate,
   shortTime,
 } from '../components/tasks/taskMeta'
+import { useTabParam } from '../hooks/useTabParam'
 
 type Tab = 'today' | 'all' | 'recurring' | 'team'
 type StationFilter = 'all' | 'L1' | 'L2'
@@ -116,8 +117,11 @@ export function KitchenTasksPage() {
       ),
   )
 
+  // tab is URL-backed (?tab=) via useTabParam; searchParams drives the separate
+  // ?task=<id> deep-link below. Both params are independent — each setter copies
+  // the others, so they never clobber one another.
+  const [tab, setTab] = useTabParam(['today', 'all', 'recurring', 'team'] as const, 'today')
   const [searchParams, setSearchParams] = useSearchParams()
-  const [tab, setTab] = useState<Tab>('today')
   const [stationFilter, setStationFilter] = useState<StationFilter>('all')
   const [personFilter, setPersonFilter] = useState<string>('all') // 'all' | 'unassigned' | staffId
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')

@@ -5,6 +5,7 @@ import { useStaff } from '../hooks/useStaff'
 import { ProductionOrderCard } from '../components/production/ProductionOrderCard'
 import { CreateOrderModal } from '../components/production/CreateOrderModal'
 import { KitchenNav } from '../components/KitchenNav'
+import { useTabParam } from '../hooks/useTabParam'
 
 // ─── Status tabs ─────────────────────────────────────────────────
 
@@ -20,7 +21,10 @@ const TABS: { key: TabKey; label: string }[] = [
 // ─── Page ────────────────────────────────────────────────────────
 
 export function ProductionOrdersPage() {
-  const [tab, setTab] = useState<TabKey>('all')
+  const [tab, setTab] = useTabParam(
+    TABS.map((t) => t.key),
+    'all',
+  )
   const [dateFilter, setDateFilter] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
 

@@ -9,13 +9,17 @@ import { ReconciliationPanel } from '../components/procurement/ReconciliationPan
 import { StockRequestsPanel, type PrefillLine } from '../components/procurement/StockRequestsPanel'
 import { StockSheetCuration } from '../components/procurement/StockSheetCuration'
 import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
+import { useTabParam } from '../hooks/useTabParam'
 import type { PurchaseOrder } from '../types/procurement'
 
 type Tab = 'purchases' | 'orders' | 'requests' | 'items'
 type Screen = 'list' | 'detail' | 'reconcile'
 
 export function Procurement() {
-  const [activeTab, setActiveTab] = useState<Tab>('orders')
+  const [activeTab, setActiveTab] = useTabParam(
+    ['purchases', 'orders', 'requests', 'items'] as const,
+    'orders',
+  )
   const [refreshKey, setRefreshKey] = useState(0)
   const [screen, setScreen] = useState<Screen>('list')
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null)
@@ -25,7 +29,7 @@ export function Procurement() {
     setPoPrefill({ lines, notes })
     setActiveTab('orders')
     setScreen('list')
-  }, [])
+  }, [setActiveTab])
 
   const {
     orders, isLoading, statusFilter, setStatusFilter,
