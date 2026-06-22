@@ -16,6 +16,10 @@ export interface SaleLabelInfo {
   carbs: number | null
   /** Ingredient text (состав), HTML entities decoded; null when not set. */
   ingredients: string | null
+  /** One-portion physical size, e.g. 200 — used as the default qty + label weight. */
+  portionSize: number | null
+  /** Unit for portionSize, e.g. "g" / "ml". */
+  portionUnit: string | null
 }
 
 /** Shape of the row we read (untyped supabase client). */
@@ -25,6 +29,8 @@ interface NutritionRow {
   fat: number | null
   carbs: number | null
   customer_ingredients: string | null
+  portion_size: number | null
+  portion_unit: string | null
 }
 
 /** Decode the few HTML entities that leak into customer_ingredients text. */
@@ -57,7 +63,7 @@ export function useSaleLabelInfo(nomenclatureId: string | null, enabled: boolean
 
     supabase
       .from('nomenclature')
-      .select('calories, protein, fat, carbs, customer_ingredients')
+      .select('calories, protein, fat, carbs, customer_ingredients, portion_size, portion_unit')
       .eq('id', nomenclatureId)
       .maybeSingle()
       .then(({ data }) => {
@@ -73,6 +79,8 @@ export function useSaleLabelInfo(nomenclatureId: string | null, enabled: boolean
             fat: row.fat,
             carbs: row.carbs,
             ingredients: raw ? decodeEntities(raw) : null,
+            portionSize: row.portion_size,
+            portionUnit: row.portion_unit,
           })
         }
         setIsLoading(false)

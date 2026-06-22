@@ -66,9 +66,10 @@ describe('renderPrepLabelTSPL', () => {
       expect(out.trimEnd().endsWith('PRINT 1,1')).toBe(true)
     })
 
-    it('omits the QR on the consumer label', () => {
+    it('includes the QR (batch barcode) on the consumer label', () => {
       const out = renderPrepLabelTSPL(sale)
-      expect(out).not.toContain('QRCODE')
+      expect(out).toContain('QRCODE')
+      expect(out).toContain('BEETRO-260615-101010')
     })
   })
 })

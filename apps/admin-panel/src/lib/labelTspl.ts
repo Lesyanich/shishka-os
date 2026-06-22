@@ -115,12 +115,18 @@ export function renderPrepLabelTSPL(
   // Scale vs the proven 60×40 baseline (480×320). min() keeps within both axes.
   const s = Math.min(wDots / 480, hDots / 320)
 
-  // SALE consumer label: name + per-portion nutrition + ingredients + dates.
+  // SALE consumer label: name + per-portion nutrition + ingredients + QR + dates.
   if (data.nutrition || data.ingredients) {
     const PAD = 24
     const usable = wDots - PAD * 2
     const charsName = Math.max(8, Math.floor(usable / 16)) // font "3" ≈ 16 dots/char
-    const chars1 = Math.max(12, Math.floor(usable / 8)) // font "1" ≈ 8 dots/char
+
+    // QR (batch barcode) sits bottom-right; ingredients wrap to clear its column.
+    const qrCell = Math.max(3, Math.round(4 * s))
+    const qrX = Math.round(wDots * 0.72)
+    const qrY = Math.round(hDots * 0.42)
+    const ingrWidth = data.qr ? qrX - PAD - 8 : usable
+    const chars1 = Math.max(12, Math.floor(ingrWidth / 8)) // font "1" ≈ 8 dots/char
 
     // Footer stacked from the bottom: batch (f1), USE BY (f3), PREP (f2).
     const batchY = hDots - FONT_H['1'] - 6
@@ -169,6 +175,7 @@ export function renderPrepLabelTSPL(
     cmds.push(`TEXT ${PAD},${prepY},"2",0,1,1,"${prep}"`)
     cmds.push(`TEXT ${PAD},${useByY},"3",0,1,1,"USE BY ${useByStr}"`)
     if (bottom) cmds.push(`TEXT ${PAD},${batchY},"1",0,1,1,"${esc(bottom)}"`)
+    if (data.qr) cmds.push(`QRCODE ${qrX},${qrY},M,${qrCell},A,0,"${esc(data.qr)}"`)
     cmds.push('PRINT 1,1')
     return cmds.join('\r\n') + '\r\n'
   }
