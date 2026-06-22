@@ -46,6 +46,7 @@ describe('renderPrepLabelTSPL', () => {
       batchCode: 'BEETRO-260615-101010',
       nutrition: { kcal: 343, protein: 14.3, fat: 18.4, carbs: 35.6 },
       ingredients: 'Chickpeas, beetroot, tahini, lemon, garlic, olive oil',
+      price: '฿111',
     }
 
     it('prints compact per-portion nutrition (ASCII)', () => {
@@ -70,6 +71,12 @@ describe('renderPrepLabelTSPL', () => {
       const out = renderPrepLabelTSPL(sale)
       expect(out).toContain('QRCODE')
       expect(out).toContain('BEETRO-260615-101010')
+    })
+
+    it('prints the price with an ASCII baht fallback (no ฿ glyph)', () => {
+      const out = renderPrepLabelTSPL(sale)
+      expect(out).toContain('THB 111')
+      expect(out).not.toContain('฿')
     })
   })
 })
