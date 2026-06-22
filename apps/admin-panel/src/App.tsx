@@ -136,6 +136,9 @@ function App() {
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                   <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
                   <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
+                  {/* Inventory/waste + receiving — owner-only, pulled off the cook floor */}
+                  <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
+                  <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 </Route>
 
                 {/* ── Task-manager tier (Mint / L2 assembly admin) + owner ── */}
@@ -150,17 +153,16 @@ function App() {
                   <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
                   <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
                   <Route path="/shopping-list" element={<Suspense fallback={<PageLoader />}><ShoppingList /></Suspense>} />
-                </Route>
-
-                {/* ── Kitchen floor (cook) — all authenticated roles ── */}
-                <Route element={<RoleGuard minRole="cook" />}>
-                  <Route path="/kitchen/my-tasks" element={<Suspense fallback={<PageLoader />}><CookTasksPage /></Suspense>} />
+                  {/* Heavy KDS production tooling — managers only, off the cook floor */}
                   <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
                   <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
-                  <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
+                </Route>
+
+                {/* ── Staff floor (cook) — all authenticated roles ── */}
+                <Route element={<RoleGuard minRole="cook" />}>
+                  <Route path="/kitchen/my-tasks" element={<Suspense fallback={<PageLoader />}><CookTasksPage /></Suspense>} />
                   <Route path="/kitchen/labels" element={<Suspense fallback={<PageLoader />}><KitchenLabels /></Suspense>} />
                   <Route path="/kitchen/recipes" element={<Suspense fallback={<PageLoader />}><KitchenRecipesPage /></Suspense>} />
-                  <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 </Route>
               </Route>
             </Route>

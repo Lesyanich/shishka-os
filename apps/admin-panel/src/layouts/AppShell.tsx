@@ -77,17 +77,14 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: 'Kitchen',
+    // Staff floor — exactly what a cook sees. Manager/owner tools live in
+    // 'Production & Planning' so this section mirrors the employee view.
+    title: 'Staff',
     defaultOpen: true,
     items: [
       { path: '/kitchen/my-tasks', icon: ListTodo, label: 'Tasks', minRole: 'cook' },
       { path: '/kitchen/recipes', icon: BookOpen, label: 'Recipes', minRole: 'cook' },
-      { path: '/kitchen/waste', icon: Trash2, label: 'Waste', minRole: 'cook' },
       { path: '/kitchen/labels', icon: Tag, label: 'Labels', minRole: 'cook' },
-      { path: '/receive', icon: ClipboardCheck, label: 'Receiving', minRole: 'cook' },
-      // Heavy KDS production tooling — managers only, hidden from the cook floor.
-      { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS', minRole: 'task_manager' },
-      { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station', minRole: 'task_manager' },
     ],
   },
   {
@@ -101,6 +98,12 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/procurement', icon: Truck, label: 'Procurement', minRole: 'task_manager' },
       { path: '/shopping-list', icon: ShoppingCart, label: 'Shopping List', minRole: 'task_manager' },
       { path: '/staff-tasks', icon: ListTodo, label: 'Staff Tasks', minRole: 'task_manager' },
+      // Heavy KDS production tooling — managers only, moved off the cook floor.
+      { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS', minRole: 'task_manager' },
+      { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station', minRole: 'task_manager' },
+      // Inventory/waste + receiving — owner-only, pulled off the cook floor (kept for the owner).
+      { path: '/kitchen/waste', icon: Trash2, label: 'Waste', minRole: 'owner' },
+      { path: '/receive', icon: ClipboardCheck, label: 'Receiving', minRole: 'owner' },
     ],
   },
   {
