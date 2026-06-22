@@ -1,8 +1,10 @@
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  X, Pencil, Check, Link2, Repeat, Clock, MessageSquare,
+  X, Pencil, Check, Link2, Repeat, Clock, MessageSquare, Camera, Loader2,
 } from 'lucide-react'
 import type { StaffTask } from '../../hooks/useStaffTasks'
+import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
 import {
   CATEGORY_LABEL,
   CATEGORY_STYLE,
@@ -20,11 +22,17 @@ interface TaskDetailModalProps {
   onClose: () => void
   onEdit: (task: StaffTask) => void
   onToggleDone?: (task: StaffTask) => void
+  /** Save a comment without leaving the read view. */
+  onSaveComment?: (task: StaffTask, comment: string) => Promise<unknown> | void
+  /** Attach photos without leaving the read view. */
+  onPhotosChange?: (task: StaffTask, photoUrls: string[]) => void
   /** Hide the Edit button when the viewer shouldn't change the task. */
   canEdit?: boolean
 }
 
 const SECTION_LABEL = 'mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500'
+const COMMENT_INPUT =
+  'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none'
 
 /**
  * Read-only task detail — opened when a card is tapped. Shows the instructions
@@ -32,9 +40,36 @@ const SECTION_LABEL = 'mb-1 text-[11px] font-semibold uppercase tracking-wide te
  * can "open, read, close" without fumbling the form. An Edit button switches to
  * the full {@link TaskFormModal}.
  */
-export function TaskDetailModal({ task, onClose, onEdit, onToggleDone, canEdit = true }: TaskDetailModalProps) {
+export function TaskDetailModal({
+  task, onClose, onEdit, onToggleDone, onSaveComment, onPhotosChange, canEdit = true,
+}: TaskDetailModalProps) {
   const navigate = useNavigate()
   const done = task.status === 'done'
+  const [comment, setComment] = useState(task.comment ?? '')
+  const [savingComment, setSavingComment] = useState(false)
+  const { upload, isUploading } = useTaskPhotoUpload()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const commentDirty = comment.trim() !== (task.comment ?? '').trim()
+
+  const onPickFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (!onPhotosChange || files.length === 0) return
+    const added: string[] = []
+    for (const file of files) {
+      const res = await upload(file, task.id)
+      if (res.ok && res.url) added.push(res.url)
+      else if (res.error) window.alert(res.error)
+    }
+    if (added.length) onPhotosChange(task, [...task.photo_urls, ...added])
+  }
+
+  const saveComment = async () => {
+    if (!onSaveComment) return
+    setSavingComment(true)
+    await onSaveComment(task, comment)
+    setSavingComment(false)
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -116,8 +151,8 @@ export function TaskDetailModal({ task, onClose, onEdit, onToggleDone, canEdit =
           </button>
         )}
 
-        {/* Photos */}
-        {task.photo_urls.length > 0 && (
+        {/* Photos — view + attach without leaving read mode */}
+        {(onPhotosChange || task.photo_urls.length > 0) && (
           <div className="mb-4">
             <h4 className={SECTION_LABEL}>Photos</h4>
             <div className="flex flex-wrap gap-2">
@@ -126,18 +161,60 @@ export function TaskDetailModal({ task, onClose, onEdit, onToggleDone, canEdit =
                   <img src={url} alt="report" className="h-full w-full object-cover" />
                 </a>
               ))}
+              {onPhotosChange && (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={isUploading}
+                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-700 text-slate-500 transition hover:border-emerald-500/40 hover:text-emerald-400 disabled:cursor-wait"
+                >
+                  {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                  <span className="text-[9px]">{isUploading ? '…' : 'Add'}</span>
+                </button>
+              )}
             </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              onChange={onPickFiles}
+              className="hidden"
+            />
           </div>
         )}
 
-        {/* Comment */}
-        {task.comment && (
+        {/* Comment — editable inline (no need to enter Edit) */}
+        {(onSaveComment || task.comment) && (
           <div className="mb-4">
             <h4 className={SECTION_LABEL}>
               <MessageSquare className="mr-1 inline h-3 w-3" />
               Comment
             </h4>
-            <p className="whitespace-pre-wrap rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-slate-300">{task.comment}</p>
+            {onSaveComment ? (
+              <>
+                <textarea
+                  className={`${COMMENT_INPUT} resize-y`}
+                  rows={3}
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Remark / feedback while doing this task…"
+                />
+                <div className="mt-1.5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={saveComment}
+                    disabled={!commentDirty || savingComment}
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40"
+                  >
+                    {savingComment ? 'Saving…' : 'Save comment'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="whitespace-pre-wrap rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-slate-300">{task.comment}</p>
+            )}
           </div>
         )}
 
