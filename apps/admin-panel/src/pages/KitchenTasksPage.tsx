@@ -23,21 +23,68 @@ import {
 } from '../components/tasks/taskMeta'
 
 type Tab = 'today' | 'all' | 'recurring' | 'team'
-type StationFilter = 'all' | 'L1' | 'L2' | 'mine'
+type StationFilter = 'all' | 'L1' | 'L2'
+type KindFilter = 'all' | 'recurring' | 'oneoff'
 
 const STATION_CHIPS: { value: StationFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'L1', label: 'L1 Kitchen' },
   { value: 'L2', label: 'L2 Assembly' },
-  { value: 'mine', label: 'Mine' },
 ]
+
+const KIND_CHIPS: { value: KindFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'recurring', label: '↻ Recurring' },
+  { value: 'oneoff', label: '• One-off' },
+]
+
+interface ChipOption {
+  value: string
+  label: string
+}
+
+/** One labelled row of filter chips. */
+function FilterChipRow({
+  label,
+  options,
+  value,
+  onSelect,
+}: {
+  label: string
+  options: ChipOption[]
+  value: string
+  onSelect: (v: string) => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onSelect(o.value)}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+            value === o.value
+              ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+              : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 /**
  * Unified kitchen task board — the single tracker behind both `/kitchen/my-tasks`
  * (cook landing) and `/staff-tasks` (manager). Everyone sees the whole team's
  * tasks and can create / assign / complete; managers additionally get the shifts
- * strip, Telegram pushes, and the Telegram-link tab. Station chips (All · L1 · L2
- * · Mine) filter the board; "general" tasks show under both L1 and L2.
+ * strip, Telegram pushes, and the Telegram-link tab. Filters: station (L1/L2),
+ * person (chips per staff member), and kind (recurring vs one-off). "general"
+ * tasks show under both L1 and L2.
  */
 export function KitchenTasksPage() {
   const today = formatLocalDate(new Date())
@@ -70,12 +117,41 @@ export function KitchenTasksPage() {
 
   const [tab, setTab] = useState<Tab>('today')
   const [stationFilter, setStationFilter] = useState<StationFilter>('all')
+  const [personFilter, setPersonFilter] = useState<string>('all') // 'all' | 'unassigned' | staffId
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<StaffTask | null>(null)
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'open' | 'all'>('open')
-  const [assigneeFilter, setAssigneeFilter] = useState<string>('')
 
   const activeStaff = useMemo(() => staff.filter((s) => s.is_active), [staff])
+
+  // People chips — distinct assignees across all tasks + templates (stable set,
+  // so chips don't appear/disappear as other filters change). Self pinned first.
+  const people = useMemo(() => {
+    const map = new Map<string, string>()
+    let hasUnassigned = false
+    for (const t of [...tasks, ...templates]) {
+      if (t.assigned_to) map.set(t.assigned_to, t.staff?.name ?? '—')
+      else hasUnassigned = true
+    }
+    const list = Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) => {
+      if (staffId) {
+        if (a.id === staffId) return -1
+        if (b.id === staffId) return 1
+      }
+      return a.name.localeCompare(b.name)
+    })
+    return { list, hasUnassigned }
+  }, [tasks, templates, staffId])
+
+  const personOptions: ChipOption[] = useMemo(() => {
+    const opts: ChipOption[] = [{ value: 'all', label: 'All' }]
+    for (const p of people.list) {
+      opts.push({ value: p.id, label: p.id === staffId ? `${p.name} · me` : p.name })
+    }
+    if (people.hasUnassigned) opts.push({ value: 'unassigned', label: 'Unassigned' })
+    return opts
+  }, [people, staffId])
 
   // Materialize today's recurring instances once on load (the cron does this at
   // 07:25 ICT; this keeps the Today view correct before then).
@@ -150,21 +226,27 @@ export function KitchenTasksPage() {
     if (window.confirm(`Delete "${task.title}"?`)) deleteTask(task.id)
   }
 
-  // Station filter applied to concrete tasks. "general" shows under L1 and L2.
-  const matchesStation = (t: StaffTask): boolean => {
-    switch (stationFilter) {
-      case 'L1': return t.station === 'L1' || t.station === 'general'
-      case 'L2': return t.station === 'L2' || t.station === 'general'
-      case 'mine': return !!staffId && t.assigned_to === staffId
-      default: return true
-    }
-  }
+  // Filter predicates. "general" tasks show under L1 and L2.
+  const matchesStation = (t: StaffTask) =>
+    stationFilter === 'all' || t.station === stationFilter || t.station === 'general'
+  const matchesPerson = (t: StaffTask) =>
+    personFilter === 'all'
+      ? true
+      : personFilter === 'unassigned'
+        ? !t.assigned_to
+        : t.assigned_to === personFilter
+  // Recurring instances carry a template_id; genuine one-offs don't.
+  const matchesKind = (t: StaffTask) =>
+    kindFilter === 'all' ? true : kindFilter === 'recurring' ? !!t.template_id : !t.template_id
 
   // ── Today: concrete tasks due today, grouped by assignee ──
   const todayTasks = useMemo(
-    () => optimisticTasks.filter((t) => t.due_date === today && matchesStation(t)),
+    () =>
+      optimisticTasks.filter(
+        (t) => t.due_date === today && matchesStation(t) && matchesPerson(t) && matchesKind(t),
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [optimisticTasks, today, stationFilter, staffId],
+    [optimisticTasks, today, stationFilter, personFilter, kindFilter],
   )
   const grouped = useMemo(() => {
     const map = new Map<string, { key: string; name: string; tasks: StaffTask[] }>()
@@ -186,14 +268,20 @@ export function KitchenTasksPage() {
   // ── All: filtered concrete tasks ──
   const filteredAll = useMemo(() => {
     return optimisticTasks.filter((t) => {
-      if (!matchesStation(t)) return false
-      if (assigneeFilter && t.assigned_to !== assigneeFilter) return false
+      if (!matchesStation(t) || !matchesPerson(t) || !matchesKind(t)) return false
       if (statusFilter === 'all') return true
       if (statusFilter === 'open') return t.status === 'todo' || t.status === 'in_progress'
       return t.status === statusFilter
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [optimisticTasks, assigneeFilter, statusFilter, stationFilter, staffId])
+  }, [optimisticTasks, statusFilter, stationFilter, personFilter, kindFilter])
+
+  // ── Recurring: templates, filtered by station + person (kind is implicit) ──
+  const filteredTemplates = useMemo(
+    () => templates.filter((t) => matchesStation(t) && matchesPerson(t)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [templates, stationFilter, personFilter],
+  )
 
   const doneToday = todayTasks.filter((t) => t.status === 'done').length
 
@@ -204,7 +292,8 @@ export function KitchenTasksPage() {
     ...(isManager ? [{ value: 'team' as Tab, label: 'Telegram', icon: Send }] : []),
   ]
 
-  const showStationChips = tab === 'today' || tab === 'all'
+  const showFilters = tab === 'today' || tab === 'all' || tab === 'recurring'
+  const showKindRow = tab === 'today' || tab === 'all'
 
   return (
     <div className="space-y-4">
@@ -254,23 +343,29 @@ export function KitchenTasksPage() {
         )}
       </div>
 
-      {/* Station filter chips */}
-      {showStationChips && (
-        <div className="flex flex-wrap gap-1.5">
-          {STATION_CHIPS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setStationFilter(c.value)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                stationFilter === c.value
-                  ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
-                  : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
+      {/* Filter bar: Station · People · Type */}
+      {showFilters && (
+        <div className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-2.5">
+          <FilterChipRow
+            label="Station"
+            options={STATION_CHIPS}
+            value={stationFilter}
+            onSelect={(v) => setStationFilter(v as StationFilter)}
+          />
+          <FilterChipRow
+            label="People"
+            options={personOptions}
+            value={personFilter}
+            onSelect={setPersonFilter}
+          />
+          {showKindRow && (
+            <FilterChipRow
+              label="Type"
+              options={KIND_CHIPS}
+              value={kindFilter}
+              onSelect={(v) => setKindFilter(v as KindFilter)}
+            />
+          )}
         </div>
       )}
 
@@ -361,16 +456,6 @@ export function KitchenTasksPage() {
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
-            <select
-              value={assigneeFilter}
-              onChange={(e) => setAssigneeFilter(e.target.value)}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200"
-            >
-              <option value="">Everyone</option>
-              {activeStaff.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
           </div>
 
           {filteredAll.length === 0 ? (
@@ -399,18 +484,18 @@ export function KitchenTasksPage() {
       {/* ── RECURRING ── */}
       {tab === 'recurring' && (
         <div className="space-y-1.5">
-          {templates.length === 0 ? (
+          {filteredTemplates.length === 0 ? (
             <p className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-xs text-slate-600">
               No recurring templates. Create a task and set it to repeat daily or weekly.
             </p>
           ) : (
-            templates.map((t) => (
+            filteredTemplates.map((t) => (
               <TaskRow key={t.id} task={t} onEdit={openEdit} onDelete={handleDelete} />
             ))
           )}
-          {templates.length > 0 && (
+          {filteredTemplates.length > 0 && (
             <p className="px-1 pt-2 text-[11px] text-slate-600">
-              {templates.length} template(s) · {templates.map((t) => describeRecurrence(t)).join(' · ')}
+              {filteredTemplates.length} template(s) · {filteredTemplates.map((t) => describeRecurrence(t)).join(' · ')}
             </p>
           )}
         </div>

@@ -88,6 +88,14 @@ export function TaskRow({
               {describeRecurrence(task)}
             </span>
           )}
+          {!task.is_template && task.template_id && (
+            <span
+              className="inline-flex items-center rounded-full bg-indigo-500/15 px-1 py-0.5 text-indigo-300"
+              title="Recurring task (from a template)"
+            >
+              <Repeat className="h-3 w-3" />
+            </span>
+          )}
         </div>
 
         {task.title_th && (
