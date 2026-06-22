@@ -57,6 +57,7 @@ const CashierPage = lazyWithReload(() => import('./pages/cashier/CashierPage').t
 const CookTasksPage = lazyWithReload(() => import('./pages/CookTasksPage').then(m => ({ default: m.CookTasksPage })))
 const KitchenLabels = lazyWithReload(() => import('./pages/KitchenLabels').then(m => ({ default: m.KitchenLabels })))
 const KitchenRecipesPage = lazyWithReload(() => import('./pages/KitchenRecipesPage').then(m => ({ default: m.KitchenRecipesPage })))
+const StaffSchedulePage = lazyWithReload(() => import('./pages/staff/StaffSchedulePage').then(m => ({ default: m.StaffSchedulePage })))
 
 function PageLoader() {
   return (
@@ -172,6 +173,7 @@ function App() {
                   <Route path="/kitchen/my-tasks" element={<Suspense fallback={<PageLoader />}><CookTasksPage /></Suspense>} />
                   <Route path="/kitchen/labels" element={<Suspense fallback={<PageLoader />}><KitchenLabels /></Suspense>} />
                   <Route path="/kitchen/recipes" element={<Suspense fallback={<PageLoader />}><KitchenRecipesPage /></Suspense>} />
+                  <Route path="/staff/schedule" element={<Suspense fallback={<PageLoader />}><StaffSchedulePage /></Suspense>} />
                 </Route>
               </Route>
             </Route>
