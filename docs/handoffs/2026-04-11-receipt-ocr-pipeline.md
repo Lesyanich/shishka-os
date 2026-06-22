@@ -28,7 +28,7 @@ Photo → GCV OCR ($0.0015/image) → raw text → LLM ($0.001-0.07) → JSON + 
 - `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` (Gemini), `GOOGLE_API_KEY_VISAI` (Cloud Vision)
 
 ### Edge Function deployed
-- `ocr-receipt` — deployed to qcqgtcsjoacuktcewpvo, --no-verify-jwt
+- `ocr-receipt` — deployed to qcqgtcsjoacuktcewpvo (JWT verification enabled; see README-DEPLOY.md)
 - Symlink: `supabase/functions → ../services/supabase/functions`
 
 ### Test results (receipt 166501146001, 16 items, 2251 THB)
@@ -77,6 +77,6 @@ Read: apps/admin-panel/src/hooks/useReceiptInbox.ts
 # Test a receipt
 curl "https://qcqgtcsjoacuktcewpvo.supabase.co/functions/v1/ocr-receipt?inbox_id=<ID>&model=gemini-flash"
 
-# Deploy after changes
-cd <repo> && npx supabase functions deploy ocr-receipt --no-verify-jwt
+# Deploy after changes (JWT verification stays ENABLED — do NOT pass --no-verify-jwt)
+cd <repo> && npx supabase functions deploy ocr-receipt
 ```

@@ -86,6 +86,6 @@ Read: apps/admin-panel/src/components/receipts/InboxReviewPanel.tsx
 Read: apps/admin-panel/src/components/receipts/InboxList.tsx
 Read: services/supabase/functions/ocr-receipt/prompts.ts
 
-# Deploy after changes
-cd <repo> && npx supabase functions deploy ocr-receipt --no-verify-jwt
+# Deploy after changes (JWT verification stays ENABLED — do NOT pass --no-verify-jwt)
+cd <repo> && npx supabase functions deploy ocr-receipt
 ```
