@@ -133,33 +133,25 @@ export function KitchenTasksPage() {
 
   const activeStaff = useMemo(() => staff.filter((s) => s.is_active), [staff])
 
-  // People chips — distinct assignees across all tasks + templates (stable set,
-  // so chips don't appear/disappear as other filters change). Self pinned first.
-  const people = useMemo(() => {
-    const map = new Map<string, string>()
-    let hasUnassigned = false
-    for (const t of [...tasks, ...templates]) {
-      if (t.assigned_to) map.set(t.assigned_to, t.staff?.name ?? '—')
-      else hasUnassigned = true
-    }
-    const list = Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) => {
+  // People chips — every active staff member (so you can filter by anyone, even
+  // those with no tasks yet). Self pinned first; "Unassigned" only when relevant.
+  const personOptions: ChipOption[] = useMemo(() => {
+    const opts: ChipOption[] = [{ value: 'all', label: 'All' }]
+    const sorted = [...activeStaff].sort((a, b) => {
       if (staffId) {
         if (a.id === staffId) return -1
         if (b.id === staffId) return 1
       }
       return a.name.localeCompare(b.name)
     })
-    return { list, hasUnassigned }
-  }, [tasks, templates, staffId])
-
-  const personOptions: ChipOption[] = useMemo(() => {
-    const opts: ChipOption[] = [{ value: 'all', label: 'All' }]
-    for (const p of people.list) {
-      opts.push({ value: p.id, label: p.id === staffId ? `${p.name} · me` : p.name })
+    for (const s of sorted) {
+      opts.push({ value: s.id, label: s.id === staffId ? `${s.name} · me` : s.name })
     }
-    if (people.hasUnassigned) opts.push({ value: 'unassigned', label: 'Unassigned' })
+    if ([...tasks, ...templates].some((t) => !t.assigned_to)) {
+      opts.push({ value: 'unassigned', label: 'Unassigned' })
+    }
     return opts
-  }, [people, staffId])
+  }, [activeStaff, staffId, tasks, templates])
 
   // Materialize today's recurring instances once on load (the cron does this at
   // 07:25 ICT; this keeps the Today view correct before then).
@@ -275,6 +267,9 @@ export function KitchenTasksPage() {
 
   const handlePhotosChange = (task: StaffTask, photoUrls: string[]) =>
     updateTask(task.id, { photo_urls: photoUrls })
+
+  const handleSaveComment = (task: StaffTask, comment: string) =>
+    updateTask(task.id, { comment: comment.trim() || null })
 
   const handleDelete = (task: StaffTask) => {
     if (window.confirm(`Delete "${task.title}"?`)) deleteTask(task.id)
@@ -567,6 +562,8 @@ export function KitchenTasksPage() {
           onClose={closeView}
           onEdit={openEdit}
           onToggleDone={toggleDone}
+          onSaveComment={handleSaveComment}
+          onPhotosChange={handlePhotosChange}
         />
       )}
 
