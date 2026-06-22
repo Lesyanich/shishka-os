@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search, ChevronLeft, Loader2, Tag, Printer, Trash2, Usb, Plus } from 'lucide-react'
-import { usePrepLabelItems, type PrepItem } from '../hooks/usePrepLabelItems'
+import { usePrepLabelItems, type PrepItem, type PrepItemKind } from '../hooks/usePrepLabelItems'
 import { usePfPackCard } from '../hooks/usePfPackCard'
 import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
 import { useLocations } from '../hooks/useLocations'
@@ -27,6 +27,27 @@ const shortDate = (iso: string | Date) =>
 const shelfDaysOf = (b: PrepBatch) =>
   Math.max(1, Math.round((new Date(b.expires_at).getTime() - new Date(b.produced_at).getTime()) / DAY_MS))
 
+/** PF / Sale filter chips for the item list. */
+type KindFilter = 'all' | PrepItemKind
+const KIND_FILTERS: { id: KindFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'PF', label: 'Preps (PF)' },
+  { id: 'SALE', label: 'Dishes (Sale)' },
+]
+
+/** Small colored badge marking an item as a PF prep or a SALE dish. */
+function KindBadge({ kind }: { kind: PrepItemKind }) {
+  const styles =
+    kind === 'SALE'
+      ? 'bg-emerald-900/40 text-emerald-300'
+      : 'bg-amber-900/40 text-amber-300'
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${styles}`}>
+      {kind === 'SALE' ? 'Sale' : 'PF'}
+    </span>
+  )
+}
+
 /**
  * Kitchen label station (cook-accessible). An L1 cook picks a prep item, enters
  * the batch weight + shelf life, and prints a storage label to the XP-420B via
@@ -38,17 +59,29 @@ const shelfDaysOf = (b: PrepBatch) =>
 export function KitchenLabels() {
   const { items, isLoading, error } = usePrepLabelItems()
   const [query, setQuery] = useState('')
+  const [kind, setKind] = useState<KindFilter>('all')
   const [selected, setSelected] = useState<PrepItem | null>(null)
+
+  const counts = useMemo(
+    () => ({
+      all: items.length,
+      PF: items.filter((i) => i.kind === 'PF').length,
+      SALE: items.filter((i) => i.kind === 'SALE').length,
+    }),
+    [items],
+  )
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return items
-    return items.filter(
-      (i) =>
+    return items.filter((i) => {
+      if (kind !== 'all' && i.kind !== kind) return false
+      if (!q) return true
+      return (
         i.name.toLowerCase().includes(q) ||
-        i.product_code.toLowerCase().includes(q),
-    )
-  }, [items, query])
+        i.product_code.toLowerCase().includes(q)
+      )
+    })
+  }, [items, query, kind])
 
   if (selected) {
     return <LabelEditor item={selected} onBack={() => setSelected(null)} />
@@ -58,18 +91,39 @@ export function KitchenLabels() {
     <div className="mx-auto max-w-2xl p-4">
       <div className="mb-4 flex items-center gap-2">
         <Tag className="h-5 w-5 text-amber-400" />
-        <h1 className="text-lg font-semibold text-slate-100">Prep Labels</h1>
+        <h1 className="text-lg font-semibold text-slate-100">Kitchen Labels</h1>
       </div>
 
-      <div className="relative mb-4">
+      <div className="relative mb-3">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search prep item…"
+          placeholder="Search item…"
           className="w-full rounded-xl border border-slate-700 bg-slate-900 py-3 pl-10 pr-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
         />
+      </div>
+
+      <div className="mb-4 flex gap-2">
+        {KIND_FILTERS.map((f) => {
+          const active = kind === f.id
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setKind(f.id)}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                active
+                  ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
+                  : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+              }`}
+            >
+              {f.label}
+              <span className="ml-1.5 text-xs text-slate-500">{counts[f.id]}</span>
+            </button>
+          )
+        })}
       </div>
 
       {isLoading && (
@@ -80,7 +134,7 @@ export function KitchenLabels() {
 
       {error && (
         <p className="rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
-          Couldn&apos;t load prep items: {error}
+          Couldn&apos;t load items: {error}
         </p>
       )}
 
@@ -96,7 +150,10 @@ export function KitchenLabels() {
             onClick={() => setSelected(item)}
             className="flex flex-col items-start gap-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-left transition hover:border-amber-500/50 hover:bg-slate-800"
           >
-            <span className="text-sm font-medium text-slate-100">{item.name}</span>
+            <div className="flex w-full items-center justify-between gap-2">
+              <span className="text-sm font-medium text-slate-100">{item.name}</span>
+              <KindBadge kind={item.kind} />
+            </div>
             <span className="text-[11px] text-slate-500">{item.product_code}</span>
           </button>
         ))}
