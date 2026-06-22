@@ -25,13 +25,15 @@ interface TaskRowProps {
   onEdit?: (task: StaffTask) => void
   onDelete?: (task: StaffTask) => void
   onPush?: (task: StaffTask) => void
+  /** Open the task (click on its body) — view/edit its full details. */
+  onOpen?: (task: StaffTask) => void
   /** Persist a changed photo set (after camera capture). */
   onPhotosChange?: (task: StaffTask, photoUrls: string[]) => void
   showDate?: boolean
 }
 
 export function TaskRow({
-  task, onToggleDone, onEdit, onDelete, onPush, onPhotosChange, showDate,
+  task, onToggleDone, onEdit, onDelete, onPush, onOpen, onPhotosChange, showDate,
 }: TaskRowProps) {
   const done = task.status === 'done'
   const overdue = isOverdue(task)
@@ -73,6 +75,10 @@ export function TaskRow({
 
       {/* Body */}
       <div className="min-w-0 flex-1">
+        <div
+          className={onOpen ? 'cursor-pointer' : undefined}
+          onClick={onOpen ? () => onOpen(task) : undefined}
+        >
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[task.priority]}`} />
           <span
@@ -86,6 +92,14 @@ export function TaskRow({
             <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300">
               <Repeat className="h-3 w-3" />
               {describeRecurrence(task)}
+            </span>
+          )}
+          {!task.is_template && task.template_id && (
+            <span
+              className="inline-flex items-center rounded-full bg-indigo-500/15 px-1 py-0.5 text-indigo-300"
+              title="Recurring task (from a template)"
+            >
+              <Repeat className="h-3 w-3" />
             </span>
           )}
         </div>
@@ -120,6 +134,7 @@ export function TaskRow({
               {STATUS_LABEL[task.status]}
             </span>
           )}
+        </div>
         </div>
 
         {/* Deep link chip */}
