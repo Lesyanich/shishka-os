@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ChefHat, Package, Loader2 } from 'lucide-react'
 import { useMenuData } from '../hooks/useMenuData'
 import { useMenuListEnrichment } from '../hooks/useMenuListEnrichment'
@@ -43,16 +44,38 @@ export function KitchenRecipesPage() {
 
   const enrichment = useMenuListEnrichment(items, childrenByParent)
 
+  // Deep-link params (?dish={product_code}&station=l1-cook|l2-assembler) — a task
+  // in the tracker can link straight to a dish's recipe on the right station tab.
+  const [searchParams] = useSearchParams()
+  const dishParam = searchParams.get('dish')
+  const initialStation: RecipeStation =
+    searchParams.get('station') === 'l2-assembler' ? 'l2-assembler' : 'l1-cook'
+
   // Station tab (L1 / L2)
-  const [station, setStation] = useState<RecipeStation>('l1-cook')
+  const [station, setStation] = useState<RecipeStation>(initialStation)
 
   // Filters
-  const [typeFilter, setTypeFilter] = useState<TypeFilterValue>(defaultType('l1-cook'))
+  const [typeFilter, setTypeFilter] = useState<TypeFilterValue>(defaultType(initialStation))
   const [availableFilter, setAvailableFilter] = useState<boolean | null>(
-    defaultAvailable('l1-cook'),
+    defaultAvailable(initialStation),
   )
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null)
+
+  // When deep-linked to a specific dish, surface it: show All availability and
+  // narrow to the dish's type + section so its card (with steps) is at the top.
+  const appliedDishRef = useRef(false)
+  useEffect(() => {
+    if (appliedDishRef.current) return
+    if (!dishParam || items.length === 0) return
+    appliedDishRef.current = true
+    const item = items.find((i) => i.product_code === dishParam)
+    if (!item) return
+    setTypeFilter(item.kind as TypeFilterValue)
+    setAvailableFilter(null)
+    setSelectedCategory(item.section_id ?? item.category_id ?? null)
+    setSelectedSubcategory(null)
+  }, [dishParam, items])
 
   // Reset filters to station-appropriate defaults on tab switch.
   function handleStationChange(next: RecipeStation) {

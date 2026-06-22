@@ -6,6 +6,7 @@ import type {
   StaffTask,
   TaskCategory,
   TaskPriority,
+  TaskStation,
   TaskStatus,
 } from '../../hooks/useStaffTasks'
 
@@ -54,6 +55,29 @@ export const PRIORITY_DOT: Record<TaskPriority, string> = {
   high: 'bg-amber-500',
   medium: 'bg-sky-500',
   low: 'bg-slate-500',
+}
+
+// Station: L1 = prep kitchen, L2 = assembly/service, general = both.
+export interface StationOption {
+  value: TaskStation
+  label: string
+  label_th: string
+}
+
+export const STATION_OPTIONS: StationOption[] = [
+  { value: 'general', label: 'General', label_th: 'ทั่วไป' },
+  { value: 'L1', label: 'L1 Kitchen', label_th: 'L1 ครัว' },
+  { value: 'L2', label: 'L2 Assembly', label_th: 'L2 ประกอบ' },
+]
+
+export const STATION_LABEL: Record<TaskStation, string> = Object.fromEntries(
+  STATION_OPTIONS.map((s) => [s.value, s.label]),
+) as Record<TaskStation, string>
+
+export const STATION_STYLE: Record<TaskStation, string> = {
+  L1: 'bg-orange-500/15 text-orange-300',
+  L2: 'bg-cyan-500/15 text-cyan-300',
+  general: 'bg-slate-700/40 text-slate-300',
 }
 
 export const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [

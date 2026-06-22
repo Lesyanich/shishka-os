@@ -1,9 +1,17 @@
-import { Check, Clock, Pencil, Trash2, AlertTriangle, Repeat, Send } from 'lucide-react'
+import { useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  Check, Clock, Pencil, Trash2, AlertTriangle, Repeat, Send,
+  Camera, Loader2, Link2,
+} from 'lucide-react'
 import type { StaffTask } from '../../hooks/useStaffTasks'
+import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
 import {
   CATEGORY_LABEL,
   CATEGORY_STYLE,
   PRIORITY_DOT,
+  STATION_LABEL,
+  STATION_STYLE,
   STATUS_LABEL,
   STATUS_STYLE,
   describeRecurrence,
@@ -17,13 +25,33 @@ interface TaskRowProps {
   onEdit?: (task: StaffTask) => void
   onDelete?: (task: StaffTask) => void
   onPush?: (task: StaffTask) => void
+  /** Persist a changed photo set (after camera capture). */
+  onPhotosChange?: (task: StaffTask, photoUrls: string[]) => void
   showDate?: boolean
 }
 
-export function TaskRow({ task, onToggleDone, onEdit, onDelete, onPush, showDate }: TaskRowProps) {
+export function TaskRow({
+  task, onToggleDone, onEdit, onDelete, onPush, onPhotosChange, showDate,
+}: TaskRowProps) {
   const done = task.status === 'done'
   const overdue = isOverdue(task)
   const assignee = task.staff?.name ?? 'Unassigned'
+  const navigate = useNavigate()
+  const { upload, isUploading } = useTaskPhotoUpload()
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const onPickFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (!onPhotosChange || files.length === 0) return
+    const added: string[] = []
+    for (const file of files) {
+      const res = await upload(file, task.id)
+      if (res.ok && res.url) added.push(res.url)
+      else if (res.error) window.alert(res.error)
+    }
+    if (added.length) onPhotosChange(task, [...task.photo_urls, ...added])
+  }
 
   return (
     <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2.5">
@@ -67,6 +95,11 @@ export function TaskRow({ task, onToggleDone, onEdit, onDelete, onPush, showDate
         )}
 
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+          {task.station !== 'general' && (
+            <span className={`rounded-full px-1.5 py-0.5 font-semibold ${STATION_STYLE[task.station]}`}>
+              {STATION_LABEL[task.station]}
+            </span>
+          )}
           <span className={`rounded-full px-1.5 py-0.5 ${CATEGORY_STYLE[task.category]}`}>
             {CATEGORY_LABEL[task.category]}
           </span>
@@ -88,10 +121,55 @@ export function TaskRow({ task, onToggleDone, onEdit, onDelete, onPush, showDate
             </span>
           )}
         </div>
+
+        {/* Deep link chip */}
+        {task.linked_route && (
+          <button
+            type="button"
+            onClick={() => navigate(task.linked_route!)}
+            className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-300 ring-1 ring-emerald-500/20 transition hover:bg-emerald-500/20"
+          >
+            <Link2 className="h-3 w-3 shrink-0" />
+            <span className="truncate">{task.linked_label ?? 'Open tab'}</span>
+          </button>
+        )}
+
+        {/* Photo report thumbnails */}
+        {task.photo_urls.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {task.photo_urls.map((url) => (
+              <a key={url} href={url} target="_blank" rel="noreferrer" className="block h-12 w-12 overflow-hidden rounded-md border border-slate-700">
+                <img src={url} alt="report" className="h-full w-full object-cover" />
+              </a>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Actions */}
       <div className="flex shrink-0 items-center gap-1">
+        {onPhotosChange && !task.is_template && (
+          <>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={isUploading}
+              title="Add photo"
+              className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-emerald-400 disabled:cursor-wait"
+            >
+              {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              onChange={onPickFiles}
+              className="hidden"
+            />
+          </>
+        )}
         {onPush && !task.is_template && task.assigned_to && (
           <button
             type="button"
