@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Loader2, X } from 'lucide-react'
+import { Loader2, Printer, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useToast } from '../ui/Toast'
+import { printOrder } from '../../lib/printBridge'
+import { toReceiptPayload } from '../../lib/orderReceipt'
 
 type OrderItem = {
   id: string
@@ -22,6 +25,13 @@ export type Order = {
   total_amount: number
   notes: string | null
   created_at: string
+  /* Optional — present once the board selects them; used for printing & badges. */
+  order_code?: string | null
+  payment_status?: string | null
+  payment_method?: string | null
+  fulfillment_type?: 'pickup' | 'dine_in' | null
+  table_number?: string | null
+  channel?: string | null
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -51,6 +61,49 @@ export function OrderDetailsModal({
 }) {
   const [items, setItems] = useState<OrderItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [printing, setPrinting] = useState<null | 'customer' | 'assembly'>(null)
+  const toast = useToast()
+
+  const handlePrint = async (kind: 'customer' | 'assembly') => {
+    setPrinting(kind)
+    try {
+      const lines = items.map((i) => ({
+        name: i.item_name,
+        quantity: i.quantity,
+        price: i.price_at_purchase,
+      }))
+      const payload = toReceiptPayload(
+        {
+          orderCode: order.order_code ?? order.id.slice(0, 8),
+          total: order.total_amount,
+          customerName: order.customer_name,
+          notes: order.notes,
+          fulfillmentType: order.fulfillment_type ?? undefined,
+          tableNumber: order.table_number,
+          paymentStatus: order.payment_status,
+        },
+        lines,
+        kind,
+      )
+      await printOrder(payload)
+      toast.push({
+        title: kind === 'customer' ? 'Customer receipt sent' : 'Kitchen ticket sent',
+        variant: 'success',
+      })
+    } catch (e) {
+      toast.push({
+        title: 'Print failed',
+        body:
+          e instanceof Error
+            ? e.message
+            : 'Printer unreachable — is print-bridge running on this device?',
+        variant: 'error',
+        durationMs: 8000,
+      })
+    } finally {
+      setPrinting(null)
+    }
+  }
 
   useEffect(() => {
     const loadItems = async () => {
@@ -76,12 +129,16 @@ export function OrderDetailsModal({
       const nomIds = [...new Set(rawItems.map((i) => i.nomenclature_id as string))]
       const { data: nomData } = await supabase
         .from('nomenclature')
-        .select('id, product_code, name')
+        .select('id, product_code, name, customer_short_name')
         .in('id', nomIds)
 
       const nomMap: Record<string, { code: string; name: string }> = {}
       for (const n of nomData ?? []) {
-        nomMap[n.id as string] = { code: n.product_code as string, name: n.name as string }
+        // Prefer the clean customer-facing label; it fits the 58mm receipt.
+        nomMap[n.id as string] = {
+          code: n.product_code as string,
+          name: (n.customer_short_name as string) ?? (n.name as string),
+        }
       }
 
       setItems(
@@ -278,6 +335,36 @@ export function OrderDetailsModal({
               </tbody>
             </table>
           )}
+        </div>
+
+        {/* Print actions — customer receipt + kitchen/assembly ticket */}
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-800 px-5 py-3">
+          <button
+            type="button"
+            onClick={() => handlePrint('assembly')}
+            disabled={printing !== null || isLoading}
+            className="inline-flex h-8 items-center rounded-md border border-violet-500/50 bg-violet-500/10 px-3 text-xs font-medium text-violet-200 hover:bg-violet-500/20 disabled:opacity-50"
+          >
+            {printing === 'assembly' ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Printer className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Kitchen ticket
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePrint('customer')}
+            disabled={printing !== null || isLoading}
+            className="inline-flex h-8 items-center rounded-md border border-sky-500/50 bg-sky-500/10 px-3 text-xs font-medium text-sky-200 hover:bg-sky-500/20 disabled:opacity-50"
+          >
+            {printing === 'customer' ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Printer className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Customer receipt
+          </button>
         </div>
 
         {/* Status transition buttons */}

@@ -46,7 +46,9 @@ export function LiveOrderBoard() {
     setIsLoading(true)
     const { data, error } = await supabase
       .from('orders')
-      .select('id, source, status, customer_name, customer_phone, total_amount, notes, created_at')
+      .select(
+        'id, source, status, customer_name, customer_phone, total_amount, notes, created_at, order_code, payment_status, payment_method, fulfillment_type, table_number, channel',
+      )
       .in('status', ['new', 'preparing', 'ready'])
       .order('created_at', { ascending: false })
       .limit(100)
@@ -311,12 +313,19 @@ export function LiveOrderBoard() {
                       className="w-full rounded-lg border border-slate-800 bg-slate-900/80 p-3 text-left transition hover:border-slate-600"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-[10px] text-slate-500">
-                          {order.id.slice(0, 8)}
+                        <span className="font-mono text-xs font-semibold text-slate-200">
+                          #{order.order_code ?? order.id.slice(0, 8)}
                         </span>
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[9px] uppercase text-slate-500">
-                          {order.source}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          {order.payment_status === 'paid' && (
+                            <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-300">
+                              paid
+                            </span>
+                          )}
+                          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[9px] uppercase text-slate-500">
+                            {order.source}
+                          </span>
+                        </div>
                       </div>
                       <p className="mt-1 text-xs font-medium text-slate-200">
                         {order.customer_name || 'Walk-in'}

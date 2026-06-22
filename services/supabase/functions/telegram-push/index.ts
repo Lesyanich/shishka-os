@@ -3,10 +3,12 @@
 // Outbound pushes for the staff task tracker (Phase 2).
 //
 // Actions (query param ?action=):
-//   assign     &task_id=  → DM the assignee one task with Done/Snooze buttons
-//   morning               → DM every linked staff their tasks for today (ICT)
-//   schedule              → post today's shift schedule to the group chat
-//   reminders             → DM due/overdue, not-done tasks once (reminder_sent_at)
+//   assign     &task_id=   → DM the assignee one task with Done/Snooze buttons
+//   morning                → DM every linked staff their tasks for today (ICT)
+//   schedule               → post today's shift schedule to the group chat
+//   reminders              → DM due/overdue, not-done tasks once (reminder_sent_at)
+//   new_order  &order_id=  → post a new website order to the kitchen group chat
+//                            (fired by the orders AFTER INSERT trigger, mig 306)
 //
 // Auth: deployed WITH verify_jwt (default). Callable by the authenticated admin
 // (supabase.functions.invoke attaches the user token) and by pg_cron via pg_net
@@ -19,6 +21,7 @@
 import { db } from "../_shared/supabase.ts"
 import { json } from "../_shared/cors.ts"
 import {
+  escapeHtml,
   formatTask,
   hasToken,
   sendMessage,
@@ -159,6 +162,54 @@ async function actionReminders() {
   return json({ ok: true, sent, scanned: tasks.length })
 }
 
+const ORDER_COLS =
+  "id, order_code, source, channel, customer_name, customer_phone, fulfillment_type, table_number, total_amount, notes, payment_status"
+
+type NomRef = { name?: string; customer_short_name?: string }
+type OrderItemRow = { quantity: number; nomenclature: NomRef | NomRef[] | null }
+
+/** Post a new website order to the kitchen group chat. Best-effort line items. */
+async function actionNewOrder(orderId: string) {
+  if (!GROUP_CHAT_ID) return json({ ok: false, error: "no_group_chat_configured" }, 200)
+
+  const { data: o, error } = await db.from("orders").select(ORDER_COLS).eq("id", orderId).maybeSingle()
+  if (error || !o) return json({ ok: false, error: "order_not_found" }, 404)
+  const order = o as Record<string, unknown>
+
+  const { data: rawItems } = await db
+    .from("order_items")
+    .select("quantity, nomenclature:nomenclature_id (name, customer_short_name)")
+    .eq("order_id", orderId)
+
+  const itemLines = ((rawItems ?? []) as OrderItemRow[]).map((it) => {
+    const nom = Array.isArray(it.nomenclature) ? it.nomenclature[0] : it.nomenclature
+    const name = nom?.customer_short_name ?? nom?.name ?? "Item"
+    return `• ${it.quantity}× ${escapeHtml(name)}`
+  })
+
+  const code = (order.order_code as string) ?? String(order.id).slice(0, 8)
+  const ful =
+    order.fulfillment_type === "dine_in"
+      ? `Dine-in${order.table_number ? " · table " + escapeHtml(String(order.table_number)) : ""}`
+      : "Pickup · รับเอง"
+  const total = Number(order.total_amount ?? 0)
+  const paid = order.payment_status === "paid"
+
+  const lines = [
+    "🔔 <b>New website order · ออเดอร์ใหม่</b>",
+    `<b>#${escapeHtml(code)}</b> · ${ful}`,
+    order.customer_name
+      ? `👤 ${escapeHtml(String(order.customer_name))}${order.customer_phone ? " · " + escapeHtml(String(order.customer_phone)) : ""}`
+      : null,
+    itemLines.length ? itemLines.join("\n") : null,
+    `💰 <b>${total.toFixed(0)} THB</b> · ${paid ? "✅ PAID" : "🕗 UNPAID"}`,
+    order.notes ? `📝 <i>${escapeHtml(String(order.notes))}</i>` : null,
+  ].filter(Boolean) as string[]
+
+  const res = await sendMessage(GROUP_CHAT_ID, lines.join("\n"))
+  return json({ ok: res.ok, message_id: res.messageId ?? null })
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204 })
   if (!hasToken()) return json({ ok: false, error: "TELEGRAM_BOT_TOKEN not set" }, 500)
@@ -179,8 +230,13 @@ Deno.serve(async (req) => {
         return await actionSchedule()
       case "reminders":
         return await actionReminders()
+      case "new_order": {
+        const orderId = url.searchParams.get("order_id")
+        if (!orderId) return json({ ok: false, error: "order_id required" }, 400)
+        return await actionNewOrder(orderId)
+      }
       default:
-        return json({ ok: false, error: "unknown_action", actions: ["assign", "morning", "schedule", "reminders"] }, 400)
+        return json({ ok: false, error: "unknown_action", actions: ["assign", "morning", "schedule", "reminders", "new_order"] }, 400)
     }
   } catch (e) {
     console.error("[telegram-push] error:", e)
