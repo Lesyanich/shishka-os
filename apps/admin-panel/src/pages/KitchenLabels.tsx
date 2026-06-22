@@ -1,8 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, ChevronLeft, Loader2, Tag, Printer, Trash2, Usb, Plus } from 'lucide-react'
+import {
+  Search,
+  ChevronLeft,
+  Loader2,
+  Tag,
+  Printer,
+  Trash2,
+  Usb,
+  Plus,
+  LayoutGrid,
+  ClipboardList,
+} from 'lucide-react'
 import { usePrepLabelItems, type PrepItem, type PrepItemKind } from '../hooks/usePrepLabelItems'
 import { usePfPackCard } from '../hooks/usePfPackCard'
 import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
+import { useAllPrepBatches, type AllPrepBatch } from '../hooks/useAllPrepBatches'
 import { useLocations } from '../hooks/useLocations'
 import { useAppRole } from '../contexts/AppRoleContext'
 import { addDays, printPrepLabel, LABEL_SIZES, DEFAULT_LABEL_SIZE } from '../lib/labelPrinting'
@@ -24,6 +36,14 @@ type Transport = 'usb' | 'bluetooth'
 const DAY_MS = 86_400_000
 const shortDate = (iso: string | Date) =>
   new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
+const shortDateTime = (iso: string | Date) =>
+  new Date(iso).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 const shelfDaysOf = (b: PrepBatch) =>
   Math.max(1, Math.round((new Date(b.expires_at).getTime() - new Date(b.produced_at).getTime()) / DAY_MS))
 
@@ -58,6 +78,7 @@ function KindBadge({ kind }: { kind: PrepItemKind }) {
  */
 export function KitchenLabels() {
   const { items, isLoading, error } = usePrepLabelItems()
+  const [view, setView] = useState<'items' | 'log'>('items')
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<KindFilter>('all')
   const [selected, setSelected] = useState<PrepItem | null>(null)
@@ -94,70 +115,192 @@ export function KitchenLabels() {
         <h1 className="text-lg font-semibold text-slate-100">Kitchen Labels</h1>
       </div>
 
-      <div className="relative mb-3">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search item…"
-          className="w-full rounded-xl border border-slate-700 bg-slate-900 py-3 pl-10 pr-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
-        />
+      {/* View toggle: pick an item to print vs. the global production log */}
+      <div className="mb-4 flex gap-1 rounded-xl border border-slate-800 bg-slate-900/60 p-1">
+        <button
+          type="button"
+          onClick={() => setView('items')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition ${
+            view === 'items'
+              ? 'bg-slate-800 text-amber-300'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <LayoutGrid className="h-4 w-4" /> Print labels
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('log')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition ${
+            view === 'log'
+              ? 'bg-slate-800 text-amber-300'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <ClipboardList className="h-4 w-4" /> All batches
+        </button>
       </div>
 
-      <div className="mb-4 flex gap-2">
-        {KIND_FILTERS.map((f) => {
-          const active = kind === f.id
-          return (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setKind(f.id)}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                active
-                  ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
-                  : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-              }`}
-            >
-              {f.label}
-              <span className="ml-1.5 text-xs text-slate-500">{counts[f.id]}</span>
-            </button>
-          )
-        })}
-      </div>
+      {view === 'log' ? (
+        <AllBatchesLog onOpen={setSelected} />
+      ) : (
+        <>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search item…"
+              className="w-full rounded-xl border border-slate-700 bg-slate-900 py-3 pl-10 pr-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
+            />
+          </div>
 
-      {isLoading && (
-        <div className="flex items-center justify-center py-20 text-slate-500">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading…
-        </div>
-      )}
+          <div className="mb-4 flex gap-2">
+            {KIND_FILTERS.map((f) => {
+              const active = kind === f.id
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setKind(f.id)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                    active
+                      ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
+                      : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                  }`}
+                >
+                  {f.label}
+                  <span className="ml-1.5 text-xs text-slate-500">{counts[f.id]}</span>
+                </button>
+              )
+            })}
+          </div>
 
-      {error && (
-        <p className="rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
-          Couldn&apos;t load items: {error}
-        </p>
-      )}
-
-      {!isLoading && !error && filtered.length === 0 && (
-        <p className="py-20 text-center text-sm text-slate-500">Nothing found.</p>
-      )}
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {filtered.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setSelected(item)}
-            className="flex flex-col items-start gap-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-left transition hover:border-amber-500/50 hover:bg-slate-800"
-          >
-            <div className="flex w-full items-center justify-between gap-2">
-              <span className="text-sm font-medium text-slate-100">{item.name}</span>
-              <KindBadge kind={item.kind} />
+          {isLoading && (
+            <div className="flex items-center justify-center py-20 text-slate-500">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading…
             </div>
-            <span className="text-[11px] text-slate-500">{item.product_code}</span>
-          </button>
-        ))}
+          )}
+
+          {error && (
+            <p className="rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
+              Couldn&apos;t load items: {error}
+            </p>
+          )}
+
+          {!isLoading && !error && filtered.length === 0 && (
+            <p className="py-20 text-center text-sm text-slate-500">Nothing found.</p>
+          )}
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {filtered.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSelected(item)}
+                className="flex flex-col items-start gap-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-left transition hover:border-amber-500/50 hover:bg-slate-800"
+              >
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-slate-100">{item.name}</span>
+                  <KindBadge kind={item.kind} />
+                </div>
+                <span className="text-[11px] text-slate-500">{item.product_code}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Global production log — every recorded batch across all items (PF + SALE),
+ * newest first: what was made, when it was made, and when its sticker was
+ * printed. Tapping a row opens that item's editor (to reprint); the trash
+ * button removes a mistaken record.
+ */
+function AllBatchesLog({ onOpen }: { onOpen: (item: PrepItem) => void }) {
+  const { batches, isLoading, error, remove } = useAllPrepBatches()
+
+  async function handleDelete(b: AllPrepBatch) {
+    if (!window.confirm(`Delete batch ${b.batch_code ?? b.barcode}?`)) return
+    await remove(b.id)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-slate-500">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading…
       </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <p className="rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
+        Couldn&apos;t load batches: {error}
+      </p>
+    )
+  }
+
+  if (batches.length === 0) {
+    return <p className="py-20 text-center text-sm text-slate-500">No batches recorded yet.</p>
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        All batches ({batches.length})
+      </p>
+      {batches.map((b) => {
+        const unit = b.base_unit ?? 'kg'
+        return (
+          <div
+            key={b.id}
+            className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5"
+          >
+            <button
+              type="button"
+              onClick={() =>
+                onOpen({
+                  id: b.nomenclature_id,
+                  name: b.name,
+                  product_code: b.product_code,
+                  base_unit: b.base_unit,
+                  kind: b.kind,
+                })
+              }
+              className="min-w-0 flex-1 text-left"
+              title="Open item to reprint"
+            >
+              <div className="flex items-center gap-2">
+                <span className="truncate text-sm font-medium text-slate-100">{b.name}</span>
+                <KindBadge kind={b.kind} />
+              </div>
+              <p className="truncate font-mono text-[11px] text-slate-500">
+                {b.batch_code ?? b.barcode}
+              </p>
+              <p className="text-[11px] text-slate-400">
+                {b.weight} {unit} · made {shortDateTime(b.produced_at)} · use by{' '}
+                {shortDate(b.expires_at)}
+              </p>
+              <p className="flex items-center gap-1 text-[11px] text-slate-500">
+                <Printer className="h-3 w-3" /> sticker {shortDateTime(b.created_at)}
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDelete(b)}
+              title="Delete batch"
+              className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:border-rose-500/50 hover:text-rose-400"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }
