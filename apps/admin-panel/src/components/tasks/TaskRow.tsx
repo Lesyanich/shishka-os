@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Check, Clock, Pencil, Trash2, AlertTriangle, Repeat, Send,
-  Camera, Loader2, Link2,
+  Camera, Loader2, Link2, MessageSquare,
 } from 'lucide-react'
 import type { StaffTask } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
@@ -132,6 +132,14 @@ export function TaskRow({
           {!task.is_template && (
             <span className={`rounded-full px-1.5 py-0.5 ${STATUS_STYLE[task.status]}`}>
               {STATUS_LABEL[task.status]}
+            </span>
+          )}
+          {task.comment && (
+            <span
+              className="inline-flex items-center rounded-full bg-slate-700/40 px-1 py-0.5 text-slate-300"
+              title={task.comment}
+            >
+              <MessageSquare className="h-3 w-3" />
             </span>
           )}
         </div>

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Camera, Loader2, X } from 'lucide-react'
+import { Camera, Loader2, MessageSquare, X } from 'lucide-react'
 import type { Staff } from '../../hooks/useStaff'
 import type {
   StaffTask,
@@ -43,6 +43,7 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
   const [title, setTitle] = useState(initial?.title ?? '')
   const [titleTh, setTitleTh] = useState(initial?.title_th ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
+  const [comment, setComment] = useState(initial?.comment ?? '')
   const [assignedTo, setAssignedTo] = useState(initial?.assigned_to ?? '')
   const [station, setStation] = useState<TaskStation>(initial?.station ?? 'general')
   const [category, setCategory] = useState<TaskCategory>(initial?.category ?? 'general')
@@ -106,6 +107,7 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
       linked_route: link.linked_route,
       linked_label: link.linked_label,
       linked_label_th: link.linked_label_th,
+      comment: comment.trim() || null,
     }
     await onSubmit(input, canNotify && notify)
     setSaving(false)
@@ -144,8 +146,14 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
           </div>
 
           <div>
-            <label className={LABEL}>Notes</label>
-            <textarea className={INPUT} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details" />
+            <label className={LABEL}>Notes · Instructions</label>
+            <textarea
+              className={`${INPUT} resize-y leading-relaxed`}
+              rows={6}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What to do — steps, details…"
+            />
           </div>
 
           {/* Station */}
@@ -288,6 +296,21 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
               multiple
               onChange={onPickFiles}
               className="hidden"
+            />
+          </div>
+
+          {/* Comment — execution feedback / remark */}
+          <div>
+            <label className={LABEL}>
+              <MessageSquare className="mr-1 inline h-3 w-3" />
+              Comment
+            </label>
+            <textarea
+              className={`${INPUT} resize-y`}
+              rows={3}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Remark / feedback while doing this task…"
             />
           </div>
 
