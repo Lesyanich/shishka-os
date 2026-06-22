@@ -34,9 +34,11 @@ describe('taskMeta', () => {
     expect(formatLocalDate(new Date('2026-06-10T05:00:00Z'))).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
-  it('describeRecurrence summarizes weekly days', () => {
+  it('describeRecurrence summarizes daily, weekly, monthly, one-off', () => {
     expect(describeRecurrence({ recurrence: 'daily', recurrence_days: null })).toBe('Every day')
     expect(describeRecurrence({ recurrence: 'weekly', recurrence_days: [1, 5] })).toContain('Mon')
+    expect(describeRecurrence({ recurrence: 'monthly', recurrence_days: [1] })).toBe('Monthly · day 1')
+    expect(describeRecurrence({ recurrence: 'monthly', recurrence_days: null })).toBe('Monthly')
     expect(describeRecurrence({ recurrence: 'none', recurrence_days: null })).toBe('One-off')
   })
 
