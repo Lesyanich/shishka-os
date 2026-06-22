@@ -1,21 +1,30 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-/** A prep (PF) item the kitchen can print a storage label for. */
+/** Whether a label item is a semi-finished prep (PF-) or a finished dish (SALE-). */
+export type PrepItemKind = 'PF' | 'SALE'
+
+/** A prep (PF) or finished dish (SALE) item the kitchen can print a storage label for. */
 export interface PrepItem {
   id: string
   name: string
   product_code: string
   base_unit: string | null
+  /** Derived from the product_code prefix — used for the PF / Sale filter. */
+  kind: PrepItemKind
 }
 
 /**
- * Lightweight list of PF (prep / semi-finished) items for the kitchen label
- * station. Selects only what the storage label needs — no cost/price columns,
- * so the cook tier never receives financial data.
+ * Lightweight list of items the kitchen label station can print for: PF
+ * (prep / semi-finished) and SALE (finished dishes). A dish made and stored
+ * ready-to-serve in the kitchen (e.g. hummus portioned for display) is a SALE
+ * item, not a PF — so both are offered and filterable on the page.
  *
- * NOTE: `nomenclature` has no `is_active` column; PF items are filtered purely
- * by product_code prefix.
+ * Selects only what the storage label needs — no cost/price columns, so the
+ * cook tier never receives financial data.
+ *
+ * NOTE: `nomenclature` has no `is_active` column; items are filtered purely by
+ * product_code prefix, excluding soft-deleted rows.
  */
 export function usePrepLabelItems() {
   const [items, setItems] = useState<PrepItem[]>([])
@@ -28,7 +37,8 @@ export function usePrepLabelItems() {
     supabase
       .from('nomenclature')
       .select('id, name, product_code, base_unit')
-      .like('product_code', 'PF-%')
+      .or('product_code.like.PF-%,product_code.like.SALE-%')
+      .not('is_deleted', 'is', true)
       .order('name', { ascending: true })
       .then(({ data, error: err }) => {
         if (cancelled) return
@@ -37,7 +47,14 @@ export function usePrepLabelItems() {
           setIsLoading(false)
           return
         }
-        setItems((data ?? []) as PrepItem[])
+        const mapped: PrepItem[] = (data ?? []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          product_code: row.product_code,
+          base_unit: row.base_unit,
+          kind: row.product_code.startsWith('SALE-') ? 'SALE' : 'PF',
+        }))
+        setItems(mapped)
         setIsLoading(false)
       })
 
