@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Camera, Loader2, X } from 'lucide-react'
 import type { Staff } from '../../hooks/useStaff'
 import type {
   StaffTask,
@@ -7,10 +7,14 @@ import type {
   TaskCategory,
   TaskPriority,
   TaskRecurrence,
+  TaskStation,
 } from '../../hooks/useStaffTasks'
+import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
+import { TaskLinkPicker, type TaskLinkValue } from './TaskLinkPicker'
 import {
   CATEGORY_OPTIONS,
   PRIORITY_OPTIONS,
+  STATION_OPTIONS,
   WEEKDAYS,
   formatLocalDate,
 } from './taskMeta'
@@ -27,11 +31,20 @@ const INPUT =
   'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none'
 const LABEL = 'mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500'
 
+/** Stable id for this form session so photos can be uploaded to the task's
+ *  folder before the row is created. */
+function freshId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
 export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskFormModalProps) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [titleTh, setTitleTh] = useState(initial?.title_th ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [assignedTo, setAssignedTo] = useState(initial?.assigned_to ?? '')
+  const [station, setStation] = useState<TaskStation>(initial?.station ?? 'general')
   const [category, setCategory] = useState<TaskCategory>(initial?.category ?? 'general')
   const [priority, setPriority] = useState<TaskPriority>(initial?.priority ?? 'medium')
   const [recurrence, setRecurrence] = useState<TaskRecurrence>(initial?.recurrence ?? 'none')
@@ -42,6 +55,16 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
   const [notify, setNotify] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  const [link, setLink] = useState<TaskLinkValue>({
+    linked_route: initial?.linked_route ?? null,
+    linked_label: initial?.linked_label ?? null,
+    linked_label_th: initial?.linked_label_th ?? null,
+  })
+  const [photoUrls, setPhotoUrls] = useState<string[]>(initial?.photo_urls ?? [])
+  const [taskId] = useState<string>(() => initial?.id ?? freshId())
+  const { upload, isUploading } = useTaskPhotoUpload()
+  const fileRef = useRef<HTMLInputElement>(null)
+
   if (!open) return null
 
   const isTemplate = recurrence !== 'none'
@@ -50,15 +73,27 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
 
+  const onPickFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    for (const file of files) {
+      const res = await upload(file, taskId)
+      if (res.ok && res.url) setPhotoUrls((prev) => [...prev, res.url!])
+      else if (res.error) window.alert(res.error)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!title.trim()) return
     if (recurrence === 'weekly' && days.length === 0) return
     setSaving(true)
     const input: StaffTaskInsert = {
+      ...(initial ? {} : { id: taskId }),
       title: title.trim(),
       title_th: titleTh.trim() || null,
       description: description.trim() || null,
       assigned_to: assignedTo || null,
+      station,
       category,
       priority,
       recurrence,
@@ -67,6 +102,10 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
       recurrence_days: recurrence === 'weekly' ? days : null,
       due_date: isTemplate ? null : dueDate || null,
       due_time: dueTime ? `${dueTime}:00` : null,
+      photo_urls: photoUrls,
+      linked_route: link.linked_route,
+      linked_label: link.linked_label,
+      linked_label_th: link.linked_label_th,
     }
     await onSubmit(input, canNotify && notify)
     setSaving(false)
@@ -107,6 +146,27 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
           <div>
             <label className={LABEL}>Notes</label>
             <textarea className={INPUT} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details" />
+          </div>
+
+          {/* Station */}
+          <div>
+            <label className={LABEL}>Station</label>
+            <div className="flex gap-1.5">
+              {STATION_OPTIONS.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() => setStation(s.value)}
+                  className={`flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                    station === s.value
+                      ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -185,6 +245,50 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
               <label className={LABEL}>Remind (min before)</label>
               <input type="number" min={0} step={5} className={INPUT} value={reminder} onChange={(e) => setReminder(Number(e.target.value))} />
             </div>
+          </div>
+
+          {/* Deep link */}
+          <TaskLinkPicker value={link} station={station} onChange={setLink} />
+
+          {/* Photo report */}
+          <div>
+            <label className={LABEL}>
+              <Camera className="mr-1 inline h-3 w-3" />
+              Photo report (optional)
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              {photoUrls.map((url) => (
+                <div key={url} className="relative h-16 w-16 overflow-hidden rounded-lg border border-slate-700">
+                  <img src={url} alt="report" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
+                    className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white/80 hover:bg-black/80"
+                    title="Remove"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={isUploading}
+                className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-700 text-slate-500 transition hover:border-emerald-500/40 hover:text-emerald-400 disabled:cursor-wait"
+              >
+                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                <span className="text-[9px]">{isUploading ? '…' : 'Add'}</span>
+              </button>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              onChange={onPickFiles}
+              className="hidden"
+            />
           </div>
 
           {isTemplate && (

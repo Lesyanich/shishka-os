@@ -12,9 +12,10 @@ function makeTask(over: Partial<StaffTask> = {}): StaffTask {
   return {
     id: 't1', title: 'x', title_th: null, description: null, description_th: null,
     assigned_to: null, created_by: null, category: 'general', priority: 'medium',
-    status: 'todo', due_date: null, due_time: null, reminder_offset_min: 30,
+    status: 'todo', station: 'general', due_date: null, due_time: null, reminder_offset_min: 30,
     recurrence: 'none', recurrence_days: null, is_template: false, template_id: null,
-    dm_message_id: null, group_message_id: null, completed_at: null, completed_via: null,
+    dm_message_id: null, group_message_id: null, photo_urls: [], linked_route: null,
+    linked_label: null, linked_label_th: null, completed_at: null, completed_via: null,
     created_at: '', updated_at: '', staff: null, ...over,
   }
 }

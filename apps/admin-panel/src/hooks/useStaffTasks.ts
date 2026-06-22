@@ -5,6 +5,8 @@ export type TaskCategory = 'opening' | 'closing' | 'prep' | 'cleaning' | 'admin'
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low'
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'skipped' | 'cancelled'
 export type TaskRecurrence = 'none' | 'daily' | 'weekly'
+/** L1 = prep kitchen · L2 = assembly/service · general = shown in both. */
+export type TaskStation = 'L1' | 'L2' | 'general'
 
 export interface StaffTask {
   id: string
@@ -17,6 +19,7 @@ export interface StaffTask {
   category: TaskCategory
   priority: TaskPriority
   status: TaskStatus
+  station: TaskStation
   due_date: string | null
   due_time: string | null
   reminder_offset_min: number
@@ -26,6 +29,12 @@ export interface StaffTask {
   template_id: string | null
   dm_message_id: string | null
   group_message_id: string | null
+  /** Optional photo report(s) — public URLs in the task-photos bucket. */
+  photo_urls: string[]
+  /** In-app deep link to a relevant tab (recipe, stock sheet, labels…). */
+  linked_route: string | null
+  linked_label: string | null
+  linked_label_th: string | null
   completed_at: string | null
   completed_via: 'telegram' | 'admin' | null
   created_at: string
@@ -34,6 +43,9 @@ export interface StaffTask {
 }
 
 export interface StaffTaskInsert {
+  /** Optional client-supplied id — lets the create form attach photos to the
+   *  task's storage folder before the row exists. */
+  id?: string
   title: string
   title_th?: string | null
   description?: string | null
@@ -43,18 +55,23 @@ export interface StaffTaskInsert {
   category?: TaskCategory
   priority?: TaskPriority
   status?: TaskStatus
+  station?: TaskStation
   due_date?: string | null
   due_time?: string | null
   reminder_offset_min?: number
   recurrence?: TaskRecurrence
   recurrence_days?: number[] | null
   is_template?: boolean
+  photo_urls?: string[]
+  linked_route?: string | null
+  linked_label?: string | null
+  linked_label_th?: string | null
 }
 
 export type StaffTaskUpdate = Partial<StaffTaskInsert>
 
 const SELECT_COLS =
-  'id, title, title_th, description, description_th, assigned_to, created_by, category, priority, status, due_date, due_time, reminder_offset_min, recurrence, recurrence_days, is_template, template_id, dm_message_id, group_message_id, completed_at, completed_via, created_at, updated_at, staff:staff(name, role)'
+  'id, title, title_th, description, description_th, assigned_to, created_by, category, priority, status, station, due_date, due_time, reminder_offset_min, recurrence, recurrence_days, is_template, template_id, dm_message_id, group_message_id, photo_urls, linked_route, linked_label, linked_label_th, completed_at, completed_via, created_at, updated_at, staff:staff(name, role)'
 
 export interface UseStaffTasksResult {
   tasks: StaffTask[]        // concrete tasks (is_template = false)

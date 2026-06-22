@@ -1,34 +1,42 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard,
   ChefHat,
-  Monitor,
+  ListTodo,
+  Tag,
+  Trash2,
   CalendarClock,
   CalendarDays,
+  PackageOpen,
 } from 'lucide-react'
+import { useAppRole } from '../contexts/AppRoleContext'
 
-const MANAGER_PAGES = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/tasks', label: 'My Tasks', icon: ChefHat },
-  { path: '/live', label: 'Kitchen Live', icon: Monitor },
-  { path: '/planner/batch', label: 'Planner', icon: CalendarClock },
-  { path: '/schedule', label: 'Schedule', icon: CalendarDays },
+// Cooks get the lean kitchen set (tasks + reference stations). The heavy KDS
+// planner (Gantt / production scheduling) is hidden from cooks and kept for
+// managers only.
+const COOK_PAGES = [
+  { path: '/kitchen/my-tasks', label: 'Tasks', icon: ListTodo },
+  { path: '/kitchen/recipes', label: 'Recipes', icon: ChefHat },
+  { path: '/kitchen/labels', label: 'Labels', icon: Tag },
+  { path: '/kitchen/waste', label: 'Waste', icon: Trash2 },
 ] as const
 
-const COOK_PAGES = [
-  { path: '/tasks', label: 'My Tasks', icon: ChefHat },
-  { path: '/live', label: 'Kitchen Live', icon: Monitor },
+const MANAGER_PAGES = [
+  { path: '/kitchen/my-tasks', label: 'Tasks', icon: ListTodo },
+  { path: '/kitchen/recipes', label: 'Recipes', icon: ChefHat },
+  { path: '/planner/batch', label: 'Planner', icon: CalendarClock },
+  { path: '/kitchen/schedule', label: 'Schedule', icon: CalendarDays },
+  { path: '/receive', label: 'Receiving', icon: PackageOpen },
 ] as const
 
 export function KitchenNav() {
   const { pathname } = useLocation()
-  const isCookSession = !!sessionStorage.getItem('cook_staff_id')
-  const pages = isCookSession ? COOK_PAGES : MANAGER_PAGES
+  const { role } = useAppRole()
+  const pages = role === 'cook' ? COOK_PAGES : MANAGER_PAGES
 
   return (
     <nav className="flex items-center gap-1 text-xs overflow-x-auto pb-1">
       {pages.map(({ path, label, icon: Icon }) => {
-        const isActive = pathname === path
+        const isActive = pathname === path || pathname.startsWith(`${path}/`)
         return (
           <Link
             key={path}

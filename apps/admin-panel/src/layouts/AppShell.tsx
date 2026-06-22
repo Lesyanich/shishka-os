@@ -80,13 +80,14 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Kitchen',
     defaultOpen: true,
     items: [
-      { path: '/kitchen/my-tasks', icon: ListTodo, label: 'My Tasks', minRole: 'cook' },
+      { path: '/kitchen/my-tasks', icon: ListTodo, label: 'Tasks', minRole: 'cook' },
       { path: '/kitchen/recipes', icon: BookOpen, label: 'Recipes', minRole: 'cook' },
-      { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS', minRole: 'cook' },
-      { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station', minRole: 'cook' },
       { path: '/kitchen/waste', icon: Trash2, label: 'Waste', minRole: 'cook' },
       { path: '/kitchen/labels', icon: Tag, label: 'Labels', minRole: 'cook' },
       { path: '/receive', icon: ClipboardCheck, label: 'Receiving', minRole: 'cook' },
+      // Heavy KDS production tooling — managers only, hidden from the cook floor.
+      { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS', minRole: 'task_manager' },
+      { path: '/kitchen/tasks', icon: Timer, label: 'Cook Station', minRole: 'task_manager' },
     ],
   },
   {
