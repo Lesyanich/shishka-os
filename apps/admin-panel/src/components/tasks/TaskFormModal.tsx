@@ -100,7 +100,12 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
       recurrence,
       reminder_offset_min: reminder,
       is_template: isTemplate,
-      recurrence_days: recurrence === 'weekly' ? days : null,
+      recurrence_days:
+        recurrence === 'weekly'
+          ? days
+          : recurrence === 'monthly'
+            ? [Math.min(31, Math.max(1, days[0] ?? 1))]
+            : null,
       due_date: isTemplate ? null : dueDate || null,
       due_time: dueTime ? `${dueTime}:00` : null,
       photo_urls: photoUrls,
@@ -212,6 +217,7 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
                 <option value="none">One-off</option>
                 <option value="daily">Every day</option>
                 <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
               </select>
             </div>
           </div>
@@ -235,6 +241,26 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {recurrence === 'monthly' && (
+            <div>
+              <label className={LABEL}>Day of month</label>
+              <input
+                type="number"
+                min={1}
+                max={31}
+                className={INPUT}
+                value={days[0] ?? 1}
+                onChange={(e) => {
+                  const n = Math.min(31, Math.max(1, Math.round(Number(e.target.value) || 1)))
+                  setDays([n])
+                }}
+              />
+              <p className="mt-1 text-[11px] text-slate-500">
+                Days 29–31 run on the last day in shorter months.
+              </p>
             </div>
           )}
 

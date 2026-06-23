@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 export type TaskCategory = 'opening' | 'closing' | 'prep' | 'cleaning' | 'admin' | 'general'
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low'
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'skipped' | 'cancelled'
-export type TaskRecurrence = 'none' | 'daily' | 'weekly'
+export type TaskRecurrence = 'none' | 'daily' | 'weekly' | 'monthly'
 /** L1 = prep kitchen · L2 = assembly/service · general = shown in both. */
 export type TaskStation = 'L1' | 'L2' | 'general'
 

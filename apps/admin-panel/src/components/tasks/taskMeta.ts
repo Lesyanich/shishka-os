@@ -132,6 +132,11 @@ export function describeRecurrence(task: Pick<StaffTask, 'recurrence' | 'recurre
       .filter(Boolean)
     return days.length ? `Weekly · ${days.join(', ')}` : 'Weekly'
   }
+  if (task.recurrence === 'monthly') {
+    // For monthly, recurrence_days holds the day-of-month (1–31).
+    const day = task.recurrence_days?.[0]
+    return day ? `Monthly · day ${day}` : 'Monthly'
+  }
   return 'One-off'
 }
 
