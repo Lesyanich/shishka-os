@@ -85,6 +85,7 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/kitchen/my-tasks', icon: ListTodo, label: 'Tasks', minRole: 'cook' },
       { path: '/kitchen/recipes', icon: BookOpen, label: 'Recipes', minRole: 'cook' },
       { path: '/kitchen/labels', icon: Tag, label: 'Labels', minRole: 'cook' },
+      { path: '/staff/schedule', icon: CalendarDays, label: 'Schedule', minRole: 'cook' },
     ],
   },
   {
