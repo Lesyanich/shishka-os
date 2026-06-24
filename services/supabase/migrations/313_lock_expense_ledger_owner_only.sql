@@ -1,4 +1,5 @@
--- 312_lock_expense_ledger_owner_only.sql
+-- 313_lock_expense_ledger_owner_only.sql
+-- (renumbered 312 -> 313: 312 was concurrently taken by 312_seed_pf_mini_bun_pack.sql / PR os#400)
 -- Lock expense_ledger to owner-only at the database layer, and add a narrow
 -- duplicate-probe RPC so receipt reviewers keep duplicate detection without
 -- read access to the full ledger.
@@ -82,7 +83,7 @@ GRANT EXECUTE ON FUNCTION public.fn_check_expense_duplicate(text, date, numeric,
 -- check-migrations.ts; md5-of-own-contents is chicken-and-egg). Idempotent.
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '312_lock_expense_ledger_owner_only.sql',
+  '313_lock_expense_ledger_owner_only.sql',
   'claude-code',
   NULL,
   'Lock expense_ledger RLS to fn_is_owner(); add fn_check_expense_duplicate (owner/task_manager) so receipt dup-check survives the lock (task 49ffbe68)'
