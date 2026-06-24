@@ -1,12 +1,13 @@
 import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Check, Clock, Pencil, Trash2, AlertTriangle, Repeat, Send,
-  Camera, Loader2, Link2, MessageSquare,
+  Check, Clock, AlertTriangle, Repeat, Camera, Loader2, Link2, MessageSquare,
 } from 'lucide-react'
 import type { StaffTask } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
 import {
+  CATEGORY_ACCENT,
+  CATEGORY_ICON,
   CATEGORY_LABEL,
   CATEGORY_STYLE,
   PRIORITY_DOT,
@@ -22,25 +23,31 @@ import {
 interface TaskRowProps {
   task: StaffTask
   onToggleDone?: (task: StaffTask) => void
-  onEdit?: (task: StaffTask) => void
-  onDelete?: (task: StaffTask) => void
-  onPush?: (task: StaffTask) => void
-  /** Open the task (click on its body) — view/edit its full details. */
+  /** Open the task (tap its body) — full details, edit & delete live there. */
   onOpen?: (task: StaffTask) => void
   /** Persist a changed photo set (after camera capture). */
   onPhotosChange?: (task: StaffTask, photoUrls: string[]) => void
   showDate?: boolean
 }
 
-export function TaskRow({
-  task, onToggleDone, onEdit, onDelete, onPush, onOpen, onPhotosChange, showDate,
-}: TaskRowProps) {
+/**
+ * One task card. Tuned for phone readability: a coloured left stripe + icon
+ * names the work type at a glance, the title wraps (never truncates), and the
+ * card carries only the fast in-place action (camera). Editing, deleting and
+ * Telegram pushes happen in the detail view opened by tapping the card.
+ */
+export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }: TaskRowProps) {
   const done = task.status === 'done'
   const overdue = isOverdue(task)
   const assignee = task.staff?.name ?? 'Unassigned'
   const navigate = useNavigate()
   const { upload, isUploading } = useTaskPhotoUpload()
   const fileRef = useRef<HTMLInputElement>(null)
+  const CatIcon = CATEGORY_ICON[task.category]
+  // todo/done read off the checkbox + strikethrough; only the exceptional
+  // states still warrant an explicit badge.
+  const showStatusBadge =
+    !task.is_template && (task.status === 'skipped' || task.status === 'cancelled')
 
   const onPickFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
@@ -56,14 +63,16 @@ export function TaskRow({
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2.5">
-      {/* Done toggle */}
+    <div
+      className={`flex items-start gap-3 rounded-xl border border-l-4 border-slate-800 bg-slate-900/60 px-3 py-3 ${CATEGORY_ACCENT[task.category]}`}
+    >
+      {/* Done toggle — big tap target */}
       {onToggleDone && !task.is_template && (
         <button
           type="button"
           onClick={() => onToggleDone(task)}
           title={done ? 'Mark as to-do' : 'Mark as done'}
-          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${
+          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition ${
             done
               ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-300'
               : 'border-slate-700 text-transparent hover:border-emerald-500/40 hover:text-emerald-400/50'
@@ -79,70 +88,67 @@ export function TaskRow({
           className={onOpen ? 'cursor-pointer' : undefined}
           onClick={onOpen ? () => onOpen(task) : undefined}
         >
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[task.priority]}`} />
-          <span
-            className={`truncate text-sm font-medium ${
-              done ? 'text-slate-500 line-through' : 'text-slate-100'
-            }`}
-          >
-            {task.title}
-          </span>
-          {task.is_template && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300">
-              <Repeat className="h-3 w-3" />
-              {describeRecurrence(task)}
-            </span>
-          )}
-          {!task.is_template && task.template_id && (
+          {/* Title row — wraps to two lines, never truncates */}
+          <div className="flex items-start gap-2">
+            <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[task.priority]}`} />
             <span
-              className="inline-flex items-center rounded-full bg-indigo-500/15 px-1 py-0.5 text-indigo-300"
-              title="Recurring task (from a template)"
-            >
-              <Repeat className="h-3 w-3" />
-            </span>
-          )}
-        </div>
-
-        {task.title_th && (
-          <p className="truncate text-xs text-slate-400">{task.title_th}</p>
-        )}
-
-        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
-          {task.station !== 'general' && (
-            <span className={`rounded-full px-1.5 py-0.5 font-semibold ${STATION_STYLE[task.station]}`}>
-              {STATION_LABEL[task.station]}
-            </span>
-          )}
-          <span className={`rounded-full px-1.5 py-0.5 ${CATEGORY_STYLE[task.category]}`}>
-            {CATEGORY_LABEL[task.category]}
-          </span>
-          <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-slate-300">{assignee}</span>
-          {!task.is_template && (task.due_time || (showDate && task.due_date)) && (
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${
-                overdue ? 'bg-rose-500/15 text-rose-300' : 'bg-slate-800 text-slate-400'
+              className={`line-clamp-2 text-[15px] font-medium leading-snug ${
+                done ? 'text-slate-500 line-through' : 'text-slate-100'
               }`}
             >
-              {overdue ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-              {showDate && task.due_date ? `${task.due_date} ` : ''}
-              {shortTime(task.due_time)}
+              {task.title}
             </span>
+            {task.is_template && (
+              <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300">
+                <Repeat className="h-3 w-3" />
+                {describeRecurrence(task)}
+              </span>
+            )}
+          </div>
+
+          {task.title_th && (
+            <p className="mt-0.5 line-clamp-1 pl-4 text-xs text-slate-400">{task.title_th}</p>
           )}
-          {!task.is_template && (
-            <span className={`rounded-full px-1.5 py-0.5 ${STATUS_STYLE[task.status]}`}>
-              {STATUS_LABEL[task.status]}
-            </span>
-          )}
-          {task.comment && (
+
+          {/* Meta row — work type leads, then station / who / when */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
             <span
-              className="inline-flex items-center rounded-full bg-slate-700/40 px-1 py-0.5 text-slate-300"
-              title={task.comment}
+              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium ${CATEGORY_STYLE[task.category]}`}
             >
-              <MessageSquare className="h-3 w-3" />
+              <CatIcon className="h-3 w-3" />
+              {CATEGORY_LABEL[task.category]}
             </span>
-          )}
-        </div>
+            {task.station !== 'general' && (
+              <span className={`rounded-full px-1.5 py-0.5 font-semibold ${STATION_STYLE[task.station]}`}>
+                {STATION_LABEL[task.station]}
+              </span>
+            )}
+            <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-slate-300">{assignee}</span>
+            {!task.is_template && (task.due_time || (showDate && task.due_date)) && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${
+                  overdue ? 'bg-rose-500/15 text-rose-300' : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {overdue ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                {showDate && task.due_date ? `${task.due_date} ` : ''}
+                {shortTime(task.due_time)}
+              </span>
+            )}
+            {showStatusBadge && (
+              <span className={`rounded-full px-1.5 py-0.5 ${STATUS_STYLE[task.status]}`}>
+                {STATUS_LABEL[task.status]}
+              </span>
+            )}
+            {task.comment && (
+              <span
+                className="inline-flex items-center rounded-full bg-slate-700/40 px-1 py-0.5 text-slate-300"
+                title={task.comment}
+              >
+                <MessageSquare className="h-3 w-3" />
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Deep link chip */}
@@ -169,61 +175,29 @@ export function TaskRow({
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex shrink-0 items-center gap-1">
-        {onPhotosChange && !task.is_template && (
-          <>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={isUploading}
-              title="Add photo"
-              className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-emerald-400 disabled:cursor-wait"
-            >
-              {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              onChange={onPickFiles}
-              className="hidden"
-            />
-          </>
-        )}
-        {onPush && !task.is_template && task.assigned_to && (
+      {/* Action — fast photo proof only; edit/delete/Telegram live in the detail view */}
+      {onPhotosChange && !task.is_template && (
+        <div className="shrink-0">
           <button
             type="button"
-            onClick={() => onPush(task)}
-            title="Send to Telegram"
-            className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-sky-400"
+            onClick={() => fileRef.current?.click()}
+            disabled={isUploading}
+            title="Add photo"
+            className="rounded-md p-2 text-slate-500 transition hover:bg-slate-800 hover:text-emerald-400 disabled:cursor-wait"
           >
-            <Send className="h-3.5 w-3.5" />
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
           </button>
-        )}
-        {onEdit && (
-          <button
-            type="button"
-            onClick={() => onEdit(task)}
-            title="Edit"
-            className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-slate-200"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        )}
-        {onDelete && (
-          <button
-            type="button"
-            onClick={() => onDelete(task)}
-            title="Delete"
-            className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-rose-400"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            multiple
+            onChange={onPickFiles}
+            className="hidden"
+          />
+        </div>
+      )}
     </div>
   )
 }

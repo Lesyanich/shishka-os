@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   X, Pencil, Check, Link2, Repeat, Clock, MessageSquare, Camera, Loader2,
+  Trash2, Send,
 } from 'lucide-react'
 import type { StaffTask } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
@@ -26,6 +27,10 @@ interface TaskDetailModalProps {
   onSaveComment?: (task: StaffTask, comment: string) => Promise<unknown> | void
   /** Attach photos without leaving the read view. */
   onPhotosChange?: (task: StaffTask, photoUrls: string[]) => void
+  /** Delete the task (confirmed here, then the modal closes). */
+  onDelete?: (task: StaffTask) => void
+  /** Push the task to the assignee's Telegram (managers only). */
+  onPush?: (task: StaffTask) => void
   /** Hide the Edit button when the viewer shouldn't change the task. */
   canEdit?: boolean
 }
@@ -41,7 +46,8 @@ const COMMENT_INPUT =
  * the full {@link TaskFormModal}.
  */
 export function TaskDetailModal({
-  task, onClose, onEdit, onToggleDone, onSaveComment, onPhotosChange, canEdit = true,
+  task, onClose, onEdit, onToggleDone, onSaveComment, onPhotosChange, onDelete, onPush,
+  canEdit = true,
 }: TaskDetailModalProps) {
   const navigate = useNavigate()
   const done = task.status === 'done'
@@ -69,6 +75,14 @@ export function TaskDetailModal({
     setSavingComment(true)
     await onSaveComment(task, comment)
     setSavingComment(false)
+  }
+
+  const confirmDelete = () => {
+    if (!onDelete) return
+    if (window.confirm(`Delete "${task.title}"?`)) {
+      onDelete(task)
+      onClose()
+    }
   }
 
   return (
@@ -232,6 +246,26 @@ export function TaskDetailModal({
             >
               <Check className="h-4 w-4" />
               {done ? 'Mark as to-do' : 'Mark done'}
+            </button>
+          )}
+          {onPush && !task.is_template && task.assigned_to && (
+            <button
+              type="button"
+              onClick={() => onPush(task)}
+              title="Send to Telegram"
+              className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-sky-400"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={confirmDelete}
+              title="Delete task"
+              className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-400"
+            >
+              <Trash2 className="h-4 w-4" />
             </button>
           )}
           <button
