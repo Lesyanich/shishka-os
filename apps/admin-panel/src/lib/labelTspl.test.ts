@@ -36,6 +36,12 @@ describe('renderPrepLabelTSPL', () => {
     expect(out).not.toContain('"weird"')
   })
 
+  it('prints a countable pack QTY (count + total weight, ASCII only)', () => {
+    const out = renderPrepLabelTSPL({ ...data, weight: '8 pcs / 480 g' })
+    expect(out).toContain('QTY    8 pcs / 480 g')
+    expect(out).not.toContain('·')
+  })
+
   describe('SALE consumer label (nutrition + ingredients)', () => {
     const sale = {
       name: 'Beetroot Hummus',
