@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useOptimistic, useRef, useState, startTransition } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Plus, RefreshCw, CalendarDays, ListTodo, Repeat, Users, Send,
+  Plus, RefreshCw, CalendarDays, ListTodo, Repeat, Users, Send, ChevronDown, SlidersHorizontal,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAppRole } from '../contexts/AppRoleContext'
@@ -12,22 +12,29 @@ import {
   type StaffTask,
   type StaffTaskInsert,
   type TaskStatus,
+  type TaskCategory,
 } from '../hooks/useStaffTasks'
 import { TaskRow } from '../components/tasks/TaskRow'
 import { TaskFormModal } from '../components/tasks/TaskFormModal'
 import { TaskDetailModal } from '../components/tasks/TaskDetailModal'
 import { TelegramLinkPanel } from '../components/tasks/TelegramLinkPanel'
 import {
+  CATEGORY_OPTIONS,
+  CATEGORY_SORT,
   STATUS_OPTIONS,
+  TIME_BANDS,
+  type TimeBand,
   describeRecurrence,
   formatLocalDate,
   shortTime,
+  timeBandOf,
 } from '../components/tasks/taskMeta'
 import { useTabParam } from '../hooks/useTabParam'
 
 type Tab = 'today' | 'all' | 'recurring' | 'team'
 type StationFilter = 'all' | 'L1' | 'L2'
 type KindFilter = 'all' | 'recurring' | 'oneoff'
+type CategoryFilter = 'all' | TaskCategory
 
 const STATION_CHIPS: { value: StationFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -46,7 +53,12 @@ interface ChipOption {
   label: string
 }
 
-/** One labelled row of filter chips. */
+const CATEGORY_CHIPS: ChipOption[] = [
+  { value: 'all', label: 'All' },
+  ...CATEGORY_OPTIONS.map((c) => ({ value: c.value, label: c.label })),
+]
+
+/** One labelled row of filter chips — label stays put, chips scroll sideways. */
 function FilterChipRow({
   label,
   options,
@@ -59,24 +71,26 @@ function FilterChipRow({
   onSelect: (v: string) => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+    <div className="flex items-center gap-1.5">
+      <span className="w-14 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </span>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onSelect(o.value)}
-          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-            value === o.value
-              ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
-              : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+      <div className="flex gap-1.5 overflow-x-auto">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onSelect(o.value)}
+            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
+              value === o.value
+                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+                : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -85,9 +99,12 @@ function FilterChipRow({
  * Unified kitchen task board — the single tracker behind both `/kitchen/my-tasks`
  * (cook landing) and `/staff-tasks` (manager). Everyone sees the whole team's
  * tasks and can create / assign / complete; managers additionally get the shifts
- * strip, Telegram pushes, and the Telegram-link tab. Filters: station (L1/L2),
- * person (chips per staff member), and kind (recurring vs one-off). "general"
- * tasks show under both L1 and L2.
+ * strip, Telegram pushes, and the Telegram-link tab.
+ *
+ * Today is sectioned by time of day (Morning / Day / Evening / Anytime); inside
+ * each section cards are clustered by work type, which also shows as a coloured
+ * stripe + icon. Filters (work type / station / person / kind) collapse behind a
+ * single button to keep the phone view clean. "general" tasks show under L1 & L2.
  */
 export function KitchenTasksPage() {
   const today = formatLocalDate(new Date())
@@ -126,6 +143,9 @@ export function KitchenTasksPage() {
   const [stationFilter, setStationFilter] = useState<StationFilter>('all')
   const [personFilter, setPersonFilter] = useState<string>('all') // 'all' | 'unassigned' | staffId
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [collapsedBands, setCollapsedBands] = useState<Set<TimeBand>>(new Set())
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<StaffTask | null>(null)
   const [viewingId, setViewingId] = useState<string | null>(null)
@@ -271,9 +291,16 @@ export function KitchenTasksPage() {
   const handleSaveComment = (task: StaffTask, comment: string) =>
     updateTask(task.id, { comment: comment.trim() || null })
 
-  const handleDelete = (task: StaffTask) => {
-    if (window.confirm(`Delete "${task.title}"?`)) deleteTask(task.id)
-  }
+  // Delete is confirmed inside TaskDetailModal, which then closes itself.
+  const handleDelete = (task: StaffTask) => deleteTask(task.id)
+
+  const toggleBand = (key: TimeBand) =>
+    setCollapsedBands((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
 
   // Filter predicates. "general" tasks show under L1 and L2.
   const matchesStation = (t: StaffTask) =>
@@ -287,43 +314,52 @@ export function KitchenTasksPage() {
   // Recurring instances carry a template_id; genuine one-offs don't.
   const matchesKind = (t: StaffTask) =>
     kindFilter === 'all' ? true : kindFilter === 'recurring' ? !!t.template_id : !t.template_id
+  const matchesCategory = (t: StaffTask) => categoryFilter === 'all' || t.category === categoryFilter
 
-  // ── Today: concrete tasks due today, grouped by assignee ──
+  // ── Today: concrete tasks due today, grouped into time-of-day bands ──
   const todayTasks = useMemo(
     () =>
       optimisticTasks.filter(
-        (t) => t.due_date === today && matchesStation(t) && matchesPerson(t) && matchesKind(t),
+        (t) =>
+          t.due_date === today &&
+          matchesStation(t) &&
+          matchesPerson(t) &&
+          matchesKind(t) &&
+          matchesCategory(t),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [optimisticTasks, today, stationFilter, personFilter, kindFilter],
+    [optimisticTasks, today, stationFilter, personFilter, kindFilter, categoryFilter],
   )
-  const grouped = useMemo(() => {
-    const map = new Map<string, { key: string; name: string; tasks: StaffTask[] }>()
+  // Group by time band, drop empty bands, cluster by work type inside each.
+  const bands = useMemo(() => {
+    const map = new Map<TimeBand, StaffTask[]>()
     for (const t of todayTasks) {
-      const key = t.assigned_to ?? 'unassigned'
-      const name = t.staff?.name ?? 'Unassigned'
-      if (!map.has(key)) map.set(key, { key, name, tasks: [] })
-      map.get(key)!.tasks.push(t)
+      const b = timeBandOf(t)
+      const arr = map.get(b)
+      if (arr) arr.push(t)
+      else map.set(b, [t])
     }
-    return Array.from(map.values()).sort((a, b) => {
-      if (staffId) {
-        if (a.key === staffId) return -1
-        if (b.key === staffId) return 1
-      }
-      return a.name.localeCompare(b.name)
-    })
-  }, [todayTasks, staffId])
+    return TIME_BANDS.map((band) => ({
+      ...band,
+      tasks: (map.get(band.key) ?? []).slice().sort(
+        (a, b) =>
+          CATEGORY_SORT[a.category] - CATEGORY_SORT[b.category] ||
+          (a.due_time ?? '').localeCompare(b.due_time ?? '') ||
+          a.title.localeCompare(b.title),
+      ),
+    })).filter((band) => band.tasks.length > 0)
+  }, [todayTasks])
 
   // ── All: filtered concrete tasks ──
   const filteredAll = useMemo(() => {
     return optimisticTasks.filter((t) => {
-      if (!matchesStation(t) || !matchesPerson(t) || !matchesKind(t)) return false
+      if (!matchesStation(t) || !matchesPerson(t) || !matchesKind(t) || !matchesCategory(t)) return false
       if (statusFilter === 'all') return true
       if (statusFilter === 'open') return t.status === 'todo' || t.status === 'in_progress'
       return t.status === statusFilter
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [optimisticTasks, statusFilter, stationFilter, personFilter, kindFilter])
+  }, [optimisticTasks, statusFilter, stationFilter, personFilter, kindFilter, categoryFilter])
 
   // ── Recurring: templates, filtered by station + person (kind is implicit) ──
   const filteredTemplates = useMemo(
@@ -342,81 +378,117 @@ export function KitchenTasksPage() {
   ]
 
   const showFilters = tab === 'today' || tab === 'all' || tab === 'recurring'
+  const showCategoryRow = tab === 'today' || tab === 'all'
   const showKindRow = tab === 'today' || tab === 'all'
+  const activeFilterCount =
+    (stationFilter !== 'all' ? 1 : 0) +
+    (personFilter !== 'all' ? 1 : 0) +
+    (showCategoryRow && categoryFilter !== 'all' ? 1 : 0) +
+    (showKindRow && kindFilter !== 'all' ? 1 : 0)
 
   return (
     <div className="space-y-4">
-      {/* Header / tabs */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1 rounded-lg bg-slate-900/60 p-1 ring-1 ring-slate-800">
-          {TABS.map(({ value, label, icon: Icon }) => (
+      {/* Sticky header: tabs · filters toggle · actions, plus the collapsible filter panel */}
+      <div className="sticky top-0 z-20 -mx-6 space-y-2 bg-slate-950/90 px-6 pb-2 pt-1 backdrop-blur">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 overflow-x-auto rounded-lg bg-slate-900/60 p-1 ring-1 ring-slate-800">
+            {TABS.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTab(value)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                  tab === value
+                    ? 'bg-emerald-500/15 text-emerald-300 shadow-sm'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1" />
+
+          {showFilters && (
             <button
-              key={value}
               type="button"
-              onClick={() => setTab(value)}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                tab === value
-                  ? 'bg-emerald-500/15 text-emerald-300 shadow-sm'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              onClick={() => setFiltersOpen((o) => !o)}
+              title="Filters"
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                filtersOpen || activeFilterCount > 0
+                  ? 'bg-emerald-500/15 text-emerald-300'
+                  : 'bg-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-emerald-500/20 px-1.5 text-[10px] font-semibold text-emerald-300">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
-          ))}
-        </div>
+          )}
 
-        <div className="flex-1" />
+          {tab === 'today' && (
+            <button
+              type="button"
+              onClick={() => materializeToday()}
+              title="Generate today's recurring tasks"
+              className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          )}
 
-        {tab === 'today' && (
-          <button
-            type="button"
-            onClick={() => materializeToday()}
-            title="Generate today's recurring tasks"
-            className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
-          </button>
-        )}
-
-        {tab !== 'team' && (
-          <button
-            type="button"
-            onClick={openNew}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New task
-          </button>
-        )}
-      </div>
-
-      {/* Filter bar: Station · People · Type */}
-      {showFilters && (
-        <div className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-2.5">
-          <FilterChipRow
-            label="Station"
-            options={STATION_CHIPS}
-            value={stationFilter}
-            onSelect={(v) => setStationFilter(v as StationFilter)}
-          />
-          <FilterChipRow
-            label="People"
-            options={personOptions}
-            value={personFilter}
-            onSelect={setPersonFilter}
-          />
-          {showKindRow && (
-            <FilterChipRow
-              label="Type"
-              options={KIND_CHIPS}
-              value={kindFilter}
-              onSelect={(v) => setKindFilter(v as KindFilter)}
-            />
+          {tab !== 'team' && (
+            <button
+              type="button"
+              onClick={openNew}
+              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">New task</span>
+            </button>
           )}
         </div>
-      )}
+
+        {showFilters && filtersOpen && (
+          <div className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-2.5">
+            {showCategoryRow && (
+              <FilterChipRow
+                label="Work"
+                options={CATEGORY_CHIPS}
+                value={categoryFilter}
+                onSelect={(v) => setCategoryFilter(v as CategoryFilter)}
+              />
+            )}
+            <FilterChipRow
+              label="Station"
+              options={STATION_CHIPS}
+              value={stationFilter}
+              onSelect={(v) => setStationFilter(v as StationFilter)}
+            />
+            <FilterChipRow
+              label="People"
+              options={personOptions}
+              value={personFilter}
+              onSelect={setPersonFilter}
+            />
+            {showKindRow && (
+              <FilterChipRow
+                label="Type"
+                options={KIND_CHIPS}
+                value={kindFilter}
+                onSelect={(v) => setKindFilter(v as KindFilter)}
+              />
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── TODAY ── */}
       {tab === 'today' && (
@@ -456,37 +528,49 @@ export function KitchenTasksPage() {
 
           {isLoading ? (
             <p className="text-xs text-slate-500">Loading…</p>
-          ) : grouped.length === 0 ? (
+          ) : bands.length === 0 ? (
             <p className="rounded-xl border border-dashed border-slate-800 px-4 py-12 text-center text-sm text-slate-600">
               No tasks for today. · วันนี้ไม่มีงาน
             </p>
           ) : (
-            grouped.map((g) => (
-              <div key={g.key}>
-                <h3
-                  className={`mb-1.5 px-1 text-xs font-semibold ${
-                    g.key === staffId ? 'text-emerald-300' : 'text-slate-400'
-                  }`}
-                >
-                  {g.name}
-                  {g.key === staffId && <span className="ml-1.5 text-[10px] text-emerald-500">· you</span>}
-                </h3>
-                <div className="space-y-1.5">
-                  {g.tasks.map((t) => (
-                    <TaskRow
-                      key={t.id}
-                      task={t}
-                      onOpen={openView}
-                      onToggleDone={toggleDone}
-                      onEdit={openEdit}
-                      onDelete={handleDelete}
-                      onPhotosChange={handlePhotosChange}
-                      onPush={isManager ? handlePush : undefined}
+            bands.map((band) => {
+              const Icon = band.icon
+              const total = band.tasks.length
+              const doneN = band.tasks.filter((t) => t.status === 'done').length
+              const collapsed = collapsedBands.has(band.key)
+              return (
+                <div key={band.key}>
+                  <button
+                    type="button"
+                    onClick={() => toggleBand(band.key)}
+                    className="mb-1.5 flex w-full items-center gap-2 px-1 text-left"
+                  >
+                    <Icon className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-semibold text-slate-200">{band.label}</span>
+                    <span className="text-xs text-slate-500">· {band.label_th}</span>
+                    <span className="ml-auto rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-300">
+                      {doneN}/{total}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-slate-500 transition-transform ${collapsed ? '-rotate-90' : ''}`}
                     />
-                  ))}
+                  </button>
+                  {!collapsed && (
+                    <div className="space-y-1.5">
+                      {band.tasks.map((t) => (
+                        <TaskRow
+                          key={t.id}
+                          task={t}
+                          onOpen={openView}
+                          onToggleDone={toggleDone}
+                          onPhotosChange={handlePhotosChange}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       )}
@@ -521,10 +605,7 @@ export function KitchenTasksPage() {
                   showDate
                   onOpen={openView}
                   onToggleDone={toggleDone}
-                  onEdit={openEdit}
-                  onDelete={handleDelete}
                   onPhotosChange={handlePhotosChange}
-                  onPush={isManager ? handlePush : undefined}
                 />
               ))}
             </div>
@@ -541,7 +622,7 @@ export function KitchenTasksPage() {
             </p>
           ) : (
             filteredTemplates.map((t) => (
-              <TaskRow key={t.id} task={t} onOpen={openView} onEdit={openEdit} onDelete={handleDelete} />
+              <TaskRow key={t.id} task={t} onOpen={openView} />
             ))
           )}
           {filteredTemplates.length > 0 && (
@@ -564,6 +645,8 @@ export function KitchenTasksPage() {
           onToggleDone={toggleDone}
           onSaveComment={handleSaveComment}
           onPhotosChange={handlePhotosChange}
+          onDelete={handleDelete}
+          onPush={isManager ? handlePush : undefined}
         />
       )}
 

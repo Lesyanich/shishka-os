@@ -2,6 +2,11 @@
 // Storage is English (per Language Contract); Thai labels are for the bilingual
 // surfaces (admin preview + Telegram pushes in Phase 2).
 
+import type { LucideIcon } from 'lucide-react'
+import {
+  DoorOpen, DoorClosed, ChefHat, Sparkles, ClipboardList, Tag,
+  PackageCheck, Trash2, Sunrise, Sun, Sunset, Clock,
+} from 'lucide-react'
 import type {
   StaffTask,
   TaskCategory,
@@ -21,6 +26,8 @@ export const CATEGORY_OPTIONS: CategoryOption[] = [
   { value: 'closing', label: 'Closing', label_th: 'ปิดร้าน' },
   { value: 'prep', label: 'Prep', label_th: 'เตรียมของ' },
   { value: 'cleaning', label: 'Cleaning', label_th: 'ทำความสะอาด' },
+  { value: 'stock_check', label: 'Stock check', label_th: 'เช็คสต๊อก' },
+  { value: 'waste', label: 'Write-off', label_th: 'ตัดทิ้ง' },
   { value: 'admin', label: 'Admin', label_th: 'งานเอกสาร' },
   { value: 'general', label: 'General', label_th: 'ทั่วไป' },
 ]
@@ -34,8 +41,46 @@ export const CATEGORY_STYLE: Record<TaskCategory, string> = {
   closing: 'bg-violet-500/15 text-violet-300',
   prep: 'bg-amber-500/15 text-amber-300',
   cleaning: 'bg-teal-500/15 text-teal-300',
+  stock_check: 'bg-lime-500/15 text-lime-300',
+  waste: 'bg-rose-500/15 text-rose-300',
   admin: 'bg-slate-500/15 text-slate-300',
   general: 'bg-slate-700/40 text-slate-300',
+}
+
+/** Per-category icon — used for the card's work-type chip & accent. */
+export const CATEGORY_ICON: Record<TaskCategory, LucideIcon> = {
+  opening: DoorOpen,
+  closing: DoorClosed,
+  prep: ChefHat,
+  cleaning: Sparkles,
+  stock_check: PackageCheck,
+  waste: Trash2,
+  admin: ClipboardList,
+  general: Tag,
+}
+
+/** Left-border accent class per category — the card's at-a-glance work-type stripe. */
+export const CATEGORY_ACCENT: Record<TaskCategory, string> = {
+  opening: 'border-l-sky-500/60',
+  closing: 'border-l-violet-500/60',
+  prep: 'border-l-amber-500/60',
+  cleaning: 'border-l-teal-500/60',
+  stock_check: 'border-l-lime-500/60',
+  waste: 'border-l-rose-500/60',
+  admin: 'border-l-slate-500/60',
+  general: 'border-l-slate-700',
+}
+
+/** Clustering order so same-type work sits together inside a time-of-day section. */
+export const CATEGORY_SORT: Record<TaskCategory, number> = {
+  opening: 0,
+  prep: 1,
+  stock_check: 2,
+  cleaning: 3,
+  waste: 4,
+  admin: 5,
+  closing: 6,
+  general: 7,
 }
 
 export interface PriorityOption {
@@ -120,6 +165,33 @@ export function formatLocalDate(d: Date): string {
 export function shortTime(t: string | null): string {
   if (!t) return ''
   return t.slice(0, 5)
+}
+
+// ── Time-of-day bands ──────────────────────────────────────────────────────
+// Today's tasks are sectioned by when they're due. Thresholds chosen against
+// shifts 08:00–17:00 / close 18:00 — easily tweakable. Tasks with no due_time
+// fall into "Anytime".
+export type TimeBand = 'morning' | 'day' | 'evening' | 'anytime'
+
+export const TIME_BANDS: {
+  key: TimeBand
+  label: string
+  label_th: string
+  icon: LucideIcon
+}[] = [
+  { key: 'morning', label: 'Morning', label_th: 'ช่วงเช้า', icon: Sunrise },
+  { key: 'day', label: 'Day', label_th: 'ช่วงกลางวัน', icon: Sun },
+  { key: 'evening', label: 'Evening', label_th: 'ช่วงเย็น', icon: Sunset },
+  { key: 'anytime', label: 'Anytime', label_th: 'ไม่ระบุเวลา', icon: Clock },
+]
+
+/** Bucket a task into a time-of-day band from its `due_time` (HH:MM[:SS]). */
+export function timeBandOf(task: Pick<StaffTask, 'due_time'>): TimeBand {
+  if (!task.due_time) return 'anytime'
+  const hhmm = task.due_time.slice(0, 5)
+  if (hhmm < '11:00') return 'morning'
+  if (hhmm < '16:00') return 'day'
+  return 'evening'
 }
 
 export function describeRecurrence(task: Pick<StaffTask, 'recurrence' | 'recurrence_days'>): string {
