@@ -143,7 +143,6 @@ function App() {
                     <Route path="staff" element={<StaffPage />} />
                     <Route path="schedule" element={<Suspense fallback={<PageLoader />}><SchedulePage /></Suspense>} />
                   </Route>
-                  <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                   <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
                   <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
                   {/* Inventory/waste + receiving — owner-only, pulled off the cook floor */}
@@ -153,6 +152,8 @@ function App() {
 
                 {/* ── Task-manager tier (Mint / L2 assembly admin) + owner ── */}
                 <Route element={<RoleGuard minRole="task_manager" />}>
+                  {/* Receipt inbox — managers upload receipts + verify OCR. Full finance views (dashboard/ledger/analytics) stay owner-only. */}
+                  <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
                   <Route path="/staff-tasks" element={<Suspense fallback={<PageLoader />}><StaffTasksPage /></Suspense>} />
                   <Route path="/salad-bar" element={<Suspense fallback={<PageLoader />}><SaladBarPage /></Suspense>} />
                   <Route path="/cashier" element={<Suspense fallback={<PageLoader />}><CashierPage /></Suspense>} />

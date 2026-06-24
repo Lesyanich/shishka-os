@@ -7,6 +7,15 @@ import { supabase } from '../../lib/supabase'
 
 type FlowType = 'COGS' | 'OpEx' | 'CapEx'
 
+/** Minimal duplicate-match row returned by the fn_check_expense_duplicate RPC. */
+type LedgerDupe = {
+  id: string
+  transaction_date: string
+  amount_original: number | null
+  details: string | null
+  invoice_number: string | null
+}
+
 interface UnifiedItem {
   name: string
   original_name?: string
@@ -178,27 +187,23 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               warnings.push(`Inbox duplicate: receipt ${inv} also in row ${d.id.slice(0, 8)}… (${d.status}, ${new Date(d.created_at).toLocaleDateString()})`)
             }
           }
-          const { data: ledgerDupes } = await supabase
-            .from('expense_ledger')
-            .select('id, transaction_date, amount_original, details')
-            .eq('invoice_number', inv)
-            .limit(5)
-          if (ledgerDupes?.length) {
-            for (const d of ledgerDupes) {
-              warnings.push(`Already approved: ${inv} on ${d.transaction_date} — ฿${d.amount_original?.toLocaleString()} (${d.details})`)
-            }
-          }
-        } else if (date && amount && amount > 0) {
-          const { data: fuzzyDupes } = await supabase
-            .from('expense_ledger')
-            .select('id, transaction_date, amount_original, details')
-            .eq('transaction_date', date)
-            .gte('amount_original', amount - 1)
-            .lte('amount_original', amount + 1)
-            .limit(5)
-          if (fuzzyDupes?.length) {
-            for (const d of fuzzyDupes) {
-              warnings.push(`Possible duplicate: ${d.transaction_date} — ฿${d.amount_original?.toLocaleString()} (${d.details})`)
+        }
+        // Ledger duplicate check via SECURITY DEFINER RPC — reviewers verify
+        // duplicates without read access to the owner-only expense_ledger.
+        if (inv || (date && amount && amount > 0)) {
+          const { data: ledgerDupes } = await supabase.rpc('fn_check_expense_duplicate', {
+            p_invoice_number: inv || null,
+            p_transaction_date: date || null,
+            p_amount: amount ?? null,
+            p_supplier: null,
+          })
+          if (Array.isArray(ledgerDupes) && ledgerDupes.length) {
+            for (const d of ledgerDupes as LedgerDupe[]) {
+              warnings.push(
+                inv
+                  ? `Already approved: ${inv} on ${d.transaction_date} — ฿${d.amount_original?.toLocaleString()} (${d.details})`
+                  : `Possible duplicate: ${d.transaction_date} — ฿${d.amount_original?.toLocaleString()} (${d.details})`,
+              )
             }
           }
         }
@@ -421,43 +426,36 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
 
     // ── Duplicate detection before confirm dialog ──
     try {
+      let dupes: LedgerDupe[] = []
       if (invoiceNumber) {
-        const { data: dupes } = await supabase
-          .from('expense_ledger')
-          .select('id, details, transaction_date, amount_original')
-          .eq('invoice_number', invoiceNumber)
-          .limit(3)
-
-        if (dupes && dupes.length > 0) {
-          const dupeInfo = dupes.map(d =>
-            `${d.transaction_date} — ฿${d.amount_original} (${d.details})`
-          ).join('\n')
-
-          const proceed = window.confirm(
-            `Possible duplicate!\n\nReceipt "${invoiceNumber}" already exists in ledger:\n${dupeInfo}\n\nProceed anyway?`
-          )
-          if (!proceed) return
-        }
+        const { data } = await supabase.rpc('fn_check_expense_duplicate', {
+          p_invoice_number: invoiceNumber,
+          p_transaction_date: transactionDate || null,
+          p_amount: receiptTotal || null,
+          p_supplier: null,
+        })
+        dupes = (Array.isArray(data) ? data : []) as LedgerDupe[]
       } else if (supplierName && receiptTotal > 0 && transactionDate) {
-        const { data: dupes } = await supabase
-          .from('expense_ledger')
-          .select('id, details, transaction_date, amount_original, invoice_number')
-          .eq('transaction_date', transactionDate)
-          .gte('amount_original', receiptTotal - 1)
-          .lte('amount_original', receiptTotal + 1)
-          .ilike('details', `%${supplierName.slice(0, 20)}%`)
-          .limit(3)
+        const { data } = await supabase.rpc('fn_check_expense_duplicate', {
+          p_invoice_number: null,
+          p_transaction_date: transactionDate,
+          p_amount: receiptTotal,
+          p_supplier: supplierName,
+        })
+        dupes = (Array.isArray(data) ? data : []) as LedgerDupe[]
+      }
 
-        if (dupes && dupes.length > 0) {
-          const dupeInfo = dupes.map(d =>
-            `${d.transaction_date} — ฿${d.amount_original} (${d.details})`
-          ).join('\n')
+      if (dupes.length > 0) {
+        const dupeInfo = dupes.map(d =>
+          `${d.transaction_date} — ฿${d.amount_original} (${d.details})`
+        ).join('\n')
 
-          const proceed = window.confirm(
-            `Possible duplicate!\n\nSimilar expense found:\n${dupeInfo}\n\nProceed anyway?`
-          )
-          if (!proceed) return
-        }
+        const proceed = window.confirm(
+          invoiceNumber
+            ? `Possible duplicate!\n\nReceipt "${invoiceNumber}" already exists in ledger:\n${dupeInfo}\n\nProceed anyway?`
+            : `Possible duplicate!\n\nSimilar expense found:\n${dupeInfo}\n\nProceed anyway?`
+        )
+        if (!proceed) return
       }
     } catch (err) {
       console.warn('[InboxReviewPanel] Duplicate check failed:', err)

@@ -15,6 +15,13 @@
 
 ## In-flight (backend foundation)
 
+- **2026-06-24 — Receipts tab for managers + expense_ledger locked owner-only (MC 49ffbe68, branch `feature/admin/receipts-task-manager-access`).**
+  - CEO: open ONLY `/receipts` to Mint (task_manager) so she can upload receipts + verify OCR, without exposing full expenses.
+  - Frontend: `/receipts` route (App.tsx) + AppShell nav lowered `minRole` owner → task_manager. Finance dashboard/ledger/analytics/api-costs stay owner-only; Mint's "Finance" section now shows just Receipt Inbox.
+  - Security finding + fix: `expense_ledger` RLS was `fn_is_authenticated()` — ANY logged-in staff (every cook + Mint) could read/write the whole ledger via the API; hiding finance tabs never hid the data. Mig **312** swaps it to `fn_is_owner()` (single `expense_ledger_owner_only` ALL policy). Approval path unaffected: `fn_approve_receipt_with_learning` is SECURITY DEFINER / owner=postgres / `force_rls=false` → bypasses RLS.
+  - New RPC `fn_check_expense_duplicate(invoice, date, amount, supplier)` (SECURITY DEFINER, self-gated to active owner/task_manager, EXECUTE→authenticated only, LIMIT 5). `InboxReviewPanel` duplicate detection (on mount + pre-approve) now calls it instead of reading `expense_ledger` directly — managers keep dup warnings without table read access.
+  - Verified: build (`tsc -b` + vite) + eslint green; prod RLS policy + RPC grants confirmed; RPC smoke test (unauthed → 0 rows, no error). Mig 312 applied to prod + self-registered.
+
 - **2026-06-16 — Recipe-step station split in /menu drawer + inline-expand (MC acde9cc5, branch `feature/menu/recipe-step-station-split`).**
   - Fixes the acde9cc5 label-swap bug: the Owner-table inline-expand "L2 ASSEMBLY — Dish plating" block was rendering ALL of a SALE dish's recipe steps (incl. L1 press/pre-bake/blast-freeze each tagged "L1 production") under an L2 header.
   - New `src/lib/recipeStation.ts` (`stationForLocation`, `bucketStepsByStation`): Kitchen+Storage → L1, Assembly → L2; null/unknown → L1 bucket; `tagged=false` when no step carries a station so callers fall back to legacy "show all" (no regression for untagged smoothies/salads/etc.).
