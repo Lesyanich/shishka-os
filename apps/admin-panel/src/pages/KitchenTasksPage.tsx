@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useOptimistic, useRef, useState, startTransition } from 'react'
 import {
-  Plus, RefreshCw, CalendarDays, ListTodo, Repeat, Users, Send,
+  Plus, RefreshCw, CalendarDays, ListTodo, Repeat, Users, Send, Wrench,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAppRole } from '../contexts/AppRoleContext'
@@ -21,8 +21,9 @@ import {
   formatLocalDate,
   shortTime,
 } from '../components/tasks/taskMeta'
+import { useEquipmentMaintenance } from '../hooks/useEquipmentMaintenance'
 
-type Tab = 'today' | 'all' | 'recurring' | 'team'
+type Tab = 'today' | 'all' | 'recurring' | 'equipment' | 'team'
 type StationFilter = 'all' | 'L1' | 'L2' | 'mine'
 
 const STATION_CHIPS: { value: StationFilter; label: string }[] = [
@@ -56,6 +57,7 @@ export function KitchenTasksPage() {
     deleteTask,
     materializeToday,
   } = useStaffTasks()
+  const { schedules: equipmentSchedules, isLoading: equipmentLoading } = useEquipmentMaintenance()
 
   // Optimistic done-toggle: flip the checkbox instantly, reconcile on refetch.
   const [optimisticTasks, applyOptimistic] = useOptimistic(
@@ -201,6 +203,7 @@ export function KitchenTasksPage() {
     { value: 'today', label: 'Today', icon: CalendarDays },
     { value: 'all', label: 'All tasks', icon: ListTodo },
     { value: 'recurring', label: 'Recurring', icon: Repeat },
+    { value: 'equipment', label: 'Equipment', icon: Wrench },
     ...(isManager ? [{ value: 'team' as Tab, label: 'Telegram', icon: Send }] : []),
   ]
 
@@ -412,6 +415,71 @@ export function KitchenTasksPage() {
             <p className="px-1 pt-2 text-[11px] text-slate-600">
               {templates.length} template(s) · {templates.map((t) => describeRecurrence(t)).join(' · ')}
             </p>
+          )}
+        </div>
+      )}
+
+      {/* ── EQUIPMENT (cleaning & maintenance schedule, staff-facing) ── */}
+      {tab === 'equipment' && (
+        <div className="space-y-3">
+          <p className="flex items-center gap-2 text-xs text-slate-400">
+            <Wrench className="h-4 w-4 text-emerald-400" />
+            <span>Cleaning &amp; maintenance schedule per unit · ตารางทำความสะอาดและบำรุงรักษาต่ออุปกรณ์</span>
+          </p>
+          {equipmentLoading ? (
+            <p className="text-xs text-slate-500">Loading…</p>
+          ) : equipmentSchedules.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-xs text-slate-600">
+              No equipment has a schedule yet. Open a recurring task and set its Equipment field.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {equipmentSchedules.map((eq) => (
+                <div key={eq.equipmentId} className="rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-100">{eq.name}</p>
+                      {eq.code && <p className="text-[10px] text-slate-500">{eq.code}</p>}
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        eq.serviceStatus === 'overdue'
+                          ? 'bg-rose-500/10 text-rose-300'
+                          : eq.serviceStatus === 'warning'
+                          ? 'bg-amber-500/10 text-amber-300'
+                          : 'bg-emerald-500/10 text-emerald-300'
+                      }`}
+                    >
+                      {eq.lastServiceDate
+                        ? `Serviced ${new Date(eq.lastServiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                        : 'Never serviced'}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {([['Daily', eq.daily], ['Weekly', eq.weekly], ['Monthly', eq.monthly]] as const).map(
+                      ([label, items]) =>
+                        items.length > 0 && (
+                          <div key={label} className="flex gap-2">
+                            <span className="w-14 shrink-0 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                              {label}
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {items.map((t) => (
+                                <span
+                                  key={t.taskId}
+                                  className="rounded-md bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300"
+                                >
+                                  {t.title}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ),
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

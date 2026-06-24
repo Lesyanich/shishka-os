@@ -95,6 +95,8 @@ JOIN public.staff_tasks t
 ORDER BY e.name,
   CASE t.recurrence WHEN 'daily' THEN 1 WHEN 'weekly' THEN 2 WHEN 'monthly' THEN 3 ELSE 4 END, t.due_time;
 
+GRANT SELECT ON public.v_equipment_maintenance_schedule TO authenticated;
+
 -- 5) Auto-log a maintenance event + bump last_service_date when a linked task is completed.
 --    type is mapped onto the equipment_maintenance_type_check enum; cadence + source
 --    are recorded in result_notes. performed_by left NULL (avoids cross-table FK risk).
