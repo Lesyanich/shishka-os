@@ -16,6 +16,7 @@ import { usePrepLabelItems, type PrepItem, type PrepItemKind } from '../hooks/us
 import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
 import { useAllPrepBatches, type AllPrepBatch } from '../hooks/useAllPrepBatches'
 import { useSaleLabelInfo, type SaleLabelInfo } from '../hooks/useSaleLabelInfo'
+import { usePfPackCard } from '../hooks/usePfPackCard'
 import { useLocations } from '../hooks/useLocations'
 import { useAppRole } from '../contexts/AppRoleContext'
 import {
@@ -26,6 +27,7 @@ import {
   type LabelNutrition,
 } from '../lib/labelPrinting'
 import { renderPrepLabelTSPL } from '../lib/labelTspl'
+import { isCountableUnit, formatGramsAscii, packQtyLabel, packBatchWeight } from '../lib/packLabel'
 import {
   isWebUsbSupported,
   getGrantedPrinter,
@@ -436,9 +438,18 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const { batches, create, remove } = usePrepBatches(item.id)
   const unit = item.base_unit ?? 'kg'
 
-  // Two inputs: per-label weight (grams) + number of labels to print. SALE
-  // portions are fixed, so the weight auto-fills from portion_size below.
+  // Countable preps (pcs / portion) are packed N-per-package: ONE label shows
+  // the piece count (+ total weight from the DB), unlike mass preps (kg) which
+  // print a per-label weight. SALE dishes keep their one-portion-per-label flow.
+  const isCountable = !isSale && isCountableUnit(unit)
+  const { card: packCard } = usePfPackCard(isSale ? null : item.id)
+  const portionWeightG = packCard?.portion_weight_g ?? null
+
+  // Inputs: per-label weight (grams, mass preps) OR pieces-per-pack (countable
+  // preps), plus the number of labels (copies) to print. SALE portions are
+  // fixed, so the weight auto-fills from portion_size below.
   const [grams, setGrams] = useState('')
+  const [pieces, setPieces] = useState('1')
   const [count, setCount] = useState('1')
   const [days, setDays] = useState('')
   const [printing, setPrinting] = useState(false)
@@ -500,11 +511,19 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
     if (isSale && saleInfo?.portionSize != null) setGrams(String(saleInfo.portionSize))
   }, [isSale, saleInfo])
 
+  // Countable preps default the pack size from the DB pack card (portions_per_bag).
+  useEffect(() => {
+    if (isCountable && packCard?.portions_per_bag != null) setPieces(String(packCard.portions_per_bag))
+  }, [isCountable, packCard])
+
   const hasPortion = isSale && saleInfo?.portionSize != null && !!saleInfo.portionUnit
   const portionUnit = saleInfo?.portionUnit ?? 'g'
 
   const gramsNum = grams.trim() === '' ? null : Number(grams)
   const gramsValid = gramsNum != null && Number.isFinite(gramsNum) && gramsNum > 0
+  const piecesNum = pieces.trim() === '' ? null : Number(pieces)
+  const piecesValid =
+    piecesNum != null && Number.isInteger(piecesNum) && piecesNum >= 1 && piecesNum <= 999
   const countNum = count.trim() === '' ? null : Number(count)
   const countValid = countNum != null && Number.isInteger(countNum) && countNum >= 1 && countNum <= 50
   const daysNum = days.trim() === '' ? null : Number(days)
@@ -514,17 +533,16 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const useByLabel = useBy ? shortDate(useBy) : '—'
 
   // What a batch row stores in its base_unit: a mass (kg) base keeps kilograms;
-  // a pcs/portion base counts one portion per label.
-  const batchWeight = unit === 'kg' && gramsNum != null ? gramsNum / 1000 : 1
+  // a countable (pcs/portion) base records the pieces packed into this label.
+  const batchWeight = packBatchWeight({ unit, isCountable, gramsNum, piecesNum })
 
-  function formatGrams(g: number): string {
-    return g >= 1000 ? `${(g / 1000).toFixed(g % 1000 === 0 ? 0 : 2)} kg` : `${Math.round(g)} g`
-  }
   // Per-label weight string for a recorded batch: SALE = the fixed portion,
-  // mass base = stored kg → g, otherwise the raw amount in its base unit.
+  // mass base = stored kg → g, countable = "8 pcs / 480 g" (total from the DB
+  // per-piece weight), otherwise the raw amount in its base unit.
   function weightLabelFor(b: PrepBatch): string {
-    if (hasPortion && saleInfo?.portionSize != null) return formatGrams(saleInfo.portionSize)
-    if (unit === 'kg') return formatGrams(b.weight * 1000)
+    if (hasPortion && saleInfo?.portionSize != null) return formatGramsAscii(saleInfo.portionSize)
+    if (unit === 'kg') return formatGramsAscii(b.weight * 1000)
+    if (isCountable) return packQtyLabel(b.weight, unit, portionWeightG)
     return `${b.weight} ${unit}`
   }
 
@@ -534,7 +552,9 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const showSaleExtras =
     isSale && !!saleInfo && (saleNutrition != null || !!saleInfo.ingredients || priceLabel != null)
 
-  const canPrint = gramsValid && countValid && daysValid && !!locationId && !printing
+  // Countable preps validate the pieces-per-pack field; mass / SALE validate the weight.
+  const measureValid = isCountable ? piecesValid : gramsValid
+  const canPrint = measureValid && countValid && daysValid && !!locationId && !printing
 
   async function printBatch(b: PrepBatch) {
     // SALE dishes get a consumer label: per-portion КБЖУ + состав + price. PF
@@ -646,35 +666,63 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       </div>
 
       <div className="space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
-        {/* Per-label weight — SALE auto-fills from portion size (one per label) */}
-        <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-            Weight per label
-          </span>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="1"
-              value={grams}
-              onChange={(e) => setGrams(e.target.value)}
-              readOnly={hasPortion}
-              placeholder="e.g. 100"
-              className={`w-full rounded-xl border px-3 py-3 text-lg outline-none ${
-                hasPortion
-                  ? 'border-slate-800 bg-slate-900 text-slate-300'
-                  : 'border-slate-700 bg-slate-950 text-slate-100 focus:border-amber-500/60'
-              }`}
-            />
-            <span className="whitespace-nowrap text-base text-slate-400">{hasPortion ? portionUnit : 'g'}</span>
-          </div>
-          {hasPortion && (
-            <span className="mt-1 block text-[11px] text-slate-500">
-              Auto from portion size — one portion per label
+        {/* Countable prep → pieces packed into ONE label; otherwise per-label
+            weight (SALE auto-fills from portion size, one per label). */}
+        {isCountable ? (
+          <label className="block">
+            <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
+              Pieces in pack
             </span>
-          )}
-        </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={999}
+                step="1"
+                value={pieces}
+                onChange={(e) => setPieces(e.target.value)}
+                placeholder="e.g. 8"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-lg text-slate-100 outline-none focus:border-amber-500/60"
+              />
+              <span className="whitespace-nowrap text-base text-slate-400">{unit}</span>
+            </div>
+            <span className="mt-1 block text-[11px] text-slate-500">
+              {portionWeightG != null
+                ? `≈ ${formatGramsAscii((piecesNum ?? 0) * portionWeightG)} total (${piecesNum ?? 0} × ${portionWeightG} g)`
+                : 'Per-piece weight not set on the pack card — printing count only'}
+            </span>
+          </label>
+        ) : (
+          <label className="block">
+            <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
+              Weight per label
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="1"
+                value={grams}
+                onChange={(e) => setGrams(e.target.value)}
+                readOnly={hasPortion}
+                placeholder="e.g. 100"
+                className={`w-full rounded-xl border px-3 py-3 text-lg outline-none ${
+                  hasPortion
+                    ? 'border-slate-800 bg-slate-900 text-slate-300'
+                    : 'border-slate-700 bg-slate-950 text-slate-100 focus:border-amber-500/60'
+                }`}
+              />
+              <span className="whitespace-nowrap text-base text-slate-400">{hasPortion ? portionUnit : 'g'}</span>
+            </div>
+            {hasPortion && (
+              <span className="mt-1 block text-[11px] text-slate-500">
+                Auto from portion size — one portion per label
+              </span>
+            )}
+          </label>
+        )}
 
         {/* How many labels to print (each is its own batch + QR) */}
         <label className="block">
@@ -732,7 +780,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
                 {Math.round(saleNutrition.fat)} · C{Math.round(saleNutrition.carbs)}
                 {hasPortion && saleInfo.portionSize != null && (
                   <span className="ml-1.5 text-[11px] text-slate-500">
-                    per portion ({formatGrams(saleInfo.portionSize)})
+                    per portion ({formatGramsAscii(saleInfo.portionSize)})
                   </span>
                 )}
               </p>

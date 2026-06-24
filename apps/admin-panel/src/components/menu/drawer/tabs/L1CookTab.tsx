@@ -397,8 +397,8 @@ export function L1CookTab({
       {/* Storage (PF only) */}
       {pfPackCard && <StorageBlock card={pfPackCard} item={item} />}
 
-      {/* Storage label — shelf-life editor + RawBT print (PF only) */}
-      {item.kind === 'PF' && <PrepLabelBlock item={item} />}
+      {/* Storage label — shelf-life + pack-size editor + RawBT print (PF only) */}
+      {item.kind === 'PF' && <PrepLabelBlock item={item} packCard={pfPackCard} />}
 
       {/* L2 Assembly (SALE only) */}
       {dishCard && <L2AssemblyBlock card={dishCard} item={item} />}
