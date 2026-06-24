@@ -27,6 +27,8 @@ export interface StaffTask {
   recurrence_days: number[] | null
   is_template: boolean
   template_id: string | null
+  /** FK to the equipment unit this task services — powers the maintenance register. */
+  equipment_id: string | null
   dm_message_id: string | null
   group_message_id: string | null
   /** Optional photo report(s) — public URLs in the task-photos bucket. */
@@ -66,12 +68,13 @@ export interface StaffTaskInsert {
   linked_route?: string | null
   linked_label?: string | null
   linked_label_th?: string | null
+  equipment_id?: string | null
 }
 
 export type StaffTaskUpdate = Partial<StaffTaskInsert>
 
 const SELECT_COLS =
-  'id, title, title_th, description, description_th, assigned_to, created_by, category, priority, status, station, due_date, due_time, reminder_offset_min, recurrence, recurrence_days, is_template, template_id, dm_message_id, group_message_id, photo_urls, linked_route, linked_label, linked_label_th, completed_at, completed_via, created_at, updated_at, staff:staff(name, role)'
+  'id, title, title_th, description, description_th, assigned_to, created_by, category, priority, status, station, due_date, due_time, reminder_offset_min, recurrence, recurrence_days, is_template, template_id, equipment_id, dm_message_id, group_message_id, photo_urls, linked_route, linked_label, linked_label_th, completed_at, completed_via, created_at, updated_at, staff:staff(name, role)'
 
 export interface UseStaffTasksResult {
   tasks: StaffTask[]        // concrete tasks (is_template = false)

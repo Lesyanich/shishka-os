@@ -10,6 +10,7 @@ import type {
   TaskStation,
 } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
+import { useEquipment } from '../../hooks/useEquipment'
 import { TaskLinkPicker, type TaskLinkValue } from './TaskLinkPicker'
 import {
   CATEGORY_OPTIONS,
@@ -46,6 +47,7 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
   const [assignedTo, setAssignedTo] = useState(initial?.assigned_to ?? '')
   const [station, setStation] = useState<TaskStation>(initial?.station ?? 'general')
   const [category, setCategory] = useState<TaskCategory>(initial?.category ?? 'general')
+  const [equipmentId, setEquipmentId] = useState(initial?.equipment_id ?? '')
   const [priority, setPriority] = useState<TaskPriority>(initial?.priority ?? 'medium')
   const [recurrence, setRecurrence] = useState<TaskRecurrence>(initial?.recurrence ?? 'none')
   const [days, setDays] = useState<number[]>(initial?.recurrence_days ?? [])
@@ -63,6 +65,7 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
   const [photoUrls, setPhotoUrls] = useState<string[]>(initial?.photo_urls ?? [])
   const [taskId] = useState<string>(() => initial?.id ?? freshId())
   const { upload, isUploading } = useTaskPhotoUpload()
+  const { equipment } = useEquipment()
   const fileRef = useRef<HTMLInputElement>(null)
 
   if (!open) return null
@@ -111,6 +114,7 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
       linked_route: link.linked_route,
       linked_label: link.linked_label,
       linked_label_th: link.linked_label_th,
+      equipment_id: equipmentId || null,
     }
     await onSubmit(input, canNotify && notify)
     setSaving(false)
@@ -172,6 +176,19 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Equipment (optional) — links the task to a unit for the maintenance register */}
+          <div>
+            <label className={LABEL}>Equipment (optional)</label>
+            <select className={INPUT} value={equipmentId} onChange={(e) => setEquipmentId(e.target.value)}>
+              <option value="">None</option>
+              {[...equipment]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((eq) => (
+                  <option key={eq.id} value={eq.id}>{eq.name}</option>
+                ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
