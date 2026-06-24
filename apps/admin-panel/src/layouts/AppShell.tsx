@@ -113,7 +113,7 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/finance/dashboard', icon: LayoutDashboard, label: 'Dashboard', minRole: 'owner' },
       { path: '/finance/ledger', icon: Table2, label: 'Ledger', minRole: 'owner' },
       { path: '/finance/analytics', icon: BarChart3, label: 'Analytics', minRole: 'owner' },
-      { path: '/receipts', icon: Inbox, label: 'Receipt Inbox', minRole: 'owner' },
+      { path: '/receipts', icon: Inbox, label: 'Receipt Inbox', minRole: 'task_manager' },
       { path: '/api-costs', icon: DollarSign, label: 'API Costs', minRole: 'owner' },
     ],
   },
