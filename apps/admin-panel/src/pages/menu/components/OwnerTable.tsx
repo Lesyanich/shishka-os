@@ -721,7 +721,8 @@ export function OwnerTable({
                         value={portionEditing.size}
                         onChange={(e) => setPortionEditing({ ...portionEditing, size: e.target.value })}
                         onKeyDown={handlePortionKeyDown}
-                        className="w-16 rounded border border-surface-3 bg-surface-2 px-2 py-1 text-right text-xs text-cream focus:border-forest-soft focus:outline-none"
+                        onWheel={(e) => e.currentTarget.blur()}
+                        className="w-16 rounded border border-surface-3 bg-surface-2 px-2 py-1 text-right text-xs text-cream focus:border-forest-soft focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:[-webkit-appearance:none] [&::-webkit-outer-spin-button]:[-webkit-appearance:none] [&::-webkit-inner-spin-button]:m-0"
                         type="number"
                         min={0}
                         autoFocus

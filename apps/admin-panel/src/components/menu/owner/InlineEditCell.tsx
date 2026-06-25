@@ -115,8 +115,15 @@ export function InlineEditCell<T extends string | number | null>({
     'border border-[var(--color-brick-soft)]/60 shadow-[0_0_0_3px_rgba(155,28,33,0.18)] transition-[box-shadow,border-color] duration-[120ms] ease-out'
   const failFlash =
     'ring-2 ring-inset ring-[var(--color-royal-red)]/70 animate-[inline-flash_800ms_ease-out]'
+  // Strip the native number-spinner arrows — the owner types prices by hand and
+  // the steppers only crowd the digits out of a narrow right-aligned cell.
+  // `appearance:textfield` covers Firefox; the webkit pseudo-elements cover
+  // Chrome/Safari. min/max/step stay live for validation, just without the UI.
+  const noSpinner =
+    '[appearance:textfield] [&::-webkit-inner-spin-button]:[-webkit-appearance:none] [&::-webkit-outer-spin-button]:[-webkit-appearance:none] [&::-webkit-inner-spin-button]:m-0'
 
   if (isEditing) {
+    const editorClass = `w-full rounded bg-[var(--color-surface-1)] px-2 py-1 text-xs text-[color:var(--color-cream)] focus:outline-none ${alignCls} ${brickRing}`
     const common = {
       ref: inputRef as never,
       value: draft,
@@ -125,19 +132,24 @@ export function InlineEditCell<T extends string | number | null>({
       onBlur: () => void commit(),
       onKeyDown: onKey,
       'aria-label': ariaLabel,
-      className: `w-full rounded bg-[var(--color-surface-1)] px-2 py-1 text-xs text-[color:var(--color-cream)] focus:outline-none ${alignCls} ${brickRing}`,
+      className: editorClass,
     } as const
     if (variant === 'textarea') {
       return <textarea {...common} rows={rows} />
     }
+    const isNumber = variant === 'number'
     return (
       <input
         {...common}
-        type={variant === 'number' ? 'number' : 'text'}
+        type={isNumber ? 'number' : 'text'}
         min={min}
         max={max}
         step={step}
-        inputMode={variant === 'number' ? 'decimal' : undefined}
+        inputMode={isNumber ? 'decimal' : undefined}
+        // Don't let a stray scroll-wheel over the focused field silently
+        // change the price — a classic type="number" footgun.
+        onWheel={isNumber ? (e) => e.currentTarget.blur() : undefined}
+        className={isNumber ? `${editorClass} ${noSpinner}` : editorClass}
       />
     )
   }
