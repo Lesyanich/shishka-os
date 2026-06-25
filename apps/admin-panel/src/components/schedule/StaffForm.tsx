@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import type { Staff, StaffInsert, StaffUpdate } from '../../hooks/useStaff'
 
 const ROLES: { value: Staff['role']; label: string }[] = [
@@ -16,7 +17,7 @@ function generatePin(): string {
 
 interface StaffFormProps {
   staff?: Staff | null
-  onSave: (data: StaffInsert | StaffUpdate) => Promise<unknown>
+  onSave: (data: StaffInsert | StaffUpdate) => Promise<Staff | null>
   onClose: () => void
 }
 
@@ -26,24 +27,53 @@ export function StaffForm({ staff, onSave, onClose }: StaffFormProps) {
   const [nameTh, setNameTh] = useState(staff?.name_th ?? '')
   const [role, setRole] = useState<Staff['role']>(staff?.role ?? 'cook')
   const [phone, setPhone] = useState(staff?.phone ?? '')
-  const [pinCode, setPinCode] = useState(staff?.pin_code ?? '')
+  // PIN is write-only here — never prefilled, since the plaintext is no longer
+  // stored. Leave blank to keep the current PIN; type a new one to reset it.
+  const [pinCode, setPinCode] = useState('')
   const [isActive, setIsActive] = useState(staff?.is_active ?? true)
   const [saving, setSaving] = useState(false)
+  const [pinError, setPinError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
 
     setSaving(true)
+    setPinError(null)
     const payload = {
       name: name.trim(),
       name_th: nameTh.trim() || null,
       role,
       phone: phone.trim() || null,
-      pin_code: pinCode.trim() || null,
       is_active: isActive,
     }
-    await onSave(payload)
+    const saved = await onSave(payload)
+    if (!saved) {
+      // onSave failed; the list surfaces the error. Keep the form open.
+      setSaving(false)
+      return
+    }
+
+    // Set / reset the PIN via the owner-only RPC, which updates the real
+    // Supabase Auth password (and provisions the auth user on first use).
+    const pin = pinCode.trim()
+    if (pin.length > 0) {
+      if (!/^\d{4}$/.test(pin)) {
+        setPinError('PIN must be exactly 4 digits')
+        setSaving(false)
+        return
+      }
+      const { error } = await supabase.rpc('fn_set_staff_pin', {
+        p_staff_id: saved.id,
+        p_pin: pin,
+      })
+      if (error) {
+        setPinError(error.message || 'Failed to set PIN')
+        setSaving(false)
+        return
+      }
+    }
+
     setSaving(false)
     onClose()
   }
@@ -123,14 +153,17 @@ export function StaffForm({ staff, onSave, onClose }: StaffFormProps) {
 
           {/* PIN */}
           <div>
-            <label className="mb-1 block text-xs text-slate-400">PIN Code (4 digits)</label>
+            <label className="mb-1 block text-xs text-slate-400">
+              {isEdit ? 'Reset PIN (4 digits)' : 'PIN Code (4 digits)'}
+            </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 maxLength={4}
+                inputMode="numeric"
                 value={pinCode}
                 onChange={(e) => setPinCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="1234"
+                placeholder={isEdit ? 'Leave blank to keep current' : '1234'}
                 className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
               />
               <button
@@ -141,6 +174,10 @@ export function StaffForm({ staff, onSave, onClose }: StaffFormProps) {
                 Generate
               </button>
             </div>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Sets the staff member's login PIN (their Supabase Auth password).
+            </p>
+            {pinError && <p className="mt-1 text-xs text-rose-400">{pinError}</p>}
           </div>
 
           {/* Active */}

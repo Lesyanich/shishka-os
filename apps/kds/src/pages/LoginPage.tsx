@@ -8,6 +8,15 @@ import type { StaffMember } from '../types/staff'
 
 type Lang = 'en' | 'th'
 
+// Staff log in with their name + PIN, which maps to a synthetic Supabase Auth
+// identity ({name}@staff.shishka.local). The PIN is the Auth password — there is
+// no plaintext PIN stored anywhere. Keep in sync with admin-panel staffAuth.ts.
+const STAFF_EMAIL_DOMAIN = 'staff.shishka.local'
+function staffNameToEmail(name: string): string {
+  const slug = name.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+  return `${slug}@${STAFF_EMAIL_DOMAIN}`
+}
+
 export function LoginPage() {
   const navigate = useNavigate()
   const { login } = useCook()
@@ -58,27 +67,14 @@ export function LoginPage() {
       setVerifying(true)
       setError(null)
 
-      const { data, error: fetchErr } = await supabase
-        .from('staff')
-        .select('id, pin_code')
-        .eq('id', selectedStaff!.id)
-        .single()
+      // The PIN is the Supabase Auth password for the staff member's synthetic
+      // email identity — verify it through Auth, never against a plaintext column.
+      const { error: authErr } = await supabase.auth.signInWithPassword({
+        email: staffNameToEmail(selectedStaff!.name),
+        password: pin,
+      })
 
-      if (fetchErr || !data) {
-        setError('Staff not found')
-        setPin('')
-        setVerifying(false)
-        return
-      }
-
-      if (!data.pin_code) {
-        setError('No PIN set. Ask manager.')
-        setPin('')
-        setVerifying(false)
-        return
-      }
-
-      if (data.pin_code !== pin) {
+      if (authErr) {
         setError('Wrong PIN')
         setPin('')
         setVerifying(false)

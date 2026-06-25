@@ -8,17 +8,18 @@ export interface Staff {
   name_th: string | null
   role: 'cook' | 'sous_chef' | 'admin' | 'dishwasher' | 'prep'
   phone: string | null
-  pin_code: string | null
   is_active: boolean
   created_at: string
 }
 
+// NOTE: PINs are NOT a column here. The PIN is the staff member's Supabase Auth
+// password and is set via the owner-only `fn_set_staff_pin` RPC (see StaffForm).
+// The plaintext `staff.pin_code` column was removed for security.
 export interface StaffInsert {
   name: string
   name_th?: string | null
   role?: Staff['role']
   phone?: string | null
-  pin_code?: string | null
   is_active?: boolean
 }
 
@@ -27,7 +28,6 @@ export interface StaffUpdate {
   name_th?: string | null
   role?: Staff['role']
   phone?: string | null
-  pin_code?: string | null
   is_active?: boolean
 }
 
@@ -52,7 +52,7 @@ export function useStaff(): UseStaffResult {
 
     const { data, error: fetchError } = await supabase
       .from('staff')
-      .select('id, name, name_th, role, phone, pin_code, is_active, created_at')
+      .select('id, name, name_th, role, phone, is_active, created_at')
       .order('name', { ascending: true })
 
     if (fetchError) {

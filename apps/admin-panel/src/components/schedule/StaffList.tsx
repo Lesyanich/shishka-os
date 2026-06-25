@@ -39,12 +39,11 @@ export function StaffList() {
     setFormOpen(true)
   }
 
-  async function handleSave(data: StaffInsert | StaffUpdate) {
+  async function handleSave(data: StaffInsert | StaffUpdate): Promise<Staff | null> {
     if (editingStaff) {
-      await updateStaff(editingStaff.id, data as StaffUpdate)
-    } else {
-      await createStaff(data as StaffInsert)
+      return updateStaff(editingStaff.id, data as StaffUpdate)
     }
+    return createStaff(data as StaffInsert)
   }
 
   async function handleDelete(s: Staff) {
@@ -101,7 +100,6 @@ export function StaffList() {
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Role</th>
               <th className="hidden px-4 py-3 sm:table-cell">Phone</th>
-              <th className="hidden px-4 py-3 sm:table-cell">PIN</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -109,7 +107,7 @@ export function StaffList() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                   No staff members
                 </td>
               </tr>
@@ -134,9 +132,6 @@ export function StaffList() {
                   </td>
                   <td className="hidden px-4 py-3 text-slate-400 sm:table-cell">
                     {s.phone ?? '—'}
-                  </td>
-                  <td className="hidden px-4 py-3 font-mono text-slate-400 sm:table-cell">
-                    {s.pin_code ?? '—'}
                   </td>
                   <td className="px-4 py-3">
                     <span
