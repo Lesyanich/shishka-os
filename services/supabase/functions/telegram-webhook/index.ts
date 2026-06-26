@@ -723,6 +723,49 @@ async function createSelfTask(chatId: string, rawText: string, markDone: boolean
   }
 }
 
+// Guided task creation (no AI): type title → pick station → pick assignee.
+// Stored as a draft and finalised via approveAndAssign, so it ends up bound to
+// a station + a person and DM'd to them — no free-form, no token cost.
+async function startGuidedAdd(chatId: string, rawText: string) {
+  const staff = await staffForChat(chatId)
+  if (!staff) {
+    await sendMessage(chatId, "You're not connected yet. Ask the owner for your link. · ยังไม่ได้เชื่อมต่อ")
+    return
+  }
+  const title = rawText.trim()
+  if (!title) {
+    await sendMessage(chatId, "Usage: type the task, e.g. «mop the L1 floor» · พิมพ์ชื่องาน")
+    return
+  }
+  const { data, error } = await db
+    .from("staff_tasks")
+    .insert({
+      title,
+      title_th: title,
+      created_by: staff.name,
+      assigned_to: staff.id,
+      category: "general",
+      priority: "medium",
+      due_date: todayICT(),
+      station: "general",
+      status: "draft",
+      is_template: false,
+    })
+    .select("id")
+    .single()
+  if (error || !data) {
+    console.error("[telegram-webhook] startGuidedAdd insert error:", error)
+    await sendMessage(chatId, "⚠️ Could not start. Try again. · ลองใหม่")
+    return
+  }
+  const draftId = data.id as string
+  await sendMessage(chatId, `➕ <b>${escapeHtml(title)}</b>\nWhich station? · สถานีไหน?`, [[
+    { text: "🔪 L1", callback_data: `na:st:${draftId}:L1` },
+    { text: "🍽 L2", callback_data: `na:st:${draftId}:L2` },
+    { text: "📍 General", callback_data: `na:st:${draftId}:general` },
+  ]])
+}
+
 async function handleCallback(cq: Record<string, unknown>) {
   const id = String(cq.id)
   const data = typeof cq.data === "string" ? cq.data : ""
@@ -836,6 +879,38 @@ async function handleCallback(cq: Record<string, unknown>) {
       return
     }
     await answerCallbackQuery(id, "Unknown action")
+    return
+  }
+
+  // ── Guided add: station picked → assignee picker ──
+  if (data.startsWith("na:st:")) {
+    const parts = data.split(":") // [na, st, draftId, station]
+    const draftId = parts[2]
+    const station = parts[3] === "L1" || parts[3] === "L2" ? parts[3] : "general"
+    if (draftId) await db.from("staff_tasks").update({ station }).eq("id", draftId)
+    const roster = await activeStaffRoster()
+    const rows: InlineKeyboard = roster.map((s, i) => [{ text: s.name, callback_data: `na:as:${draftId}:${i}` }])
+    rows.unshift([{ text: "👤 Me · ฉัน", callback_data: `na:as:${draftId}:me` }])
+    await editMessageText(msgChatId, messageId, "👤 <b>Assign to · มอบหมายให้:</b>", rows)
+    await answerCallbackQuery(id)
+    return
+  }
+  // ── Guided add: assignee picked → create + DM the assignee ──
+  if (data.startsWith("na:as:")) {
+    const parts = data.split(":") // [na, as, draftId, who]
+    const draftId = parts[2]
+    const who = parts[3]
+    let assigneeId: string | undefined
+    if (who === "me") assigneeId = staff.id
+    else {
+      const roster = await activeStaffRoster()
+      assigneeId = roster[Number.parseInt(who ?? "", 10)]?.id
+    }
+    if (!draftId || !assigneeId) {
+      await answerCallbackQuery(id, "Invalid choice")
+      return
+    }
+    await approveAndAssign(draftId, assigneeId, msgChatId, messageId, id)
     return
   }
 
@@ -975,7 +1050,7 @@ Deno.serve(async (req) => {
       }
     } // Free-text reply to the Add / Done button prompts (no slash typing needed)
     else if (replyTo.startsWith("✍️ Type the task")) {
-      await createSelfTask(chatId, text, false)
+      await startGuidedAdd(chatId, text)
     } else if (replyTo.startsWith("✍️ What did you")) {
       await createSelfTask(chatId, text, true)
     } else if (text.startsWith("/start")) {
@@ -996,7 +1071,7 @@ Deno.serve(async (req) => {
       // instead of the free-text prompt that used to create phantom tasks.
       await handleToday(chatId)
     } else if (text.startsWith("/add")) {
-      await createSelfTask(chatId, text.slice("/add".length), false)
+      await startGuidedAdd(chatId, text.slice("/add".length))
     } else if (text.startsWith("/done")) {
       await createSelfTask(chatId, text.slice("/done".length), true)
     } else if (text.startsWith("/")) {
