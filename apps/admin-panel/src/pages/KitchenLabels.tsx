@@ -587,6 +587,12 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
 
   // One label = one portion → per-portion КБЖУ (not scaled by count) + price.
   const saleNutrition = isSale ? saleNutritionFor(saleInfo, 1) : null
+  // Portion mass in grams for the per-100 g column — only when the portion is
+  // measured in grams (skip ml / pcs, where a per-100g conversion is meaningless).
+  const portionG =
+    isSale && saleInfo?.portionSize != null && /^(g|г|gram|grams|гр)$/i.test(saleInfo.portionUnit ?? '')
+      ? saleInfo.portionSize
+      : null
   const priceLabel = isSale && saleInfo?.price != null ? `฿${saleInfo.price}` : null
   const showSaleExtras =
     isSale && !!saleInfo && (saleNutrition != null || !!saleInfo.ingredients || priceLabel != null)
@@ -628,6 +634,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       qr: item.product_code,
       batchCode: item.product_code,
       nutrition: saleNutrition,
+      nutritionPortionG: portionG,
       ingredients,
       price: priceLabel,
     }),
@@ -640,6 +647,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       daysNum,
       previewWeight,
       nKey,
+      portionG,
       ingredients,
       priceLabel,
     ],
@@ -663,6 +671,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           qr: b.barcode,
           batchCode: b.batch_code ?? b.barcode,
           nutrition,
+          nutritionPortionG: portionG,
           ingredients,
           price: priceLabel,
         },
@@ -685,6 +694,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
         qr: b.barcode,
         batchCode: b.batch_code ?? b.barcode,
         nutrition,
+        nutritionPortionG: portionG,
         ingredients,
         price: priceLabel,
       },
