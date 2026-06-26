@@ -23,22 +23,40 @@ import { db } from "../_shared/supabase.ts"
 import {
   ADD_PROMPT,
   answerCallbackQuery,
+  boardUrl,
   DONE_PROMPT,
+  downloadFile,
   editMessageText,
   escapeHtml,
   formatTask,
+  formatTaskLine,
+  getFilePath,
   MENU_ADD,
+  MENU_BOARD,
   MENU_DONE,
+  MENU_TEAM,
   MENU_TODAY,
   sendForceReply,
   sendMenu,
   sendMessage,
+  sendPhoto,
   setMyCommands,
   taskKeyboard,
   type FormattableTask,
+  type InlineKeyboard,
 } from "../_shared/telegram.ts"
 
+const REPLY_PROMPT = "↩ Type your reply · พิมพ์คำตอบ"
+
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
+
+/** Keep an async task alive after we return 200 (Supabase Edge runtime). */
+function fireAndForget(p: Promise<unknown>) {
+  const er = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime
+  if (er?.waitUntil) er.waitUntil(p)
+  else p.catch(() => {})
+}
 
 function ok(data: unknown = { ok: true }) {
   return new Response(JSON.stringify(data), {
@@ -64,16 +82,42 @@ function todayICT(): string {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10)
 }
 
-async function staffForChat(chatId: string): Promise<{ id: string; name: string } | null> {
+interface StaffCtx {
+  id: string
+  name: string
+  lang: string
+  appRole: string | null
+}
+
+async function staffForChat(chatId: string): Promise<StaffCtx | null> {
   const { data } = await db
     .from("staff_telegram")
-    .select("staff_id, staff:staff(name)")
+    .select("staff_id, lang, staff:staff(name, app_role)")
     .eq("telegram_chat_id", chatId)
     .maybeSingle()
   if (!data) return null
-  const raw = data.staff as { name?: string } | { name?: string }[] | null
+  const raw = data.staff as { name?: string; app_role?: string } | { name?: string; app_role?: string }[] | null
   const staff = Array.isArray(raw) ? raw[0] : raw
-  return { id: data.staff_id as string, name: staff?.name ?? "" }
+  return {
+    id: data.staff_id as string,
+    name: staff?.name ?? "",
+    lang: (data.lang as string) ?? "th",
+    appRole: staff?.app_role ?? null,
+  }
+}
+
+/** Hand a free-text message to telegram-ai (slow LLM work) without blocking the 200. */
+function triggerAI(chatId: string, text: string, staff: StaffCtx) {
+  if (!SUPABASE_URL || !WEBHOOK_SECRET) return
+  const p = fetch(`${SUPABASE_URL}/functions/v1/telegram-ai`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-telegram-bot-api-secret-token": WEBHOOK_SECRET,
+    },
+    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 1000), lang: staff.lang, staff_name: staff.name }),
+  }).catch((e) => console.error("[telegram-webhook] triggerAI failed:", e))
+  fireAndForget(p)
 }
 
 async function handleStart(chatId: string, username: string | null, code: string | null) {
@@ -121,7 +165,7 @@ async function handleToday(chatId: string) {
     .eq("assigned_to", staff.id)
     .eq("due_date", todayICT())
     .eq("is_template", false)
-    .neq("status", "cancelled")
+    .not("status", "in", "(cancelled,draft)")
     .order("due_time", { ascending: true, nullsFirst: true })
 
   const tasks = (data ?? []) as Array<FormattableTask & { id: string; status: string }>
@@ -136,6 +180,371 @@ async function handleToday(chatId: string) {
     const body = formatTask(t) + (done ? "\n✅ Done" : "")
     await sendMessage(chatId, body, done ? undefined : taskKeyboard(t.id))
   }
+}
+
+// ── Team tasks (colleagues' tasks for today) ────────────────────────────────
+const PAGE_SIZE = 8
+const STATION_LABEL: Record<string, string> = {
+  L1: "🔪 L1 · Prep kitchen",
+  L2: "🍽 L2 · Assembly",
+  general: "📍 General · ทั่วไป",
+}
+
+interface TeamFilter {
+  station?: string
+  staffIdx?: number
+}
+interface TeamTaskRow {
+  id: string
+  title: string
+  due_time: string | null
+  priority: string
+  status: string
+  station: string
+  assigned_to: string | null
+  staff: { name?: string } | { name?: string }[] | null
+}
+
+/** Active staff in a stable order — the roster index used in callback_data. */
+async function activeStaffRoster(): Promise<Array<{ id: string; name: string }>> {
+  const { data } = await db
+    .from("staff")
+    .select("id, name")
+    .eq("is_active", true)
+    .order("name", { ascending: true })
+  return (data ?? []) as Array<{ id: string; name: string }>
+}
+
+/** Parse a `t:team[:filter[:page]]` callback into a filter + page. */
+function parseTeam(data: string): { filter: TeamFilter; page: number; fKey: string } {
+  const parts = data.split(":") // [t, team, f?, page?]
+  const fRaw = parts[2] ?? "all"
+  const page = parts[3] != null ? Math.max(0, parseInt(parts[3], 10) || 0) : 0
+  const filter: TeamFilter = {}
+  let fKey = "all"
+  if (fRaw === "L1" || fRaw === "L2") {
+    filter.station = fRaw
+    fKey = fRaw
+  } else if (fRaw === "gen") {
+    filter.station = "general"
+    fKey = "gen"
+  } else if (fRaw.startsWith("p")) {
+    const idx = parseInt(fRaw.slice(1), 10)
+    if (!isNaN(idx)) {
+      filter.staffIdx = idx
+      fKey = fRaw
+    }
+  }
+  return { filter, page, fKey }
+}
+
+function teamKeyboard(fKey: string, page: number, totalPages: number): InlineKeyboard {
+  const tab = (val: string, label: string, cb: string): { text: string; callback_data: string } => ({
+    text: fKey === val ? `• ${label}` : label,
+    callback_data: cb,
+  })
+  const rows: InlineKeyboard = [[
+    tab("all", "All", "t:team"),
+    tab("L1", "L1", "t:team:L1"),
+    tab("L2", "L2", "t:team:L2"),
+    tab("gen", "Gen", "t:team:gen"),
+    { text: "👤", callback_data: "t:roster" },
+  ]]
+  if (totalPages > 1) {
+    const prev = page > 0 ? `t:team:${fKey}:${page - 1}` : "t:noop"
+    const next = page < totalPages - 1 ? `t:team:${fKey}:${page + 1}` : "t:noop"
+    rows.push([
+      { text: page > 0 ? "◀ Prev" : "·", callback_data: prev },
+      { text: `${page + 1}/${totalPages}`, callback_data: "t:noop" },
+      { text: page < totalPages - 1 ? "Next ▶" : "·", callback_data: next },
+    ])
+  }
+  return rows
+}
+
+function assigneeName(t: TeamTaskRow): string {
+  const raw = t.staff
+  const s = Array.isArray(raw) ? raw[0] : raw
+  return s?.name ?? "—"
+}
+
+async function handleTeam(
+  chatId: string,
+  filter: TeamFilter,
+  page: number,
+  fKey = "all",
+  editMessageId?: number,
+) {
+  const staff = await staffForChat(chatId)
+  if (!staff) {
+    await sendMessage(chatId, "You're not connected yet. Ask the owner for your link. · ยังไม่ได้เชื่อมต่อ")
+    return
+  }
+
+  // Resolve the optional person filter via the stable roster ordering.
+  let assigneeId: string | null = null
+  if (filter.staffIdx != null) {
+    const roster = await activeStaffRoster()
+    assigneeId = roster[filter.staffIdx]?.id ?? null
+  }
+
+  // Filters first (keep `q` a filter builder), then order on the final chain.
+  let q = db
+    .from("staff_tasks")
+    .select("id, title, due_time, priority, status, station, assigned_to, staff:staff(name)")
+    .eq("due_date", todayICT())
+    .eq("is_template", false)
+    .not("status", "in", "(cancelled,draft)")
+  if (filter.station) q = q.eq("station", filter.station)
+  if (assigneeId) q = q.eq("assigned_to", assigneeId)
+
+  const { data } = await q
+    .order("station", { ascending: true })
+    .order("due_time", { ascending: true, nullsFirst: true })
+  const all = (data ?? []) as TeamTaskRow[]
+
+  const total = all.length
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const p = Math.min(page, totalPages - 1)
+  const slice = all.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE)
+
+  const lines: string[] = [`👥 <b>Team tasks · งานทีม</b> (${total})`]
+  if (total === 0) {
+    lines.push("\n🎉 No tasks today · วันนี้ไม่มีงาน")
+  } else {
+    let lastStation: string | null = null
+    for (const t of slice) {
+      if (t.station !== lastStation) {
+        lines.push(`\n<b>${STATION_LABEL[t.station] ?? escapeHtml(t.station)}</b>`)
+        lastStation = t.station
+      }
+      lines.push(formatTaskLine(t, assigneeName(t)))
+    }
+  }
+
+  const text = lines.join("\n")
+  const kb = teamKeyboard(fKey, p, totalPages)
+  if (editMessageId != null) {
+    await editMessageText(chatId, editMessageId, text, kb)
+  } else {
+    await sendMessage(chatId, text, kb)
+  }
+}
+
+/** Edit the team message into a "filter by person" picker. */
+async function handleRoster(chatId: string, messageId: number) {
+  const roster = await activeStaffRoster()
+  const rows: InlineKeyboard = roster.map((s, i) => [
+    { text: s.name, callback_data: `t:team:p${i}` },
+  ])
+  rows.push([{ text: "⬅ Back · กลับ", callback_data: "t:team" }])
+  await editMessageText(chatId, messageId, "👤 <b>Filter by person · เลือกคน</b>", rows)
+}
+
+/** Send a deep-link button into the deployed admin board (role-aware target). */
+async function handleBoard(chatId: string) {
+  const staff = await staffForChat(chatId)
+  const url = boardUrl(staff?.appRole ?? null)
+  await sendMessage(
+    chatId,
+    "🗂 Open the full task board · เปิดบอร์ดงานเต็ม\n<i>Sign in with your name + PIN.</i>",
+    [[{ text: "🗂 Open board · เปิดบอร์ด", url }]],
+  )
+}
+
+// ── AI task-draft approval (Phase C) ────────────────────────────────────────
+async function chatForStaff(staffId: string): Promise<string | null> {
+  const { data } = await db
+    .from("staff_telegram")
+    .select("telegram_chat_id")
+    .eq("staff_id", staffId)
+    .maybeSingle()
+  return data ? (data.telegram_chat_id as string) : null
+}
+
+async function staffNameById(staffId: string): Promise<string> {
+  const { data } = await db.from("staff").select("name").eq("id", staffId).maybeSingle()
+  return (data?.name as string) ?? "—"
+}
+
+/** Flip a draft to a real assigned task and DM the assignee. */
+async function approveAndAssign(
+  draftId: string,
+  assigneeId: string,
+  ownerChatId: string,
+  ownerMsgId: number,
+  cbId: string,
+) {
+  await db.from("staff_tasks").update({ status: "todo", assigned_to: assigneeId }).eq("id", draftId)
+  const { data: t } = await db
+    .from("staff_tasks")
+    .select("id, title, title_th, description, due_time, category, priority, status")
+    .eq("id", draftId)
+    .maybeSingle()
+  const task = t as (FormattableTask & { id: string }) | null
+  if (!task) {
+    await answerCallbackQuery(cbId, "Task not found")
+    return
+  }
+
+  const assigneeName = await staffNameById(assigneeId)
+  const chat = await chatForStaff(assigneeId)
+  if (chat) {
+    const res = await sendMessage(chat, `🆕 ${formatTask(task)}`, taskKeyboard(task.id))
+    if (res.ok && res.messageId != null) {
+      await db.from("staff_tasks")
+        .update({ dm_message_id: String(res.messageId), reminder_sent_at: null })
+        .eq("id", draftId)
+    }
+  }
+  await editMessageText(
+    ownerChatId,
+    ownerMsgId,
+    `${formatTask(task)}\n✅ Assigned to ${escapeHtml(assigneeName)}${chat ? "" : " ⚠️ (not on Telegram)"}`,
+  )
+  await answerCallbackQuery(cbId, "✅ Assigned")
+}
+
+/** Owner/task_manager taps on an AI draft card: appr / asg:<idx> / disc. */
+async function handleDraftCallback(
+  cbId: string,
+  data: string,
+  staff: StaffCtx,
+  msgChatId: string,
+  messageId: number,
+) {
+  if (staff.appRole !== "owner" && staff.appRole !== "task_manager") {
+    await answerCallbackQuery(cbId, "Only a manager can approve tasks")
+    return
+  }
+  const [action, draftId, idxStr] = data.split(":")
+  if (!draftId) {
+    await answerCallbackQuery(cbId, "Unknown action")
+    return
+  }
+
+  const { data: draftRow } = await db
+    .from("staff_tasks")
+    .select("id, status, assigned_to")
+    .eq("id", draftId)
+    .maybeSingle()
+  if (!draftRow) {
+    await answerCallbackQuery(cbId, "Draft not found")
+    return
+  }
+  const draft = draftRow as { id: string; status: string; assigned_to: string | null }
+  if (draft.status !== "draft") {
+    await answerCallbackQuery(cbId, "Already handled")
+    return
+  }
+
+  if (action === "disc") {
+    await db.from("staff_tasks").update({ status: "cancelled" }).eq("id", draftId)
+    await editMessageText(msgChatId, messageId, "❌ <i>Draft discarded</i> · ทิ้งแล้ว")
+    await answerCallbackQuery(cbId, "Discarded")
+    return
+  }
+
+  if (action === "asg") {
+    const idx = Number.parseInt(idxStr ?? "", 10)
+    const roster = await activeStaffRoster()
+    const chosen = Number.isNaN(idx) ? undefined : roster[idx]
+    if (!chosen) {
+      await answerCallbackQuery(cbId, "Invalid choice")
+      return
+    }
+    await approveAndAssign(draftId, chosen.id, msgChatId, messageId, cbId)
+    return
+  }
+
+  if (action === "appr") {
+    if (draft.assigned_to) {
+      await approveAndAssign(draftId, draft.assigned_to, msgChatId, messageId, cbId)
+    } else {
+      const roster = await activeStaffRoster()
+      const rows: InlineKeyboard = roster.map((s, i) => [
+        { text: s.name, callback_data: `asg:${draftId}:${i}` },
+      ])
+      rows.push([{ text: "❌ Discard · ทิ้ง", callback_data: `disc:${draftId}` }])
+      await editMessageText(msgChatId, messageId, "👤 <b>Assign to · มอบหมายให้:</b>", rows)
+      await answerCallbackQuery(cbId)
+    }
+    return
+  }
+
+  await answerCallbackQuery(cbId, "Unknown action")
+}
+
+// ── Photos + owner relay (Phase D) ──────────────────────────────────────────
+/** Linked owner/task_manager chat ids. */
+async function ownerChats(): Promise<string[]> {
+  const { data } = await db
+    .from("staff_telegram")
+    .select("telegram_chat_id, staff:staff!inner(app_role, is_active)")
+    .eq("staff.is_active", true)
+    .in("staff.app_role", ["owner", "task_manager"])
+  return ((data ?? []) as Array<{ telegram_chat_id: string }>).map((r) => r.telegram_chat_id)
+}
+
+/** Download a Telegram photo and store it in the public task-photos bucket. */
+async function storePhoto(fileId: string, taskId: string): Promise<string | null> {
+  const path = await getFilePath(fileId)
+  if (!path) return null
+  const bytes = await downloadFile(path)
+  if (!bytes) return null
+  const ext = (path.split(".").pop() || "jpg").toLowerCase()
+  const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg"
+  const key = `${taskId}/${Date.now()}.${ext}`
+  const { error } = await db.storage.from("task-photos").upload(key, bytes, { contentType, upsert: false })
+  if (error) {
+    console.error("[telegram-webhook] photo upload failed:", error)
+    return null
+  }
+  return db.storage.from("task-photos").getPublicUrl(key).data.publicUrl
+}
+
+/** Inbound photo: attach to a task (if it replies to a task DM) else relay to owners. */
+async function handlePhoto(chatId: string, fileId: string, caption: string, replyToMsgId: number | null) {
+  const staff = await staffForChat(chatId)
+  if (!staff) {
+    await sendMenu(chatId, "Connect first 👇 · เชื่อมต่อก่อน")
+    return
+  }
+
+  if (replyToMsgId != null) {
+    const { data: taskRow } = await db
+      .from("staff_tasks")
+      .select("id, title, photo_urls")
+      .eq("dm_message_id", String(replyToMsgId))
+      .maybeSingle()
+    const task = taskRow as { id: string; title: string; photo_urls: string[] | null } | null
+    if (task) {
+      const url = await storePhoto(fileId, task.id)
+      if (url) {
+        await db.from("staff_tasks")
+          .update({ photo_urls: [...(task.photo_urls ?? []), url] })
+          .eq("id", task.id)
+        await sendMessage(chatId, `📷 Added to “${escapeHtml(task.title)}” · เพิ่มรูปแล้ว`)
+        return
+      }
+      await sendMessage(chatId, "⚠️ Couldn't save the photo. · บันทึกรูปไม่สำเร็จ")
+      return
+    }
+  }
+
+  // Not tied to a task → relay to owners (re-share by file_id, no download).
+  const owners = await ownerChats()
+  const cap = `📷 <b>${escapeHtml(staff.name)}</b>${caption ? `: ${escapeHtml(caption)}` : ""}`
+  let sent = 0
+  for (const c of owners) {
+    if (c === chatId) continue
+    const r = await sendPhoto(c, fileId, cap)
+    if (r.ok) sent++
+  }
+  await sendMessage(
+    chatId,
+    sent > 0 ? "📷 Sent to the team · ส่งให้ทีมแล้ว" : "📷 Saved, but no manager is connected. · ยังไม่มีผู้จัดการเชื่อมต่อ",
+  )
 }
 
 // Staff self-service: /add <task> (todo) and /done <text> (logged as done).
@@ -199,8 +608,7 @@ async function handleCallback(cq: Record<string, unknown>) {
   const msgChatId = message?.chat?.id != null ? String(message.chat.id) : null
   const messageId = message?.message_id
 
-  const [action, taskId] = data.split(":")
-  if (!taskId || !presserChatId || !msgChatId || messageId == null) {
+  if (!presserChatId || !msgChatId || messageId == null) {
     await answerCallbackQuery(id, "Unknown action")
     return
   }
@@ -208,6 +616,53 @@ async function handleCallback(cq: Record<string, unknown>) {
   const staff = await staffForChat(presserChatId)
   if (!staff) {
     await answerCallbackQuery(id, "You're not connected. Ask the owner for your link.")
+    return
+  }
+
+  // ── Navigation callbacks (lists / filters / paging — no task involved) ──
+  if (data === "t:noop") {
+    await answerCallbackQuery(id)
+    return
+  }
+  if (data === "t:mine") {
+    await answerCallbackQuery(id)
+    await handleToday(msgChatId)
+    return
+  }
+  if (data === "t:roster") {
+    await answerCallbackQuery(id)
+    await handleRoster(msgChatId, messageId)
+    return
+  }
+  if (data.startsWith("t:team")) {
+    await answerCallbackQuery(id)
+    const { filter, page, fKey } = parseTeam(data)
+    await handleTeam(msgChatId, filter, page, fKey, messageId)
+    return
+  }
+
+  // ── AI task-draft approval (owner/task_manager only) ──
+  if (data.startsWith("appr:") || data.startsWith("disc:") || data.startsWith("asg:")) {
+    await handleDraftCallback(id, data, staff, msgChatId, messageId)
+    return
+  }
+
+  // ── Owner replies to a relayed staff message ──
+  if (data.startsWith("rly:")) {
+    if (staff.appRole !== "owner" && staff.appRole !== "task_manager") {
+      await answerCallbackQuery(id, "Only a manager can reply here")
+      return
+    }
+    const target = data.slice("rly:".length)
+    await sendForceReply(msgChatId, `${REPLY_PROMPT}\n(to:${target})`)
+    await answerCallbackQuery(id)
+    return
+  }
+
+  // ── Task action callbacks (start / done / snooze) ──
+  const [action, taskId] = data.split(":")
+  if (!taskId) {
+    await answerCallbackQuery(id, "Unknown action")
     return
   }
 
@@ -222,6 +677,18 @@ async function handleCallback(cq: Record<string, unknown>) {
     return
   }
   const task = taskRow as FormattableTask & { id: string; status: string }
+
+  if (action === "start") {
+    await db.from("staff_tasks").update({ status: "in_progress" }).eq("id", taskId)
+    await editMessageText(
+      msgChatId,
+      messageId,
+      `${formatTask(task)}\n🔄 In progress · ${escapeHtml(staff.name)}`,
+      taskKeyboard(taskId),
+    )
+    await answerCallbackQuery(id, "🔄 Started")
+    return
+  }
 
   if (action === "done") {
     await db
@@ -284,20 +751,40 @@ Deno.serve(async (req) => {
     const message = update.message as
       | {
           text?: string
+          caption?: string
+          photo?: Array<{ file_id: string }>
           chat?: { id?: number }
           from?: { username?: string }
-          reply_to_message?: { text?: string }
+          reply_to_message?: { text?: string; message_id?: number }
         }
       | undefined
     const text = message?.text?.trim() ?? ""
     const chatId = message?.chat?.id != null ? String(message.chat.id) : null
     const username = message?.from?.username ?? null
     const replyTo = message?.reply_to_message?.text ?? ""
+    const replyToMsgId = message?.reply_to_message?.message_id ?? null
+    const photos = message?.photo
+    const caption = message?.caption?.trim() ?? ""
 
     if (!chatId) return ok()
 
-    // Free-text reply to the Add / Done button prompts (no slash typing needed)
-    if (replyTo.startsWith("✍️ Type the task")) {
+    // Inbound photo → attach to a task (reply to its DM) or relay to owners.
+    if (photos?.length) {
+      await handlePhoto(chatId, photos[photos.length - 1].file_id, caption, replyToMsgId)
+      return ok()
+    }
+
+    // Owner's reply to a relayed staff message → deliver it back to the asker.
+    if (replyTo.startsWith(REPLY_PROMPT)) {
+      const m = replyTo.match(/\(to:(-?\d+)\)/)
+      if (m && text) {
+        await sendMessage(m[1], `💬 From the team · จากทีม:\n${escapeHtml(text)}`)
+        await sendMessage(chatId, "✅ Sent · ส่งแล้ว")
+      } else {
+        await sendMenu(chatId, "Tap a button below 👇 · กดปุ่มด้านล่าง")
+      }
+    } // Free-text reply to the Add / Done button prompts (no slash typing needed)
+    else if (replyTo.startsWith("✍️ Type the task")) {
       await createSelfTask(chatId, text, false)
     } else if (replyTo.startsWith("✍️ What did you")) {
       await createSelfTask(chatId, text, true)
@@ -306,6 +793,10 @@ Deno.serve(async (req) => {
       await handleStart(chatId, username, code)
     } else if (text === MENU_TODAY || text.startsWith("/today")) {
       await handleToday(chatId)
+    } else if (text === MENU_TEAM || text.startsWith("/team")) {
+      await handleTeam(chatId, {}, 0)
+    } else if (text === MENU_BOARD || text.startsWith("/board")) {
+      await handleBoard(chatId)
     } else if (text === MENU_ADD) {
       await sendForceReply(chatId, ADD_PROMPT)
     } else if (text === MENU_DONE) {
@@ -314,6 +805,18 @@ Deno.serve(async (req) => {
       await createSelfTask(chatId, text.slice("/add".length), false)
     } else if (text.startsWith("/done")) {
       await createSelfTask(chatId, text.slice("/done".length), true)
+    } else if (text.startsWith("/")) {
+      await sendMenu(chatId, "Tap a button below 👇 · กดปุ่มด้านล่าง")
+    } else if (text) {
+      // Free text → AI assistant (menu Q&A etc). Ack fast, process async so
+      // Telegram doesn't time out; telegram-ai sends the real reply.
+      const staff = await staffForChat(chatId)
+      if (!staff) {
+        await sendMenu(chatId, "Connect first to ask me things 👇 · เชื่อมต่อก่อนเพื่อถามได้")
+      } else {
+        await sendMessage(chatId, "💭 Looking it up… · กำลังค้นหา…")
+        triggerAI(chatId, text, staff)
+      }
     } else {
       await sendMenu(chatId, "Tap a button below 👇 · กดปุ่มด้านล่าง")
     }
