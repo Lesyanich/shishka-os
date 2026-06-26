@@ -48,6 +48,8 @@ import {
 const REPLY_PROMPT = "↩ Type your reply · พิมพ์คำตอบ"
 const REV_PROMPT = "📦 Send the stock counts · ส่งจำนวนสต๊อก"
 const FORM_TITLE_PROMPT = "📝 Type the task title · พิมพ์ชื่องาน"
+const COMMENT_PROMPT = "💬 Type your comment · พิมพ์ความคิดเห็น"
+const PHOTO_PROMPT = "📷 Send the photo for this task · ส่งรูปสำหรับงานนี้"
 
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
@@ -231,12 +233,13 @@ async function toggleDone(taskId: string) {
   }
 }
 
+type ListMode = "browse" | "mark" | "open"
 /**
- * My tasks today. Browse (mark=false) is read-only — just the list + one
- * "Mark done" button, so a stray tap can't change anything. Mark mode shows
- * per-task toggle buttons (tap flips done/undone, fully reversible) + Done exit.
+ * My tasks today. browse = read-only list + Mark done / Open / New buttons.
+ * mark = per-task toggle buttons (reversible). open = pick a number to drill
+ * into a task's detail (description, comments, photos).
  */
-async function handleToday(chatId: string, editMessageId?: number, mark = false) {
+async function handleToday(chatId: string, editMessageId?: number, mode: ListMode = "browse") {
   const staff = await staffForChat(chatId)
   if (!staff) {
     await sendMessage(chatId, "You're not connected yet. Ask the owner for your link. · ยังไม่ได้เชื่อมต่อ")
@@ -264,19 +267,76 @@ async function handleToday(chatId: string, editMessageId?: number, mark = false)
   if (tasks.length === 0) lines.push("\n🎉 No tasks today · วันนี้ไม่มีงาน")
 
   let keyboard: InlineKeyboard = [[{ text: "➕ New task · новая", callback_data: "f:new" }]]
-  if (tasks.length > 0 && mark) {
+  if (tasks.length > 0 && mode === "mark") {
     lines.push("\n<i>Tap a number to mark done — tap again to undo · กดเลขเพื่อสลับ</i>")
     const btns = tasks.map((t, i) => ({ text: `${statusBox(t.status)} ${i + 1}`, callback_data: `tgm:${t.id}` }))
     keyboard = [...chunk(btns, 5), [{ text: "✔ Done · เสร็จ", callback_data: "t:mine" }]]
+  } else if (tasks.length > 0 && mode === "open") {
+    lines.push("\n<i>Tap a number to open the task · กดเลขเพื่อเปิดงาน</i>")
+    const btns = tasks.map((t, i) => ({ text: `${i + 1}`, callback_data: `op:${t.id}` }))
+    keyboard = [...chunk(btns, 5), [{ text: "🔙 Back · กลับ", callback_data: "t:mine" }]]
   } else if (tasks.length > 0) {
     keyboard = [
-      [{ text: "✅ Mark done · ทำเครื่องหมาย", callback_data: "mkm" }],
+      [
+        { text: "✅ Mark done · ทำ", callback_data: "mkm" },
+        { text: "📂 Open · เปิด", callback_data: "t:open" },
+      ],
       [{ text: "➕ New task · новая", callback_data: "f:new" }],
     ]
   }
 
   if (editMessageId != null) await editMessageText(chatId, editMessageId, lines.join("\n"), keyboard)
   else await sendMessage(chatId, lines.join("\n"), keyboard)
+}
+
+/** Drill-in: full task card with description, comment, photo count + actions. */
+async function renderTaskDetail(chatId: string, taskId: string, messageId: number) {
+  const { data } = await db
+    .from("staff_tasks")
+    .select("id, title, title_th, description, comment, photo_urls, station, status, due_time, priority, assigned_to")
+    .eq("id", taskId)
+    .maybeSingle()
+  if (!data) {
+    await editMessageText(chatId, messageId, "⚠️ Task not found · ไม่พบงาน")
+    return
+  }
+  const t = data as {
+    title: string
+    title_th: string | null
+    description: string | null
+    comment: string | null
+    photo_urls: string[] | null
+    station: string
+    status: string
+    due_time: string | null
+    priority: string
+    assigned_to: string | null
+  }
+  const assignee = t.assigned_to ? await staffNameById(t.assigned_to) : "—"
+  const photos = t.photo_urls ?? []
+  const flag = t.status === "done" ? "" : `${PRIORITY_FLAG[t.priority] ?? ""} `
+  const time = t.due_time ? ` · ⏰${t.due_time.slice(0, 5)}` : ""
+  const lines = [
+    `${statusBox(t.status)} <b>${escapeHtml(t.title)}</b>${time}`,
+    t.title_th && t.title_th !== t.title ? escapeHtml(t.title_th) : "",
+    `🏷 ${STATION_SHORT[t.station] ?? t.station} · 👤 ${escapeHtml(assignee)} · ${flag}${t.status}`,
+  ].filter(Boolean)
+  if (t.description) lines.push(`\n📄 ${escapeHtml(t.description)}`)
+  if (t.comment) lines.push(`\n💬 <i>${escapeHtml(t.comment)}</i>`)
+  lines.push(`\n📷 Photos: ${photos.length}`)
+
+  const kb: InlineKeyboard = [
+    [
+      { text: t.status === "done" ? "↩ Undo · เลิก" : "✅ Done · เสร็จ", callback_data: `td:done:${taskId}` },
+      { text: "💬 Comment · ความเห็น", callback_data: `td:cm:${taskId}` },
+    ],
+    [
+      { text: "📷 Photo · รูป", callback_data: `td:ph:${taskId}` },
+      ...(photos.length ? [{ text: `🖼 View (${photos.length})`, callback_data: `td:pics:${taskId}` }] : []),
+    ],
+    [{ text: "🔙 Back · กลับ", callback_data: "t:mine" }],
+  ]
+  await editMessageText(chatId, messageId, lines.join("\n"), kb)
 }
 
 // ── Team tasks (colleagues' tasks for today) ────────────────────────────────
@@ -636,11 +696,41 @@ async function storePhoto(fileId: string, taskId: string): Promise<string | null
 }
 
 /** Inbound photo: attach to a task (if it replies to a task DM) else relay to owners. */
-async function handlePhoto(chatId: string, fileId: string, caption: string, replyToMsgId: number | null) {
+/** Append a photo to a task's photo_urls; returns true on success. */
+async function attachPhotoToTask(fileId: string, taskId: string): Promise<{ ok: boolean; title?: string }> {
+  const { data } = await db.from("staff_tasks").select("id, title, photo_urls").eq("id", taskId).maybeSingle()
+  const task = data as { id: string; title: string; photo_urls: string[] | null } | null
+  if (!task) return { ok: false }
+  const url = await storePhoto(fileId, task.id)
+  if (!url) return { ok: false, title: task.title }
+  await db.from("staff_tasks").update({ photo_urls: [...(task.photo_urls ?? []), url] }).eq("id", task.id)
+  return { ok: true, title: task.title }
+}
+
+async function handlePhoto(
+  chatId: string,
+  fileId: string,
+  caption: string,
+  replyToMsgId: number | null,
+  replyToText = "",
+) {
   const staff = await staffForChat(chatId)
   if (!staff) {
     await sendMenu(chatId, "Connect first 👇 · เชื่อมต่อก่อน")
     return
+  }
+
+  // Explicit "📷 Photo report" for a chosen task (force_reply carries (task:<id>)).
+  if (replyToText.startsWith(PHOTO_PROMPT)) {
+    const m = replyToText.match(/\(task:([0-9a-f-]{36})\)/)
+    if (m) {
+      const r = await attachPhotoToTask(fileId, m[1])
+      await sendMessage(
+        chatId,
+        r.ok ? `📷 Added to “${escapeHtml(r.title ?? "")}” · เพิ่มรูปแล้ว` : "⚠️ Couldn't save the photo. · บันทึกรูปไม่สำเร็จ",
+      )
+      return
+    }
   }
 
   if (replyToMsgId != null) {
@@ -950,7 +1040,46 @@ async function handleCallback(cq: Record<string, unknown>) {
   }
   if (data === "t:mine") {
     await answerCallbackQuery(id)
-    await handleToday(msgChatId, messageId, false)
+    await handleToday(msgChatId, messageId, "browse")
+    return
+  }
+  if (data === "t:open") {
+    await answerCallbackQuery(id)
+    await handleToday(msgChatId, messageId, "open")
+    return
+  }
+  if (data.startsWith("op:")) {
+    await answerCallbackQuery(id)
+    await renderTaskDetail(msgChatId, data.slice(3), messageId)
+    return
+  }
+  if (data.startsWith("td:")) {
+    const parts = data.split(":") // [td, action, taskId]
+    const tdAction = parts[1]
+    const tid = parts[2]
+    if (!tid) {
+      await answerCallbackQuery(id, "Unknown action")
+      return
+    }
+    if (tdAction === "done") {
+      await toggleDone(tid)
+      await answerCallbackQuery(id)
+      await renderTaskDetail(msgChatId, tid, messageId)
+    } else if (tdAction === "cm") {
+      await answerCallbackQuery(id)
+      await sendForceReply(msgChatId, `${COMMENT_PROMPT}\n(task:${tid})`)
+    } else if (tdAction === "ph") {
+      await answerCallbackQuery(id)
+      await sendForceReply(msgChatId, `${PHOTO_PROMPT}\n(task:${tid})`)
+    } else if (tdAction === "pics") {
+      await answerCallbackQuery(id)
+      const { data: d } = await db.from("staff_tasks").select("photo_urls").eq("id", tid).maybeSingle()
+      const urls = ((d?.photo_urls as string[] | null) ?? []).slice(0, 10)
+      if (urls.length === 0) await sendMessage(msgChatId, "No photos yet · ยังไม่มีรูป")
+      for (const u of urls) await sendPhoto(msgChatId, u)
+    } else {
+      await answerCallbackQuery(id, "Unknown action")
+    }
     return
   }
   if (data === "t:roster") {
@@ -986,13 +1115,13 @@ async function handleCallback(cq: Record<string, unknown>) {
   // ── Checklist mark mode: enter mark mode / toggle a task / (exit via t:*) ──
   if (data === "mkm") {
     await answerCallbackQuery(id)
-    await handleToday(msgChatId, messageId, true)
+    await handleToday(msgChatId, messageId, "mark")
     return
   }
   if (data.startsWith("tgm:")) {
     await toggleDone(data.slice(4))
     await answerCallbackQuery(id)
-    await handleToday(msgChatId, messageId, true)
+    await handleToday(msgChatId, messageId, "mark")
     return
   }
   if (data.startsWith("mkt:")) {
@@ -1156,7 +1285,7 @@ Deno.serve(async (req) => {
 
     // Inbound photo → attach to a task (reply to its DM) or relay to owners.
     if (photos?.length) {
-      await handlePhoto(chatId, photos[photos.length - 1].file_id, caption, replyToMsgId)
+      await handlePhoto(chatId, photos[photos.length - 1].file_id, caption, replyToMsgId, replyTo)
       return ok()
     }
 
@@ -1178,6 +1307,17 @@ Deno.serve(async (req) => {
         const { data: d } = await db.from("staff_tasks").select("dm_message_id").eq("id", m[1]).maybeSingle()
         const cardId = d?.dm_message_id ? Number(d.dm_message_id) : undefined
         await renderTaskForm(chatId, m[1], cardId)
+      }
+    } // Task comment reply → append "Name: text" to the task's comment field.
+    else if (replyTo.startsWith(COMMENT_PROMPT)) {
+      const m = replyTo.match(/\(task:([0-9a-f-]{36})\)/)
+      if (m && text) {
+        const staff = await staffForChat(chatId)
+        const { data: d } = await db.from("staff_tasks").select("comment").eq("id", m[1]).maybeSingle()
+        const prev = (d?.comment as string | null) ?? ""
+        const entry = `${staff?.name ?? "?"}: ${text.trim()}`
+        await db.from("staff_tasks").update({ comment: prev ? `${prev}\n${entry}` : entry }).eq("id", m[1])
+        await sendMessage(chatId, "💬 Comment added · เพิ่มความเห็นแล้ว")
       }
     } // Owner's reply to a relayed staff message → deliver it back to the asker.
     else if (replyTo.startsWith(REPLY_PROMPT)) {
