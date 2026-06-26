@@ -335,7 +335,14 @@ async function handleAI(chatId: string, text: string, fallbackLang: Lang, propos
   } else if (intent === "general_question") {
     await answerGeneral(chatId, text, lang)
   } else if (intent === "task_intake") {
-    await handleTaskIntake(chatId, text, lang, proposerName)
+    // No AI task creation — guide them to the native form (no tokens, no surprise drafts).
+    await sendMessage(
+      chatId,
+      tri(lang,
+        "📝 Чтобы создать задачу — нажмите кнопку ➕ Add (форма: станция, исполнитель, дата).",
+        "📝 To create a task, tap the ➕ Add button (form: station, assignee, date).",
+        "📝 สร้างงานได้โดยกดปุ่ม ➕ Add (ฟอร์ม: สถานี ผู้รับผิดชอบ วันที่)"),
+    )
   } else {
     await relayToOwners(chatId, text, lang, proposerName)
   }

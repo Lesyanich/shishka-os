@@ -21,7 +21,6 @@
 
 import { db } from "../_shared/supabase.ts"
 import {
-  ADD_PROMPT,
   answerCallbackQuery,
   boardUrl,
   downloadFile,
@@ -48,6 +47,7 @@ import {
 
 const REPLY_PROMPT = "↩ Type your reply · พิมพ์คำตอบ"
 const REV_PROMPT = "📦 Send the stock counts · ส่งจำนวนสต๊อก"
+const FORM_TITLE_PROMPT = "📝 Type the task title · พิมพ์ชื่องาน"
 
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
@@ -723,27 +723,29 @@ async function createSelfTask(chatId: string, rawText: string, markDone: boolean
   }
 }
 
-// Guided task creation (no AI): type title → pick station → pick assignee.
-// Stored as a draft and finalised via approveAndAssign, so it ends up bound to
-// a station + a person and DM'd to them — no free-form, no token cost.
-async function startGuidedAdd(chatId: string, rawText: string) {
+function tomorrowICT(): string {
+  return new Date(Date.now() + 31 * 3600 * 1000).toISOString().slice(0, 10)
+}
+const STATION_SHORT: Record<string, string> = { L1: "🔪 L1", L2: "🍽 L2", general: "📍 General" }
+
+/**
+ * Native task-creation form (NO AI). Tapping "Add" opens this card immediately;
+ * each field is a button. The card edits itself in place as fields are set; the
+ * card's message_id is parked in dm_message_id so the title reply can edit it.
+ */
+async function newTaskForm(chatId: string) {
   const staff = await staffForChat(chatId)
   if (!staff) {
     await sendMessage(chatId, "You're not connected yet. Ask the owner for your link. · ยังไม่ได้เชื่อมต่อ")
     return
   }
-  const title = rawText.trim()
-  if (!title) {
-    await sendMessage(chatId, "Usage: type the task, e.g. «mop the L1 floor» · พิมพ์ชื่องาน")
-    return
-  }
   const { data, error } = await db
     .from("staff_tasks")
     .insert({
-      title,
-      title_th: title,
+      title: "",
+      title_th: "",
       created_by: staff.name,
-      assigned_to: staff.id,
+      assigned_to: staff.id, // default to creator; changeable in the form
       category: "general",
       priority: "medium",
       due_date: todayICT(),
@@ -754,16 +756,147 @@ async function startGuidedAdd(chatId: string, rawText: string) {
     .select("id")
     .single()
   if (error || !data) {
-    console.error("[telegram-webhook] startGuidedAdd insert error:", error)
+    console.error("[telegram-webhook] newTaskForm insert error:", error)
     await sendMessage(chatId, "⚠️ Could not start. Try again. · ลองใหม่")
     return
   }
-  const draftId = data.id as string
-  await sendMessage(chatId, `➕ <b>${escapeHtml(title)}</b>\nWhich station? · สถานีไหน?`, [[
-    { text: "🔪 L1", callback_data: `na:st:${draftId}:L1` },
-    { text: "🍽 L2", callback_data: `na:st:${draftId}:L2` },
-    { text: "📍 General", callback_data: `na:st:${draftId}:general` },
-  ]])
+  await renderTaskForm(chatId, data.id as string)
+}
+
+/** Render / re-render the task-creation form card. */
+async function renderTaskForm(chatId: string, draftId: string, messageId?: number) {
+  const { data } = await db
+    .from("staff_tasks")
+    .select("id, title, station, due_date, assigned_to")
+    .eq("id", draftId)
+    .maybeSingle()
+  if (!data) {
+    if (messageId != null) await editMessageText(chatId, messageId, "⚠️ Form expired. Tap ➕ Add again. · ลองใหม่")
+    return
+  }
+  const t = data as { title: string | null; station: string; due_date: string | null; assigned_to: string | null }
+  const assignee = t.assigned_to ? await staffNameById(t.assigned_to) : "—"
+  const dateLabel = t.due_date === todayICT() ? "Today" : t.due_date === tomorrowICT() ? "Tomorrow" : (t.due_date ?? "—")
+  const lines = [
+    "➕ <b>New task · новая задача</b>",
+    `📝 ${t.title && t.title.trim() ? escapeHtml(t.title) : "<i>— tap 📝 to set —</i>"}`,
+    `${STATION_SHORT[t.station] ?? t.station}   👤 ${escapeHtml(assignee)}   📅 ${dateLabel}`,
+  ]
+  const kb: InlineKeyboard = [
+    [{ text: "📝 Title · название", callback_data: `f:ti:${draftId}` }],
+    [
+      { text: "🏷 Station", callback_data: `f:st:${draftId}` },
+      { text: "👤 Assignee", callback_data: `f:as:${draftId}` },
+      { text: "📅 Date", callback_data: `f:dt:${draftId}` },
+    ],
+    [
+      { text: "✅ Create · создать", callback_data: `f:create:${draftId}` },
+      { text: "❌ Cancel", callback_data: `f:cancel:${draftId}` },
+    ],
+  ]
+  if (messageId != null) {
+    await editMessageText(chatId, messageId, lines.join("\n"), kb)
+  } else {
+    const res = await sendMessage(chatId, lines.join("\n"), kb)
+    if (res.messageId != null) await db.from("staff_tasks").update({ dm_message_id: String(res.messageId) }).eq("id", draftId)
+  }
+}
+
+/** Handle a tap on a task-form field button (f:<action>:<draftId>[:arg]). */
+async function handleFormCallback(cbId: string, data: string, staff: StaffCtx, msgChatId: string, messageId: number) {
+  const parts = data.split(":") // [f, action, draftId, arg?]
+  const action = parts[1]
+  const draftId = parts[2]
+  if (!draftId) {
+    await answerCallbackQuery(cbId, "Unknown action")
+    return
+  }
+
+  if (action === "ti") {
+    await answerCallbackQuery(cbId)
+    await sendForceReply(msgChatId, `${FORM_TITLE_PROMPT}\n(task:${draftId})`)
+    return
+  }
+  if (action === "st") {
+    await answerCallbackQuery(cbId)
+    await editMessageText(msgChatId, messageId, "🏷 <b>Station · สถานี</b>", [
+      [
+        { text: "🔪 L1", callback_data: `f:sts:${draftId}:L1` },
+        { text: "🍽 L2", callback_data: `f:sts:${draftId}:L2` },
+        { text: "📍 General", callback_data: `f:sts:${draftId}:general` },
+      ],
+      [{ text: "🔙 Back", callback_data: `f:back:${draftId}` }],
+    ])
+    return
+  }
+  if (action === "sts") {
+    const st = parts[3] === "L1" || parts[3] === "L2" ? parts[3] : "general"
+    await db.from("staff_tasks").update({ station: st }).eq("id", draftId)
+    await answerCallbackQuery(cbId)
+    await renderTaskForm(msgChatId, draftId, messageId)
+    return
+  }
+  if (action === "as") {
+    await answerCallbackQuery(cbId)
+    const roster = await activeStaffRoster()
+    const rows: InlineKeyboard = roster.map((s, i) => [{ text: s.name, callback_data: `f:ass:${draftId}:${i}` }])
+    rows.unshift([{ text: "👤 Me · ฉัน", callback_data: `f:ass:${draftId}:me` }])
+    rows.push([{ text: "🔙 Back", callback_data: `f:back:${draftId}` }])
+    await editMessageText(msgChatId, messageId, "👤 <b>Assignee · ผู้รับผิดชอบ</b>", rows)
+    return
+  }
+  if (action === "ass") {
+    let aid: string | undefined
+    if (parts[3] === "me") aid = staff.id
+    else {
+      const roster = await activeStaffRoster()
+      aid = roster[Number.parseInt(parts[3] ?? "", 10)]?.id
+    }
+    if (aid) await db.from("staff_tasks").update({ assigned_to: aid }).eq("id", draftId)
+    await answerCallbackQuery(cbId)
+    await renderTaskForm(msgChatId, draftId, messageId)
+    return
+  }
+  if (action === "dt") {
+    await answerCallbackQuery(cbId)
+    await editMessageText(msgChatId, messageId, "📅 <b>Date · วันที่</b>", [
+      [
+        { text: "Today · วันนี้", callback_data: `f:dts:${draftId}:today` },
+        { text: "Tomorrow · พรุ่งนี้", callback_data: `f:dts:${draftId}:tmrw` },
+      ],
+      [{ text: "🔙 Back", callback_data: `f:back:${draftId}` }],
+    ])
+    return
+  }
+  if (action === "dts") {
+    const due = parts[3] === "tmrw" ? tomorrowICT() : todayICT()
+    await db.from("staff_tasks").update({ due_date: due }).eq("id", draftId)
+    await answerCallbackQuery(cbId)
+    await renderTaskForm(msgChatId, draftId, messageId)
+    return
+  }
+  if (action === "back") {
+    await answerCallbackQuery(cbId)
+    await renderTaskForm(msgChatId, draftId, messageId)
+    return
+  }
+  if (action === "create") {
+    const { data } = await db.from("staff_tasks").select("title, assigned_to").eq("id", draftId).maybeSingle()
+    const title = (data?.title as string | undefined)?.trim()
+    if (!title) {
+      await answerCallbackQuery(cbId, "Set a title first · ตั้งชื่อก่อน")
+      return
+    }
+    await approveAndAssign(draftId, (data?.assigned_to as string) || staff.id, msgChatId, messageId, cbId)
+    return
+  }
+  if (action === "cancel") {
+    await db.from("staff_tasks").update({ status: "cancelled" }).eq("id", draftId)
+    await editMessageText(msgChatId, messageId, "❌ <i>Cancelled · ยกเลิก</i>")
+    await answerCallbackQuery(cbId, "Cancelled")
+    return
+  }
+  await answerCallbackQuery(cbId, "Unknown action")
 }
 
 async function handleCallback(cq: Record<string, unknown>) {
@@ -882,35 +1015,9 @@ async function handleCallback(cq: Record<string, unknown>) {
     return
   }
 
-  // ── Guided add: station picked → assignee picker ──
-  if (data.startsWith("na:st:")) {
-    const parts = data.split(":") // [na, st, draftId, station]
-    const draftId = parts[2]
-    const station = parts[3] === "L1" || parts[3] === "L2" ? parts[3] : "general"
-    if (draftId) await db.from("staff_tasks").update({ station }).eq("id", draftId)
-    const roster = await activeStaffRoster()
-    const rows: InlineKeyboard = roster.map((s, i) => [{ text: s.name, callback_data: `na:as:${draftId}:${i}` }])
-    rows.unshift([{ text: "👤 Me · ฉัน", callback_data: `na:as:${draftId}:me` }])
-    await editMessageText(msgChatId, messageId, "👤 <b>Assign to · มอบหมายให้:</b>", rows)
-    await answerCallbackQuery(id)
-    return
-  }
-  // ── Guided add: assignee picked → create + DM the assignee ──
-  if (data.startsWith("na:as:")) {
-    const parts = data.split(":") // [na, as, draftId, who]
-    const draftId = parts[2]
-    const who = parts[3]
-    let assigneeId: string | undefined
-    if (who === "me") assigneeId = staff.id
-    else {
-      const roster = await activeStaffRoster()
-      assigneeId = roster[Number.parseInt(who ?? "", 10)]?.id
-    }
-    if (!draftId || !assigneeId) {
-      await answerCallbackQuery(id, "Invalid choice")
-      return
-    }
-    await approveAndAssign(draftId, assigneeId, msgChatId, messageId, id)
+  // ── Task-creation form (no AI): field buttons ──
+  if (data.startsWith("f:")) {
+    await handleFormCallback(id, data, staff, msgChatId, messageId)
     return
   }
 
@@ -1039,6 +1146,15 @@ Deno.serve(async (req) => {
         await sendMessage(chatId, "💭 Reading the count… · กำลังอ่าน…")
         triggerAI(chatId, text, staff, { mode: "stocktake", station: st ? st[1] : "general" })
       }
+    } // Task-form title reply → set the title and re-render the form card.
+    else if (replyTo.startsWith(FORM_TITLE_PROMPT)) {
+      const m = replyTo.match(/\(task:([0-9a-f-]{36})\)/)
+      if (m && text) {
+        await db.from("staff_tasks").update({ title: text.trim(), title_th: text.trim() }).eq("id", m[1])
+        const { data: d } = await db.from("staff_tasks").select("dm_message_id").eq("id", m[1]).maybeSingle()
+        const cardId = d?.dm_message_id ? Number(d.dm_message_id) : undefined
+        await renderTaskForm(chatId, m[1], cardId)
+      }
     } // Owner's reply to a relayed staff message → deliver it back to the asker.
     else if (replyTo.startsWith(REPLY_PROMPT)) {
       const m = replyTo.match(/\(to:(-?\d+)\)/)
@@ -1050,7 +1166,7 @@ Deno.serve(async (req) => {
       }
     } // Free-text reply to the Add / Done button prompts (no slash typing needed)
     else if (replyTo.startsWith("✍️ Type the task")) {
-      await startGuidedAdd(chatId, text)
+      await newTaskForm(chatId)
     } else if (replyTo.startsWith("✍️ What did you")) {
       await createSelfTask(chatId, text, true)
     } else if (text.startsWith("/start")) {
@@ -1065,13 +1181,13 @@ Deno.serve(async (req) => {
     } else if (text === MENU_STOCKTAKE || text.startsWith("/stocktake") || text.startsWith("/revision")) {
       await handleStocktakeStart(chatId)
     } else if (text === MENU_ADD) {
-      await sendForceReply(chatId, ADD_PROMPT)
+      await newTaskForm(chatId)
     } else if (text === MENU_DONE) {
       // Old "Log done" button (cached keyboards) → show the tappable checklist
       // instead of the free-text prompt that used to create phantom tasks.
       await handleToday(chatId)
     } else if (text.startsWith("/add")) {
-      await startGuidedAdd(chatId, text.slice("/add".length))
+      await newTaskForm(chatId)
     } else if (text.startsWith("/done")) {
       await createSelfTask(chatId, text.slice("/done".length), true)
     } else if (text.startsWith("/")) {
