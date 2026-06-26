@@ -24,12 +24,10 @@ import {
   ADD_PROMPT,
   answerCallbackQuery,
   boardUrl,
-  DONE_PROMPT,
   downloadFile,
   editMessageText,
   escapeHtml,
   formatTask,
-  formatTaskLine,
   getFilePath,
   MENU_ADD,
   MENU_BOARD,
@@ -43,6 +41,7 @@ import {
   setMyCommands,
   taskKeyboard,
   type FormattableTask,
+  type InlineButton,
   type InlineKeyboard,
 } from "../_shared/telegram.ts"
 
@@ -152,7 +151,51 @@ async function handleStart(chatId: string, username: string | null, code: string
   )
 }
 
-async function handleToday(chatId: string) {
+interface ChecklistTask {
+  id: string
+  title: string
+  due_time: string | null
+  priority: string
+  status: string
+}
+
+const PRIORITY_FLAG: Record<string, string> = { critical: "🔴", high: "🟠", medium: "🔵", low: "⚪" }
+
+/**
+ * Render a tappable checklist: numbered task lines (☐ / ✅ / 🔄) plus a row of
+ * "✓ N" buttons for the open ones. `cbFor(id)` builds each button's callback;
+ * `extraRows` are appended below (filters/paging for the team view).
+ */
+function renderChecklist(
+  tasks: ChecklistTask[],
+  header: string,
+  cbFor: (id: string) => string,
+  extraRows: InlineKeyboard = [],
+  numbered?: (t: ChecklistTask, n: number) => string,
+): { text: string; keyboard: InlineKeyboard } {
+  const doneCount = tasks.filter((t) => t.status === "done").length
+  const lines = [`${header} — ${doneCount}/${tasks.length} ✅`]
+  const btns: InlineButton[] = []
+  tasks.forEach((t, i) => {
+    const n = i + 1
+    const done = t.status === "done"
+    const box = done ? "✅" : t.status === "in_progress" ? "🔄" : "☐"
+    const time = t.due_time ? `⏰${t.due_time.slice(0, 5)} ` : ""
+    const titleRaw = numbered ? numbered(t, n) : escapeHtml(t.title)
+    const title = done ? `<s>${titleRaw}</s>` : titleRaw
+    const flag = done ? "" : `${PRIORITY_FLAG[t.priority] ?? ""} `
+    lines.push(`${box} <b>${n}.</b> ${flag}${time}${title}`)
+    if (!done) btns.push({ text: `✓ ${n}`, callback_data: cbFor(t.id) })
+  })
+  if (tasks.length === 0) lines.push("\n🎉 No tasks · ไม่มีงาน")
+  else lines.push("\n<i>Tap ✓ to check off · กดเพื่อทำเครื่องหมาย</i>")
+  const rows: InlineKeyboard = []
+  for (let i = 0; i < btns.length; i += 5) rows.push(btns.slice(i, i + 5))
+  return { text: lines.join("\n"), keyboard: [...rows, ...extraRows] }
+}
+
+/** My tasks for today as a tappable checklist (tap ✓ → marks done in the DB). */
+async function handleToday(chatId: string, editMessageId?: number) {
   const staff = await staffForChat(chatId)
   if (!staff) {
     await sendMessage(chatId, "You're not connected yet. Ask the owner for your link. · ยังไม่ได้เชื่อมต่อ")
@@ -161,25 +204,25 @@ async function handleToday(chatId: string) {
 
   const { data } = await db
     .from("staff_tasks")
-    .select("id, title, title_th, description, due_time, category, priority, status")
+    .select("id, title, due_time, priority, status")
     .eq("assigned_to", staff.id)
     .eq("due_date", todayICT())
     .eq("is_template", false)
     .not("status", "in", "(cancelled,draft)")
     .order("due_time", { ascending: true, nullsFirst: true })
 
-  const tasks = (data ?? []) as Array<FormattableTask & { id: string; status: string }>
-  if (tasks.length === 0) {
-    await sendMessage(chatId, "🎉 No tasks for today. · วันนี้ไม่มีงาน")
-    return
-  }
+  const tasks = (data ?? []) as ChecklistTask[]
+  const { text, keyboard } = renderChecklist(tasks, "📋 <b>My tasks today · งานของฉัน</b>", (id) => `dm:${id}`)
+  if (editMessageId != null) await editMessageText(chatId, editMessageId, text, keyboard)
+  else await sendMessage(chatId, text, keyboard)
+}
 
-  await sendMessage(chatId, `📋 <b>Today · วันนี้</b> (${tasks.length})`)
-  for (const t of tasks) {
-    const done = t.status === "done"
-    const body = formatTask(t) + (done ? "\n✅ Done" : "")
-    await sendMessage(chatId, body, done ? undefined : taskKeyboard(t.id))
-  }
+/** Mark a task done (via Telegram) — shared by all checklist taps. */
+async function markDone(taskId: string) {
+  await db
+    .from("staff_tasks")
+    .update({ status: "done", completed_at: new Date().toISOString(), completed_via: "telegram" })
+    .eq("id", taskId)
 }
 
 // ── Team tasks (colleagues' tasks for today) ────────────────────────────────
@@ -309,26 +352,50 @@ async function handleTeam(
   const slice = all.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE)
 
   const lines: string[] = [`👥 <b>Team tasks · งานทีม</b> (${total})`]
+  const doneButtons: InlineButton[] = []
   if (total === 0) {
     lines.push("\n🎉 No tasks today · วันนี้ไม่มีงาน")
   } else {
     let lastStation: string | null = null
-    for (const t of slice) {
+    slice.forEach((t, i) => {
+      const n = i + 1
       if (t.station !== lastStation) {
         lines.push(`\n<b>${STATION_LABEL[t.station] ?? escapeHtml(t.station)}</b>`)
         lastStation = t.station
       }
-      lines.push(formatTaskLine(t, assigneeName(t)))
-    }
+      const done = t.status === "done"
+      const box = done ? "✅" : t.status === "in_progress" ? "🔄" : "☐"
+      const flag = done ? "" : `${PRIORITY_FLAG[t.priority] ?? ""} `
+      const time = t.due_time ? `⏰${t.due_time.slice(0, 5)} ` : ""
+      const nm = assigneeName(t)
+      const who = nm && nm !== "—" ? ` — ${escapeHtml(nm)}` : ""
+      const title = done ? `<s>${escapeHtml(t.title)}</s>` : escapeHtml(t.title)
+      lines.push(`${box} <b>${n}.</b> ${flag}${time}${title}${who}`)
+      if (!done) doneButtons.push({ text: `✓ ${n}`, callback_data: `dt:${t.id}:${fKey}:${p}` })
+    })
+    lines.push("\n<i>Tap ✓ to check off · กดเพื่อทำเครื่องหมาย</i>")
   }
 
   const text = lines.join("\n")
-  const kb = teamKeyboard(fKey, p, totalPages)
+  const doneRows: InlineKeyboard = []
+  for (let i = 0; i < doneButtons.length; i += 5) doneRows.push(doneButtons.slice(i, i + 5))
+  const kb: InlineKeyboard = [...doneRows, ...teamKeyboard(fKey, p, totalPages)]
   if (editMessageId != null) {
     await editMessageText(chatId, editMessageId, text, kb)
   } else {
     await sendMessage(chatId, text, kb)
   }
+}
+
+/** Map a team filter key (all/L1/L2/gen/p<idx>) back to a TeamFilter. */
+function teamFilterFromKey(fKey: string): TeamFilter {
+  if (fKey === "L1" || fKey === "L2") return { station: fKey }
+  if (fKey === "gen") return { station: "general" }
+  if (fKey.startsWith("p")) {
+    const idx = parseInt(fKey.slice(1), 10)
+    if (!isNaN(idx)) return { staffIdx: idx }
+  }
+  return {}
 }
 
 /** Edit the team message into a "filter by person" picker. */
@@ -659,6 +726,23 @@ async function handleCallback(cq: Record<string, unknown>) {
     return
   }
 
+  // ── Checklist tap: mark done + re-render the list in place ──
+  if (data.startsWith("dm:")) {
+    await markDone(data.slice(3))
+    await answerCallbackQuery(id, "✅ Done")
+    await handleToday(msgChatId, messageId)
+    return
+  }
+  if (data.startsWith("dt:")) {
+    const parts = data.split(":") // [dt, id, fKey, page]
+    if (parts[1]) await markDone(parts[1])
+    await answerCallbackQuery(id, "✅ Done")
+    const fKey = parts[2] ?? "all"
+    const page = parts[3] != null ? Math.max(0, parseInt(parts[3], 10) || 0) : 0
+    await handleTeam(msgChatId, teamFilterFromKey(fKey), page, fKey, messageId)
+    return
+  }
+
   // ── Task action callbacks (start / done / snooze) ──
   const [action, taskId] = data.split(":")
   if (!taskId) {
@@ -800,7 +884,9 @@ Deno.serve(async (req) => {
     } else if (text === MENU_ADD) {
       await sendForceReply(chatId, ADD_PROMPT)
     } else if (text === MENU_DONE) {
-      await sendForceReply(chatId, DONE_PROMPT)
+      // Old "Log done" button (cached keyboards) → show the tappable checklist
+      // instead of the free-text prompt that used to create phantom tasks.
+      await handleToday(chatId)
     } else if (text.startsWith("/add")) {
       await createSelfTask(chatId, text.slice("/add".length), false)
     } else if (text.startsWith("/done")) {
