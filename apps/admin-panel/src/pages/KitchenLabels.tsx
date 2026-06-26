@@ -22,11 +22,14 @@ import { useAppRole } from '../contexts/AppRoleContext'
 import {
   addDays,
   printPrepLabel,
+  renderPrepLabel,
+  buildPrepLabelTSPLBitmap,
   LABEL_SIZES,
   DEFAULT_LABEL_SIZE,
   type LabelNutrition,
+  type LabelSize,
+  type PrepLabelData,
 } from '../lib/labelPrinting'
-import { renderPrepLabelTSPL } from '../lib/labelTspl'
 import { isCountableUnit, formatGramsAscii, packQtyLabel, packBatchWeight } from '../lib/packLabel'
 import {
   isWebUsbSupported,
@@ -430,6 +433,42 @@ function saleNutritionFor(info: SaleLabelInfo | null, qty: number): LabelNutriti
   }
 }
 
+/**
+ * A faithful, to-scale preview of a label. It renders the exact same canvas
+ * that prints (PNG for display, the identical bitmap goes to the printer over
+ * USB), so what the cook sees here is what comes out. `scale` is on-screen
+ * px-per-mm; the aspect ratio is locked to the real stock.
+ */
+function LabelPreview({
+  data,
+  size,
+  scale = 6,
+  className = '',
+}: {
+  data: PrepLabelData
+  size: LabelSize
+  scale?: number
+  className?: string
+}) {
+  const url = useMemo(() => {
+    try {
+      return renderPrepLabel(data, size, 0)
+    } catch {
+      return null
+    }
+  }, [data, size])
+  if (!url) return null
+  const w = Math.round(size.wMm * scale)
+  return (
+    <img
+      src={url}
+      alt={`Label preview ${size.label}`}
+      style={{ width: w, aspectRatio: `${size.wMm} / ${size.hMm}` }}
+      className={`block rounded-md bg-white shadow-md shadow-black/40 ${className}`}
+    />
+  )
+}
+
 function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const isSale = item.kind === 'SALE'
   const { info: saleInfo } = useSaleLabelInfo(item.id, isSale)
@@ -556,11 +595,61 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const measureValid = isCountable ? piecesValid : gramsValid
   const canPrint = measureValid && countValid && daysValid && !!locationId && !printing
 
+  // Weight string for the live preview, mirroring weightLabelFor but from the
+  // current form inputs (null while the field is empty/invalid).
+  const previewWeight =
+    hasPortion && saleInfo?.portionSize != null
+      ? formatGramsAscii(saleInfo.portionSize)
+      : isCountable
+        ? packQtyLabel(piecesValid && piecesNum != null ? piecesNum : 0, unit, portionWeightG)
+        : unit === 'kg'
+          ? gramsValid && gramsNum != null
+            ? formatGramsAscii(gramsNum)
+            : null
+          : gramsValid
+            ? `${gramsNum} ${unit}`
+            : null
+
+  // Live preview model — exactly what printBatch builds, but from the current
+  // inputs. A placeholder code stands in for the not-yet-created batch QR so the
+  // QR/batch line renders. Memoized on primitives so the canvases only redraw
+  // when something visible actually changes.
+  const ingredients = isSale ? saleInfo?.ingredients ?? null : null
+  const nKey = saleNutrition
+    ? `${saleNutrition.kcal}|${saleNutrition.protein}|${saleNutrition.fat}|${saleNutrition.carbs}`
+    : ''
+  const previewData: PrepLabelData = useMemo(
+    () => ({
+      name: item.name,
+      productCode: item.product_code,
+      prepDate: new Date(),
+      shelfLifeDays: daysValid ? daysNum : item.shelfLifeDays ?? null,
+      weight: previewWeight,
+      qr: item.product_code,
+      batchCode: item.product_code,
+      nutrition: saleNutrition,
+      ingredients,
+      price: priceLabel,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      item.name,
+      item.product_code,
+      item.shelfLifeDays,
+      daysValid,
+      daysNum,
+      previewWeight,
+      nKey,
+      ingredients,
+      priceLabel,
+    ],
+  )
+
   async function printBatch(b: PrepBatch) {
     // SALE dishes get a consumer label: per-portion КБЖУ + состав + price. PF
-    // preps print the plain storage label (extras stay undefined).
+    // preps print the plain storage label (extras stay undefined). `nutrition`
+    // and `ingredients` are the same values that drive the live preview above.
     const nutrition = saleNutrition
-    const ingredients = isSale ? saleInfo?.ingredients ?? null : null
 
     // Bluetooth fallback: RawBT can only rasterize a PNG (ESC/POS) — may drift.
     if (transport === 'bluetooth') {
@@ -583,22 +672,23 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       return
     }
 
-    // USB (recommended): native TSPL, self-registers to the gap, no drift.
-    const bytes = new TextEncoder().encode(
-      renderPrepLabelTSPL(
-        {
-          name: item.name,
-          prepDate: new Date(b.produced_at),
-          shelfLifeDays: shelfDaysOf(b),
-          weight: weightLabelFor(b),
-          qr: b.barcode,
-          batchCode: b.batch_code ?? b.barcode,
-          nutrition,
-          ingredients,
-          price: priceLabel,
-        },
-        size,
-      ),
+    // USB (recommended): print the previewed canvas as a native TSPL bitmap.
+    // SIZE/GAP make the printer self-register to the gap, so there's no drift,
+    // and the bytes are exactly what the cook saw in the preview.
+    const bytes = buildPrepLabelTSPLBitmap(
+      {
+        name: item.name,
+        productCode: item.product_code,
+        prepDate: new Date(b.produced_at),
+        shelfLifeDays: shelfDaysOf(b),
+        weight: weightLabelFor(b),
+        qr: b.barcode,
+        batchCode: b.batch_code ?? b.barcode,
+        nutrition,
+        ingredients,
+        price: priceLabel,
+      },
+      size,
     )
     const device = usbDevice ?? (await getGrantedPrinter())
     if (!device) {
@@ -663,6 +753,15 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       <div className="mb-5">
         <h1 className="text-lg font-semibold text-slate-100">{item.name}</h1>
         <p className="text-xs text-slate-500">{item.product_code}</p>
+      </div>
+
+      {/* Live preview — exactly what prints, at the selected stock size. Sits
+          on a checkered backdrop so the white label reads as a physical sticker. */}
+      <div className="mb-4 flex flex-col items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 p-4">
+        <LabelPreview data={previewData} size={size} scale={6} />
+        <span className="text-[11px] uppercase tracking-wider text-slate-500">
+          Preview · {size.label}
+        </span>
       </div>
 
       <div className="space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
@@ -813,23 +912,37 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           </select>
         </label>
 
-        {/* Paper size */}
-        <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
+        {/* Paper size — tap a real, to-scale preview of each stock. The big
+            preview above mirrors the selected one. */}
+        <div className="block">
+          <span className="mb-2 block text-xs uppercase tracking-wider text-slate-400">
             Paper size
           </span>
-          <select
-            value={sizeId}
-            onChange={(e) => chooseSize(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
-          >
-            {LABEL_SIZES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div className="flex flex-wrap items-end gap-2">
+            {LABEL_SIZES.map((s) => {
+              const selected = s.id === sizeId
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => chooseSize(s.id)}
+                  aria-pressed={selected}
+                  title={s.label}
+                  className={`flex flex-col items-center gap-1 rounded-xl border p-2 transition ${
+                    selected
+                      ? 'border-amber-500 bg-amber-500/10'
+                      : 'border-slate-700 bg-slate-950 hover:border-slate-500'
+                  }`}
+                >
+                  <LabelPreview data={previewData} size={s} scale={2} />
+                  <span className={`text-[10px] ${selected ? 'text-amber-300' : 'text-slate-400'}`}>
+                    {s.label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         {/* Transport: USB (TSPL, perfect) or Bluetooth (RawBT, may drift) */}
         <label className="block">
@@ -895,7 +1008,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
 
         <p className="text-center text-[11px] text-slate-500">
           {transport === 'usb'
-            ? 'Records the batch + prints a native TSPL label over USB'
+            ? 'Records the batch + prints the previewed label over USB (native TSPL bitmap)'
             : 'Records the batch + prints via RawBT over Bluetooth (may misalign)'}
         </p>
       </div>
