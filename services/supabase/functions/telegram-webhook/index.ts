@@ -161,41 +161,34 @@ interface ChecklistTask {
 
 const PRIORITY_FLAG: Record<string, string> = { critical: "🔴", high: "🟠", medium: "🔵", low: "⚪" }
 
-/**
- * Render a tappable checklist: numbered task lines (☐ / ✅ / 🔄) plus a row of
- * "✓ N" buttons for the open ones. `cbFor(id)` builds each button's callback;
- * `extraRows` are appended below (filters/paging for the team view).
- */
-function renderChecklist(
-  tasks: ChecklistTask[],
-  header: string,
-  cbFor: (id: string) => string,
-  extraRows: InlineKeyboard = [],
-  numbered?: (t: ChecklistTask, n: number) => string,
-): { text: string; keyboard: InlineKeyboard } {
-  const doneCount = tasks.filter((t) => t.status === "done").length
-  const lines = [`${header} — ${doneCount}/${tasks.length} ✅`]
-  const btns: InlineButton[] = []
-  tasks.forEach((t, i) => {
-    const n = i + 1
-    const done = t.status === "done"
-    const box = done ? "✅" : t.status === "in_progress" ? "🔄" : "☐"
-    const time = t.due_time ? `⏰${t.due_time.slice(0, 5)} ` : ""
-    const titleRaw = numbered ? numbered(t, n) : escapeHtml(t.title)
-    const title = done ? `<s>${titleRaw}</s>` : titleRaw
-    const flag = done ? "" : `${PRIORITY_FLAG[t.priority] ?? ""} `
-    lines.push(`${box} <b>${n}.</b> ${flag}${time}${title}`)
-    if (!done) btns.push({ text: `✓ ${n}`, callback_data: cbFor(t.id) })
-  })
-  if (tasks.length === 0) lines.push("\n🎉 No tasks · ไม่มีงาน")
-  else lines.push("\n<i>Tap ✓ to check off · กดเพื่อทำเครื่องหมาย</i>")
+function chunk(btns: InlineButton[], size: number): InlineKeyboard {
   const rows: InlineKeyboard = []
-  for (let i = 0; i < btns.length; i += 5) rows.push(btns.slice(i, i + 5))
-  return { text: lines.join("\n"), keyboard: [...rows, ...extraRows] }
+  for (let i = 0; i < btns.length; i += size) rows.push(btns.slice(i, i + size))
+  return rows
+}
+function statusBox(status: string): string {
+  return status === "done" ? "✅" : status === "in_progress" ? "🔄" : "☐"
 }
 
-/** My tasks for today as a tappable checklist (tap ✓ → marks done in the DB). */
-async function handleToday(chatId: string, editMessageId?: number) {
+/** Toggle a task done ↔ todo — reversible, so an accidental tap is undone by tapping again. */
+async function toggleDone(taskId: string) {
+  const { data } = await db.from("staff_tasks").select("status").eq("id", taskId).maybeSingle()
+  const cur = (data?.status as string) ?? "todo"
+  if (cur === "done") {
+    await db.from("staff_tasks").update({ status: "todo", completed_at: null, completed_via: null }).eq("id", taskId)
+  } else {
+    await db.from("staff_tasks")
+      .update({ status: "done", completed_at: new Date().toISOString(), completed_via: "telegram" })
+      .eq("id", taskId)
+  }
+}
+
+/**
+ * My tasks today. Browse (mark=false) is read-only — just the list + one
+ * "Mark done" button, so a stray tap can't change anything. Mark mode shows
+ * per-task toggle buttons (tap flips done/undone, fully reversible) + Done exit.
+ */
+async function handleToday(chatId: string, editMessageId?: number, mark = false) {
   const staff = await staffForChat(chatId)
   if (!staff) {
     await sendMessage(chatId, "You're not connected yet. Ask the owner for your link. · ยังไม่ได้เชื่อมต่อ")
@@ -212,17 +205,27 @@ async function handleToday(chatId: string, editMessageId?: number) {
     .order("due_time", { ascending: true, nullsFirst: true })
 
   const tasks = (data ?? []) as ChecklistTask[]
-  const { text, keyboard } = renderChecklist(tasks, "📋 <b>My tasks today · งานของฉัน</b>", (id) => `dm:${id}`)
-  if (editMessageId != null) await editMessageText(chatId, editMessageId, text, keyboard)
-  else await sendMessage(chatId, text, keyboard)
-}
+  const done = tasks.filter((t) => t.status === "done").length
+  const lines = [`📋 <b>My tasks today · งานของฉัน</b> — ${done}/${tasks.length} ✅`]
+  tasks.forEach((t, i) => {
+    const time = t.due_time ? `⏰${t.due_time.slice(0, 5)} ` : ""
+    const flag = t.status === "done" ? "" : `${PRIORITY_FLAG[t.priority] ?? ""} `
+    const title = t.status === "done" ? `<s>${escapeHtml(t.title)}</s>` : escapeHtml(t.title)
+    lines.push(`${statusBox(t.status)} <b>${i + 1}.</b> ${flag}${time}${title}`)
+  })
+  if (tasks.length === 0) lines.push("\n🎉 No tasks today · วันนี้ไม่มีงาน")
 
-/** Mark a task done (via Telegram) — shared by all checklist taps. */
-async function markDone(taskId: string) {
-  await db
-    .from("staff_tasks")
-    .update({ status: "done", completed_at: new Date().toISOString(), completed_via: "telegram" })
-    .eq("id", taskId)
+  let keyboard: InlineKeyboard = []
+  if (tasks.length > 0 && mark) {
+    lines.push("\n<i>Tap a number to mark done — tap again to undo · กดเลขเพื่อสลับ</i>")
+    const btns = tasks.map((t, i) => ({ text: `${statusBox(t.status)} ${i + 1}`, callback_data: `tgm:${t.id}` }))
+    keyboard = [...chunk(btns, 5), [{ text: "✔ Done · เสร็จ", callback_data: "t:mine" }]]
+  } else if (tasks.length > 0) {
+    keyboard = [[{ text: "✅ Mark done · ทำเครื่องหมาย", callback_data: "mkm" }]]
+  }
+
+  if (editMessageId != null) await editMessageText(chatId, editMessageId, lines.join("\n"), keyboard)
+  else await sendMessage(chatId, lines.join("\n"), keyboard)
 }
 
 // ── Team tasks (colleagues' tasks for today) ────────────────────────────────
@@ -281,28 +284,30 @@ function parseTeam(data: string): { filter: TeamFilter; page: number; fKey: stri
   return { filter, page, fKey }
 }
 
-function teamKeyboard(fKey: string, page: number, totalPages: number): InlineKeyboard {
-  const tab = (val: string, label: string, cb: string): { text: string; callback_data: string } => ({
+/** Station/person filter row — kept at the TOP of the team keyboard. */
+function teamFilterRow(fKey: string): InlineButton[] {
+  const tab = (val: string, label: string, cb: string): InlineButton => ({
     text: fKey === val ? `• ${label}` : label,
     callback_data: cb,
   })
-  const rows: InlineKeyboard = [[
+  return [
     tab("all", "All", "t:team"),
     tab("L1", "L1", "t:team:L1"),
     tab("L2", "L2", "t:team:L2"),
     tab("gen", "Gen", "t:team:gen"),
     { text: "👤", callback_data: "t:roster" },
-  ]]
-  if (totalPages > 1) {
-    const prev = page > 0 ? `t:team:${fKey}:${page - 1}` : "t:noop"
-    const next = page < totalPages - 1 ? `t:team:${fKey}:${page + 1}` : "t:noop"
-    rows.push([
-      { text: page > 0 ? "◀ Prev" : "·", callback_data: prev },
-      { text: `${page + 1}/${totalPages}`, callback_data: "t:noop" },
-      { text: page < totalPages - 1 ? "Next ▶" : "·", callback_data: next },
-    ])
-  }
-  return rows
+  ]
+}
+/** Prev/Next paging row, or null when there's a single page. */
+function teamPagingRow(fKey: string, page: number, totalPages: number): InlineButton[] | null {
+  if (totalPages <= 1) return null
+  const prev = page > 0 ? `t:team:${fKey}:${page - 1}` : "t:noop"
+  const next = page < totalPages - 1 ? `t:team:${fKey}:${page + 1}` : "t:noop"
+  return [
+    { text: page > 0 ? "◀ Prev" : "·", callback_data: prev },
+    { text: `${page + 1}/${totalPages}`, callback_data: "t:noop" },
+    { text: page < totalPages - 1 ? "Next ▶" : "·", callback_data: next },
+  ]
 }
 
 function assigneeName(t: TeamTaskRow): string {
@@ -317,6 +322,7 @@ async function handleTeam(
   page: number,
   fKey = "all",
   editMessageId?: number,
+  mark = false,
 ) {
   const staff = await staffForChat(chatId)
   if (!staff) {
@@ -352,38 +358,41 @@ async function handleTeam(
   const slice = all.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE)
 
   const lines: string[] = [`👥 <b>Team tasks · งานทีม</b> (${total})`]
-  const doneButtons: InlineButton[] = []
   if (total === 0) {
     lines.push("\n🎉 No tasks today · วันนี้ไม่มีงาน")
   } else {
     let lastStation: string | null = null
     slice.forEach((t, i) => {
-      const n = i + 1
       if (t.station !== lastStation) {
         lines.push(`\n<b>${STATION_LABEL[t.station] ?? escapeHtml(t.station)}</b>`)
         lastStation = t.station
       }
-      const done = t.status === "done"
-      const box = done ? "✅" : t.status === "in_progress" ? "🔄" : "☐"
-      const flag = done ? "" : `${PRIORITY_FLAG[t.priority] ?? ""} `
+      const flag = t.status === "done" ? "" : `${PRIORITY_FLAG[t.priority] ?? ""} `
       const time = t.due_time ? `⏰${t.due_time.slice(0, 5)} ` : ""
       const nm = assigneeName(t)
       const who = nm && nm !== "—" ? ` — ${escapeHtml(nm)}` : ""
-      const title = done ? `<s>${escapeHtml(t.title)}</s>` : escapeHtml(t.title)
-      lines.push(`${box} <b>${n}.</b> ${flag}${time}${title}${who}`)
-      if (!done) doneButtons.push({ text: `✓ ${n}`, callback_data: `dt:${t.id}:${fKey}:${p}` })
+      const title = t.status === "done" ? `<s>${escapeHtml(t.title)}</s>` : escapeHtml(t.title)
+      lines.push(`${statusBox(t.status)} <b>${i + 1}.</b> ${flag}${time}${title}${who}`)
     })
-    lines.push("\n<i>Tap ✓ to check off · กดเพื่อทำเครื่องหมาย</i>")
   }
 
-  const text = lines.join("\n")
-  const doneRows: InlineKeyboard = []
-  for (let i = 0; i < doneButtons.length; i += 5) doneRows.push(doneButtons.slice(i, i + 5))
-  const kb: InlineKeyboard = [...doneRows, ...teamKeyboard(fKey, p, totalPages)]
+  // Filters on TOP; then either a single "Mark done" button (browse) or the
+  // per-task toggle buttons + Done exit (mark mode); then paging.
+  const kb: InlineKeyboard = [teamFilterRow(fKey)]
+  if (total > 0 && mark) {
+    lines.push("\n<i>Tap a number to mark done — tap again to undo · กดเลขเพื่อสลับ</i>")
+    const btns = slice.map((t, i) => ({ text: `${statusBox(t.status)} ${i + 1}`, callback_data: `tgt:${t.id}:${fKey}:${p}` }))
+    kb.push(...chunk(btns, 5), [{ text: "✔ Done · เสร็จ", callback_data: `t:team:${fKey}:${p}` }])
+  } else if (total > 0) {
+    kb.push([{ text: "✅ Mark done · ทำเครื่องหมาย", callback_data: `mkt:${fKey}:${p}` }])
+  }
+  const pagingRow = teamPagingRow(fKey, p, totalPages)
+  if (pagingRow) kb.push(pagingRow)
+
   if (editMessageId != null) {
-    await editMessageText(chatId, editMessageId, text, kb)
+    await editMessageText(chatId, editMessageId, lines.join("\n"), kb)
   } else {
-    await sendMessage(chatId, text, kb)
+    await sendMessage(chatId, lines.join("\n"), kb)
   }
 }
 
@@ -693,7 +702,7 @@ async function handleCallback(cq: Record<string, unknown>) {
   }
   if (data === "t:mine") {
     await answerCallbackQuery(id)
-    await handleToday(msgChatId)
+    await handleToday(msgChatId, messageId, false)
     return
   }
   if (data === "t:roster") {
@@ -726,20 +735,33 @@ async function handleCallback(cq: Record<string, unknown>) {
     return
   }
 
-  // ── Checklist tap: mark done + re-render the list in place ──
-  if (data.startsWith("dm:")) {
-    await markDone(data.slice(3))
-    await answerCallbackQuery(id, "✅ Done")
-    await handleToday(msgChatId, messageId)
+  // ── Checklist mark mode: enter mark mode / toggle a task / (exit via t:*) ──
+  if (data === "mkm") {
+    await answerCallbackQuery(id)
+    await handleToday(msgChatId, messageId, true)
     return
   }
-  if (data.startsWith("dt:")) {
-    const parts = data.split(":") // [dt, id, fKey, page]
-    if (parts[1]) await markDone(parts[1])
-    await answerCallbackQuery(id, "✅ Done")
+  if (data.startsWith("tgm:")) {
+    await toggleDone(data.slice(4))
+    await answerCallbackQuery(id)
+    await handleToday(msgChatId, messageId, true)
+    return
+  }
+  if (data.startsWith("mkt:")) {
+    const parts = data.split(":") // [mkt, fKey, page]
+    const fKey = parts[1] ?? "all"
+    const page = parts[2] != null ? Math.max(0, parseInt(parts[2], 10) || 0) : 0
+    await answerCallbackQuery(id)
+    await handleTeam(msgChatId, teamFilterFromKey(fKey), page, fKey, messageId, true)
+    return
+  }
+  if (data.startsWith("tgt:")) {
+    const parts = data.split(":") // [tgt, id, fKey, page]
+    if (parts[1]) await toggleDone(parts[1])
+    await answerCallbackQuery(id)
     const fKey = parts[2] ?? "all"
     const page = parts[3] != null ? Math.max(0, parseInt(parts[3], 10) || 0) : 0
-    await handleTeam(msgChatId, teamFilterFromKey(fKey), page, fKey, messageId)
+    await handleTeam(msgChatId, teamFilterFromKey(fKey), page, fKey, messageId, true)
     return
   }
 
