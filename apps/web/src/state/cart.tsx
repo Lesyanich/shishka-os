@@ -1,5 +1,16 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { MenuDish } from '../hooks/usePublicMenu.ts'
+
+const CART_KEY = 'shishka_cart_v1'
+
+function loadCart(): CartLine[] {
+  try {
+    const raw = localStorage.getItem(CART_KEY)
+    return raw ? (JSON.parse(raw) as CartLine[]) : []
+  } catch {
+    return []
+  }
+}
 
 export interface CartLine {
   dish: MenuDish
@@ -19,7 +30,11 @@ interface CartApi {
 const CartContext = createContext<CartApi | null>(null)
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [lines, setLines] = useState<CartLine[]>([])
+  const [lines, setLines] = useState<CartLine[]>(loadCart)
+
+  useEffect(() => {
+    localStorage.setItem(CART_KEY, JSON.stringify(lines))
+  }, [lines])
 
   const api = useMemo<CartApi>(() => {
     const add = (dish: MenuDish) =>
