@@ -273,8 +273,8 @@ function drawSaleLabel(
   const F = (n: number) => Math.round(n * s)
   const maxW = wPx - PAD * 2
 
-  // QR (batch barcode) sits bottom-right; text content keeps to the left of it.
-  const qrPx = data.qr ? Math.round(Math.min(100 * s, wPx * 0.26, hPx * 0.44)) : 0
+  // QR (batch barcode) sits on the right; text content keeps to the left of it.
+  const qrPx = data.qr ? Math.round(Math.min(112 * s, wPx * 0.28, hPx * 0.48)) : 0
   const qrX = wPx - qrPx - PAD
   const contentRight = data.qr ? qrX - 16 * s : wPx - PAD
   const contentW = contentRight - PAD
@@ -367,9 +367,10 @@ function drawSaleLabel(
   ctx.font = `500 ${F(19)}px sans-serif`
   ctx.fillText(`USE BY ${useBy ? formatDate(useBy) : '—'}`, PAD, useByY)
 
-  // ── QR (batch barcode), bottom-right ──
+  // ── QR (batch barcode), right side, raised to sit beside the table ──
   if (data.qr && qrPx > 0) {
-    drawQr(ctx, data.qr, qrX, hPx - qrPx - 6 * s, qrPx)
+    const qrY = Math.max(14 * s, prepY - qrPx)
+    drawQr(ctx, data.qr, qrX, qrY, qrPx)
   }
 }
 
