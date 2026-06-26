@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { X, Clock, ShoppingBag } from 'lucide-react'
 import type { MenuDish } from '../hooks/usePublicMenu.ts'
 
@@ -11,16 +11,15 @@ interface Props {
 }
 
 export function ProductSheet({ dish, onClose, onAddToCart }: Props) {
-  const closeRef = useRef<HTMLButtonElement>(null)
-
   useEffect(() => {
     if (!dish) return
-    closeRef.current?.focus()
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', onKey)
+    }
   }, [dish, onClose])
 
   if (!dish) return null
@@ -31,7 +30,7 @@ export function ProductSheet({ dish, onClose, onAddToCart }: Props) {
       <div
         aria-hidden
         onClick={onClose}
-        className="fixed inset-0 z-40 bg-black/60"
+        className="fixed inset-0 z-40 bg-black/40"
       />
 
       {/* Sheet */}
@@ -39,83 +38,116 @@ export function ProductSheet({ dish, onClose, onAddToCart }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={dish.name}
-        className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-2xl bg-surface-1 shadow-2xl"
+        className="fixed inset-x-0 bottom-0 z-50 flex max-h-[95dvh] flex-col overflow-hidden rounded-t-3xl shadow-2xl"
+        style={{ background: '#FAF7F0' }}
       >
-        {/* Drag handle + close row */}
-        <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between rounded-t-2xl bg-surface-1 px-4 py-3">
-          <div className="mx-auto h-1 w-10 rounded-full bg-surface-3 absolute left-1/2 top-3 -translate-x-1/2" />
-          <span className="text-[11px] uppercase tracking-[0.18em] text-cream/50 pt-2">
-            {dish.category_name ?? 'Menu'}
-          </span>
+        {/* Photo area — close button floats here, always visible */}
+        <div className="relative shrink-0">
+          {/* X button — fixed to top-right of photo, never scrolls */}
           <button
-            ref={closeRef}
             type="button"
             onClick={onClose}
-            aria-label="Close"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-cream/70 transition hover:bg-surface-3 hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-forest-soft"
+            aria-label="Закрыть"
+            className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition active:scale-90"
+            style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(8px)', color: '#2D3F1C' }}
           >
-            <X size={18} />
+            <X size={20} strokeWidth={2.5} />
           </button>
-        </div>
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Photo */}
+          {/* Drag pill */}
+          <div
+            className="absolute left-1/2 top-3 h-1 w-10 -translate-x-1/2 rounded-full"
+            style={{ background: 'rgba(45,63,28,0.15)' }}
+          />
+
           {dish.image_url ? (
             <img
               src={dish.image_url}
               alt={dish.name}
-              className="w-full aspect-[4/3] object-cover"
+              className="w-full"
+              style={{
+                aspectRatio: '1 / 1',
+                objectFit: 'contain',
+                background: '#FAF7F0',
+                display: 'block',
+              }}
             />
           ) : (
-            <div className="w-full aspect-[4/3] bg-surface-2 flex items-center justify-center">
-              <span className="text-5xl opacity-30">🍽</span>
+            <div
+              className="flex w-full items-center justify-center"
+              style={{ aspectRatio: '1 / 1', background: '#F0EAD6' }}
+            >
+              <span style={{ fontSize: 64, opacity: 0.18 }}>🍽</span>
             </div>
           )}
+        </div>
 
-          <div className="px-5 py-5 space-y-4">
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto" style={{ color: '#2D3F1C' }}>
+          <div className="px-5 pt-5 pb-4 space-y-3">
             {/* Name + price */}
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="font-display text-2xl text-cream leading-tight">{dish.name}</h2>
-              <span className="shrink-0 font-mono text-xl text-amber-watch">
+            <div className="flex items-start justify-between gap-3">
+              <h2
+                className="leading-tight"
+                style={{
+                  fontFamily: 'Alegreya, Georgia, serif',
+                  fontSize: '1.9rem',
+                  fontWeight: 700,
+                  color: '#2D3F1C',
+                  lineHeight: 1.1,
+                }}
+              >
+                {dish.name}
+              </h2>
+              <span
+                style={{
+                  fontFamily: 'Alegreya, Georgia, serif',
+                  fontSize: '1.6rem',
+                  fontWeight: 700,
+                  color: '#2D3F1C',
+                  whiteSpace: 'nowrap',
+                  paddingTop: 4,
+                }}
+              >
                 {baht(dish.price)}
               </span>
             </div>
 
             {/* Weight */}
             {dish.portion_size != null && (
-              <p className="flex items-center gap-1.5 text-sm text-cream/50">
+              <p className="flex items-center gap-1.5 text-sm" style={{ color: 'rgba(45,63,28,0.55)' }}>
                 <Clock size={14} className="shrink-0" />
-                {dish.portion_size}
-                {dish.portion_unit ?? 'g'}
+                {dish.portion_size}{dish.portion_unit ?? 'g'}
               </p>
             )}
 
             {/* Description */}
             {dish.description && (
-              <p className="text-cream/80 leading-relaxed text-sm">{dish.description}</p>
+              <p className="leading-relaxed text-[0.95rem]" style={{ color: 'rgba(45,63,28,0.8)' }}>
+                {dish.description}
+              </p>
             )}
 
-            {/* Nutrition row */}
+            {/* Nutrition */}
             {(dish.calories != null || dish.protein != null || dish.carbs != null || dish.fat != null) && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {dish.calories != null && (
-                  <span className="rounded-full bg-amber-900/40 px-3 py-1 text-xs text-amber-300">
+                  <span className="rounded-full px-3 py-1 text-xs" style={{ background: '#FEF3C7', color: '#92400E' }}>
                     {dish.calories} kcal
                   </span>
                 )}
                 {dish.protein != null && (
-                  <span className="rounded-full bg-sky-900/40 px-3 py-1 text-xs text-sky-300">
+                  <span className="rounded-full px-3 py-1 text-xs" style={{ background: '#E0F2FE', color: '#0C4A6E' }}>
                     P {dish.protein}g
                   </span>
                 )}
                 {dish.carbs != null && (
-                  <span className="rounded-full bg-violet-900/40 px-3 py-1 text-xs text-violet-300">
+                  <span className="rounded-full px-3 py-1 text-xs" style={{ background: '#EDE9FE', color: '#4C1D95' }}>
                     C {dish.carbs}g
                   </span>
                 )}
                 {dish.fat != null && (
-                  <span className="rounded-full bg-rose-900/40 px-3 py-1 text-xs text-rose-300">
+                  <span className="rounded-full px-3 py-1 text-xs" style={{ background: '#FFE4E6', color: '#9F1239' }}>
                     F {dish.fat}g
                   </span>
                 )}
@@ -124,7 +156,7 @@ export function ProductSheet({ dish, onClose, onAddToCart }: Props) {
 
             {/* Allergens */}
             {dish.allergens.length > 0 && (
-              <p className="text-xs text-cream/40">
+              <p className="text-xs" style={{ color: 'rgba(45,63,28,0.38)' }}>
                 Contains: {dish.allergens.join(', ')}
               </p>
             )}
@@ -135,8 +167,12 @@ export function ProductSheet({ dish, onClose, onAddToCart }: Props) {
                 {dish.tags.map((tag) => (
                   <span
                     key={tag.slug}
-                    className="rounded-full bg-surface-2 px-3 py-1 text-xs text-cream/60"
-                    style={tag.color ? { backgroundColor: `${tag.color}33`, color: tag.color } : undefined}
+                    className="rounded-full px-3 py-1 text-xs"
+                    style={
+                      tag.color
+                        ? { background: `${tag.color}22`, color: tag.color }
+                        : { border: '1px solid rgba(45,63,28,0.18)', color: 'rgba(45,63,28,0.6)' }
+                    }
                   >
                     {tag.name}
                   </span>
@@ -147,15 +183,13 @@ export function ProductSheet({ dish, onClose, onAddToCart }: Props) {
         </div>
 
         {/* Add to cart footer */}
-        <div className="shrink-0 border-t border-surface-2 bg-surface-1 px-5 py-4">
+        <div className="shrink-0 px-5 pb-8 pt-3" style={{ background: '#FAF7F0' }}>
           <button
             type="button"
             disabled={dish.price == null}
-            onClick={() => {
-              onAddToCart(dish)
-              onClose()
-            }}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-forest-soft py-4 font-medium text-surface-1 transition active:scale-95 disabled:opacity-40"
+            onClick={() => { onAddToCart(dish); onClose() }}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-semibold transition active:scale-[0.98] disabled:opacity-40"
+            style={{ background: '#2D3F1C', color: '#F0EAD6', letterSpacing: '0.01em' }}
           >
             <ShoppingBag size={18} />
             Add to cart · {baht(dish.price)}
