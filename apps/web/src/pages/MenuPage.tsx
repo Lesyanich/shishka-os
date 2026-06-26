@@ -172,7 +172,7 @@ export default function MenuPage() {
       <ProductSheet
         dish={selectedDish}
         onClose={() => setSelectedDish(null)}
-        onAddToCart={(dish) => cart.add(dish)}
+        onAddToCart={(dish, modifiers) => cart.add(dish, modifiers)}
       />
     </div>
   )

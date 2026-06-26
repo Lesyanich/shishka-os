@@ -55,30 +55,37 @@ export default function CheckoutPage() {
         <>
           {/* Cart lines */}
           <ul className="space-y-2 px-5">
-            {cart.lines.map((l) => (
+            {cart.lines.map((l) => {
+              const lineTotal = (l.dish.price ?? 0) + (l.modifiers ?? []).reduce((s, m) => s + m.priceDelta, 0)
+              return (
               <li
-                key={l.dish.id}
-                className="flex items-center gap-3 rounded-xl p-3"
+                key={l.lineId}
+                className="flex items-start gap-3 rounded-xl p-3"
                 style={{ background: 'rgba(45,63,28,0.06)' }}
               >
                 {l.dish.image_url && (
                   <img
                     src={l.dish.image_url}
                     alt=""
-                    className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                    className="h-12 w-12 shrink-0 rounded-lg object-cover mt-0.5"
                   />
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{l.dish.name}</p>
-                  <p className="text-sm" style={{ color: '#B88830', fontFamily: 'monospace' }}>
-                    {baht(l.dish.price ?? 0)}
+                  {l.modifiers && l.modifiers.length > 0 && (
+                    <p className="mt-0.5 text-xs truncate" style={{ color: 'rgba(45,63,28,0.5)' }}>
+                      {l.modifiers.map((m) => m.optionName).join(', ')}
+                    </p>
+                  )}
+                  <p className="text-sm mt-0.5" style={{ color: '#B88830', fontFamily: 'monospace' }}>
+                    {baht(lineTotal)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 mt-1">
                   <button
                     type="button"
                     aria-label="decrease"
-                    onClick={() => cart.setQuantity(l.dish.id, l.quantity - 1)}
+                    onClick={() => cart.setQuantity(l.lineId, l.quantity - 1)}
                     className="flex h-7 w-7 items-center justify-center rounded-full transition active:scale-90"
                     style={{ background: 'rgba(45,63,28,0.1)' }}
                   >
@@ -88,7 +95,7 @@ export default function CheckoutPage() {
                   <button
                     type="button"
                     aria-label="increase"
-                    onClick={() => cart.setQuantity(l.dish.id, l.quantity + 1)}
+                    onClick={() => cart.setQuantity(l.lineId, l.quantity + 1)}
                     className="flex h-7 w-7 items-center justify-center rounded-full transition active:scale-90"
                     style={{ background: 'rgba(45,63,28,0.1)' }}
                   >
@@ -96,7 +103,7 @@ export default function CheckoutPage() {
                   </button>
                 </div>
               </li>
-            ))}
+            )})}
           </ul>
 
           {/* Total */}
