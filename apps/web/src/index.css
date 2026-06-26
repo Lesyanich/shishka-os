@@ -30,3 +30,8 @@ body {
   background: var(--color-surface-1);
   color: var(--color-cream);
 }
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
