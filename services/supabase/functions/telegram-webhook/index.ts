@@ -23,12 +23,16 @@ import { db } from "../_shared/supabase.ts"
 import {
   ADD_PROMPT,
   answerCallbackQuery,
+  boardUrl,
   DONE_PROMPT,
   editMessageText,
   escapeHtml,
   formatTask,
+  formatTaskLine,
   MENU_ADD,
+  MENU_BOARD,
   MENU_DONE,
+  MENU_TEAM,
   MENU_TODAY,
   sendForceReply,
   sendMenu,
@@ -36,6 +40,7 @@ import {
   setMyCommands,
   taskKeyboard,
   type FormattableTask,
+  type InlineKeyboard,
 } from "../_shared/telegram.ts"
 
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
@@ -64,16 +69,28 @@ function todayICT(): string {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10)
 }
 
-async function staffForChat(chatId: string): Promise<{ id: string; name: string } | null> {
+interface StaffCtx {
+  id: string
+  name: string
+  lang: string
+  appRole: string | null
+}
+
+async function staffForChat(chatId: string): Promise<StaffCtx | null> {
   const { data } = await db
     .from("staff_telegram")
-    .select("staff_id, staff:staff(name)")
+    .select("staff_id, lang, staff:staff(name, app_role)")
     .eq("telegram_chat_id", chatId)
     .maybeSingle()
   if (!data) return null
-  const raw = data.staff as { name?: string } | { name?: string }[] | null
+  const raw = data.staff as { name?: string; app_role?: string } | { name?: string; app_role?: string }[] | null
   const staff = Array.isArray(raw) ? raw[0] : raw
-  return { id: data.staff_id as string, name: staff?.name ?? "" }
+  return {
+    id: data.staff_id as string,
+    name: staff?.name ?? "",
+    lang: (data.lang as string) ?? "th",
+    appRole: staff?.app_role ?? null,
+  }
 }
 
 async function handleStart(chatId: string, username: string | null, code: string | null) {
@@ -121,7 +138,7 @@ async function handleToday(chatId: string) {
     .eq("assigned_to", staff.id)
     .eq("due_date", todayICT())
     .eq("is_template", false)
-    .neq("status", "cancelled")
+    .not("status", "in", "(cancelled,draft)")
     .order("due_time", { ascending: true, nullsFirst: true })
 
   const tasks = (data ?? []) as Array<FormattableTask & { id: string; status: string }>
@@ -136,6 +153,176 @@ async function handleToday(chatId: string) {
     const body = formatTask(t) + (done ? "\n✅ Done" : "")
     await sendMessage(chatId, body, done ? undefined : taskKeyboard(t.id))
   }
+}
+
+// ── Team tasks (colleagues' tasks for today) ────────────────────────────────
+const PAGE_SIZE = 8
+const STATION_LABEL: Record<string, string> = {
+  L1: "🔪 L1 · Prep kitchen",
+  L2: "🍽 L2 · Assembly",
+  general: "📍 General · ทั่วไป",
+}
+
+interface TeamFilter {
+  station?: string
+  staffIdx?: number
+}
+interface TeamTaskRow {
+  id: string
+  title: string
+  due_time: string | null
+  priority: string
+  status: string
+  station: string
+  assigned_to: string | null
+  staff: { name?: string } | { name?: string }[] | null
+}
+
+/** Active staff in a stable order — the roster index used in callback_data. */
+async function activeStaffRoster(): Promise<Array<{ id: string; name: string }>> {
+  const { data } = await db
+    .from("staff")
+    .select("id, name")
+    .eq("is_active", true)
+    .order("name", { ascending: true })
+  return (data ?? []) as Array<{ id: string; name: string }>
+}
+
+/** Parse a `t:team[:filter[:page]]` callback into a filter + page. */
+function parseTeam(data: string): { filter: TeamFilter; page: number; fKey: string } {
+  const parts = data.split(":") // [t, team, f?, page?]
+  const fRaw = parts[2] ?? "all"
+  const page = parts[3] != null ? Math.max(0, parseInt(parts[3], 10) || 0) : 0
+  const filter: TeamFilter = {}
+  let fKey = "all"
+  if (fRaw === "L1" || fRaw === "L2") {
+    filter.station = fRaw
+    fKey = fRaw
+  } else if (fRaw === "gen") {
+    filter.station = "general"
+    fKey = "gen"
+  } else if (fRaw.startsWith("p")) {
+    const idx = parseInt(fRaw.slice(1), 10)
+    if (!isNaN(idx)) {
+      filter.staffIdx = idx
+      fKey = fRaw
+    }
+  }
+  return { filter, page, fKey }
+}
+
+function teamKeyboard(fKey: string, page: number, totalPages: number): InlineKeyboard {
+  const tab = (val: string, label: string, cb: string): { text: string; callback_data: string } => ({
+    text: fKey === val ? `• ${label}` : label,
+    callback_data: cb,
+  })
+  const rows: InlineKeyboard = [[
+    tab("all", "All", "t:team"),
+    tab("L1", "L1", "t:team:L1"),
+    tab("L2", "L2", "t:team:L2"),
+    tab("gen", "Gen", "t:team:gen"),
+    { text: "👤", callback_data: "t:roster" },
+  ]]
+  if (totalPages > 1) {
+    const prev = page > 0 ? `t:team:${fKey}:${page - 1}` : "t:noop"
+    const next = page < totalPages - 1 ? `t:team:${fKey}:${page + 1}` : "t:noop"
+    rows.push([
+      { text: page > 0 ? "◀ Prev" : "·", callback_data: prev },
+      { text: `${page + 1}/${totalPages}`, callback_data: "t:noop" },
+      { text: page < totalPages - 1 ? "Next ▶" : "·", callback_data: next },
+    ])
+  }
+  return rows
+}
+
+function assigneeName(t: TeamTaskRow): string {
+  const raw = t.staff
+  const s = Array.isArray(raw) ? raw[0] : raw
+  return s?.name ?? "—"
+}
+
+async function handleTeam(
+  chatId: string,
+  filter: TeamFilter,
+  page: number,
+  fKey = "all",
+  editMessageId?: number,
+) {
+  const staff = await staffForChat(chatId)
+  if (!staff) {
+    await sendMessage(chatId, "You're not connected yet. Ask the owner for your link. · ยังไม่ได้เชื่อมต่อ")
+    return
+  }
+
+  // Resolve the optional person filter via the stable roster ordering.
+  let assigneeId: string | null = null
+  if (filter.staffIdx != null) {
+    const roster = await activeStaffRoster()
+    assigneeId = roster[filter.staffIdx]?.id ?? null
+  }
+
+  // Filters first (keep `q` a filter builder), then order on the final chain.
+  let q = db
+    .from("staff_tasks")
+    .select("id, title, due_time, priority, status, station, assigned_to, staff:staff(name)")
+    .eq("due_date", todayICT())
+    .eq("is_template", false)
+    .not("status", "in", "(cancelled,draft)")
+  if (filter.station) q = q.eq("station", filter.station)
+  if (assigneeId) q = q.eq("assigned_to", assigneeId)
+
+  const { data } = await q
+    .order("station", { ascending: true })
+    .order("due_time", { ascending: true, nullsFirst: true })
+  const all = (data ?? []) as TeamTaskRow[]
+
+  const total = all.length
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const p = Math.min(page, totalPages - 1)
+  const slice = all.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE)
+
+  const lines: string[] = [`👥 <b>Team tasks · งานทีม</b> (${total})`]
+  if (total === 0) {
+    lines.push("\n🎉 No tasks today · วันนี้ไม่มีงาน")
+  } else {
+    let lastStation: string | null = null
+    for (const t of slice) {
+      if (t.station !== lastStation) {
+        lines.push(`\n<b>${STATION_LABEL[t.station] ?? escapeHtml(t.station)}</b>`)
+        lastStation = t.station
+      }
+      lines.push(formatTaskLine(t, assigneeName(t)))
+    }
+  }
+
+  const text = lines.join("\n")
+  const kb = teamKeyboard(fKey, p, totalPages)
+  if (editMessageId != null) {
+    await editMessageText(chatId, editMessageId, text, kb)
+  } else {
+    await sendMessage(chatId, text, kb)
+  }
+}
+
+/** Edit the team message into a "filter by person" picker. */
+async function handleRoster(chatId: string, messageId: number) {
+  const roster = await activeStaffRoster()
+  const rows: InlineKeyboard = roster.map((s, i) => [
+    { text: s.name, callback_data: `t:team:p${i}` },
+  ])
+  rows.push([{ text: "⬅ Back · กลับ", callback_data: "t:team" }])
+  await editMessageText(chatId, messageId, "👤 <b>Filter by person · เลือกคน</b>", rows)
+}
+
+/** Send a deep-link button into the deployed admin board (role-aware target). */
+async function handleBoard(chatId: string) {
+  const staff = await staffForChat(chatId)
+  const url = boardUrl(staff?.appRole ?? null)
+  await sendMessage(
+    chatId,
+    "🗂 Open the full task board · เปิดบอร์ดงานเต็ม\n<i>Sign in with your name + PIN.</i>",
+    [[{ text: "🗂 Open board · เปิดบอร์ด", url }]],
+  )
 }
 
 // Staff self-service: /add <task> (todo) and /done <text> (logged as done).
@@ -199,8 +386,7 @@ async function handleCallback(cq: Record<string, unknown>) {
   const msgChatId = message?.chat?.id != null ? String(message.chat.id) : null
   const messageId = message?.message_id
 
-  const [action, taskId] = data.split(":")
-  if (!taskId || !presserChatId || !msgChatId || messageId == null) {
+  if (!presserChatId || !msgChatId || messageId == null) {
     await answerCallbackQuery(id, "Unknown action")
     return
   }
@@ -208,6 +394,35 @@ async function handleCallback(cq: Record<string, unknown>) {
   const staff = await staffForChat(presserChatId)
   if (!staff) {
     await answerCallbackQuery(id, "You're not connected. Ask the owner for your link.")
+    return
+  }
+
+  // ── Navigation callbacks (lists / filters / paging — no task involved) ──
+  if (data === "t:noop") {
+    await answerCallbackQuery(id)
+    return
+  }
+  if (data === "t:mine") {
+    await answerCallbackQuery(id)
+    await handleToday(msgChatId)
+    return
+  }
+  if (data === "t:roster") {
+    await answerCallbackQuery(id)
+    await handleRoster(msgChatId, messageId)
+    return
+  }
+  if (data.startsWith("t:team")) {
+    await answerCallbackQuery(id)
+    const { filter, page, fKey } = parseTeam(data)
+    await handleTeam(msgChatId, filter, page, fKey, messageId)
+    return
+  }
+
+  // ── Task action callbacks (start / done / snooze) ──
+  const [action, taskId] = data.split(":")
+  if (!taskId) {
+    await answerCallbackQuery(id, "Unknown action")
     return
   }
 
@@ -222,6 +437,18 @@ async function handleCallback(cq: Record<string, unknown>) {
     return
   }
   const task = taskRow as FormattableTask & { id: string; status: string }
+
+  if (action === "start") {
+    await db.from("staff_tasks").update({ status: "in_progress" }).eq("id", taskId)
+    await editMessageText(
+      msgChatId,
+      messageId,
+      `${formatTask(task)}\n🔄 In progress · ${escapeHtml(staff.name)}`,
+      taskKeyboard(taskId),
+    )
+    await answerCallbackQuery(id, "🔄 Started")
+    return
+  }
 
   if (action === "done") {
     await db
@@ -306,6 +533,10 @@ Deno.serve(async (req) => {
       await handleStart(chatId, username, code)
     } else if (text === MENU_TODAY || text.startsWith("/today")) {
       await handleToday(chatId)
+    } else if (text === MENU_TEAM || text.startsWith("/team")) {
+      await handleTeam(chatId, {}, 0)
+    } else if (text === MENU_BOARD || text.startsWith("/board")) {
+      await handleBoard(chatId)
     } else if (text === MENU_ADD) {
       await sendForceReply(chatId, ADD_PROMPT)
     } else if (text === MENU_DONE) {

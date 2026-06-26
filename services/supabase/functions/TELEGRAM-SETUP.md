@@ -54,9 +54,40 @@ curl -s "https://api.telegram.org/bot<PASTE_BOT_TOKEN>/getWebhookInfo"
    you get a DM with **✅ Done / ⏰ Snooze** buttons.
 3. Tap **✅ Done** → the message updates and the task flips to *done* live in the admin board.
 
+## 5. Phase A — team tasks + fix the dead "Kitchen" / ngrok menu button (2026-06-25)
+
+Phase A adds a **👥 Team tasks** view (colleagues' tasks for today, filterable by
+station/person), a **🗂 Open full board** deep-link into the deployed admin panel
+(role-aware: owner/task_manager → `/staff-tasks`, cook → `/kitchen/my-tasks`), and a
+**▶️ Start** button on task DMs.
+
+The reported `ERR_NGROK_3200` on a "Kitchen" button is a stale BotFather **chat menu
+button** pointing at a dead free-ngrok dev tunnel. It is NOT in the repo — it was set
+out-of-band. Fix it (and re-assert the webhook) with the new idempotent `setup` action:
+
+```bash
+cd services
+# Redeploy the two changed functions (new menu rows, team view, setup action)
+supabase functions deploy telegram-webhook --no-verify-jwt --project-ref qcqgtcsjoacuktcewpvo
+supabase functions deploy telegram-push --project-ref qcqgtcsjoacuktcewpvo
+
+# Reset the menu button to the native commands list (kills the ngrok web_app button),
+# re-register /today /team /add /done commands, and re-assert the webhook + secret.
+# telegram-push has verify_jwt ON, so call it with the project SERVICE_ROLE key as Bearer:
+curl -s -X POST "https://qcqgtcsjoacuktcewpvo.supabase.co/functions/v1/telegram-push?action=setup" \
+  -H "Authorization: Bearer <SERVICE_ROLE_KEY>"
+# Response echoes menu_button_before/after — confirm `after` is { type: "commands" }.
+```
+
+Verify in Telegram: the ☰ menu now lists commands (no broken web view); tap
+**👥 Team tasks** → see everyone's tasks for today with `[All][L1][L2][Gen][👤]` filters;
+tap **🗂 Open full board** → opens the admin panel (sign in with name + PIN).
+
 ## Deploy log
 
 | Date | Function | Action | Notes |
 |------|----------|--------|-------|
 | 2026-06-10 | `telegram-webhook` | Initial deploy | Staff task tracker Phase 2. `--no-verify-jwt` + secret-token header. |
 | 2026-06-10 | `telegram-push` | Initial deploy | Staff task tracker Phase 2. verify_jwt ON. |
+| 2026-06-25 | `telegram-webhook` | Phase A | Team-tasks view + filters, ▶️ Start, /team + /board, role-aware "Open full board". |
+| 2026-06-25 | `telegram-push` | Phase A | `?action=setup` resets chat menu button (fixes ngrok) + re-asserts webhook. |

@@ -20,13 +20,20 @@ import { db } from "../_shared/supabase.ts"
 import { json } from "../_shared/cors.ts"
 import {
   formatTask,
+  getChatMenuButton,
+  getWebhookInfo,
   hasToken,
   sendMessage,
+  setChatMenuButton,
+  setMyCommands,
+  setWebhook,
   taskKeyboard,
   type FormattableTask,
 } from "../_shared/telegram.ts"
 
 const GROUP_CHAT_ID = Deno.env.get("TELEGRAM_GROUP_CHAT_ID") ?? ""
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
+const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
 
 const TASK_COLS = "id, title, title_th, description, due_time, due_date, category, priority, status, assigned_to"
 type Task = FormattableTask & { id: string; due_date: string | null; status: string; assigned_to: string | null }
@@ -138,7 +145,7 @@ async function actionReminders() {
     .not("due_time", "is", null)
     .not("assigned_to", "is", null)
 
-  const tasks = (data ?? []) as Array<Task & { reminder_offset_min: number }>
+  const tasks = (data ?? []) as unknown as Array<Task & { reminder_offset_min: number }>
   let sent = 0
   for (const t of tasks) {
     const dueMin = timeToMin(t.due_time)
@@ -157,6 +164,29 @@ async function actionReminders() {
     }
   }
   return json({ ok: true, sent, scanned: tasks.length })
+}
+
+// One-shot maintenance: reset the chat menu button to the native commands list
+// (overrides any stale BotFather web_app/ngrok button) and re-register the
+// webhook with our secret. Idempotent — safe to call repeatedly.
+async function actionSetup() {
+  const before = await getChatMenuButton()
+  const menu = await setChatMenuButton()
+  await setMyCommands()
+  let webhook: { ok: boolean } | null = null
+  if (SUPABASE_URL && WEBHOOK_SECRET) {
+    webhook = await setWebhook(`${SUPABASE_URL}/functions/v1/telegram-webhook`, WEBHOOK_SECRET)
+  }
+  const after = await getChatMenuButton()
+  const info = await getWebhookInfo()
+  return json({
+    ok: true,
+    menu_button_before: before.result ?? null,
+    menu_button_after: after.result ?? null,
+    set_menu_ok: menu.ok,
+    set_webhook: webhook,
+    webhook_info: info.result ?? null,
+  })
 }
 
 Deno.serve(async (req) => {
@@ -179,8 +209,10 @@ Deno.serve(async (req) => {
         return await actionSchedule()
       case "reminders":
         return await actionReminders()
+      case "setup":
+        return await actionSetup()
       default:
-        return json({ ok: false, error: "unknown_action", actions: ["assign", "morning", "schedule", "reminders"] }, 400)
+        return json({ ok: false, error: "unknown_action", actions: ["assign", "morning", "schedule", "reminders", "setup"] }, 400)
     }
   } catch (e) {
     console.error("[telegram-push] error:", e)
