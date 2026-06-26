@@ -156,32 +156,36 @@ export function ProductSheet({ dish, onClose, onAddToCart }: Props) {
         className="fixed inset-x-0 bottom-0 z-50 flex max-h-[95dvh] flex-col overflow-hidden rounded-t-3xl shadow-2xl"
         style={{ background: '#FAF7F0' }}
       >
-        {/* Photo — X floats here, never scrolls away */}
-        <div className="relative shrink-0">
+        {/* Drag handle + close button — always in view, never inside the image */}
+        <div className="relative flex shrink-0 items-center justify-center" style={{ height: 48 }}>
+          <div
+            className="h-1 w-10 rounded-full"
+            style={{ background: 'rgba(45,63,28,0.15)' }}
+          />
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition active:scale-90"
-            style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(8px)', color: '#2D3F1C' }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full shadow transition active:scale-90"
+            style={{ background: 'rgba(45,63,28,0.08)', color: '#2D3F1C' }}
           >
             <X size={20} strokeWidth={2.5} />
           </button>
-          <div
-            className="absolute left-1/2 top-3 h-1 w-10 -translate-x-1/2 rounded-full"
-            style={{ background: 'rgba(45,63,28,0.15)' }}
-          />
+        </div>
+
+        {/* Photo */}
+        <div className="shrink-0">
           {dish.image_url ? (
             <img
               src={dish.image_url}
               alt={dish.name}
               className="w-full"
-              style={{ aspectRatio: '1 / 1', objectFit: 'contain', background: '#FAF7F0', display: 'block' }}
+              style={{ aspectRatio: '3 / 2', objectFit: 'cover', background: '#FAF7F0', display: 'block' }}
             />
           ) : (
             <div
               className="flex w-full items-center justify-center"
-              style={{ aspectRatio: '1 / 1', background: '#F0EAD6' }}
+              style={{ aspectRatio: '3 / 2', background: '#F0EAD6' }}
             >
               <span style={{ fontSize: 64, opacity: 0.18 }}>🍽</span>
             </div>

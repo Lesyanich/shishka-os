@@ -1,5 +1,8 @@
 {
   "permissions": {
+    "allow": [
+      "mcp__0e6dfa89-a72c-4a86-b435-54563e1fe0d2__execute_sql"
+    ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
