@@ -83,6 +83,34 @@ Verify in Telegram: the ☰ menu now lists commands (no broken web view); tap
 **👥 Team tasks** → see everyone's tasks for today with `[All][L1][L2][Gen][👤]` filters;
 tap **🗂 Open full board** → opens the admin panel (sign in with name + PIN).
 
+## 6. Phase B — AI menu Q&A (2026-06-26)
+
+Staff can now send the bot a free-text question and it answers from the DB. New function
+`telegram-ai` does the slow LLM work (intent classify + answer) so the webhook can ack
+instantly. The webhook's free-text branch sends a "💭" ack and fires `telegram-ai` in the
+background — so **`telegram-ai` must be deployed together with the updated webhook**, or
+free-text messages get only the ack with no answer.
+
+Prereq: `ANTHROPIC_API_KEY` secret must be set (already used by `ocr-receipt`). Verify:
+```bash
+supabase secrets list --project-ref qcqgtcsjoacuktcewpvo | grep ANTHROPIC_API_KEY
+```
+
+Deploy (new function is server-to-server; no JWT, guarded by the shared secret header):
+```bash
+cd services
+supabase functions deploy telegram-ai --no-verify-jwt --project-ref qcqgtcsjoacuktcewpvo
+supabase functions deploy telegram-webhook --no-verify-jwt --project-ref qcqgtcsjoacuktcewpvo
+```
+
+Model: `claude-haiku` (cheap/fast). Menu answers read **only `menu_public`** (price / КБЖУ /
+ingredients — never cost/margin). Every call logs to `api_cost_log` (`feature='telegram-ai'`).
+Task-intake and report-to-owner messages get a "coming soon" reply (Phases C / D).
+
+Verify in Telegram (as a linked staff member): send "сколько калорий в хумусе?" or
+"what's in the falafel wrap?" → a concise answer in your language within a few seconds.
+Then check a row landed: `select * from api_cost_log where feature='telegram-ai' order by ts desc limit 3;`
+
 ## Deploy log
 
 | Date | Function | Action | Notes |
@@ -91,3 +119,5 @@ tap **🗂 Open full board** → opens the admin panel (sign in with name + PIN)
 | 2026-06-10 | `telegram-push` | Initial deploy | Staff task tracker Phase 2. verify_jwt ON. |
 | 2026-06-25 | `telegram-webhook` | Phase A | Team-tasks view + filters, ▶️ Start, /team + /board, role-aware "Open full board". |
 | 2026-06-25 | `telegram-push` | Phase A | `?action=setup` resets chat menu button (fixes ngrok) + re-asserts webhook. |
+| 2026-06-26 | `telegram-ai` | Phase B | NEW. Intent classify + menu Q&A from menu_public via claude-haiku; cost→api_cost_log. |
+| 2026-06-26 | `telegram-webhook` | Phase B | Free-text → 💭 ack + fire-and-forget to telegram-ai. |

@@ -44,6 +44,14 @@ import {
 } from "../_shared/telegram.ts"
 
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
+
+/** Keep an async task alive after we return 200 (Supabase Edge runtime). */
+function fireAndForget(p: Promise<unknown>) {
+  const er = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime
+  if (er?.waitUntil) er.waitUntil(p)
+  else p.catch(() => {})
+}
 
 function ok(data: unknown = { ok: true }) {
   return new Response(JSON.stringify(data), {
@@ -91,6 +99,20 @@ async function staffForChat(chatId: string): Promise<StaffCtx | null> {
     lang: (data.lang as string) ?? "th",
     appRole: staff?.app_role ?? null,
   }
+}
+
+/** Hand a free-text message to telegram-ai (slow LLM work) without blocking the 200. */
+function triggerAI(chatId: string, text: string, staff: StaffCtx) {
+  if (!SUPABASE_URL || !WEBHOOK_SECRET) return
+  const p = fetch(`${SUPABASE_URL}/functions/v1/telegram-ai`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-telegram-bot-api-secret-token": WEBHOOK_SECRET,
+    },
+    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 1000), lang: staff.lang }),
+  }).catch((e) => console.error("[telegram-webhook] triggerAI failed:", e))
+  fireAndForget(p)
 }
 
 async function handleStart(chatId: string, username: string | null, code: string | null) {
@@ -545,6 +567,18 @@ Deno.serve(async (req) => {
       await createSelfTask(chatId, text.slice("/add".length), false)
     } else if (text.startsWith("/done")) {
       await createSelfTask(chatId, text.slice("/done".length), true)
+    } else if (text.startsWith("/")) {
+      await sendMenu(chatId, "Tap a button below 👇 · กดปุ่มด้านล่าง")
+    } else if (text) {
+      // Free text → AI assistant (menu Q&A etc). Ack fast, process async so
+      // Telegram doesn't time out; telegram-ai sends the real reply.
+      const staff = await staffForChat(chatId)
+      if (!staff) {
+        await sendMenu(chatId, "Connect first to ask me things 👇 · เชื่อมต่อก่อนเพื่อถามได้")
+      } else {
+        await sendMessage(chatId, "💭 Looking it up… · กำลังค้นหา…")
+        triggerAI(chatId, text, staff)
+      }
     } else {
       await sendMenu(chatId, "Tap a button below 👇 · กดปุ่มด้านล่าง")
     }
