@@ -140,8 +140,11 @@ function fitText(
       return { size, lines: lines.slice(0, maxLines) }
     }
   }
+  // Nothing fit cleanly: keep the greedy wrap at the smallest size (clamped to
+  // maxLines) instead of dumping the whole string on one line — that was the
+  // source of names getting visually cut off at the label edge.
   ctx.font = `${weight} ${minSize}px sans-serif`
-  return { size: minSize, lines: [text] }
+  return { size: minSize, lines: wrapToWidth(ctx, text, maxWidth).slice(0, maxLines) }
 }
 
 /**
@@ -156,6 +159,20 @@ export function renderPrepLabel(
   size: LabelSize = DEFAULT_LABEL_SIZE,
   gapMm = 0,
 ): string {
+  return renderPrepLabelCanvas(data, size, gapMm).toDataURL('image/png')
+}
+
+/**
+ * The single label-layout engine: draws the label at exact printer dot
+ * dimensions and returns the canvas. Everything else is a thin wrapper —
+ * the on-screen preview, the Bluetooth PNG, and the USB TSPL bitmap all
+ * render from this same canvas, so what the cook sees is what prints.
+ */
+export function renderPrepLabelCanvas(
+  data: PrepLabelData,
+  size: LabelSize = DEFAULT_LABEL_SIZE,
+  gapMm = 0,
+): HTMLCanvasElement {
   const wPx = Math.round(size.wMm * DOTS_PER_MM)
   const hPx = Math.round(size.hMm * DOTS_PER_MM) // label content area
   const gapPx = Math.round(gapMm * DOTS_PER_MM)
@@ -179,7 +196,7 @@ export function renderPrepLabel(
   // SALE consumer label: name + price + nutrition + ingredients + dates.
   if (data.nutrition || data.ingredients || data.price) {
     drawSaleLabel(ctx, data, wPx, hPx, s)
-    return canvas.toDataURL('image/png')
+    return canvas
   }
 
   // ── Item name (bold, up to 2 lines, auto-shrink) ──
@@ -188,8 +205,8 @@ export function renderPrepLabel(
     data.name.toUpperCase(),
     wPx - PAD * 2,
     2,
-    Math.round(46 * s),
-    Math.round(26 * s),
+    Math.round(44 * s),
+    Math.round(19 * s),
     '800',
   )
   ctx.font = `800 ${nameSize}px sans-serif`
@@ -226,7 +243,7 @@ export function renderPrepLabel(
   const useBy = data.shelfLifeDays != null ? addDays(data.prepDate, data.shelfLifeDays) : null
   ctx.font = `500 ${F(26)}px sans-serif`
   ctx.fillText('USE BY', PAD, row)
-  ctx.font = `800 ${F(36)}px sans-serif`
+  ctx.font = `800 ${F(32)}px sans-serif`
   ctx.fillText(useBy ? formatDate(useBy) : '—', VALX, row - 4 * s)
 
   // ── QR (optional, bottom-right) encoding the batch barcode ──
@@ -239,7 +256,7 @@ export function renderPrepLabel(
   ctx.font = `400 ${F(22)}px monospace`
   ctx.fillText(data.batchCode ?? data.productCode, PAD, hPx - 28 * s)
 
-  return canvas.toDataURL('image/png')
+  return canvas
 }
 
 /**
@@ -264,10 +281,12 @@ function drawSaleLabel(
   const qrX = wPx - qrPx - PAD
   const ingrMaxW = data.qr ? qrX - 8 * s - PAD : maxW
 
-  // Footer rows pinned to the bottom (computed first so ingredients can fill up to them).
-  const batchY = hPx - F(16) - 6 * s
-  const useByY = batchY - F(22) - 4 * s
-  const prepY = useByY - F(20) - 2 * s
+  // Footer rows pinned to the bottom (computed first so ingredients can fill up
+  // to them). Dates are kept compact so the nutrition + ingredients — the info
+  // the customer actually reads — get the prominence and the vertical room.
+  const batchY = hPx - F(15) - 6 * s
+  const useByY = batchY - F(19) - 4 * s
+  const prepY = useByY - F(18) - 2 * s
 
   // ── Price (bold, top-right) — reserve its width so the name doesn't collide ──
   let priceW = 0
@@ -282,8 +301,8 @@ function drawSaleLabel(
     data.name.toUpperCase(),
     maxW - priceW,
     2,
-    Math.round(34 * s),
-    Math.round(20 * s),
+    Math.round(32 * s),
+    Math.round(17 * s),
     '800',
   )
   ctx.font = `800 ${nameSize}px sans-serif`
@@ -300,14 +319,14 @@ function drawSaleLabel(
   }
   y += 4 * s
 
-  // ── Nutrition (per portion), shrink to fit one line ──
+  // ── Nutrition (per portion) — prominent; shrink only as far as needed ──
   if (data.nutrition) {
     const str = nutritionLine(data.nutrition)
-    let ns = F(24)
-    ctx.font = `700 ${ns}px sans-serif`
-    while (ns > F(15) && ctx.measureText(str).width > maxW) {
+    let ns = F(27)
+    ctx.font = `800 ${ns}px sans-serif`
+    while (ns > F(20) && ctx.measureText(str).width > maxW) {
       ns -= 1
-      ctx.font = `700 ${ns}px sans-serif`
+      ctx.font = `800 ${ns}px sans-serif`
     }
     ctx.fillText(str, PAD, y)
     y += ns + 6 * s
@@ -319,13 +338,13 @@ function drawSaleLabel(
 
   // ── Ingredients (wrapped, clamped to the room above the footer) ──
   if (data.ingredients) {
-    ctx.font = `600 ${F(15)}px sans-serif`
+    ctx.font = `600 ${F(16)}px sans-serif`
     ctx.fillText('INGREDIENTS', PAD, y)
-    y += F(15) + 3 * s
+    y += F(16) + 3 * s
 
-    const isize = F(19)
+    const isize = F(22)
     ctx.font = `400 ${isize}px sans-serif`
-    const lineH = isize + 3 * s
+    const lineH = isize + 4 * s
     const allLines = wrapToWidth(ctx, data.ingredients, ingrMaxW)
     const maxLines = Math.max(1, Math.floor((prepY - 4 * s - y) / lineH))
     const shown = allLines.slice(0, maxLines)
@@ -342,16 +361,16 @@ function drawSaleLabel(
     }
   }
 
-  // ── Footer: PREP, USE BY (emphasized), batch code ──
+  // ── Footer: PREP, USE BY (emphasized), batch code — kept compact ──
   const prep = data.weight ? `PREP ${formatDate(data.prepDate)} · ${data.weight}` : `PREP ${formatDate(data.prepDate)}`
-  ctx.font = `500 ${F(20)}px sans-serif`
+  ctx.font = `500 ${F(18)}px sans-serif`
   ctx.fillText(prep, PAD, prepY)
 
   const useBy = data.shelfLifeDays != null ? addDays(data.prepDate, data.shelfLifeDays) : null
-  ctx.font = `800 ${F(22)}px sans-serif`
+  ctx.font = `700 ${F(19)}px sans-serif`
   ctx.fillText(`USE BY ${useBy ? formatDate(useBy) : '—'}`, PAD, useByY)
 
-  ctx.font = `400 ${F(16)}px monospace`
+  ctx.font = `400 ${F(15)}px monospace`
   ctx.fillText(data.batchCode ?? data.productCode, PAD, batchY)
 
   // ── QR (batch barcode), bottom-right ──
@@ -414,4 +433,73 @@ export function printPrepLabel(
   gapMm = 0,
 ): void {
   printViaRawBT(renderPrepLabel(data, size, gapMm), useIntent)
+}
+
+// ── Native TSPL bitmap (USB) ────────────────────────────────────────────────
+//
+// The XP-420B's TSPL `BITMAP` command prints a 1-bit raster at exact dot
+// dimensions, registering to the gap via `SIZE`/`GAP` just like native text —
+// so there's no drift (the RawBT drift came from Bluetooth omitting the gap
+// commands, not from raster itself). Printing the very canvas the cook previews
+// guarantees what-you-see-is-what-prints and auto-adapts to every stock size.
+
+/** DIRECTION the bitmap is fed in. 1 matched the proven native-text labels; if
+ *  a test print comes out rotated 180°, flip this to 0. */
+const TSPL_DIRECTION = 1
+
+/**
+ * Pack RGBA pixels into a TSPL 1-bit bitmap (MSB = leftmost pixel). A pixel is
+ * "black" (printed) when dark; per the TSPL BITMAP spec bit 0 = black, 1 =
+ * white, so we start every byte white and clear the bits that are black.
+ */
+export function packMonoBits(
+  rgba: Uint8ClampedArray | Uint8Array | number[],
+  wPx: number,
+  hPx: number,
+): { widthBytes: number; data: Uint8Array } {
+  const widthBytes = Math.ceil(wPx / 8)
+  const data = new Uint8Array(widthBytes * hPx).fill(0xff)
+  for (let y = 0; y < hPx; y++) {
+    for (let x = 0; x < wPx; x++) {
+      const i = (y * wPx + x) * 4
+      // Anti-aliased edges average to grey; threshold at the midpoint. Treat
+      // transparent pixels as white so nothing prints outside the drawn art.
+      const alpha = rgba[i + 3]
+      const black = alpha > 128 && rgba[i] < 128
+      if (black) data[y * widthBytes + (x >> 3)] &= ~(0x80 >> (x & 7))
+    }
+  }
+  return { widthBytes, data }
+}
+
+/**
+ * Build a complete TSPL program (as raw bytes) that prints the label as a
+ * native bitmap over USB. The header/footer are ASCII; the BITMAP payload is
+ * binary, so the whole thing is assembled as a Uint8Array.
+ */
+export function buildPrepLabelTSPLBitmap(
+  data: PrepLabelData,
+  size: LabelSize = DEFAULT_LABEL_SIZE,
+): Uint8Array {
+  const canvas = renderPrepLabelCanvas(data, size, 0)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas 2D context unavailable')
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const { widthBytes, data: bits } = packMonoBits(img.data, canvas.width, canvas.height)
+
+  const enc = new TextEncoder()
+  const header = enc.encode(
+    `SIZE ${size.wMm} mm,${size.hMm} mm\r\n` +
+      'GAP 2 mm,0 mm\r\n' +
+      `DIRECTION ${TSPL_DIRECTION}\r\n` +
+      'CLS\r\n' +
+      `BITMAP 0,0,${widthBytes},${canvas.height},0,`,
+  )
+  const footer = enc.encode('\r\nPRINT 1,1\r\n')
+
+  const out = new Uint8Array(header.length + bits.length + footer.length)
+  out.set(header, 0)
+  out.set(bits, header.length)
+  out.set(footer, header.length + bits.length)
+  return out
 }
