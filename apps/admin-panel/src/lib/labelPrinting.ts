@@ -262,8 +262,9 @@ export function renderPrepLabelCanvas(
 /**
  * Draw the SALE consumer label: bold name, per-portion nutrition line, a thin
  * divider, the ingredient list (wrapped, filling the space above the footer),
- * then PREP / USE BY dates and the batch code pinned to the bottom. Auto-shrinks
- * and clamps ingredient lines so everything stays on the chosen stock.
+ * then PREP / USE BY dates pinned to the bottom. No human-readable code line —
+ * the QR (raised above the dates) carries the batch barcode. Auto-shrinks and
+ * clamps ingredient lines so everything stays on the chosen stock.
  */
 function drawSaleLabel(
   ctx: CanvasRenderingContext2D,
@@ -276,7 +277,7 @@ function drawSaleLabel(
   const F = (n: number) => Math.round(n * s)
   const maxW = wPx - PAD * 2
 
-  // QR (batch barcode) sits bottom-right; ingredients wrap to clear its column.
+  // QR (batch barcode) sits on the right; ingredients wrap to clear its column.
   const qrPx = data.qr ? Math.round(Math.min(118 * s, wPx * 0.3, hPx * 0.4)) : 0
   const qrX = wPx - qrPx - PAD
   const ingrMaxW = data.qr ? qrX - 8 * s - PAD : maxW
@@ -284,9 +285,10 @@ function drawSaleLabel(
   // Footer rows pinned to the bottom (computed first so ingredients can fill up
   // to them). Dates are kept compact so the nutrition + ingredients — the info
   // the customer actually reads — get the prominence and the vertical room.
-  const batchY = hPx - F(15) - 6 * s
-  const useByY = batchY - F(19) - 4 * s
-  const prepY = useByY - F(18) - 2 * s
+  // No human-readable code line on the consumer label: the QR already carries
+  // the batch barcode for scanning.
+  const useByY = hPx - F(19) - 6 * s
+  const prepY = useByY - F(18) - 4 * s
 
   // ── Price (bold, top-right) — reserve its width so the name doesn't collide ──
   let priceW = 0
@@ -370,12 +372,10 @@ function drawSaleLabel(
   ctx.font = `700 ${F(19)}px sans-serif`
   ctx.fillText(`USE BY ${useBy ? formatDate(useBy) : '—'}`, PAD, useByY)
 
-  ctx.font = `400 ${F(15)}px monospace`
-  ctx.fillText(data.batchCode ?? data.productCode, PAD, batchY)
-
-  // ── QR (batch barcode), bottom-right ──
+  // ── QR (batch barcode), right side, raised to sit above the date footer ──
   if (data.qr && qrPx > 0) {
-    drawQr(ctx, data.qr, qrX, hPx - qrPx - 6 * s, qrPx)
+    const qrY = Math.max(14 * s, prepY - qrPx - 6 * s)
+    drawQr(ctx, data.qr, qrX, qrY, qrPx)
   }
 }
 
