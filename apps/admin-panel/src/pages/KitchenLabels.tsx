@@ -755,15 +755,6 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
         <p className="text-xs text-slate-500">{item.product_code}</p>
       </div>
 
-      {/* Live preview — exactly what prints, at the selected stock size. Sits
-          on a checkered backdrop so the white label reads as a physical sticker. */}
-      <div className="mb-4 flex flex-col items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 p-4">
-        <LabelPreview data={previewData} size={size} scale={6} />
-        <span className="text-[11px] uppercase tracking-wider text-slate-500">
-          Preview · {size.label}
-        </span>
-      </div>
-
       <div className="space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
         {/* Countable prep → pieces packed into ONE label; otherwise per-label
             weight (SALE auto-fills from portion size, one per label). */}
@@ -912,36 +903,31 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           </select>
         </label>
 
-        {/* Paper size — tap a real, to-scale preview of each stock. The big
-            preview above mirrors the selected one. */}
-        <div className="block">
-          <span className="mb-2 block text-xs uppercase tracking-wider text-slate-400">
+        {/* Paper size */}
+        <label className="block">
+          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
             Paper size
           </span>
-          <div className="flex flex-wrap items-end gap-2">
-            {LABEL_SIZES.map((s) => {
-              const selected = s.id === sizeId
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => chooseSize(s.id)}
-                  aria-pressed={selected}
-                  title={s.label}
-                  className={`flex flex-col items-center gap-1 rounded-xl border p-2 transition ${
-                    selected
-                      ? 'border-amber-500 bg-amber-500/10'
-                      : 'border-slate-700 bg-slate-950 hover:border-slate-500'
-                  }`}
-                >
-                  <LabelPreview data={previewData} size={s} scale={2} />
-                  <span className={`text-[10px] ${selected ? 'text-amber-300' : 'text-slate-400'}`}>
-                    {s.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+          <select
+            value={sizeId}
+            onChange={(e) => chooseSize(e.target.value)}
+            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
+          >
+            {LABEL_SIZES.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Live preview of the chosen size — exactly what prints. Sits right
+            under the size picker so the cook sees the result of their choice. */}
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 p-3">
+          <LabelPreview data={previewData} size={size} scale={6} />
+          <span className="text-[11px] uppercase tracking-wider text-slate-500">
+            Preview · {size.label}
+          </span>
         </div>
 
         {/* Transport: USB (TSPL, perfect) or Bluetooth (RawBT, may drift) */}
