@@ -20,7 +20,7 @@ import { db } from "../_shared/supabase.ts"
 import { json } from "../_shared/cors.ts"
 import { callLLM, type ApiResult } from "../_shared/llm-providers.ts"
 import { MODEL_MAP, MODEL_PRICING } from "../_shared/prompts.ts"
-import { sendMessage } from "../_shared/telegram.ts"
+import { escapeHtml, type InlineKeyboard, sendMessage } from "../_shared/telegram.ts"
 
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
 const MODEL_KEY = "claude-haiku" // cheap + fast; good enough for routing + Q&A
@@ -149,7 +149,176 @@ async function answerGeneral(chatId: string, text: string, lang: Lang) {
   await sendMessage(chatId, answer)
 }
 
-async function handleAI(chatId: string, text: string, fallbackLang: Lang) {
+// ── Task intake (free text → structured draft → owner approval) ─────────────
+/** Today in Asia/Bangkok (UTC+7), YYYY-MM-DD. */
+function todayICT(): string {
+  return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+interface StaffLite {
+  id: string
+  name: string
+  name_th: string | null
+  role: string | null
+}
+const STATIONS = ["L1", "L2", "general"]
+const CATEGORIES = ["opening", "closing", "prep", "cleaning", "stock_check", "waste", "admin", "general"]
+const PRIORITIES = ["critical", "high", "medium", "low"]
+
+async function activeStaff(): Promise<StaffLite[]> {
+  const { data } = await db
+    .from("staff")
+    .select("id, name, name_th, role")
+    .eq("is_active", true)
+    .order("name", { ascending: true })
+  return (data ?? []) as StaffLite[]
+}
+
+/** Resolve an AI-proposed assignee name to a staff id (exact, then fuzzy). */
+function resolveAssignee(name: unknown, roster: StaffLite[]): string | null {
+  if (typeof name !== "string" || !name.trim()) return null
+  const n = name.trim().toLowerCase()
+  const exact = roster.find((s) => s.name.toLowerCase() === n || (s.name_th ?? "").toLowerCase() === n)
+  if (exact) return exact.id
+  const partial = roster.find((s) => s.name.toLowerCase().includes(n) || n.includes(s.name.toLowerCase()))
+  return partial?.id ?? null
+}
+
+function pick<T extends string>(val: unknown, allowed: T[], fallback: T): T {
+  return allowed.includes(val as T) ? (val as T) : fallback
+}
+
+const PRIORITY_FLAG: Record<string, string> = { critical: "🔴", high: "🟠", medium: "🔵", low: "⚪" }
+
+function draftKeyboard(draftId: string): InlineKeyboard {
+  return [[
+    { text: "✅ Approve · อนุมัติ", callback_data: `appr:${draftId}` },
+    { text: "❌ Discard · ทิ้ง", callback_data: `disc:${draftId}` },
+  ]]
+}
+
+/** Send the draft card to every linked owner / task_manager. Returns how many got it. */
+async function notifyOwnersOfDraft(card: string, draftId: string): Promise<number> {
+  const { data } = await db
+    .from("staff_telegram")
+    .select("telegram_chat_id, staff:staff!inner(app_role, is_active)")
+    .eq("staff.is_active", true)
+    .in("staff.app_role", ["owner", "task_manager"])
+  const rows = (data ?? []) as Array<{ telegram_chat_id: string }>
+  let sent = 0
+  for (const r of rows) {
+    const res = await sendMessage(r.telegram_chat_id, card, draftKeyboard(draftId))
+    if (res.ok) sent++
+  }
+  return sent
+}
+
+async function handleTaskIntake(chatId: string, text: string, lang: Lang, proposerName: string) {
+  const roster = await activeStaff()
+  const rosterJson = JSON.stringify(roster.map((s) => ({ name: s.name, name_th: s.name_th, role: s.role })))
+  const sys =
+    `You convert a free-text work request from kitchen staff into a structured task for "Shishka Healthy Kitchen". Return ONLY compact JSON, no markdown, no extra text.
+
+Fields:
+- "title": short imperative task title in English.
+- "title_th": Thai translation of the title (or null).
+- "station": one of ${STATIONS.join(", ")} (L1 = prep kitchen, L2 = assembly/service, general = either).
+- "assignee": the staff member's name this should go to, matched to the roster below, or null if unclear.
+- "category": one of ${CATEGORIES.join(", ")}.
+- "priority": one of ${PRIORITIES.join(", ")} (default medium).
+- "due_date": YYYY-MM-DD if a date is mentioned (today is ${todayICT()}), else null.
+- "due_time": HH:MM 24-hour if a time is mentioned, else null.
+
+STAFF ROSTER (JSON): ${rosterJson}
+
+Return: {"title":"...","title_th":"...|null","station":"...","assignee":"...|null","category":"...","priority":"...","due_date":"...|null","due_time":"...|null"}`
+
+  const res = await callLLM(MODEL_KEY, sys, text.slice(0, 1000))
+  await logCost(res, chatId, "task_intake", lang)
+  const ex = parseJsonObject(res.text)
+  const title = typeof ex?.title === "string" ? ex.title.trim() : ""
+  if (!ex || !title) {
+    await sendMessage(
+      chatId,
+      tri(lang,
+        "🤔 Не понял задачу. Опишите чуть подробнее — что сделать и кому.",
+        "🤔 I couldn't parse that task. Try describing what to do (and for whom).",
+        "🤔 ไม่เข้าใจงาน ลองอธิบายเพิ่มว่าต้องทำอะไร (และให้ใคร)"),
+    )
+    return
+  }
+
+  const station = pick(ex.station, STATIONS, "general")
+  const category = pick(ex.category, CATEGORIES, "general")
+  const priority = pick(ex.priority, PRIORITIES, "medium")
+  const assigneeId = resolveAssignee(ex.assignee, roster)
+  const dueDate = typeof ex.due_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ex.due_date) ? ex.due_date : null
+  const dueTime = typeof ex.due_time === "string" && /^\d{2}:\d{2}/.test(ex.due_time) ? ex.due_time.slice(0, 5) : null
+  const titleTh = typeof ex.title_th === "string" && ex.title_th.trim() ? ex.title_th.trim() : null
+
+  const { data: row, error } = await db
+    .from("staff_tasks")
+    .insert({
+      title,
+      title_th: titleTh,
+      station,
+      category,
+      priority,
+      assigned_to: assigneeId,
+      created_by: proposerName,
+      due_date: dueDate,
+      due_time: dueTime,
+      status: "draft",
+      is_template: false,
+    })
+    .select("id")
+    .single()
+
+  if (error || !row) {
+    console.error("[telegram-ai] draft insert failed:", error)
+    await sendMessage(
+      chatId,
+      tri(lang,
+        "⚠️ Не удалось сохранить черновик. Попробуйте ещё раз.",
+        "⚠️ Couldn't save the draft. Please try again.",
+        "⚠️ บันทึกแบบร่างไม่สำเร็จ ลองใหม่อีกครั้ง"),
+    )
+    return
+  }
+
+  const draftId = row.id as string
+  const assigneeName = assigneeId ? (roster.find((s) => s.id === assigneeId)?.name ?? "—") : null
+  const flag = PRIORITY_FLAG[priority] ?? "🔵"
+  const due = dueTime ? `⏰ ${dueTime}` : (dueDate ? `📅 ${dueDate}` : "—")
+  const card = [
+    `📝 <b>New task draft</b> · from ${escapeHtml(proposerName)}`,
+    `${flag} <b>${escapeHtml(title)}</b>${titleTh ? ` / ${escapeHtml(titleTh)}` : ""}`,
+    `👤 ${assigneeName ? escapeHtml(assigneeName) : "<i>unassigned</i>"} · 🏷 ${station} · ${due} · ${priority}`,
+  ].join("\n")
+
+  const reached = await notifyOwnersOfDraft(card, draftId)
+  if (reached === 0) {
+    await db.from("staff_tasks").update({ status: "cancelled" }).eq("id", draftId)
+    await sendMessage(
+      chatId,
+      tri(lang,
+        "📝 Записал, но сейчас нет подключённого менеджера для подтверждения. Добавьте задачу на доске (🗂).",
+        "📝 Noted, but no manager is connected to approve it right now. Add it on the board (🗂).",
+        "📝 รับเรื่องแล้ว แต่ตอนนี้ไม่มีผู้จัดการเชื่อมต่อเพื่ออนุมัติ เพิ่มงานบนบอร์ด (🗂)"),
+    )
+    return
+  }
+
+  await sendMessage(
+    chatId,
+    tri(lang,
+      `📝 Отправил черновик «${title}» на подтверждение менеджеру.`,
+      `📝 Sent the draft "${title}" to a manager for approval.`,
+      `📝 ส่งแบบร่าง "${title}" ให้ผู้จัดการอนุมัติแล้ว`),
+  )
+}
+
+async function handleAI(chatId: string, text: string, fallbackLang: Lang, proposerName: string) {
   const { intent, lang: detected } = await classify(chatId, text)
   const lang = detected ?? fallbackLang
 
@@ -158,16 +327,7 @@ async function handleAI(chatId: string, text: string, fallbackLang: Lang) {
   } else if (intent === "general_question") {
     await answerGeneral(chatId, text, lang)
   } else if (intent === "task_intake") {
-    // Phase C will turn this into an owner-approved task draft.
-    await sendMessage(
-      chatId,
-      tri(
-        lang,
-        "📝 Понял. Создание задач прямо из чата скоро появится — пока добавьте её на доске (кнопка 🗂 Open full board).",
-        "📝 Got it. Creating tasks straight from chat is coming soon — for now add it on the board (🗂 Open full board).",
-        "📝 รับทราบ ฟีเจอร์สร้างงานจากแชทกำลังจะมา — ระหว่างนี้เพิ่มงานบนบอร์ด (🗂 Open full board)",
-      ),
-    )
+    await handleTaskIntake(chatId, text, lang, proposerName)
   } else {
     // report_to_owner — Phase D will relay this to the owner.
     await sendMessage(
@@ -192,7 +352,7 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "unauthorized" }, 401)
   }
 
-  let body: { chat_id?: unknown; text?: unknown; lang?: unknown }
+  let body: { chat_id?: unknown; text?: unknown; lang?: unknown; staff_name?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -201,10 +361,11 @@ Deno.serve(async (req) => {
   const chatId = body.chat_id != null ? String(body.chat_id) : ""
   const text = typeof body.text === "string" ? body.text.trim() : ""
   const fallbackLang = (["ru", "en", "th"].includes(body.lang as string) ? (body.lang as Lang) : "th")
+  const proposerName = typeof body.staff_name === "string" && body.staff_name.trim() ? body.staff_name.trim() : "Staff"
   if (!chatId || !text) return json({ ok: false, error: "missing_fields" }, 400)
 
   try {
-    await handleAI(chatId, text, fallbackLang)
+    await handleAI(chatId, text, fallbackLang, proposerName)
     return json({ ok: true })
   } catch (e) {
     console.error("[telegram-ai] error:", e)

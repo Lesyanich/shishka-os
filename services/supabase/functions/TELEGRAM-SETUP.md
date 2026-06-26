@@ -111,6 +111,38 @@ Verify in Telegram (as a linked staff member): send "сколько калори
 "what's in the falafel wrap?" → a concise answer in your language within a few seconds.
 Then check a row landed: `select * from api_cost_log where feature='telegram-ai' order by ts desc limit 3;`
 
+## 7. Phase C — AI task intake + owner approval (2026-06-26)
+
+Staff describe a task in free text → the AI structures it → an owner/task_manager
+approves & assigns it from Telegram with one tap.
+
+**Apply migration 315 FIRST** (adds the `draft` status; without it the draft insert
+fails and the proposer gets an error):
+```bash
+# via your normal migration flow, or:
+psql "$DATABASE_URL" -f services/supabase/migrations/315_staff_tasks_draft_status.sql
+```
+Then redeploy (same two functions as Phase B):
+```bash
+cd services
+supabase functions deploy telegram-ai --no-verify-jwt --project-ref qcqgtcsjoacuktcewpvo
+supabase functions deploy telegram-webhook --no-verify-jwt --project-ref qcqgtcsjoacuktcewpvo
+```
+
+Flow: free text classified as `task_intake` → `claude-haiku` extracts
+{title, title_th, station, assignee, category, priority, due_date, due_time} (staff
+roster injected for name-matching) → inserts a `staff_tasks` row with `status='draft'`
+→ DMs every linked **owner/task_manager** a card with `[✅ Approve] [❌ Discard]`.
+Approve → if the AI matched an assignee it assigns immediately; otherwise it shows a
+person picker → flips `draft`→`todo`, sets `assigned_to`, and DMs the assignee the task
+with Start/Done/Snooze. Only owner/task_manager callbacks are honoured.
+
+Drafts are hidden from staff views (today/team exclude `draft`); they may appear on the
+admin board only under the "All statuses" filter until approved/discarded.
+
+Verify: as a cook, send "Hein нужно помыть холодильник L1 завтra в 9". As the owner you
+get a draft card → Approve → Hein receives the task DM and the row shows on `/staff-tasks`.
+
 ## Deploy log
 
 | Date | Function | Action | Notes |
@@ -121,3 +153,6 @@ Then check a row landed: `select * from api_cost_log where feature='telegram-ai'
 | 2026-06-25 | `telegram-push` | Phase A | `?action=setup` resets chat menu button (fixes ngrok) + re-asserts webhook. |
 | 2026-06-26 | `telegram-ai` | Phase B | NEW. Intent classify + menu Q&A from menu_public via claude-haiku; cost→api_cost_log. |
 | 2026-06-26 | `telegram-webhook` | Phase B | Free-text → 💭 ack + fire-and-forget to telegram-ai. |
+| 2026-06-26 | mig 315 | Phase C | Add `draft` status to staff_tasks (apply before deploying). |
+| 2026-06-26 | `telegram-ai` | Phase C | task_intake → extract + insert draft + DM owners a card. |
+| 2026-06-26 | `telegram-webhook` | Phase C | appr/asg/disc draft callbacks (owner/task_manager) → assign DM. |

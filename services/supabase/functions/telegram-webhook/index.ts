@@ -110,7 +110,7 @@ function triggerAI(chatId: string, text: string, staff: StaffCtx) {
       "Content-Type": "application/json",
       "x-telegram-bot-api-secret-token": WEBHOOK_SECRET,
     },
-    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 1000), lang: staff.lang }),
+    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 1000), lang: staff.lang, staff_name: staff.name }),
   }).catch((e) => console.error("[telegram-webhook] triggerAI failed:", e))
   fireAndForget(p)
 }
@@ -347,6 +347,129 @@ async function handleBoard(chatId: string) {
   )
 }
 
+// ── AI task-draft approval (Phase C) ────────────────────────────────────────
+async function chatForStaff(staffId: string): Promise<string | null> {
+  const { data } = await db
+    .from("staff_telegram")
+    .select("telegram_chat_id")
+    .eq("staff_id", staffId)
+    .maybeSingle()
+  return data ? (data.telegram_chat_id as string) : null
+}
+
+async function staffNameById(staffId: string): Promise<string> {
+  const { data } = await db.from("staff").select("name").eq("id", staffId).maybeSingle()
+  return (data?.name as string) ?? "—"
+}
+
+/** Flip a draft to a real assigned task and DM the assignee. */
+async function approveAndAssign(
+  draftId: string,
+  assigneeId: string,
+  ownerChatId: string,
+  ownerMsgId: number,
+  cbId: string,
+) {
+  await db.from("staff_tasks").update({ status: "todo", assigned_to: assigneeId }).eq("id", draftId)
+  const { data: t } = await db
+    .from("staff_tasks")
+    .select("id, title, title_th, description, due_time, category, priority, status")
+    .eq("id", draftId)
+    .maybeSingle()
+  const task = t as (FormattableTask & { id: string }) | null
+  if (!task) {
+    await answerCallbackQuery(cbId, "Task not found")
+    return
+  }
+
+  const assigneeName = await staffNameById(assigneeId)
+  const chat = await chatForStaff(assigneeId)
+  if (chat) {
+    const res = await sendMessage(chat, `🆕 ${formatTask(task)}`, taskKeyboard(task.id))
+    if (res.ok && res.messageId != null) {
+      await db.from("staff_tasks")
+        .update({ dm_message_id: String(res.messageId), reminder_sent_at: null })
+        .eq("id", draftId)
+    }
+  }
+  await editMessageText(
+    ownerChatId,
+    ownerMsgId,
+    `${formatTask(task)}\n✅ Assigned to ${escapeHtml(assigneeName)}${chat ? "" : " ⚠️ (not on Telegram)"}`,
+  )
+  await answerCallbackQuery(cbId, "✅ Assigned")
+}
+
+/** Owner/task_manager taps on an AI draft card: appr / asg:<idx> / disc. */
+async function handleDraftCallback(
+  cbId: string,
+  data: string,
+  staff: StaffCtx,
+  msgChatId: string,
+  messageId: number,
+) {
+  if (staff.appRole !== "owner" && staff.appRole !== "task_manager") {
+    await answerCallbackQuery(cbId, "Only a manager can approve tasks")
+    return
+  }
+  const [action, draftId, idxStr] = data.split(":")
+  if (!draftId) {
+    await answerCallbackQuery(cbId, "Unknown action")
+    return
+  }
+
+  const { data: draftRow } = await db
+    .from("staff_tasks")
+    .select("id, status, assigned_to")
+    .eq("id", draftId)
+    .maybeSingle()
+  if (!draftRow) {
+    await answerCallbackQuery(cbId, "Draft not found")
+    return
+  }
+  const draft = draftRow as { id: string; status: string; assigned_to: string | null }
+  if (draft.status !== "draft") {
+    await answerCallbackQuery(cbId, "Already handled")
+    return
+  }
+
+  if (action === "disc") {
+    await db.from("staff_tasks").update({ status: "cancelled" }).eq("id", draftId)
+    await editMessageText(msgChatId, messageId, "❌ <i>Draft discarded</i> · ทิ้งแล้ว")
+    await answerCallbackQuery(cbId, "Discarded")
+    return
+  }
+
+  if (action === "asg") {
+    const idx = Number.parseInt(idxStr ?? "", 10)
+    const roster = await activeStaffRoster()
+    const chosen = Number.isNaN(idx) ? undefined : roster[idx]
+    if (!chosen) {
+      await answerCallbackQuery(cbId, "Invalid choice")
+      return
+    }
+    await approveAndAssign(draftId, chosen.id, msgChatId, messageId, cbId)
+    return
+  }
+
+  if (action === "appr") {
+    if (draft.assigned_to) {
+      await approveAndAssign(draftId, draft.assigned_to, msgChatId, messageId, cbId)
+    } else {
+      const roster = await activeStaffRoster()
+      const rows: InlineKeyboard = roster.map((s, i) => [
+        { text: s.name, callback_data: `asg:${draftId}:${i}` },
+      ])
+      rows.push([{ text: "❌ Discard · ทิ้ง", callback_data: `disc:${draftId}` }])
+      await editMessageText(msgChatId, messageId, "👤 <b>Assign to · มอบหมายให้:</b>", rows)
+      await answerCallbackQuery(cbId)
+    }
+    return
+  }
+
+  await answerCallbackQuery(cbId, "Unknown action")
+}
+
 // Staff self-service: /add <task> (todo) and /done <text> (logged as done).
 async function createSelfTask(chatId: string, rawText: string, markDone: boolean) {
   const staff = await staffForChat(chatId)
@@ -438,6 +561,12 @@ async function handleCallback(cq: Record<string, unknown>) {
     await answerCallbackQuery(id)
     const { filter, page, fKey } = parseTeam(data)
     await handleTeam(msgChatId, filter, page, fKey, messageId)
+    return
+  }
+
+  // ── AI task-draft approval (owner/task_manager only) ──
+  if (data.startsWith("appr:") || data.startsWith("disc:") || data.startsWith("asg:")) {
+    await handleDraftCallback(id, data, staff, msgChatId, messageId)
     return
   }
 
