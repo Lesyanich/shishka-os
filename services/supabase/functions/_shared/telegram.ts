@@ -170,16 +170,19 @@ export async function setMyCommands(): Promise<void> {
 }
 
 /**
- * Reset the bot's chat menu button to the native commands list. Overrides any
- * stale BotFather `web_app` menu button (e.g. a dead ngrok dev tunnel).
+ * Reset a menu button to Telegram's default (the native ☰ commands menu),
+ * clearing any stale `web_app` button (e.g. a dead ngrok dev tunnel). Pass a
+ * chatId to clear a per-chat override; omit it to reset the global default.
  */
-export async function setChatMenuButton(): Promise<{ ok: boolean }> {
-  const data = await call("setChatMenuButton", { menu_button: { type: "commands" } })
+export async function setChatMenuButton(chatId?: string): Promise<{ ok: boolean }> {
+  const body: Record<string, unknown> = { menu_button: { type: "default" } }
+  if (chatId) body.chat_id = chatId
+  const data = await call("setChatMenuButton", body)
   return { ok: data.ok === true }
 }
-/** Inspect the current chat menu button (diagnose a stray web_app/ngrok button). */
-export async function getChatMenuButton(): Promise<Record<string, unknown>> {
-  return await call("getChatMenuButton", {})
+/** Inspect a chat menu button (default scope, or a specific chat's override). */
+export async function getChatMenuButton(chatId?: string): Promise<Record<string, unknown>> {
+  return await call("getChatMenuButton", chatId ? { chat_id: chatId } : {})
 }
 /** Inspect the registered webhook (URL, pending updates, last error). */
 export async function getWebhookInfo(): Promise<Record<string, unknown>> {

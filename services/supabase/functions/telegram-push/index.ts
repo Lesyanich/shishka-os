@@ -166,12 +166,24 @@ async function actionReminders() {
   return json({ ok: true, sent, scanned: tasks.length })
 }
 
-// One-shot maintenance: reset the chat menu button to the native commands list
-// (overrides any stale BotFather web_app/ngrok button) and re-register the
+// One-shot maintenance: clear the stale web_app/ngrok menu button (both the
+// global default AND every linked chat's per-chat override) and re-register the
 // webhook with our secret. Idempotent — safe to call repeatedly.
 async function actionSetup() {
   const before = await getChatMenuButton()
-  const menu = await setChatMenuButton()
+  const menu = await setChatMenuButton() // reset global default → native commands
+
+  // The "Kitchen" ngrok button was set per-chat, which overrides the default,
+  // so clear it for every linked chat too.
+  const { data: chats } = await db.from("staff_telegram").select("telegram_chat_id")
+  const chatIds = ((chats ?? []) as Array<{ telegram_chat_id: string }>).map((c) => c.telegram_chat_id)
+  let cleared = 0
+  for (const cid of chatIds) {
+    const r = await setChatMenuButton(cid)
+    if (r.ok) cleared++
+  }
+  const sampleChatAfter = chatIds.length > 0 ? (await getChatMenuButton(chatIds[0])).result ?? null : null
+
   await setMyCommands()
   let webhook: { ok: boolean } | null = null
   if (SUPABASE_URL && WEBHOOK_SECRET) {
@@ -182,7 +194,9 @@ async function actionSetup() {
   return json({
     ok: true,
     menu_button_before: before.result ?? null,
-    menu_button_after: after.result ?? null,
+    menu_button_default_after: after.result ?? null,
+    menu_button_chat_after: sampleChatAfter,
+    per_chat_cleared: cleared,
     set_menu_ok: menu.ok,
     set_webhook: webhook,
     webhook_info: info.result ?? null,
