@@ -30,7 +30,7 @@ function mainMenu() {
   return {
     keyboard: [
       [{ text: MENU_TODAY }, { text: MENU_TEAM }],
-      [{ text: MENU_ADD }, { text: MENU_DONE }],
+      [{ text: MENU_ADD }],
       [{ text: MENU_BOARD }],
     ],
     resize_keyboard: true,

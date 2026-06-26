@@ -23,7 +23,9 @@ import { MODEL_MAP, MODEL_PRICING } from "../_shared/prompts.ts"
 import { escapeHtml, type InlineKeyboard, sendMessage } from "../_shared/telegram.ts"
 
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
-const MODEL_KEY = "claude-haiku" // cheap + fast; good enough for routing + Q&A
+const MODEL_KEY = "gemini-flash" // Gemini 2.5 Flash — cheap + fast; routing + Q&A
+// NOTE: Gemini/OpenAI providers force JSON output, so every prompt below must
+// ask for JSON (free-text answers are wrapped as {"answer":"..."}).
 
 type Lang = "ru" | "en" | "th"
 type Intent = "menu_question" | "task_intake" | "report_to_owner" | "general_question"
@@ -124,27 +126,33 @@ async function fetchMenu(): Promise<Array<Record<string, unknown>>> {
 async function answerMenu(chatId: string, text: string, lang: Lang) {
   const menu = await fetchMenu()
   const sys =
-    `You are a friendly assistant for the staff of "Shishka Healthy Kitchen", a Thai healthy restaurant. Answer the staff member's question using ONLY the MENU DATA below. Be concise (a few short lines). Answer in ${langName(lang)}.
+    `You are a friendly assistant for the staff of "Shishka Healthy Kitchen", a Thai healthy restaurant. Answer the staff member's question using ONLY the MENU DATA below. Be concise (a few short lines). Write the reply in ${langName(lang)}.
 - Prices are in Thai Baht (฿). КБЖУ (calories / protein / carbs / fat) are per portion.
 - For allergen or diet questions, reason from the listed ingredients; for severe allergies tell them to confirm with the kitchen.
 - If a dish or a fact is not in the data, say you don't have that info — do NOT invent prices or numbers.
 - Never mention internal cost, margin, or supplier info (it is not provided and must never be guessed).
 
+Return ONLY compact JSON: {"answer":"<your reply text, in ${langName(lang)}>"}
+
 MENU DATA (JSON):
 ${JSON.stringify(menu)}`
   const res = await callLLM(MODEL_KEY, sys, text.slice(0, 1000))
   await logCost(res, chatId, "menu_question", lang)
-  const answer = res.text.trim() ||
+  const parsed = parseJsonObject(res.text)
+  const answer = (typeof parsed?.answer === "string" ? parsed.answer.trim() : "") ||
     tri(lang, "Извините, не нашёл ответа.", "Sorry, I couldn't find an answer.", "ขออภัย ไม่พบคำตอบ")
   await sendMessage(chatId, answer)
 }
 
 async function answerGeneral(chatId: string, text: string, lang: Lang) {
   const sys =
-    `You are the staff assistant bot for "Shishka Healthy Kitchen", a Thai healthy restaurant. Answer briefly and helpfully in ${langName(lang)}. If you don't know something specific about this restaurant, say so and suggest asking the owner. Never invent menu prices, schedules, or policies.`
+    `You are the staff assistant bot for "Shishka Healthy Kitchen", a Thai healthy restaurant. The staff can ask you about the menu (prices, calories/КБЖУ, ingredients, what's vegetarian), or describe a task to assign. Answer briefly and helpfully in ${langName(lang)}. If you don't know something specific about this restaurant, say so and suggest asking the owner. Never invent menu prices, schedules, or policies.
+
+Return ONLY compact JSON: {"answer":"<your reply text, in ${langName(lang)}>"}`
   const res = await callLLM(MODEL_KEY, sys, text.slice(0, 1000))
   await logCost(res, chatId, "general_question", lang)
-  const answer = res.text.trim() ||
+  const parsed = parseJsonObject(res.text)
+  const answer = (typeof parsed?.answer === "string" ? parsed.answer.trim() : "") ||
     tri(lang, "Извините, не понял вопрос.", "Sorry, I didn't catch that.", "ขออภัย ไม่เข้าใจคำถาม")
   await sendMessage(chatId, answer)
 }
