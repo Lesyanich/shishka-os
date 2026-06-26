@@ -143,6 +143,26 @@ admin board only under the "All statuses" filter until approved/discarded.
 Verify: as a cook, send "Hein нужно помыть холодильник L1 завтra в 9". As the owner you
 get a draft card → Approve → Hein receives the task DM and the row shows on `/staff-tasks`.
 
+## 8. Phase D — photos + owner relay (2026-06-26)
+
+No migration. Redeploy the two functions:
+```bash
+cd services
+supabase functions deploy telegram-ai --no-verify-jwt --project-ref qcqgtcsjoacuktcewpvo
+supabase functions deploy telegram-webhook --no-verify-jwt --project-ref qcqgtcsjoacuktcewpvo
+```
+
+- **Photos:** if a staff member sends a photo **as a reply to a task DM**, it's downloaded
+  and stored in the public `task-photos` bucket and appended to that task's `photo_urls[]`
+  (visible on the board). Any other photo is **relayed to owners/managers** (re-shared by
+  Telegram `file_id`, no download) captioned with the sender's name.
+- **Owner relay:** a message classified `report_to_owner` is forwarded to every linked
+  owner/task_manager with a `[↩ Reply]` button. Tapping it opens a `force_reply`; the
+  manager's reply is delivered back to the original staff member as "💬 From the team".
+
+Verify: reply to a task DM with a photo → it appears in `photo_urls` and on `/staff-tasks`;
+send "передай Лесе что кондиционер сломался" → owner gets it + can reply back through the bot.
+
 ## Deploy log
 
 | Date | Function | Action | Notes |
@@ -156,3 +176,5 @@ get a draft card → Approve → Hein receives the task DM and the row shows on 
 | 2026-06-26 | mig 315 | Phase C | Add `draft` status to staff_tasks (apply before deploying). |
 | 2026-06-26 | `telegram-ai` | Phase C | task_intake → extract + insert draft + DM owners a card. |
 | 2026-06-26 | `telegram-webhook` | Phase C | appr/asg/disc draft callbacks (owner/task_manager) → assign DM. |
+| 2026-06-26 | `telegram-ai` | Phase D | report_to_owner → relay to owners with ↩ Reply button. |
+| 2026-06-26 | `telegram-webhook` | Phase D | Inbound photos → attach to task / relay; rly: reply-back via force_reply. |

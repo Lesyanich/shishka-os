@@ -329,17 +329,43 @@ async function handleAI(chatId: string, text: string, fallbackLang: Lang, propos
   } else if (intent === "task_intake") {
     await handleTaskIntake(chatId, text, lang, proposerName)
   } else {
-    // report_to_owner — Phase D will relay this to the owner.
-    await sendMessage(
-      chatId,
-      tri(
-        lang,
-        "🙏 Спасибо! Передача сообщений владельцу скоро появится. Пока, пожалуйста, напишите ему напрямую.",
-        "🙏 Thanks! Forwarding messages to the owner is coming soon. For now, please contact them directly.",
-        "🙏 ขอบคุณ! ระบบส่งข้อความถึงเจ้าของร้านกำลังจะมา ระหว่างนี้กรุณาติดต่อโดยตรง",
-      ),
-    )
+    await relayToOwners(chatId, text, lang, proposerName)
   }
+}
+
+/** Forward a staff message to linked owners/managers with a "Reply" button. */
+async function relayToOwners(askerChatId: string, text: string, lang: Lang, askerName: string) {
+  const { data } = await db
+    .from("staff_telegram")
+    .select("telegram_chat_id, staff:staff!inner(app_role, is_active)")
+    .eq("staff.is_active", true)
+    .in("staff.app_role", ["owner", "task_manager"])
+  const chats = ((data ?? []) as Array<{ telegram_chat_id: string }>).map((r) => r.telegram_chat_id)
+
+  if (chats.length === 0) {
+    await sendMessage(
+      askerChatId,
+      tri(lang,
+        "🙏 Сейчас нет подключённого менеджера. Пожалуйста, напишите ему напрямую.",
+        "🙏 No manager is connected right now. Please contact them directly.",
+        "🙏 ตอนนี้ไม่มีผู้จัดการเชื่อมต่อ กรุณาติดต่อโดยตรง"),
+    )
+    return
+  }
+
+  const card = `❓ <b>${escapeHtml(askerName)}</b> asks · ถาม:\n${escapeHtml(text.slice(0, 800))}`
+  const kb: InlineKeyboard = [[{ text: "↩ Reply · ตอบกลับ", callback_data: `rly:${askerChatId}` }]]
+  let sent = 0
+  for (const c of chats) {
+    const r = await sendMessage(c, card, kb)
+    if (r.ok) sent++
+  }
+  await sendMessage(
+    askerChatId,
+    sent > 0
+      ? tri(lang, "🙏 Передал ваше сообщение менеджеру.", "🙏 I've passed your message to a manager.", "🙏 ส่งข้อความให้ผู้จัดการแล้ว")
+      : tri(lang, "🙏 Не удалось передать. Напишите менеджеру напрямую.", "🙏 Couldn't deliver. Please contact a manager directly.", "🙏 ส่งไม่สำเร็จ กรุณาติดต่อผู้จัดการโดยตรง"),
+  )
 }
 
 Deno.serve(async (req) => {

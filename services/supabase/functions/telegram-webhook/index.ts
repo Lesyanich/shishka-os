@@ -25,10 +25,12 @@ import {
   answerCallbackQuery,
   boardUrl,
   DONE_PROMPT,
+  downloadFile,
   editMessageText,
   escapeHtml,
   formatTask,
   formatTaskLine,
+  getFilePath,
   MENU_ADD,
   MENU_BOARD,
   MENU_DONE,
@@ -37,11 +39,14 @@ import {
   sendForceReply,
   sendMenu,
   sendMessage,
+  sendPhoto,
   setMyCommands,
   taskKeyboard,
   type FormattableTask,
   type InlineKeyboard,
 } from "../_shared/telegram.ts"
+
+const REPLY_PROMPT = "↩ Type your reply · พิมพ์คำตอบ"
 
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
@@ -470,6 +475,78 @@ async function handleDraftCallback(
   await answerCallbackQuery(cbId, "Unknown action")
 }
 
+// ── Photos + owner relay (Phase D) ──────────────────────────────────────────
+/** Linked owner/task_manager chat ids. */
+async function ownerChats(): Promise<string[]> {
+  const { data } = await db
+    .from("staff_telegram")
+    .select("telegram_chat_id, staff:staff!inner(app_role, is_active)")
+    .eq("staff.is_active", true)
+    .in("staff.app_role", ["owner", "task_manager"])
+  return ((data ?? []) as Array<{ telegram_chat_id: string }>).map((r) => r.telegram_chat_id)
+}
+
+/** Download a Telegram photo and store it in the public task-photos bucket. */
+async function storePhoto(fileId: string, taskId: string): Promise<string | null> {
+  const path = await getFilePath(fileId)
+  if (!path) return null
+  const bytes = await downloadFile(path)
+  if (!bytes) return null
+  const ext = (path.split(".").pop() || "jpg").toLowerCase()
+  const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg"
+  const key = `${taskId}/${Date.now()}.${ext}`
+  const { error } = await db.storage.from("task-photos").upload(key, bytes, { contentType, upsert: false })
+  if (error) {
+    console.error("[telegram-webhook] photo upload failed:", error)
+    return null
+  }
+  return db.storage.from("task-photos").getPublicUrl(key).data.publicUrl
+}
+
+/** Inbound photo: attach to a task (if it replies to a task DM) else relay to owners. */
+async function handlePhoto(chatId: string, fileId: string, caption: string, replyToMsgId: number | null) {
+  const staff = await staffForChat(chatId)
+  if (!staff) {
+    await sendMenu(chatId, "Connect first 👇 · เชื่อมต่อก่อน")
+    return
+  }
+
+  if (replyToMsgId != null) {
+    const { data: taskRow } = await db
+      .from("staff_tasks")
+      .select("id, title, photo_urls")
+      .eq("dm_message_id", String(replyToMsgId))
+      .maybeSingle()
+    const task = taskRow as { id: string; title: string; photo_urls: string[] | null } | null
+    if (task) {
+      const url = await storePhoto(fileId, task.id)
+      if (url) {
+        await db.from("staff_tasks")
+          .update({ photo_urls: [...(task.photo_urls ?? []), url] })
+          .eq("id", task.id)
+        await sendMessage(chatId, `📷 Added to “${escapeHtml(task.title)}” · เพิ่มรูปแล้ว`)
+        return
+      }
+      await sendMessage(chatId, "⚠️ Couldn't save the photo. · บันทึกรูปไม่สำเร็จ")
+      return
+    }
+  }
+
+  // Not tied to a task → relay to owners (re-share by file_id, no download).
+  const owners = await ownerChats()
+  const cap = `📷 <b>${escapeHtml(staff.name)}</b>${caption ? `: ${escapeHtml(caption)}` : ""}`
+  let sent = 0
+  for (const c of owners) {
+    if (c === chatId) continue
+    const r = await sendPhoto(c, fileId, cap)
+    if (r.ok) sent++
+  }
+  await sendMessage(
+    chatId,
+    sent > 0 ? "📷 Sent to the team · ส่งให้ทีมแล้ว" : "📷 Saved, but no manager is connected. · ยังไม่มีผู้จัดการเชื่อมต่อ",
+  )
+}
+
 // Staff self-service: /add <task> (todo) and /done <text> (logged as done).
 async function createSelfTask(chatId: string, rawText: string, markDone: boolean) {
   const staff = await staffForChat(chatId)
@@ -570,6 +647,18 @@ async function handleCallback(cq: Record<string, unknown>) {
     return
   }
 
+  // ── Owner replies to a relayed staff message ──
+  if (data.startsWith("rly:")) {
+    if (staff.appRole !== "owner" && staff.appRole !== "task_manager") {
+      await answerCallbackQuery(id, "Only a manager can reply here")
+      return
+    }
+    const target = data.slice("rly:".length)
+    await sendForceReply(msgChatId, `${REPLY_PROMPT}\n(to:${target})`)
+    await answerCallbackQuery(id)
+    return
+  }
+
   // ── Task action callbacks (start / done / snooze) ──
   const [action, taskId] = data.split(":")
   if (!taskId) {
@@ -662,20 +751,40 @@ Deno.serve(async (req) => {
     const message = update.message as
       | {
           text?: string
+          caption?: string
+          photo?: Array<{ file_id: string }>
           chat?: { id?: number }
           from?: { username?: string }
-          reply_to_message?: { text?: string }
+          reply_to_message?: { text?: string; message_id?: number }
         }
       | undefined
     const text = message?.text?.trim() ?? ""
     const chatId = message?.chat?.id != null ? String(message.chat.id) : null
     const username = message?.from?.username ?? null
     const replyTo = message?.reply_to_message?.text ?? ""
+    const replyToMsgId = message?.reply_to_message?.message_id ?? null
+    const photos = message?.photo
+    const caption = message?.caption?.trim() ?? ""
 
     if (!chatId) return ok()
 
-    // Free-text reply to the Add / Done button prompts (no slash typing needed)
-    if (replyTo.startsWith("✍️ Type the task")) {
+    // Inbound photo → attach to a task (reply to its DM) or relay to owners.
+    if (photos?.length) {
+      await handlePhoto(chatId, photos[photos.length - 1].file_id, caption, replyToMsgId)
+      return ok()
+    }
+
+    // Owner's reply to a relayed staff message → deliver it back to the asker.
+    if (replyTo.startsWith(REPLY_PROMPT)) {
+      const m = replyTo.match(/\(to:(-?\d+)\)/)
+      if (m && text) {
+        await sendMessage(m[1], `💬 From the team · จากทีม:\n${escapeHtml(text)}`)
+        await sendMessage(chatId, "✅ Sent · ส่งแล้ว")
+      } else {
+        await sendMenu(chatId, "Tap a button below 👇 · กดปุ่มด้านล่าง")
+      }
+    } // Free-text reply to the Add / Done button prompts (no slash typing needed)
+    else if (replyTo.startsWith("✍️ Type the task")) {
       await createSelfTask(chatId, text, false)
     } else if (replyTo.startsWith("✍️ What did you")) {
       await createSelfTask(chatId, text, true)

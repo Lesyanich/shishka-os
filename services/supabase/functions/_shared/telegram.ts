@@ -101,6 +101,40 @@ export async function sendForceReply(chatId: string, prompt: string): Promise<vo
   })
 }
 
+/** Send a photo by file_id (re-share, no download) or URL, with an optional caption. */
+export async function sendPhoto(
+  chatId: string,
+  photo: string,
+  caption?: string,
+  keyboard?: InlineKeyboard,
+): Promise<{ ok: boolean }> {
+  const body: Record<string, unknown> = { chat_id: chatId, photo }
+  if (caption) {
+    body.caption = caption
+    body.parse_mode = "HTML"
+  }
+  if (keyboard) body.reply_markup = { inline_keyboard: keyboard }
+  const data = await call("sendPhoto", body)
+  return { ok: data.ok === true }
+}
+
+/** Resolve a Telegram file_id to its server file_path (for download). */
+export async function getFilePath(fileId: string): Promise<string | null> {
+  const data = await call("getFile", { file_id: fileId })
+  const result = data.result as { file_path?: string } | undefined
+  return result?.file_path ?? null
+}
+
+/** Download the bytes of a Telegram file by its file_path (token stays server-side). */
+export async function downloadFile(filePath: string): Promise<Uint8Array | null> {
+  const res = await fetch(`https://api.telegram.org/file/bot${TOKEN}/${filePath}`)
+  if (!res.ok) {
+    console.error("[telegram] downloadFile failed:", res.status)
+    return null
+  }
+  return new Uint8Array(await res.arrayBuffer())
+}
+
 export async function editMessageText(
   chatId: string,
   messageId: string | number,
