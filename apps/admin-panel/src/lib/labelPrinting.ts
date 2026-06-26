@@ -63,15 +63,11 @@ export interface PrepLabelData {
    * (name + price + nutrition + ingredients + dates) instead of the storage one.
    */
   nutrition?: LabelNutrition | null
+  /** Portion mass in grams — drives the per-100 g column of the КБЖУ table. */
+  nutritionPortionG?: number | null
   ingredients?: string | null
   /** Preformatted price, e.g. "฿111". Shown top-right on the consumer label. */
   price?: string | null
-}
-
-/** "343 kcal · P14 · F18 · C36" for the canvas (image) label. */
-function nutritionLine(n: LabelNutrition): string {
-  const r = (v: number) => String(Math.round(v))
-  return `${r(n.kcal)} kcal · P${r(n.protein)} · F${r(n.fat)} · C${r(n.carbs)}`
 }
 
 /** Greedy word-wrap `text` into lines that fit `maxWidth` at the current font. */
@@ -260,11 +256,11 @@ export function renderPrepLabelCanvas(
 }
 
 /**
- * Draw the SALE consumer label: bold name, per-portion nutrition line, a thin
- * divider, the ingredient list (wrapped, filling the space above the footer),
- * then PREP / USE BY dates pinned to the bottom. No human-readable code line —
- * the QR (raised above the dates) carries the batch barcode. Auto-shrinks and
- * clamps ingredient lines so everything stays on the chosen stock.
+ * Draw the SALE consumer label: bold name + price, a thin divider, the
+ * ingredient list (wrapped), then a КБЖУ table (per 100 g / per portion), with
+ * PREP / USE BY dates pinned to the bottom and the QR bottom-right. No
+ * human-readable code line — the QR carries the batch barcode. Ingredient lines
+ * clamp to the room above the table so everything stays on the chosen stock.
  */
 function drawSaleLabel(
   ctx: CanvasRenderingContext2D,
@@ -277,18 +273,23 @@ function drawSaleLabel(
   const F = (n: number) => Math.round(n * s)
   const maxW = wPx - PAD * 2
 
-  // QR (batch barcode) sits on the right; ingredients wrap to clear its column.
-  const qrPx = data.qr ? Math.round(Math.min(118 * s, wPx * 0.3, hPx * 0.4)) : 0
+  // QR (batch barcode) sits bottom-right; text content keeps to the left of it.
+  const qrPx = data.qr ? Math.round(Math.min(100 * s, wPx * 0.26, hPx * 0.44)) : 0
   const qrX = wPx - qrPx - PAD
-  const ingrMaxW = data.qr ? qrX - 8 * s - PAD : maxW
+  const contentRight = data.qr ? qrX - 16 * s : wPx - PAD
+  const contentW = contentRight - PAD
 
-  // Footer rows pinned to the bottom (computed first so ingredients can fill up
-  // to them). Dates are kept compact so the nutrition + ingredients — the info
-  // the customer actually reads — get the prominence and the vertical room.
-  // No human-readable code line on the consumer label: the QR already carries
-  // the batch barcode for scanning.
+  // Footer rows pinned to the bottom. The QR carries the batch barcode, so
+  // there's no human-readable code line.
   const useByY = hPx - F(19) - 6 * s
   const prepY = useByY - F(18) - 4 * s
+
+  // Nutrition table sits just above the footer, after the ingredients. Reserve
+  // its height up front so the ingredient list clamps to the room above it.
+  const tHeadH = F(13) + 6 * s
+  const tRowH = F(16) + 6 * s
+  const tableH = data.nutrition ? tHeadH + 4 * tRowH : 0
+  const tableTop = data.nutrition ? prepY - 10 * s - tableH : prepY
 
   // ── Price (bold, top-right) — reserve its width so the name doesn't collide ──
   let priceW = 0
@@ -321,19 +322,6 @@ function drawSaleLabel(
   }
   y += 4 * s
 
-  // ── Nutrition (per portion) — prominent; shrink only as far as needed ──
-  if (data.nutrition) {
-    const str = nutritionLine(data.nutrition)
-    let ns = F(27)
-    ctx.font = `800 ${ns}px sans-serif`
-    while (ns > F(20) && ctx.measureText(str).width > maxW) {
-      ns -= 1
-      ctx.font = `800 ${ns}px sans-serif`
-    }
-    ctx.fillText(str, PAD, y)
-    y += ns + 6 * s
-  }
-
   // ── Divider ──
   ctx.fillRect(PAD, y, maxW, Math.max(2, 2 * s))
   y += 8 * s
@@ -347,12 +335,12 @@ function drawSaleLabel(
     const isize = F(22)
     ctx.font = `400 ${isize}px sans-serif`
     const lineH = isize + 4 * s
-    const allLines = wrapToWidth(ctx, data.ingredients, ingrMaxW)
-    const maxLines = Math.max(1, Math.floor((prepY - 4 * s - y) / lineH))
+    const allLines = wrapToWidth(ctx, data.ingredients, contentW)
+    const maxLines = Math.max(1, Math.floor((tableTop - 6 * s - y) / lineH))
     const shown = allLines.slice(0, maxLines)
     if (allLines.length > maxLines && shown.length > 0) {
       let last = shown[shown.length - 1]
-      while (last.length > 1 && ctx.measureText(`${last}…`).width > ingrMaxW) {
+      while (last.length > 1 && ctx.measureText(`${last}…`).width > contentW) {
         last = last.slice(0, -1)
       }
       shown[shown.length - 1] = `${last}…`
@@ -363,19 +351,87 @@ function drawSaleLabel(
     }
   }
 
+  // ── Nutrition table (per 100 g / per portion), above the footer ──
+  if (data.nutrition) {
+    const portionG =
+      data.nutritionPortionG && data.nutritionPortionG > 0 ? data.nutritionPortionG : null
+    drawNutritionTable(ctx, PAD, tableTop, s, data.nutrition, portionG)
+  }
+
   // ── Footer: PREP, USE BY (emphasized), batch code — kept compact ──
   const prep = data.weight ? `PREP ${formatDate(data.prepDate)} · ${data.weight}` : `PREP ${formatDate(data.prepDate)}`
   ctx.font = `500 ${F(18)}px sans-serif`
   ctx.fillText(prep, PAD, prepY)
 
   const useBy = data.shelfLifeDays != null ? addDays(data.prepDate, data.shelfLifeDays) : null
-  ctx.font = `700 ${F(19)}px sans-serif`
+  ctx.font = `500 ${F(19)}px sans-serif`
   ctx.fillText(`USE BY ${useBy ? formatDate(useBy) : '—'}`, PAD, useByY)
 
-  // ── QR (batch barcode), right side, raised to sit above the date footer ──
+  // ── QR (batch barcode), bottom-right ──
   if (data.qr && qrPx > 0) {
-    const qrY = Math.max(14 * s, prepY - qrPx - 6 * s)
-    drawQr(ctx, data.qr, qrX, qrY, qrPx)
+    drawQr(ctx, data.qr, qrX, hPx - qrPx - 6 * s, qrPx)
+  }
+}
+
+/**
+ * Draw the КБЖУ as a compact two-column table — per 100 g and per portion —
+ * right under the ingredients. Numbers are right-aligned in each column; units
+ * live in the row label so the columns stay clean. When the portion mass is
+ * unknown, only the per-portion column is shown.
+ */
+function drawNutritionTable(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  yTop: number,
+  s: number,
+  n: LabelNutrition,
+  portionG: number | null,
+): void {
+  const F = (k: number) => Math.round(k * s)
+  const fmt = (v: number) => {
+    const r = Math.round(v * 10) / 10
+    return Number.isInteger(r) ? String(r) : r.toFixed(1)
+  }
+  const headH = F(13) + 6 * s
+  const rowH = F(16) + 6 * s
+
+  // Columns sit just right of the label text — close to the КБЖУ names, not
+  // pushed out toward the QR. Numbers are right-aligned in each column.
+  ctx.font = `500 ${F(16)}px sans-serif`
+  const labelW = ctx.measureText('Energy, kcal').width + F(18)
+  const numW = F(54)
+  const colGap = F(18)
+  const hundRight = x + labelW + numW
+  const portRight = portionG ? hundRight + colGap + numW : x + labelW + numW
+  const tableW = portRight - x
+
+  // Header: caption left, column headers right-aligned over their columns.
+  ctx.font = `700 ${F(13)}px sans-serif`
+  ctx.fillText('NUTRITION', x, yTop)
+  ctx.textAlign = 'right'
+  if (portionG) ctx.fillText('100g', hundRight, yTop)
+  ctx.fillText(portionG ? `${fmt(portionG)}g` : 'PORTION', portRight, yTop)
+  ctx.textAlign = 'left'
+
+  // Full rule across the table so it reads as one cohesive block.
+  ctx.fillRect(x, yTop + F(13) + 3 * s, Math.round(tableW), Math.max(1, Math.round(s)))
+
+  const rows: Array<[string, number]> = [
+    ['Energy, kcal', n.kcal],
+    ['Protein, g', n.protein],
+    ['Fat, g', n.fat],
+    ['Carbs, g', n.carbs],
+  ]
+  let ry = yTop + headH
+  for (const [label, val] of rows) {
+    ctx.font = `500 ${F(16)}px sans-serif`
+    ctx.fillText(label, x, ry)
+    ctx.font = `700 ${F(16)}px sans-serif`
+    ctx.textAlign = 'right'
+    if (portionG) ctx.fillText(fmt((val * 100) / portionG), hundRight, ry)
+    ctx.fillText(fmt(val), portRight, ry)
+    ctx.textAlign = 'left'
+    ry += rowH
   }
 }
 
