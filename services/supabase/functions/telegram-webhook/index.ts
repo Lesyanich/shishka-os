@@ -263,13 +263,16 @@ async function handleToday(chatId: string, editMessageId?: number, mark = false)
   })
   if (tasks.length === 0) lines.push("\n🎉 No tasks today · วันนี้ไม่มีงาน")
 
-  let keyboard: InlineKeyboard = []
+  let keyboard: InlineKeyboard = [[{ text: "➕ New task · новая", callback_data: "f:new" }]]
   if (tasks.length > 0 && mark) {
     lines.push("\n<i>Tap a number to mark done — tap again to undo · กดเลขเพื่อสลับ</i>")
     const btns = tasks.map((t, i) => ({ text: `${statusBox(t.status)} ${i + 1}`, callback_data: `tgm:${t.id}` }))
     keyboard = [...chunk(btns, 5), [{ text: "✔ Done · เสร็จ", callback_data: "t:mine" }]]
   } else if (tasks.length > 0) {
-    keyboard = [[{ text: "✅ Mark done · ทำเครื่องหมาย", callback_data: "mkm" }]]
+    keyboard = [
+      [{ text: "✅ Mark done · ทำเครื่องหมาย", callback_data: "mkm" }],
+      [{ text: "➕ New task · новая", callback_data: "f:new" }],
+    ]
   }
 
   if (editMessageId != null) await editMessageText(chatId, editMessageId, lines.join("\n"), keyboard)
@@ -432,7 +435,12 @@ async function handleTeam(
     const btns = slice.map((t, i) => ({ text: `${statusBox(t.status)} ${i + 1}`, callback_data: `tgt:${t.id}:${fKey}:${p}` }))
     kb.push(...chunk(btns, 5), [{ text: "✔ Done · เสร็จ", callback_data: `t:team:${fKey}:${p}` }])
   } else if (total > 0) {
-    kb.push([{ text: "✅ Mark done · ทำเครื่องหมาย", callback_data: `mkt:${fKey}:${p}` }])
+    kb.push([
+      { text: "✅ Mark done · ทำเครื่องหมาย", callback_data: `mkt:${fKey}:${p}` },
+      { text: "➕ New · новая", callback_data: "f:new" },
+    ])
+  } else {
+    kb.push([{ text: "➕ New task · новая", callback_data: "f:new" }])
   }
   const pagingRow = teamPagingRow(fKey, p, totalPages)
   if (pagingRow) kb.push(pagingRow)
@@ -806,6 +814,11 @@ async function renderTaskForm(chatId: string, draftId: string, messageId?: numbe
 async function handleFormCallback(cbId: string, data: string, staff: StaffCtx, msgChatId: string, messageId: number) {
   const parts = data.split(":") // [f, action, draftId, arg?]
   const action = parts[1]
+  if (action === "new") {
+    await answerCallbackQuery(cbId)
+    await newTaskForm(msgChatId)
+    return
+  }
   const draftId = parts[2]
   if (!draftId) {
     await answerCallbackQuery(cbId, "Unknown action")
@@ -859,17 +872,28 @@ async function handleFormCallback(cbId: string, data: string, staff: StaffCtx, m
   }
   if (action === "dt") {
     await answerCallbackQuery(cbId)
-    await editMessageText(msgChatId, messageId, "📅 <b>Date · วันที่</b>", [
-      [
-        { text: "Today · วันนี้", callback_data: `f:dts:${draftId}:today` },
-        { text: "Tomorrow · พรุ่งนี้", callback_data: `f:dts:${draftId}:tmrw` },
-      ],
-      [{ text: "🔙 Back", callback_data: `f:back:${draftId}` }],
-    ])
+    const rows: InlineKeyboard = []
+    let week: InlineButton[] = []
+    const base = Date.now() + 7 * 3600 * 1000 // ICT wall clock
+    const dow = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(base + i * 24 * 3600 * 1000)
+      const iso = d.toISOString().slice(0, 10)
+      const label = i === 0 ? "Today" : i === 1 ? "Tmrw" : `${dow[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth() + 1}`
+      week.push({ text: label, callback_data: `f:dts:${draftId}:${iso}` })
+      if (week.length === 3) {
+        rows.push(week)
+        week = []
+      }
+    }
+    if (week.length) rows.push(week)
+    rows.push([{ text: "🔙 Back", callback_data: `f:back:${draftId}` }])
+    await editMessageText(msgChatId, messageId, "📅 <b>Date · วันที่</b>", rows)
     return
   }
   if (action === "dts") {
-    const due = parts[3] === "tmrw" ? tomorrowICT() : todayICT()
+    const arg = parts[3] ?? ""
+    const due = /^\d{4}-\d{2}-\d{2}$/.test(arg) ? arg : todayICT()
     await db.from("staff_tasks").update({ due_date: due }).eq("id", draftId)
     await answerCallbackQuery(cbId)
     await renderTaskForm(msgChatId, draftId, messageId)
