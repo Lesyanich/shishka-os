@@ -32,6 +32,7 @@ import {
   MENU_ADD,
   MENU_BOARD,
   MENU_DONE,
+  MENU_STOCKTAKE,
   MENU_TEAM,
   MENU_TODAY,
   sendForceReply,
@@ -46,6 +47,7 @@ import {
 } from "../_shared/telegram.ts"
 
 const REPLY_PROMPT = "↩ Type your reply · พิมพ์คำตอบ"
+const REV_PROMPT = "📦 Send the stock counts · ส่งจำนวนสต๊อก"
 
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
@@ -106,7 +108,7 @@ async function staffForChat(chatId: string): Promise<StaffCtx | null> {
 }
 
 /** Hand a free-text message to telegram-ai (slow LLM work) without blocking the 200. */
-function triggerAI(chatId: string, text: string, staff: StaffCtx) {
+function triggerAI(chatId: string, text: string, staff: StaffCtx, extra?: { mode?: string; station?: string }) {
   if (!SUPABASE_URL || !WEBHOOK_SECRET) return
   const p = fetch(`${SUPABASE_URL}/functions/v1/telegram-ai`, {
     method: "POST",
@@ -114,9 +116,55 @@ function triggerAI(chatId: string, text: string, staff: StaffCtx) {
       "Content-Type": "application/json",
       "x-telegram-bot-api-secret-token": WEBHOOK_SECRET,
     },
-    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 1000), lang: staff.lang, staff_name: staff.name }),
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text.slice(0, 2000),
+      lang: staff.lang,
+      staff_name: staff.name,
+      ...extra,
+    }),
   }).catch((e) => console.error("[telegram-webhook] triggerAI failed:", e))
   fireAndForget(p)
+}
+
+/** Stocktake entry point — ask which station, then prompt for free-text counts. */
+async function handleStocktakeStart(chatId: string) {
+  await sendMessage(
+    chatId,
+    "📦 <b>Stocktake · ревизия</b>\nWhich station? · สถานีไหน?",
+    [[
+      { text: "🔪 L1 · Prep", callback_data: "rev:L1" },
+      { text: "🍽 L2 · Assembly", callback_data: "rev:L2" },
+    ]],
+  )
+}
+
+/** Confirm a parsed stocktake (flip pending → confirmed) and summarise. */
+async function confirmStocktake(session: string, msgChatId: string, messageId: number, cbId: string) {
+  await db.from("stocktake_entries")
+    .update({ status: "confirmed" })
+    .eq("session_id", session)
+    .eq("status", "pending")
+  const { data } = await db
+    .from("stocktake_entries")
+    .select("counted_qty, unit, nomenclature:nomenclature(name)")
+    .eq("session_id", session)
+    .eq("status", "confirmed")
+    .order("created_at", { ascending: true })
+  const rows = (data ?? []) as Array<{ counted_qty: number; unit: string | null; nomenclature: { name?: string } | { name?: string }[] | null }>
+  const name = (r: typeof rows[number]) => {
+    const n = Array.isArray(r.nomenclature) ? r.nomenclature[0] : r.nomenclature
+    return n?.name ?? "—"
+  }
+  const lines = [`✅ <b>Stocktake saved · บันทึกแล้ว</b> (${rows.length})`]
+  const out: string[] = []
+  rows.forEach((r) => {
+    lines.push(`• ${escapeHtml(name(r))} — ${r.counted_qty} ${r.unit ?? ""}`)
+    if (Number(r.counted_qty) === 0) out.push(escapeHtml(name(r)))
+  })
+  if (out.length) lines.push(`\n🔴 <b>Out of stock · หมด:</b> ${out.join(", ")}`)
+  await editMessageText(msgChatId, messageId, lines.join("\n"))
+  await answerCallbackQuery(cbId, "✅ Saved")
 }
 
 async function handleStart(chatId: string, username: string | null, code: string | null) {
@@ -765,6 +813,32 @@ async function handleCallback(cq: Record<string, unknown>) {
     return
   }
 
+  // ── Stocktake: pick station / save / cancel ──
+  if (data.startsWith("rev:")) {
+    const parts = data.split(":") // [rev, action, arg?]
+    const action = parts[1]
+    if (action === "L1" || action === "L2") {
+      await answerCallbackQuery(id)
+      await sendForceReply(
+        msgChatId,
+        `${REV_PROMPT}\nStation: ${action}\nе.g. 5kg carrots, 3L milk, 2 hummus · เช่น แครอท 5kg, นม 3L`,
+      )
+      return
+    }
+    if (action === "save" && parts[2]) {
+      await confirmStocktake(parts[2], msgChatId, messageId, id)
+      return
+    }
+    if (action === "cancel" && parts[2]) {
+      await db.from("stocktake_entries").update({ status: "cancelled" }).eq("session_id", parts[2]).eq("status", "pending")
+      await editMessageText(msgChatId, messageId, "❌ <i>Stocktake discarded</i> · ยกเลิก")
+      await answerCallbackQuery(id, "Cancelled")
+      return
+    }
+    await answerCallbackQuery(id, "Unknown action")
+    return
+  }
+
   // ── Task action callbacks (start / done / snooze) ──
   const [action, taskId] = data.split(":")
   if (!taskId) {
@@ -880,8 +954,18 @@ Deno.serve(async (req) => {
       return ok()
     }
 
-    // Owner's reply to a relayed staff message → deliver it back to the asker.
-    if (replyTo.startsWith(REPLY_PROMPT)) {
+    // Stocktake counts (reply to the station prompt) → AI parse into entries.
+    if (replyTo.startsWith(REV_PROMPT)) {
+      const st = replyTo.match(/Station: (L1|L2)/)
+      const staff = await staffForChat(chatId)
+      if (!staff) {
+        await sendMenu(chatId, "Connect first 👇 · เชื่อมต่อก่อน")
+      } else if (text) {
+        await sendMessage(chatId, "💭 Reading the count… · กำลังอ่าน…")
+        triggerAI(chatId, text, staff, { mode: "stocktake", station: st ? st[1] : "general" })
+      }
+    } // Owner's reply to a relayed staff message → deliver it back to the asker.
+    else if (replyTo.startsWith(REPLY_PROMPT)) {
       const m = replyTo.match(/\(to:(-?\d+)\)/)
       if (m && text) {
         await sendMessage(m[1], `💬 From the team · จากทีม:\n${escapeHtml(text)}`)
@@ -903,6 +987,8 @@ Deno.serve(async (req) => {
       await handleTeam(chatId, {}, 0)
     } else if (text === MENU_BOARD || text.startsWith("/board")) {
       await handleBoard(chatId)
+    } else if (text === MENU_STOCKTAKE || text.startsWith("/stocktake") || text.startsWith("/revision")) {
+      await handleStocktakeStart(chatId)
     } else if (text === MENU_ADD) {
       await sendForceReply(chatId, ADD_PROMPT)
     } else if (text === MENU_DONE) {

@@ -21,6 +21,7 @@ export const MENU_TODAY = "📋 My tasks · งานของฉัน"
 export const MENU_TEAM = "👥 Team tasks · งานทีม"
 export const MENU_ADD = "➕ Add · เพิ่มงาน"
 export const MENU_DONE = "✅ Log done · บันทึกเสร็จ"
+export const MENU_STOCKTAKE = "📦 Stocktake · ตรวจสต๊อก"
 export const MENU_BOARD = "🗂 Open full board · เปิดบอร์ด"
 
 export const ADD_PROMPT = "✍️ Type the task to add: · พิมพ์งานที่จะเพิ่ม:"
@@ -30,7 +31,7 @@ function mainMenu() {
   return {
     keyboard: [
       [{ text: MENU_TODAY }, { text: MENU_TEAM }],
-      [{ text: MENU_ADD }],
+      [{ text: MENU_ADD }, { text: MENU_STOCKTAKE }],
       [{ text: MENU_BOARD }],
     ],
     resize_keyboard: true,

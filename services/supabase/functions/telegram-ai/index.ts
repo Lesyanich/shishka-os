@@ -376,6 +376,94 @@ async function relayToOwners(askerChatId: string, text: string, lang: Lang, aske
   )
 }
 
+// ── Stocktake / revision (free-text count → matched entries → confirm) ──────
+interface CatalogItem {
+  code: string
+  name: string
+  unit: string | null
+}
+
+/** Items the staff might be counting at this station, for AI name-matching. */
+async function stocktakeCatalog(station: string): Promise<CatalogItem[]> {
+  const prefixes = station === "L2" ? ["PF-", "SALE-"] : ["RAW-", "PF-"]
+  const ors = prefixes.map((p) => `product_code.ilike.${p}%`).join(",")
+  const { data } = await db
+    .from("nomenclature")
+    .select("product_code, name, customer_short_name, base_unit")
+    .or(ors)
+    .not("is_deleted", "is", true)
+    .limit(800)
+  return ((data ?? []) as Array<{ product_code: string; name: string; customer_short_name: string | null; base_unit: string | null }>)
+    .map((r) => ({ code: r.product_code, name: r.customer_short_name || r.name, unit: r.base_unit }))
+}
+
+async function handleStocktake(chatId: string, text: string, station: string, countedBy: string) {
+  const catalog = await stocktakeCatalog(station)
+  const sys =
+    `You parse a kitchen STOCK COUNT for "Shishka Healthy Kitchen". The staff member lists how much of each ingredient / prep is left (any language: ru/en/th). For each line, match it to a product CODE from the CATALOG by name (or null if you can't match confidently) and extract the quantity + unit.
+
+Return ONLY compact JSON: {"items":[{"said":"<what they wrote>","code":"<catalog code or null>","qty":<number>,"unit":"<kg|L|pcs|g|ml|...>"}]}
+
+CATALOG (JSON): ${JSON.stringify(catalog)}`
+  const res = await callLLM(MODEL_KEY, sys, text.slice(0, 2000))
+  await logCost(res, chatId, "stocktake", station)
+  const parsed = parseJsonObject(res.text)
+  const rawItems = Array.isArray((parsed as { items?: unknown })?.items) ? (parsed as { items: unknown[] }).items : []
+
+  const codes = rawItems
+    .map((it) => (typeof (it as { code?: unknown }).code === "string" ? (it as { code: string }).code : null))
+    .filter((c): c is string => !!c)
+  const byCode = new Map<string, { id: string; name: string; base_unit: string | null }>()
+  if (codes.length) {
+    const { data } = await db
+      .from("nomenclature")
+      .select("id, product_code, name, customer_short_name, base_unit")
+      .in("product_code", codes)
+    for (const n of (data ?? []) as Array<{ id: string; product_code: string; name: string; customer_short_name: string | null; base_unit: string | null }>) {
+      byCode.set(n.product_code, { id: n.id, name: n.customer_short_name || n.name, base_unit: n.base_unit })
+    }
+  }
+
+  const session = crypto.randomUUID()
+  const matched: Array<{ id: string; name: string; qty: number; unit: string }> = []
+  const unmatched: string[] = []
+  for (const it of rawItems as Array<{ said?: unknown; code?: unknown; qty?: unknown; unit?: unknown }>) {
+    const code = typeof it.code === "string" ? it.code : null
+    const nom = code ? byCode.get(code) : undefined
+    const qty = Number(it.qty)
+    if (nom && Number.isFinite(qty) && qty >= 0) {
+      matched.push({ id: nom.id, name: nom.name, qty, unit: (typeof it.unit === "string" && it.unit) || nom.base_unit || "" })
+    } else {
+      unmatched.push(String(it.said ?? code ?? "?").slice(0, 40))
+    }
+  }
+
+  if (matched.length === 0) {
+    await sendMessage(chatId, "🤔 Couldn't match any item. Try simpler, e.g. «carrots 5 kg». · ลองใหม่ เช่น แครอท 5kg")
+    return
+  }
+
+  await db.from("stocktake_entries").insert(matched.map((m) => ({
+    nomenclature_id: m.id,
+    station,
+    counted_qty: m.qty,
+    unit: m.unit,
+    counted_by: countedBy,
+    source_text: text.slice(0, 500),
+    status: "pending",
+    session_id: session,
+  })))
+
+  const lines = [`📦 <b>Stocktake · ${station}</b> — confirm? · ยืนยัน?`]
+  matched.forEach((m, i) => lines.push(`${i + 1}. ${escapeHtml(m.name)} — <b>${m.qty} ${escapeHtml(m.unit)}</b>`))
+  if (unmatched.length) lines.push(`\n⚠️ Not recognised · ไม่รู้จัก: ${unmatched.map(escapeHtml).join(", ")}`)
+  const kb: InlineKeyboard = [[
+    { text: "✅ Save · บันทึก", callback_data: `rev:save:${session}` },
+    { text: "❌ Cancel · ยกเลิก", callback_data: `rev:cancel:${session}` },
+  ]]
+  await sendMessage(chatId, lines.join("\n"), kb)
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204 })
   if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405)
@@ -386,7 +474,7 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "unauthorized" }, 401)
   }
 
-  let body: { chat_id?: unknown; text?: unknown; lang?: unknown; staff_name?: unknown }
+  let body: { chat_id?: unknown; text?: unknown; lang?: unknown; staff_name?: unknown; mode?: unknown; station?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -396,10 +484,16 @@ Deno.serve(async (req) => {
   const text = typeof body.text === "string" ? body.text.trim() : ""
   const fallbackLang = (["ru", "en", "th"].includes(body.lang as string) ? (body.lang as Lang) : "th")
   const proposerName = typeof body.staff_name === "string" && body.staff_name.trim() ? body.staff_name.trim() : "Staff"
+  const mode = typeof body.mode === "string" ? body.mode : ""
+  const station = ["L1", "L2", "general"].includes(body.station as string) ? (body.station as string) : "general"
   if (!chatId || !text) return json({ ok: false, error: "missing_fields" }, 400)
 
   try {
-    await handleAI(chatId, text, fallbackLang, proposerName)
+    if (mode === "stocktake") {
+      await handleStocktake(chatId, text, station, proposerName)
+    } else {
+      await handleAI(chatId, text, fallbackLang, proposerName)
+    }
     return json({ ok: true })
   } catch (e) {
     console.error("[telegram-ai] error:", e)
