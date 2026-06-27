@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-06-14T02:48:21.674969+00:00",
+  "generated_at": "2026-06-27T14:37:37.697731+00:00",
   "summary": {
-    "nodes": 3329,
-    "edges": 4776,
-    "communities": 421,
-    "cross_community_edges": 669
+    "nodes": 2997,
+    "edges": 4054,
+    "communities": 404,
+    "cross_community_edges": 426
   },
   "confidence": {
-    "extracted": 4197,
-    "inferred": 228,
+    "extracted": 3491,
+    "inferred": 212,
     "ambiguous": 0
   },
   "god_nodes": [
@@ -17,147 +17,147 @@
       "label": "getSupabase()",
       "degree": 50,
       "source_file": "services/mcp-finance/src/lib/supabase.ts",
-      "community": 5
-    },
-    {
-      "id": "lib_supabase_supabase",
-      "label": "supabase",
-      "degree": 42,
-      "source_file": "apps/web/src/lib/supabase.ts",
-      "community": 56
+      "community": 11
     },
     {
       "id": "chef_agent",
       "label": "Chef Agent",
-      "degree": 38,
+      "degree": 36,
       "source_file": "agents/chef/AGENT.md",
       "community": 9
     },
     {
-      "id": "operational_rules",
-      "label": "Operational Rules (constitution)",
-      "degree": 36,
-      "source_file": "docs/constitution/operational-rules.md",
-      "community": 21
-    },
-    {
-      "id": "mcp_mission_control",
-      "label": "MCP Server: shishka-mission-control",
-      "degree": 30,
-      "source_file": "agents/chef/AGENT.md",
-      "community": 14
+      "id": "lib_supabase_supabase",
+      "label": "supabase",
+      "degree": 32,
+      "source_file": "apps/web/src/lib/supabase.ts",
+      "community": 58
     },
     {
       "id": "finance_agent",
       "label": "Finance Agent",
-      "degree": 29,
+      "degree": 27,
       "source_file": "agents/finance/AGENT.md",
-      "community": 18
+      "community": 54
     },
     {
       "id": "ollama_agent_log",
       "label": "log()",
       "degree": 26,
       "source_file": "agents/finance/ollama-agent.js",
-      "community": 58
+      "community": 2
     },
     {
-      "id": "hooks_usemenudata_menuitem",
-      "label": "MenuItem",
-      "degree": 20,
-      "source_file": "apps/admin-panel/src/hooks/useMenuData.ts",
-      "community": 8
+      "id": "mcp_mission_control",
+      "label": "MCP Server: shishka-mission-control",
+      "degree": 26,
+      "source_file": "agents/chef/AGENT.md",
+      "community": 17
     },
     {
-      "id": "loyverse_sync_index_json",
-      "label": "json()",
+      "id": "fn_approve_receipt",
+      "label": "fn_approve_receipt v7",
       "degree": 19,
-      "source_file": "services/supabase/functions/loyverse-sync/index.ts",
-      "community": 7
+      "source_file": "docs/guides/finance-complete-rules.md",
+      "community": 41
     },
     {
       "id": "lawyer_agent",
       "label": "Lawyer Agent (AGENT.md)",
       "degree": 18,
       "source_file": ".claude/skills/lawyer/SKILL.md",
-      "community": 12
+      "community": 17
+    },
+    {
+      "id": "constitution_core_rules",
+      "label": "Core Rules (Immutable Foundation)",
+      "degree": 16,
+      "source_file": "docs/constitution/core-rules.md",
+      "community": 83
+    },
+    {
+      "id": "makro_parser_scraper_makroscraper",
+      "label": "MakroScraper",
+      "degree": 16,
+      "source_file": "tools/makro-parser/scraper.py",
+      "community": 48
     }
   ],
   "top_communities": [
     {
       "id": 0,
       "label": "Community 0",
-      "size": 53
+      "size": 79
     },
     {
       "id": 1,
       "label": "Community 1",
-      "size": 52
+      "size": 56
     },
     {
       "id": 2,
       "label": "Community 2",
-      "size": 49
+      "size": 55
     },
     {
       "id": 3,
       "label": "Community 3",
-      "size": 46
+      "size": 53
     },
     {
       "id": 4,
       "label": "Community 4",
-      "size": 44
+      "size": 52
     },
     {
       "id": 5,
       "label": "Community 5",
-      "size": 43
+      "size": 52
     },
     {
       "id": 6,
       "label": "Community 6",
-      "size": 42
+      "size": 46
     },
     {
       "id": 7,
       "label": "Community 7",
-      "size": 41
+      "size": 45
     },
     {
       "id": 8,
       "label": "Community 8",
-      "size": 38
+      "size": 45
     },
     {
       "id": 9,
       "label": "Community 9",
-      "size": 37
+      "size": 42
     },
     {
       "id": 10,
       "label": "Community 10",
-      "size": 36
+      "size": 38
     },
     {
       "id": 11,
       "label": "Community 11",
-      "size": 35
+      "size": 36
     },
     {
       "id": 12,
       "label": "Community 12",
-      "size": 34
+      "size": 36
     },
     {
       "id": 13,
       "label": "Community 13",
-      "size": 34
+      "size": 36
     },
     {
       "id": 14,
       "label": "Community 14",
-      "size": 32
+      "size": 30
     }
   ]
 }
