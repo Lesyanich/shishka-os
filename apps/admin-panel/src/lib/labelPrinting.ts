@@ -182,6 +182,9 @@ export function renderPrepLabelCanvas(
   if (!ctx) throw new Error('Canvas 2D context unavailable')
 
   const PAD = 18 * s
+  // Fixed left margin (does NOT scale with the label) to clear the printer's
+  // physical left dead-zone, which was clipping the left edge on real prints.
+  const LPAD = Math.max(PAD, 30)
 
   // Thermal printing is black-on-white. Fill the whole canvas (incl. gap) white.
   ctx.fillStyle = '#ffffff'
@@ -199,7 +202,7 @@ export function renderPrepLabelCanvas(
   const { size: nameSize, lines } = fitText(
     ctx,
     data.name.toUpperCase(),
-    wPx - PAD * 2,
+    wPx - PAD - LPAD,
     2,
     Math.round(44 * s),
     Math.round(19 * s),
@@ -208,21 +211,21 @@ export function renderPrepLabelCanvas(
   ctx.font = `800 ${nameSize}px sans-serif`
   let y = 16 * s
   for (const line of lines) {
-    ctx.fillText(line, PAD, y)
+    ctx.fillText(line, LPAD, y)
     y += nameSize + 4 * s
   }
 
   // ── Divider ──
-  ctx.fillRect(PAD, 130 * s, wPx - PAD * 2, Math.max(2, 3 * s))
+  ctx.fillRect(LPAD, 130 * s, wPx - PAD - LPAD, Math.max(2, 3 * s))
 
-  const VALX = PAD + 160 * s // x where each row's value starts
+  const VALX = LPAD + 160 * s // x where each row's value starts
   let row = 144 * s
   const F = (n: number) => Math.round(n * s) // scaled font size
 
   // ── Weight / volume (optional) ──
   if (data.weight) {
     ctx.font = `500 ${F(26)}px sans-serif`
-    ctx.fillText('QTY', PAD, row)
+    ctx.fillText('QTY', LPAD, row)
     ctx.font = `700 ${F(30)}px sans-serif`
     ctx.fillText(data.weight, VALX, row - 2 * s)
     row += 42 * s
@@ -230,7 +233,7 @@ export function renderPrepLabelCanvas(
 
   // ── PREP date ──
   ctx.font = `500 ${F(26)}px sans-serif`
-  ctx.fillText('PREP', PAD, row)
+  ctx.fillText('PREP', LPAD, row)
   ctx.font = `700 ${F(30)}px sans-serif`
   ctx.fillText(formatDate(data.prepDate), VALX, row - 2 * s)
   row += 42 * s
@@ -238,7 +241,7 @@ export function renderPrepLabelCanvas(
   // ── USE BY date (emphasized) ──
   const useBy = data.shelfLifeDays != null ? addDays(data.prepDate, data.shelfLifeDays) : null
   ctx.font = `500 ${F(26)}px sans-serif`
-  ctx.fillText('USE BY', PAD, row)
+  ctx.fillText('USE BY', LPAD, row)
   ctx.font = `800 ${F(32)}px sans-serif`
   ctx.fillText(useBy ? formatDate(useBy) : '—', VALX, row - 4 * s)
 
@@ -250,7 +253,7 @@ export function renderPrepLabelCanvas(
 
   // ── Batch code / product code (bottom-left, monospace) ──
   ctx.font = `400 ${F(22)}px monospace`
-  ctx.fillText(data.batchCode ?? data.productCode, PAD, hPx - 28 * s)
+  ctx.fillText(data.batchCode ?? data.productCode, LPAD, hPx - 28 * s)
 
   return canvas
 }
@@ -270,14 +273,19 @@ function drawSaleLabel(
   s: number,
 ): void {
   const PAD = 18 * s
+  // The printer's left dead-zone is physical (~constant dots), so the left
+  // margin must NOT scale with the label — a scaled 18·s was clipping the left
+  // edge on real prints. Left-anchored content starts at LPAD; right-anchored
+  // content (price, QR) stays at PAD.
+  const LPAD = Math.max(PAD, 30)
   const F = (n: number) => Math.round(n * s)
-  const maxW = wPx - PAD * 2
+  const maxW = wPx - PAD - LPAD
 
   // QR (batch barcode) sits on the right; text content keeps to the left of it.
   const qrPx = data.qr ? Math.round(Math.min(112 * s, wPx * 0.28, hPx * 0.48)) : 0
   const qrX = wPx - qrPx - PAD
   const contentRight = data.qr ? qrX - 16 * s : wPx - PAD
-  const contentW = contentRight - PAD
+  const contentW = contentRight - LPAD
 
   // Footer rows pinned to the bottom. The QR carries the batch barcode, so
   // there's no human-readable code line.
@@ -311,7 +319,7 @@ function drawSaleLabel(
   ctx.font = `800 ${nameSize}px sans-serif`
   let y = 14 * s
   for (const line of lines) {
-    ctx.fillText(line, PAD, y)
+    ctx.fillText(line, LPAD, y)
     y += nameSize + 4 * s
   }
   if (data.price) {
@@ -323,13 +331,13 @@ function drawSaleLabel(
   y += 4 * s
 
   // ── Divider ──
-  ctx.fillRect(PAD, y, maxW, Math.max(2, 2 * s))
+  ctx.fillRect(LPAD, y, maxW, Math.max(2, 2 * s))
   y += 8 * s
 
   // ── Ingredients (wrapped, clamped to the room above the footer) ──
   if (data.ingredients) {
     ctx.font = `600 ${F(16)}px sans-serif`
-    ctx.fillText('INGREDIENTS', PAD, y)
+    ctx.fillText('INGREDIENTS', LPAD, y)
     y += F(16) + 3 * s
 
     const isize = F(22)
@@ -346,7 +354,7 @@ function drawSaleLabel(
       shown[shown.length - 1] = `${last}…`
     }
     for (const l of shown) {
-      ctx.fillText(l, PAD, y)
+      ctx.fillText(l, LPAD, y)
       y += lineH
     }
   }
@@ -355,17 +363,17 @@ function drawSaleLabel(
   if (data.nutrition) {
     const portionG =
       data.nutritionPortionG && data.nutritionPortionG > 0 ? data.nutritionPortionG : null
-    drawNutritionTable(ctx, PAD, tableTop, s, data.nutrition, portionG)
+    drawNutritionTable(ctx, LPAD, tableTop, s, data.nutrition, portionG)
   }
 
   // ── Footer: PREP, USE BY (emphasized), batch code — kept compact ──
   const prep = data.weight ? `PREP ${formatDate(data.prepDate)} · ${data.weight}` : `PREP ${formatDate(data.prepDate)}`
   ctx.font = `500 ${F(18)}px sans-serif`
-  ctx.fillText(prep, PAD, prepY)
+  ctx.fillText(prep, LPAD, prepY)
 
   const useBy = data.shelfLifeDays != null ? addDays(data.prepDate, data.shelfLifeDays) : null
   ctx.font = `500 ${F(19)}px sans-serif`
-  ctx.fillText(`USE BY ${useBy ? formatDate(useBy) : '—'}`, PAD, useByY)
+  ctx.fillText(`USE BY ${useBy ? formatDate(useBy) : '—'}`, LPAD, useByY)
 
   // ── QR (batch barcode), right side, raised to sit beside the table ──
   if (data.qr && qrPx > 0) {
