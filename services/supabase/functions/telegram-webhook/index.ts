@@ -246,16 +246,20 @@ async function handleToday(chatId: string, editMessageId?: number, mode: ListMod
     return
   }
 
-  const { data } = await db
-    .from("staff_tasks")
-    .select("id, title, due_time, priority, status")
-    .eq("assigned_to", staff.id)
-    .eq("due_date", todayICT())
-    .eq("is_template", false)
-    .not("status", "in", "(cancelled,draft)")
-    .order("due_time", { ascending: true, nullsFirst: true })
-
-  const tasks = (data ?? []) as ChecklistTask[]
+  // "My tasks" = tasks I'm an assignee of (multi-assignee join table).
+  const myIds = await taskIdsForStaff(staff.id)
+  let tasks: ChecklistTask[] = []
+  if (myIds.length > 0) {
+    const { data } = await db
+      .from("staff_tasks")
+      .select("id, title, due_time, priority, status")
+      .in("id", myIds)
+      .eq("due_date", todayICT())
+      .eq("is_template", false)
+      .not("status", "in", "(cancelled,draft)")
+      .order("due_time", { ascending: true, nullsFirst: true })
+    tasks = (data ?? []) as ChecklistTask[]
+  }
   const done = tasks.filter((t) => t.status === "done").length
   const lines = [`📋 <b>My tasks today · งานของฉัน</b> — ${done}/${tasks.length} ✅`]
   tasks.forEach((t, i) => {
@@ -321,7 +325,8 @@ async function renderTaskDetail(chatId: string, taskId: string, messageId: numbe
     priority: string
     assigned_to: string | null
   }
-  const assignee = t.assigned_to ? await staffNameById(t.assigned_to) : "—"
+  const names = await assigneesFor(taskId)
+  const assignee = names.length ? names.map((a) => a.name).join(", ") : "—"
   const photos = t.photo_urls ?? []
   const flag = t.status === "done" ? "" : `${PRIORITY_FLAG[t.priority] ?? ""} `
   const time = t.due_time ? ` · ⏰${t.due_time.slice(0, 5)}` : ""
@@ -360,6 +365,7 @@ interface TeamFilter {
   station?: string
   staffIdx?: number
 }
+type EmbeddedStaff = { name?: string } | { name?: string }[] | null
 interface TeamTaskRow {
   id: string
   title: string
@@ -368,7 +374,8 @@ interface TeamTaskRow {
   status: string
   station: string
   assigned_to: string | null
-  staff: { name?: string } | { name?: string }[] | null
+  staff: EmbeddedStaff
+  staff_task_assignees?: Array<{ staff: EmbeddedStaff }> | null
 }
 
 /** Active staff in a stable order — the roster index used in callback_data. */
@@ -431,8 +438,11 @@ function teamPagingRow(fKey: string, page: number, totalPages: number): InlineBu
 }
 
 function assigneeName(t: TeamTaskRow): string {
-  const raw = t.staff
-  const s = Array.isArray(raw) ? raw[0] : raw
+  const names = (t.staff_task_assignees ?? [])
+    .map((a) => (Array.isArray(a.staff) ? a.staff[0]?.name : a.staff?.name) ?? "")
+    .filter(Boolean)
+  if (names.length) return names.length > 2 ? `${names[0]} +${names.length - 1}` : names.join(", ")
+  const s = Array.isArray(t.staff) ? t.staff[0] : t.staff
   return s?.name ?? "—"
 }
 
@@ -460,12 +470,15 @@ async function handleTeam(
   // Filters first (keep `q` a filter builder), then order on the final chain.
   let q = db
     .from("staff_tasks")
-    .select("id, title, due_time, priority, status, station, assigned_to, staff:staff(name)")
+    .select("id, title, due_time, priority, status, station, assigned_to, staff:staff(name), staff_task_assignees(staff:staff(name))")
     .eq("due_date", todayICT())
     .eq("is_template", false)
     .not("status", "in", "(cancelled,draft)")
   if (filter.station) q = q.eq("station", filter.station)
-  if (assigneeId) q = q.eq("assigned_to", assigneeId)
+  if (assigneeId) {
+    const ids = await taskIdsForStaff(assigneeId)
+    q = q.in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"])
+  }
 
   const { data } = await q
     .order("station", { ascending: true })
@@ -570,6 +583,70 @@ async function chatForStaff(staffId: string): Promise<string | null> {
 async function staffNameById(staffId: string): Promise<string> {
   const { data } = await db.from("staff").select("name").eq("id", staffId).maybeSingle()
   return (data?.name as string) ?? "—"
+}
+
+/** All assignees of a task (multi-assignee join table), earliest first. */
+async function assigneesFor(taskId: string): Promise<Array<{ id: string; name: string }>> {
+  const { data } = await db
+    .from("staff_task_assignees")
+    .select("staff_id, staff:staff(name)")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: true })
+  return ((data ?? []) as Array<{ staff_id: string; staff: { name?: string } | { name?: string }[] | null }>).map((r) => {
+    const s = Array.isArray(r.staff) ? r.staff[0] : r.staff
+    return { id: r.staff_id, name: s?.name ?? "—" }
+  })
+}
+
+/** Task ids the given staff member is assigned to. */
+async function taskIdsForStaff(staffId: string): Promise<string[]> {
+  const { data } = await db.from("staff_task_assignees").select("task_id").eq("staff_id", staffId)
+  return ((data ?? []) as Array<{ task_id: string }>).map((r) => r.task_id)
+}
+
+/** Add/remove one assignee (trigger keeps staff_tasks.assigned_to = primary). */
+async function setAssignee(taskId: string, staffId: string, on: boolean) {
+  if (on) {
+    await db.from("staff_task_assignees").upsert({ task_id: taskId, staff_id: staffId }, { onConflict: "task_id,staff_id" })
+  } else {
+    await db.from("staff_task_assignees").delete().eq("task_id", taskId).eq("staff_id", staffId)
+  }
+}
+
+/** Finalise a draft (form Create): flip to todo and DM every assignee. */
+async function finalizeTask(draftId: string, msgChatId: string, messageId: number, cbId: string) {
+  const assignees = await assigneesFor(draftId)
+  if (assignees.length === 0) {
+    await answerCallbackQuery(cbId, "Pick an assignee first · เลือกผู้รับผิดชอบ")
+    return
+  }
+  await db.from("staff_tasks").update({ status: "todo" }).eq("id", draftId)
+  const { data: t } = await db
+    .from("staff_tasks")
+    .select("id, title, title_th, description, due_time, category, priority, status")
+    .eq("id", draftId)
+    .maybeSingle()
+  const task = t as (FormattableTask & { id: string }) | null
+  if (!task) {
+    await answerCallbackQuery(cbId, "Task not found")
+    return
+  }
+  let firstDm: number | null = null
+  for (const a of assignees) {
+    const chat = await chatForStaff(a.id)
+    if (!chat) continue
+    const res = await sendMessage(chat, `🆕 ${formatTask(task)}`, taskKeyboard(task.id))
+    if (res.ok && res.messageId != null && firstDm === null) firstDm = res.messageId
+  }
+  if (firstDm != null) {
+    await db.from("staff_tasks").update({ dm_message_id: String(firstDm), reminder_sent_at: null }).eq("id", draftId)
+  }
+  await editMessageText(
+    msgChatId,
+    messageId,
+    `${formatTask(task)}\n✅ Assigned to ${assignees.map((a) => escapeHtml(a.name)).join(", ")}`,
+  )
+  await answerCallbackQuery(cbId, "✅ Created")
 }
 
 /** Flip a draft to a real assigned task and DM the assignee. */
@@ -871,7 +948,9 @@ async function newTaskForm(chatId: string) {
     await sendMessage(chatId, "⚠️ Could not start. Try again. · ลองใหม่")
     return
   }
-  await renderTaskForm(chatId, data.id as string)
+  const draftId = data.id as string
+  await setAssignee(draftId, staff.id, true) // creator is the default assignee
+  await renderTaskForm(chatId, draftId)
 }
 
 /** Render / re-render the task-creation form card. */
@@ -886,7 +965,8 @@ async function renderTaskForm(chatId: string, draftId: string, messageId?: numbe
     return
   }
   const t = data as { title: string | null; station: string; due_date: string | null; assigned_to: string | null }
-  const assignee = t.assigned_to ? await staffNameById(t.assigned_to) : "—"
+  const names = await assigneesFor(draftId)
+  const assignee = names.length ? names.map((n) => n.name).join(", ") : "—"
   const dateLabel = t.due_date === todayICT() ? "Today" : t.due_date === tomorrowICT() ? "Tomorrow" : (t.due_date ?? "—")
   const lines = [
     "➕ <b>New task · новая задача</b>",
@@ -911,6 +991,18 @@ async function renderTaskForm(chatId: string, draftId: string, messageId?: numbe
     const res = await sendMessage(chatId, lines.join("\n"), kb)
     if (res.messageId != null) await db.from("staff_tasks").update({ dm_message_id: String(res.messageId) }).eq("id", draftId)
   }
+}
+
+/** Multi-select assignee picker for the task form (tap to toggle ✅/☐). */
+async function assigneePicker(chatId: string, draftId: string, messageId: number) {
+  const roster = await activeStaffRoster()
+  const current = new Set((await assigneesFor(draftId)).map((a) => a.id))
+  const rows: InlineKeyboard = roster.map((s, i) => [{
+    text: `${current.has(s.id) ? "✅" : "☐"} ${s.name}`,
+    callback_data: `f:ast:${draftId}:${i}`,
+  }])
+  rows.push([{ text: "✔ Done · เสร็จ", callback_data: `f:back:${draftId}` }])
+  await editMessageText(chatId, messageId, "👤 <b>Assignees · ผู้รับผิดชอบ</b>\n<i>Tap to add / remove · กดเพื่อเลือก</i>", rows)
 }
 
 /** Handle a tap on a task-form field button (f:<action>:<draftId>[:arg]). */
@@ -954,23 +1046,18 @@ async function handleFormCallback(cbId: string, data: string, staff: StaffCtx, m
   }
   if (action === "as") {
     await answerCallbackQuery(cbId)
-    const roster = await activeStaffRoster()
-    const rows: InlineKeyboard = roster.map((s, i) => [{ text: s.name, callback_data: `f:ass:${draftId}:${i}` }])
-    rows.unshift([{ text: "👤 Me · ฉัน", callback_data: `f:ass:${draftId}:me` }])
-    rows.push([{ text: "🔙 Back", callback_data: `f:back:${draftId}` }])
-    await editMessageText(msgChatId, messageId, "👤 <b>Assignee · ผู้รับผิดชอบ</b>", rows)
+    await assigneePicker(msgChatId, draftId, messageId)
     return
   }
-  if (action === "ass") {
-    let aid: string | undefined
-    if (parts[3] === "me") aid = staff.id
-    else {
-      const roster = await activeStaffRoster()
-      aid = roster[Number.parseInt(parts[3] ?? "", 10)]?.id
+  if (action === "ast") {
+    const roster = await activeStaffRoster()
+    const sid = roster[Number.parseInt(parts[3] ?? "", 10)]?.id
+    if (sid) {
+      const current = new Set((await assigneesFor(draftId)).map((a) => a.id))
+      await setAssignee(draftId, sid, !current.has(sid))
     }
-    if (aid) await db.from("staff_tasks").update({ assigned_to: aid }).eq("id", draftId)
     await answerCallbackQuery(cbId)
-    await renderTaskForm(msgChatId, draftId, messageId)
+    await assigneePicker(msgChatId, draftId, messageId)
     return
   }
   if (action === "dt") {
@@ -1008,13 +1095,13 @@ async function handleFormCallback(cbId: string, data: string, staff: StaffCtx, m
     return
   }
   if (action === "create") {
-    const { data } = await db.from("staff_tasks").select("title, assigned_to").eq("id", draftId).maybeSingle()
+    const { data } = await db.from("staff_tasks").select("title").eq("id", draftId).maybeSingle()
     const title = (data?.title as string | undefined)?.trim()
     if (!title) {
       await answerCallbackQuery(cbId, "Set a title first · ตั้งชื่อก่อน")
       return
     }
-    await approveAndAssign(draftId, (data?.assigned_to as string) || staff.id, msgChatId, messageId, cbId)
+    await finalizeTask(draftId, msgChatId, messageId, cbId)
     return
   }
   if (action === "cancel") {

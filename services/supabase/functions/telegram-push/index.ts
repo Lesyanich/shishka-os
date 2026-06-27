@@ -62,22 +62,41 @@ async function chatForStaff(staffId: string): Promise<string | null> {
   return data ? (data.telegram_chat_id as string) : null
 }
 
+/** Every assignee of a task (multi-assignee join table; falls back to primary). */
+async function assigneeStaffIds(taskId: string, fallback: string | null): Promise<string[]> {
+  const { data } = await db.from("staff_task_assignees").select("staff_id").eq("task_id", taskId)
+  const ids = ((data ?? []) as Array<{ staff_id: string }>).map((r) => r.staff_id)
+  if (ids.length === 0 && fallback) ids.push(fallback)
+  return ids
+}
+/** Task ids a staff member is assigned to. */
+async function taskIdsForStaff(staffId: string): Promise<string[]> {
+  const { data } = await db.from("staff_task_assignees").select("task_id").eq("staff_id", staffId)
+  return ((data ?? []) as Array<{ task_id: string }>).map((r) => r.task_id)
+}
+
 async function actionAssign(taskId: string) {
   const { data: taskRow, error } = await db.from("staff_tasks").select(TASK_COLS).eq("id", taskId).maybeSingle()
   if (error || !taskRow) return json({ ok: false, error: "task_not_found" }, 404)
   const task = taskRow as Task
-  if (!task.assigned_to) return json({ ok: false, error: "task_unassigned" }, 400)
+  const staffIds = await assigneeStaffIds(taskId, task.assigned_to)
+  if (staffIds.length === 0) return json({ ok: false, error: "task_unassigned" }, 400)
 
-  const chatId = await chatForStaff(task.assigned_to)
-  if (!chatId) return json({ ok: false, error: "assignee_not_linked" }, 200)
-
-  const res = await sendMessage(chatId, `🆕 ${formatTask(task)}`, taskKeyboard(task.id))
-  if (res.ok && res.messageId != null) {
-    await db.from("staff_tasks")
-      .update({ dm_message_id: String(res.messageId), reminder_sent_at: null })
-      .eq("id", task.id)
+  let sent = 0
+  let firstMsg: number | null = null
+  for (const sid of staffIds) {
+    const chatId = await chatForStaff(sid)
+    if (!chatId) continue
+    const res = await sendMessage(chatId, `🆕 ${formatTask(task)}`, taskKeyboard(task.id))
+    if (res.ok) {
+      sent++
+      if (firstMsg === null && res.messageId != null) firstMsg = res.messageId
+    }
   }
-  return json({ ok: res.ok, message_id: res.messageId ?? null })
+  if (firstMsg != null) {
+    await db.from("staff_tasks").update({ dm_message_id: String(firstMsg), reminder_sent_at: null }).eq("id", task.id)
+  }
+  return json({ ok: sent > 0, sent })
 }
 
 async function actionMorning() {
@@ -87,16 +106,19 @@ async function actionMorning() {
   const perStaff: Array<{ staff_id: string; tasks: number }> = []
 
   for (const link of (links ?? []) as Array<{ staff_id: string; telegram_chat_id: string }>) {
-    const { data } = await db
-      .from("staff_tasks")
-      .select(TASK_COLS)
-      .eq("assigned_to", link.staff_id)
-      .eq("due_date", today)
-      .eq("is_template", false)
-      .in("status", ["todo", "in_progress"])
-      .order("due_time", { ascending: true, nullsFirst: true })
-
-    const tasks = (data ?? []) as Task[]
+    const ids = await taskIdsForStaff(link.staff_id)
+    let tasks: Task[] = []
+    if (ids.length > 0) {
+      const { data } = await db
+        .from("staff_tasks")
+        .select(TASK_COLS)
+        .in("id", ids)
+        .eq("due_date", today)
+        .eq("is_template", false)
+        .in("status", ["todo", "in_progress"])
+        .order("due_time", { ascending: true, nullsFirst: true })
+      tasks = (data ?? []) as Task[]
+    }
     perStaff.push({ staff_id: link.staff_id, tasks: tasks.length })
     if (tasks.length === 0) continue
 
@@ -152,13 +174,17 @@ async function actionReminders() {
     if (dueMin == null) continue
     if (now < dueMin - (t.reminder_offset_min ?? 30)) continue // not yet within window
 
-    const chatId = await chatForStaff(t.assigned_to as string)
-    if (!chatId) continue
-
     const overdue = now > dueMin
     const head = overdue ? "🔴 Overdue · เกินกำหนด" : "⏰ Reminder · เตือน"
-    const res = await sendMessage(chatId, `${head}\n${formatTask(t)}`, taskKeyboard(t.id))
-    if (res.ok) {
+    const staffIds = await assigneeStaffIds(t.id, t.assigned_to as string)
+    let any = false
+    for (const sid of staffIds) {
+      const chatId = await chatForStaff(sid)
+      if (!chatId) continue
+      const res = await sendMessage(chatId, `${head}\n${formatTask(t)}`, taskKeyboard(t.id))
+      if (res.ok) any = true
+    }
+    if (any) {
       await db.from("staff_tasks").update({ reminder_sent_at: new Date().toISOString() }).eq("id", t.id)
       sent++
     }
