@@ -8,18 +8,28 @@ import { PODetail } from '../components/procurement/PODetail'
 import { ReconciliationPanel } from '../components/procurement/ReconciliationPanel'
 import { StockRequestsPanel, type PrefillLine } from '../components/procurement/StockRequestsPanel'
 import { StockSheetCuration } from '../components/procurement/StockSheetCuration'
+import { PriceBook } from '../components/procurement/PriceBook'
+import { ShelfLifeEditor } from '../components/procurement/ShelfLifeEditor'
 import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
 import { useTabParam } from '../hooks/useTabParam'
 import type { PurchaseOrder } from '../types/procurement'
 
-type Tab = 'purchases' | 'orders' | 'requests' | 'items'
+const TABS = ['orders', 'suppliers', 'pricebook', 'shelf', 'requests', 'items', 'purchases'] as const
+type Tab = (typeof TABS)[number]
 type Screen = 'list' | 'detail' | 'reconcile'
 
+const TAB_LABELS: Record<Tab, string> = {
+  orders: 'Purchase Orders',
+  suppliers: 'Suppliers',
+  pricebook: 'Price Book',
+  shelf: 'Shelf Life',
+  requests: 'Stock Requests',
+  items: 'Sheet Items',
+  purchases: 'Quick Purchase',
+}
+
 export function Procurement() {
-  const [activeTab, setActiveTab] = useTabParam(
-    ['purchases', 'orders', 'requests', 'items'] as const,
-    'orders',
-  )
+  const [activeTab, setActiveTab] = useTabParam(TABS, 'orders')
   const [refreshKey, setRefreshKey] = useState(0)
   const [screen, setScreen] = useState<Screen>('list')
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null)
@@ -67,30 +77,25 @@ export function Procurement() {
       <div>
         <h1 className="text-xl font-bold text-slate-100">Procurement</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Manage purchase orders, log purchases, and track suppliers.
+          Suppliers, price comparison, shelf life, purchase orders &amp; stock — in one place.
         </p>
       </div>
 
       {/* Tab switcher — hidden during detail/reconcile views */}
       {screen === 'list' && (
-        <div className="flex gap-1 rounded-xl bg-slate-800/60 p-1">
-          {([
-            { key: 'orders' as Tab, label: 'Purchase Orders' },
-            { key: 'requests' as Tab, label: 'Stock Requests' },
-            { key: 'items' as Tab, label: 'Sheet Items' },
-            { key: 'purchases' as Tab, label: 'Quick Purchase' },
-          ]).map(({ key, label }) => (
+        <div className="flex flex-wrap gap-1 rounded-xl bg-slate-800/60 p-1">
+          {TABS.map((key) => (
             <button
               key={key}
               onClick={() => { setActiveTab(key); setSelectedPO(null) }}
               className={[
-                'flex-1 rounded-lg py-2.5 text-xs font-semibold transition',
+                'rounded-lg px-3 py-2 text-xs font-semibold transition',
                 activeTab === key
                   ? 'bg-slate-700 text-slate-100 shadow-sm'
                   : 'text-slate-500 hover:text-slate-300',
               ].join(' ')}
             >
-              {label}
+              {TAB_LABELS[key]}
             </button>
           ))}
         </div>
@@ -99,16 +104,13 @@ export function Procurement() {
       {/* === Purchase Orders Tab — List === */}
       {activeTab === 'orders' && screen === 'list' && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)]">
-          <div className="space-y-6">
-            <PurchaseOrderForm
-              createPO={createPO}
-              isCreating={isCreating}
-              onCreated={handlePOCreated}
-              initialLines={poPrefill?.lines}
-              initialNotes={poPrefill?.notes}
-            />
-            <SupplierManager />
-          </div>
+          <PurchaseOrderForm
+            createPO={createPO}
+            isCreating={isCreating}
+            onCreated={handlePOCreated}
+            initialLines={poPrefill?.lines}
+            initialNotes={poPrefill?.notes}
+          />
           <POHistory
             orders={orders}
             isLoading={isLoading}
@@ -139,6 +141,15 @@ export function Procurement() {
         />
       )}
 
+      {/* === Suppliers Tab === */}
+      {activeTab === 'suppliers' && screen === 'list' && <SupplierManager />}
+
+      {/* === Price Book Tab === */}
+      {activeTab === 'pricebook' && screen === 'list' && <PriceBook />}
+
+      {/* === Shelf Life Tab === */}
+      {activeTab === 'shelf' && screen === 'list' && <ShelfLifeEditor />}
+
       {/* === Stock Requests Tab === */}
       {activeTab === 'requests' && screen === 'list' && (
         <div className="mx-auto max-w-2xl">
@@ -156,12 +167,9 @@ export function Procurement() {
       {/* === Quick Purchase Tab (legacy) === */}
       {activeTab === 'purchases' && screen === 'list' && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)]">
-          <div className="space-y-6">
-            <PurchaseForm
-              onPurchaseCreated={() => setRefreshKey((k) => k + 1)}
-            />
-            <SupplierManager />
-          </div>
+          <PurchaseForm
+            onPurchaseCreated={() => setRefreshKey((k) => k + 1)}
+          />
           <PurchaseHistory refreshKey={refreshKey} />
         </div>
       )}
