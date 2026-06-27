@@ -289,8 +289,17 @@ async function handleToday(chatId: string, editMessageId?: number, mode: ListMod
   else await sendMessage(chatId, lines.join("\n"), keyboard)
 }
 
+/** Decode a back-token ("m" = my tasks, "t.<fKey>.<page>" = team list). */
+function decodeBack(token: string): string {
+  if (token?.startsWith("t.")) {
+    const [, fKey, page] = token.split(".")
+    return `t:team:${fKey || "all"}:${page || "0"}`
+  }
+  return "t:mine"
+}
+
 /** Drill-in: full task card with description, comment, photo count + actions. */
-async function renderTaskDetail(chatId: string, taskId: string, messageId: number) {
+async function renderTaskDetail(chatId: string, taskId: string, messageId: number, back = "m") {
   const { data } = await db
     .from("staff_tasks")
     .select("id, title, title_th, description, comment, photo_urls, station, status, due_time, priority, assigned_to")
@@ -327,14 +336,14 @@ async function renderTaskDetail(chatId: string, taskId: string, messageId: numbe
 
   const kb: InlineKeyboard = [
     [
-      { text: t.status === "done" ? "↩ Undo · เลิก" : "✅ Done · เสร็จ", callback_data: `td:done:${taskId}` },
-      { text: "💬 Comment · ความเห็น", callback_data: `td:cm:${taskId}` },
+      { text: t.status === "done" ? "↩ Undo · เลิก" : "✅ Done · เสร็จ", callback_data: `td:done:${taskId}:${back}` },
+      { text: "💬 Comment · ความเห็น", callback_data: `td:cm:${taskId}:${back}` },
     ],
     [
-      { text: "📷 Photo · รูป", callback_data: `td:ph:${taskId}` },
-      ...(photos.length ? [{ text: `🖼 View (${photos.length})`, callback_data: `td:pics:${taskId}` }] : []),
+      { text: "📷 Photo · รูป", callback_data: `td:ph:${taskId}:${back}` },
+      ...(photos.length ? [{ text: `🖼 View (${photos.length})`, callback_data: `td:pics:${taskId}:${back}` }] : []),
     ],
-    [{ text: "🔙 Back · กลับ", callback_data: "t:mine" }],
+    [{ text: "🔙 Back · กลับ", callback_data: decodeBack(back) }],
   ]
   await editMessageText(chatId, messageId, lines.join("\n"), kb)
 }
@@ -433,7 +442,7 @@ async function handleTeam(
   page: number,
   fKey = "all",
   editMessageId?: number,
-  mark = false,
+  mode: ListMode = "browse",
 ) {
   const staff = await staffForChat(chatId)
   if (!staff) {
@@ -487,16 +496,20 @@ async function handleTeam(
     })
   }
 
-  // Filters on TOP; then either a single "Mark done" button (browse) or the
-  // per-task toggle buttons + Done exit (mark mode); then paging.
+  // Filters on TOP; then mark/open per-task buttons or the browse action row.
   const kb: InlineKeyboard = [teamFilterRow(fKey)]
-  if (total > 0 && mark) {
+  if (total > 0 && mode === "mark") {
     lines.push("\n<i>Tap a number to mark done — tap again to undo · กดเลขเพื่อสลับ</i>")
     const btns = slice.map((t, i) => ({ text: `${statusBox(t.status)} ${i + 1}`, callback_data: `tgt:${t.id}:${fKey}:${p}` }))
     kb.push(...chunk(btns, 5), [{ text: "✔ Done · เสร็จ", callback_data: `t:team:${fKey}:${p}` }])
+  } else if (total > 0 && mode === "open") {
+    lines.push("\n<i>Tap a number to open the task · กดเลขเพื่อเปิดงาน</i>")
+    const btns = slice.map((t, i) => ({ text: `${i + 1}`, callback_data: `opt:${t.id}:${fKey}:${p}` }))
+    kb.push(...chunk(btns, 5), [{ text: "🔙 Back · กลับ", callback_data: `t:team:${fKey}:${p}` }])
   } else if (total > 0) {
     kb.push([
-      { text: "✅ Mark done · ทำเครื่องหมาย", callback_data: `mkt:${fKey}:${p}` },
+      { text: "✅ Mark · ทำ", callback_data: `mkt:${fKey}:${p}` },
+      { text: "📂 Open · เปิด", callback_data: `opt0:${fKey}:${p}` },
       { text: "➕ New · новая", callback_data: "f:new" },
     ])
   } else {
@@ -1048,15 +1061,23 @@ async function handleCallback(cq: Record<string, unknown>) {
     await handleToday(msgChatId, messageId, "open")
     return
   }
+  if (data.startsWith("opt:")) {
+    // team drill-in: opt:<taskId>:<fKey>:<page>
+    const parts = data.split(":")
+    await answerCallbackQuery(id)
+    await renderTaskDetail(msgChatId, parts[1], messageId, `t.${parts[2] ?? "all"}.${parts[3] ?? "0"}`)
+    return
+  }
   if (data.startsWith("op:")) {
     await answerCallbackQuery(id)
-    await renderTaskDetail(msgChatId, data.slice(3), messageId)
+    await renderTaskDetail(msgChatId, data.slice(3), messageId, "m")
     return
   }
   if (data.startsWith("td:")) {
-    const parts = data.split(":") // [td, action, taskId]
+    const parts = data.split(":") // [td, action, taskId, back]
     const tdAction = parts[1]
     const tid = parts[2]
+    const back = parts[3] ?? "m"
     if (!tid) {
       await answerCallbackQuery(id, "Unknown action")
       return
@@ -1064,7 +1085,7 @@ async function handleCallback(cq: Record<string, unknown>) {
     if (tdAction === "done") {
       await toggleDone(tid)
       await answerCallbackQuery(id)
-      await renderTaskDetail(msgChatId, tid, messageId)
+      await renderTaskDetail(msgChatId, tid, messageId, back)
     } else if (tdAction === "cm") {
       await answerCallbackQuery(id)
       await sendForceReply(msgChatId, `${COMMENT_PROMPT}\n(task:${tid})`)
@@ -1124,12 +1145,12 @@ async function handleCallback(cq: Record<string, unknown>) {
     await handleToday(msgChatId, messageId, "mark")
     return
   }
-  if (data.startsWith("mkt:")) {
-    const parts = data.split(":") // [mkt, fKey, page]
+  if (data.startsWith("mkt:") || data.startsWith("opt0:")) {
+    const parts = data.split(":") // [mkt|opt0, fKey, page]
     const fKey = parts[1] ?? "all"
     const page = parts[2] != null ? Math.max(0, parseInt(parts[2], 10) || 0) : 0
     await answerCallbackQuery(id)
-    await handleTeam(msgChatId, teamFilterFromKey(fKey), page, fKey, messageId, true)
+    await handleTeam(msgChatId, teamFilterFromKey(fKey), page, fKey, messageId, data.startsWith("opt0:") ? "open" : "mark")
     return
   }
   if (data.startsWith("tgt:")) {
@@ -1138,7 +1159,7 @@ async function handleCallback(cq: Record<string, unknown>) {
     await answerCallbackQuery(id)
     const fKey = parts[2] ?? "all"
     const page = parts[3] != null ? Math.max(0, parseInt(parts[3], 10) || 0) : 0
-    await handleTeam(msgChatId, teamFilterFromKey(fKey), page, fKey, messageId, true)
+    await handleTeam(msgChatId, teamFilterFromKey(fKey), page, fKey, messageId, "mark")
     return
   }
 
