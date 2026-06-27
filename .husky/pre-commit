@@ -8,10 +8,16 @@
 echo "=== Shishka OS pre-commit checks ==="
 
 # --- 1. TypeScript strict check (admin-panel) ---
+# Use `tsc -b` (project-reference build mode) to MATCH the Vercel deploy build
+# (`npm run build` = tsc -b && vite build). Plain `tsc --noEmit` is weaker and
+# misses errors tsc -b catches (e.g. implicit index signatures, view-row casts)
+# — which then break the deploy. Clear stale tsbuildinfo so the check is full,
+# not incrementally skipped. tsconfig.app.json has noEmit:true → no JS emitted.
 if git diff --cached --name-only | grep -q "^apps/admin-panel/"; then
-  echo "[tsc] Checking admin-panel types..."
+  echo "[tsc] Checking admin-panel types (tsc -b, matches Vercel build)..."
   cd apps/admin-panel
-  npx tsc --noEmit
+  rm -rf tsconfig.tsbuildinfo tsconfig.app.tsbuildinfo tsconfig.node.tsbuildinfo
+  npx tsc -b
   TSC_EXIT=$?
   cd ../..
   if [ $TSC_EXIT -ne 0 ]; then
