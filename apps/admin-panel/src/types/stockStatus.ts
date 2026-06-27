@@ -31,8 +31,10 @@ export interface StockStatusRow {
   stock_status: StockStatusValue
 }
 
-/** Patch shape for inline par editing (par columns only — never cost). */
-export interface StockParPatch {
+/** Patch shape for inline par editing (par columns only — never cost).
+ * A `type` (not `interface`) so it carries an implicit index signature and
+ * stays assignable to useInlineUpdate's `UpdatePatch` constraint. */
+export type StockParPatch = {
   min_stock?: number | null
   par_stock?: number | null
   reorder_qty?: number | null

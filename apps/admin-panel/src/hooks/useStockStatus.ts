@@ -98,7 +98,9 @@ export function useStockStatus(): UseStockStatusResult {
       setIsLoading(false)
       return
     }
-    setRows((data ?? []).map((r) => normalizeStockRow(r as RawRow)).sort(compareStockRows))
+    // v_stock_status isn't in the generated DB types, so supabase-js widens the
+    // row to an error-ish type — cast through unknown.
+    setRows((data ?? []).map((r) => normalizeStockRow(r as unknown as RawRow)).sort(compareStockRows))
     setIsLoading(false)
   }, [])
 
