@@ -184,7 +184,7 @@ export function renderPrepLabelCanvas(
   const PAD = 18 * s
   // Fixed left margin (does NOT scale with the label) to clear the printer's
   // physical left dead-zone, which was clipping the left edge on real prints.
-  const LPAD = Math.max(PAD, 30)
+  const LPAD = Math.max(PAD, 44)
 
   // Thermal printing is black-on-white. Fill the whole canvas (incl. gap) white.
   ctx.fillStyle = '#ffffff'
@@ -218,7 +218,7 @@ export function renderPrepLabelCanvas(
   // ── Divider ──
   ctx.fillRect(LPAD, 130 * s, wPx - PAD - LPAD, Math.max(2, 3 * s))
 
-  const VALX = LPAD + 160 * s // x where each row's value starts
+  const VALX = LPAD + 124 * s // x where each row's value starts
   let row = 144 * s
   const F = (n: number) => Math.round(n * s) // scaled font size
 
@@ -277,7 +277,7 @@ function drawSaleLabel(
   // margin must NOT scale with the label — a scaled 18·s was clipping the left
   // edge on real prints. Left-anchored content starts at LPAD; right-anchored
   // content (price, QR) stays at PAD.
-  const LPAD = Math.max(PAD, 30)
+  const LPAD = Math.max(PAD, 44)
   const F = (n: number) => Math.round(n * s)
   const maxW = wPx - PAD - LPAD
 
@@ -363,7 +363,7 @@ function drawSaleLabel(
   if (data.nutrition) {
     const portionG =
       data.nutritionPortionG && data.nutritionPortionG > 0 ? data.nutritionPortionG : null
-    drawNutritionTable(ctx, LPAD, tableTop, s, data.nutrition, portionG)
+    drawNutritionTable(ctx, LPAD, tableTop, contentRight, s, data.nutrition, portionG)
   }
 
   // ── Footer: PREP, USE BY (emphasized), batch code — kept compact ──
@@ -392,6 +392,7 @@ function drawNutritionTable(
   ctx: CanvasRenderingContext2D,
   x: number,
   yTop: number,
+  maxRight: number,
   s: number,
   n: LabelNutrition,
   portionG: number | null,
@@ -405,11 +406,20 @@ function drawNutritionTable(
   const rowH = F(16) + 6 * s
 
   // Columns sit just right of the label text — close to the КБЖУ names, not
-  // pushed out toward the QR. Numbers are right-aligned in each column.
+  // pushed out toward the QR. Numbers are right-aligned in each column. If the
+  // table would run into the QR (`maxRight`), shrink the number columns to fit.
   ctx.font = `500 ${F(16)}px sans-serif`
-  const labelW = ctx.measureText('Energy, kcal').width + F(18)
-  const numW = F(54)
-  const colGap = F(18)
+  const labelW = ctx.measureText('Energy, kcal').width + F(14)
+  const cols = portionG ? 2 : 1
+  let numW = F(52)
+  let colGap = F(16)
+  const avail = maxRight - x - labelW
+  const need = cols * numW + (cols - 1) * colGap
+  if (need > avail && avail > 0) {
+    const k = Math.max(0.62, avail / need)
+    numW = Math.round(numW * k)
+    colGap = Math.round(colGap * k)
+  }
   const hundRight = x + labelW + numW
   const portRight = portionG ? hundRight + colGap + numW : x + labelW + numW
   const tableW = portRight - x
