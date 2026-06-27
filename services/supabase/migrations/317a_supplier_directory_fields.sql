@@ -37,9 +37,12 @@ COMMENT ON COLUMN public.suppliers.payment_terms IS
 COMMENT ON COLUMN public.suppliers.contact_info IS
   'LEGACY freetext contact blob; preserved for OCR / receipt back-compat. Prefer the structured contact_person/phone/delivery fields.';
 
+-- Renumbered 317 -> 317a (2026-06-27) to deconflict the 317 collision with
+-- 317_staff_task_multi_assignee.sql (both applied same day). See migration 322
+-- for the migration_log.filename UPDATE. Precedent: RENUMBERING-2026-06-11.md.
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '317_supplier_directory_fields.sql',
+  '317a_supplier_directory_fields.sql',
   'claude-code',
   NULL,
   'Widen suppliers with structured contact/delivery fields (contact_person, phone, delivery_days[], delivery_window, lead_time_days, min_order_thb, payment_terms, notes) for the procurement Supplier Directory; contact_info preserved for OCR'

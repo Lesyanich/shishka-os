@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { ShoppingCart, CheckCircle2, Wallet, Sparkles, RefreshCw } from 'lucide-react'
-import { useShoppingList } from '../hooks/useShoppingList'
+import { ShoppingCart, CheckCircle2, Wallet, Sparkles, RefreshCw, PackageX, Truck } from 'lucide-react'
+import { useShoppingList, type POGroupingResult } from '../hooks/useShoppingList'
+import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
 import { AddItemRow } from '../components/shopping-list/AddItemRow'
 import { ShoppingListTable } from '../components/shopping-list/ShoppingListTable'
+import { ShoppingListPOPreview } from '../components/procurement/ShoppingListPOPreview'
+import { toCreatePOPayload } from '../lib/reorderGrouping'
 import type { ShoppingStatus } from '../types/shopping'
 
 function StatCard({
@@ -44,10 +47,16 @@ export function ShoppingList() {
     updateItem,
     removeItem,
     seedFromMenu,
+    seedFromLowStock,
     isSeeding,
+    buildPOGroups,
+    markOrdered,
   } = useShoppingList()
+  const { createPO } = usePurchaseOrders()
 
   const [seedMsg, setSeedMsg] = useState<string | null>(null)
+  const [poPreview, setPoPreview] = useState<POGroupingResult | null>(null)
+  const [isCreatingPOs, setIsCreatingPOs] = useState(false)
 
   const needed = items.filter((i) => i.status === 'needed')
   const bought = items.filter((i) => i.status === 'bought')
@@ -70,6 +79,52 @@ export function ShoppingList() {
     )
   }
 
+  const handleSeedLow = async () => {
+    setSeedMsg(null)
+    const res = await seedFromLowStock('makro')
+    if (!res.ok) {
+      setSeedMsg(`Ошибка: ${res.error ?? 'не удалось'}`)
+      return
+    }
+    setSeedMsg(
+      res.inserted && res.inserted > 0
+        ? `Добавлено ${res.inserted} позиций ниже par.`
+        : 'Ничего ниже par — запас в норме.',
+    )
+  }
+
+  const handleOpenPOs = async () => {
+    setSeedMsg(null)
+    const groups = await buildPOGroups()
+    setPoPreview(groups)
+  }
+
+  const handleConfirmPOs = async () => {
+    if (!poPreview) return
+    setIsCreatingPOs(true)
+    const created: string[] = []
+    const orderedNomIds: string[] = []
+    for (const group of poPreview.groups) {
+      const res = await createPO(toCreatePOPayload(group, { notes: 'From shopping list' }))
+      if (res.ok) {
+        if (res.po_number) created.push(res.po_number)
+        for (const l of group.lines) orderedNomIds.push(l.nomenclature_id)
+      }
+    }
+    // Mark every needed line whose product was ordered.
+    const orderedItemIds = needed
+      .filter((i) => i.nomenclature_id && orderedNomIds.includes(i.nomenclature_id))
+      .map((i) => i.id)
+    await markOrdered(orderedItemIds)
+    setIsCreatingPOs(false)
+    setPoPreview(null)
+    setSeedMsg(
+      created.length > 0
+        ? `Создано ${created.length} черновиков PO: ${created.join(', ')}.`
+        : 'Не удалось создать PO — проверьте поставщиков.',
+    )
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
@@ -79,14 +134,32 @@ export function ShoppingList() {
             Список закупок по магазинам · ссылки на товар · отмечай купленное
           </p>
         </div>
-        <button
-          onClick={handleSeed}
-          disabled={isSeeding}
-          className="flex shrink-0 items-center gap-1.5 rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
-        >
-          {isSeeding ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-amber-400" />}
-          Seed from menu
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <button
+            onClick={handleSeed}
+            disabled={isSeeding}
+            className="flex items-center gap-1.5 rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+          >
+            {isSeeding ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-amber-400" />}
+            Seed from menu
+          </button>
+          <button
+            onClick={handleSeedLow}
+            disabled={isSeeding}
+            className="flex items-center gap-1.5 rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+          >
+            <PackageX className="h-3.5 w-3.5 text-rose-400" />
+            Seed from low stock
+          </button>
+          <button
+            onClick={handleOpenPOs}
+            disabled={needed.length === 0}
+            className="flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40"
+          >
+            <Truck className="h-3.5 w-3.5" />
+            Create POs
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -131,6 +204,15 @@ export function ShoppingList() {
         <p className="text-sm text-slate-500">Загрузка…</p>
       ) : (
         <ShoppingListTable items={visible} onUpdate={updateItem} onRemove={removeItem} />
+      )}
+
+      {poPreview && (
+        <ShoppingListPOPreview
+          result={poPreview}
+          isBusy={isCreatingPOs}
+          onConfirm={handleConfirmPOs}
+          onClose={() => setPoPreview(null)}
+        />
       )}
     </div>
   )

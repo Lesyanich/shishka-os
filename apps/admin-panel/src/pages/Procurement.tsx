@@ -10,11 +10,12 @@ import { StockRequestsPanel, type PrefillLine } from '../components/procurement/
 import { StockSheetCuration } from '../components/procurement/StockSheetCuration'
 import { PriceBook } from '../components/procurement/PriceBook'
 import { ShelfLifeEditor } from '../components/procurement/ShelfLifeEditor'
+import { StockPanel } from '../components/procurement/StockPanel'
 import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
 import { useTabParam } from '../hooks/useTabParam'
 import type { PurchaseOrder } from '../types/procurement'
 
-const TABS = ['orders', 'suppliers', 'pricebook', 'shelf', 'requests', 'items', 'purchases'] as const
+const TABS = ['orders', 'suppliers', 'pricebook', 'shelf', 'stock', 'requests', 'items', 'purchases'] as const
 type Tab = (typeof TABS)[number]
 type Screen = 'list' | 'detail' | 'reconcile'
 
@@ -23,6 +24,7 @@ const TAB_LABELS: Record<Tab, string> = {
   suppliers: 'Suppliers',
   pricebook: 'Price Book',
   shelf: 'Shelf Life',
+  stock: 'Stock',
   requests: 'Stock Requests',
   items: 'Sheet Items',
   purchases: 'Quick Purchase',
@@ -149,6 +151,9 @@ export function Procurement() {
 
       {/* === Shelf Life Tab === */}
       {activeTab === 'shelf' && screen === 'list' && <ShelfLifeEditor />}
+
+      {/* === Stock & Reorder Tab === */}
+      {activeTab === 'stock' && screen === 'list' && <StockPanel onAddToPO={handleAddToPO} />}
 
       {/* === Stock Requests Tab === */}
       {activeTab === 'requests' && screen === 'list' && (
