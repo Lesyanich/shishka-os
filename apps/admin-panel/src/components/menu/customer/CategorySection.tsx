@@ -98,7 +98,7 @@ export function CategorySection({
       {/* Sticky tab strip */}
       <nav
         aria-label="Menu categories"
-        className="sticky z-10 -mx-2 flex gap-1 overflow-x-auto border-b border-slate-800/70 bg-[var(--color-surface-1)]/90 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-[var(--color-surface-1)]/70"
+        className="sticky z-10 -mx-2 flex gap-1 overflow-x-auto border-b border-[var(--line)] bg-[var(--color-surface-1)]/90 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-[var(--color-surface-1)]/70"
         style={{ top: stickyTopPx }}
       >
         {visibleCategories.map((cat) => {
@@ -139,11 +139,12 @@ export function CategorySection({
             >
               <h2
                 id={`cat-heading-${cat.id}`}
-                className="mb-4 italic text-[color:var(--color-cream)]"
+                className="mb-4 text-[color:var(--color-cream)]"
                 style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: 'clamp(1.35rem, 3vw, 1.75rem)',
-                  fontWeight: 500,
+                  fontWeight: 700,
+                  letterSpacing: '-0.015em',
                 }}
               >
                 {cat.name}
@@ -166,11 +167,12 @@ export function CategorySection({
             className="scroll-mt-24"
           >
             <h2
-              className="mb-4 italic text-[color:var(--color-cream)]/80"
+              className="mb-4 text-[color:var(--color-cream)]/80"
               style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: 'clamp(1.35rem, 3vw, 1.75rem)',
-                fontWeight: 500,
+                fontWeight: 700,
+                letterSpacing: '-0.015em',
               }}
             >
               More

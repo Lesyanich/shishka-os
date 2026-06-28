@@ -44,7 +44,7 @@ export function DishCard({ dish }: DishCardProps) {
         )}
         {dish.price != null && (
           <span className="absolute right-2 top-2 flex flex-col items-end rounded-lg bg-surface-1/80 px-2.5 py-1 text-right backdrop-blur">
-            <span className="text-xs font-bold text-forest-soft">
+            <span className="text-xs font-bold text-honey-300">
               {'\u0E3F'}{dish.price.toLocaleString()}
             </span>
             {per100 && (

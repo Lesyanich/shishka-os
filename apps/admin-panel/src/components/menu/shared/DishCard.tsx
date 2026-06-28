@@ -75,7 +75,7 @@ export function DishCard({
     <Wrapper
       {...wrapperProps}
       aria-disabled={unavailable || undefined}
-      className={`group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-[var(--color-surface-2)] text-left transition hover:border-slate-700 hover:bg-[var(--color-surface-3)] ${interactive ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60' : ''} ${unavailable ? 'opacity-60 saturate-50' : ''}`}
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--color-surface-2)] text-left transition duration-200 hover:border-[var(--line-strong)] hover:bg-[var(--color-surface-3)] ${interactive ? 'cursor-pointer hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-forest-soft)]/60' : ''} ${unavailable ? 'opacity-60 saturate-50' : ''}`}
     >
       <DishPhotoSlot imageUrl={dish.imageUrl} dishName={dish.name} aspect="photo" />
 
@@ -86,7 +86,7 @@ export function DishCard({
       )}
 
       {dish.isFeatured && (
-        <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+        <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-honey-300/15 px-2 py-0.5 text-[10px] font-semibold text-honey-300 ring-1 ring-inset ring-honey-300/30">
           <Star className="h-3 w-3" />
           Featured
         </span>

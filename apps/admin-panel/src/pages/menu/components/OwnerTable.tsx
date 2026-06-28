@@ -526,13 +526,13 @@ export function OwnerTable({
       }}
       aria-label="Menu items"
       aria-rowcount={orderedRowIds.length}
-      className="overflow-x-auto rounded-lg border border-surface-3 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-brick-soft)]/40"
+      className="shk-panel overflow-x-auto focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-brick-soft)]/40"
     >
       <table className="w-full text-xs" role="presentation">
         <thead>
           <tr
             role="row"
-            className="border-b border-surface-3 bg-surface-1/50 text-left text-[10px] uppercase tracking-wider text-cream/50"
+            className="border-b border-[var(--line)] bg-white/[0.02] text-left text-[10px] font-bold uppercase tracking-[0.13em] text-cream/45"
           >
             <th role="columnheader" className="px-2 py-2.5" style={{ width: 28 }}></th>
             <th role="columnheader" className="px-2 py-2.5" style={{ width: 28 }}></th>
@@ -773,7 +773,7 @@ export function OwnerTable({
                     step={1}
                     align="right"
                     ariaLabel={`Edit price for ${dish.name}`}
-                    className="font-mono font-medium tabular-nums text-[color:var(--color-cream)]"
+                    className="font-mono font-medium tabular-nums text-honey-300"
                     format={(v) => (v == null ? '-' : formatThb(v))}
                     isFailed={rowFailed}
                   />

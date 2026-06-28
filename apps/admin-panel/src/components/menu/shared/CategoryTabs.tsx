@@ -34,9 +34,11 @@ export function CategoryTabs({
   if (categories.length === 0) return null
 
   const baseCls =
-    'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition'
-  const activeCls = 'bg-emerald-500/15 text-emerald-300'
-  const idleCls = 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+    'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ring-1 ring-inset'
+  const activeCls =
+    'bg-[var(--color-royal-green)]/25 text-[color:var(--color-forest-soft)] ring-[var(--color-forest-soft)]/40'
+  const idleCls =
+    'text-cream/55 ring-transparent hover:bg-surface-3 hover:text-cream/85'
   const countCls = 'ml-1.5 font-mono text-[10px] tabular-nums opacity-60'
 
   const allCount = readCount(counts, null)

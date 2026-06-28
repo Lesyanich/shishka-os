@@ -17,7 +17,7 @@ export function HeroHeader({
 }: HeroHeaderProps) {
   return (
     <header
-      className="relative overflow-hidden rounded-2xl border border-slate-800 bg-[var(--color-surface-2)]"
+      className="relative overflow-hidden rounded-2xl border border-[var(--line-strong)] bg-[var(--color-surface-2)]"
       role="banner"
     >
       {heroImageUrl ? (
@@ -38,19 +38,20 @@ export function HeroHeader({
       <div className="relative flex flex-col gap-3 px-6 py-10 sm:px-10 sm:py-14">
         {kicker && (
           <span
-            className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-cream)]/60"
-            style={{ fontFamily: 'var(--font-display-sc)' }}
+            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-honey-300"
+            style={{ fontFamily: 'var(--font-display)' }}
           >
             {kicker}
           </span>
         )}
         <h1
-          className="italic text-[color:var(--color-cream)]"
+          className="text-[color:var(--color-cream)]"
           style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'clamp(2rem, 6vw, 3.75rem)',
-            lineHeight: 1.05,
-            fontWeight: 500,
+            lineHeight: 1.02,
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
           }}
         >
           {title}

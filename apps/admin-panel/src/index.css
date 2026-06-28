@@ -1,17 +1,36 @@
 @import "tailwindcss";
 
+/* Brand typeface — SF Pro renders natively on Apple; Albert Sans (CDN) is the
+ * documented metrics-compatible fallback everywhere else (see shishka-health
+ * design-system/tokens/fonts.css). */
+@import url('https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,300..800;1,400..600&display=swap');
+
 /* ═══════════ Menu Page Design Tokens (Expand+Drawer PM mode) ═══════════
- * Palette extracted from Shishka logo (.ai). Typography pairs Alegreya
- * (editorial serif) with Geist (utilitarian sans) and JetBrains Mono
- * (numerics). Food-cost thresholds drive badge color in the owner table.
+ * Brand-bearing tokens converged onto the shishka.health design system
+ * (accent-red, gold prices, cream, SF Pro/Albert Sans) — see RULE-DESIGN-SYSTEM
+ * + gotcha_design_royal_theme_trap. Dense near-black surfaces, food-cost
+ * thresholds and the nutrition palette are kept INTENTIONALLY: the admin is a
+ * data tool, not the marketing site.
+ *
+ * A11Y NOTE — canon contrasts are verified against royal-green #1E3903; the
+ * admin base is the DARKER near-black #0A0D08, so every brand color is
+ * re-verified against #0A0D08 here:
+ *   • cream #FBF8F0 .................... 18.2:1  ✓ (AAA)
+ *   • gold price honey-300 #F0CE83 .... 12.9:1  ✓ (AAA)
+ *   • accent-red #B62A23 AS TEXT ...... 3.1:1   ✗  → tint/background ONLY
+ *     red text uses --brick-bright #E27A7F (6.8:1 ✓), never the raw accent.
  * Reusable on future customer site — see src/components/menu/shared/. */
 @theme {
   /* Brand */
   --color-royal-green: #2D3F1C;
-  --color-royal-red: #9B1C21;
+  --color-royal-red: #B62A23;      /* brand red-600 accent (tint/bg only) */
   --color-forest-soft: #5B7A3D;
   --color-brick-soft: #C74A4F;
   --color-amber-watch: #B88830;
+  --color-honey-300: #F0CE83;      /* brand gold — menu prices */
+  --color-honey-600: #C8901F;      /* gold hairline / deep accent */
+  --color-royal-soft: #2C4D0C;     /* raised royal-green (toggles, active seg) */
+  --color-mint-200: #CCDAAE;       /* canon green-200 — positive numerics / kcal */
 
   /* Dark surfaces (menu page) */
   --color-surface-1: #0B0F0A;
@@ -19,7 +38,7 @@
   --color-surface-3: #1A2114;
 
   /* Text */
-  --color-cream: #F0EAD6;
+  --color-cream: #FBF8F0;          /* brand cream-50 (canon --text-strong) */
 
   /* Nutrition badges (editorial, muted) */
   --color-nutri-cal: #B88830;   /* amber */
@@ -33,11 +52,14 @@
   --color-fc-warn: #B88830;     /* 30–45% */
   --color-fc-bad:  #9B1C21;     /* > 45% */
 
-  /* Typography */
-  --font-display: "Alegreya", ui-serif, Georgia, serif;
-  --font-display-sc: "Alegreya SC", ui-serif, Georgia, serif;
-  --font-sans: "Geist", "DM Sans", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* Typography — brand SF Pro (native on Apple) / Albert Sans (CDN fallback).
+   * --font-display-sc keeps its name for callers but is now the same sans
+   * family; the small-caps look is carried by `uppercase tracking-wider` in
+   * the badge classNames, not a dedicated SC face. */
+  --font-display: -apple-system, "SF Pro Display", "Albert Sans", system-ui, sans-serif;
+  --font-display-sc: -apple-system, "SF Pro Display", "Albert Sans", system-ui, sans-serif;
+  --font-sans: -apple-system, "SF Pro Text", "Albert Sans", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, monospace;
 
   /* Warmer-dark surface tokens (v1.3 prototype) — consumed via var(--s-N) */
   --s-0: #0A0D08;  /* page */
@@ -56,14 +78,14 @@
 }
 
 :root {
-  font-family: "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    ui-sans-serif, "Segoe UI", sans-serif;
+  font-family: -apple-system, "SF Pro Text", "Albert Sans", system-ui,
+    BlinkMacSystemFont, ui-sans-serif, "Segoe UI", sans-serif;
   color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, monospace;
 }
 
 body {
@@ -264,4 +286,70 @@ body {
 .wiki-prose strong { color: rgb(248 250 252); font-weight: 600; }
 .wiki-prose em     { color: rgb(226 232 240); }
 .wiki-prose img    { max-width: 100%; border-radius: 0.5rem; margin: 0.5rem 0; }
+
+/* ----------------------------------------------------------------------
+ * SHISHKA brand chrome — /menu premium surfaces
+ * Reusable primitives so the four menu views (Owner/L1/L2/Customer) share
+ * one branded language: warm near-black canvas with a royal-green glow,
+ * stamp eyebrows, the seal mark, KPI cards and a segmented view switch.
+ * Authored here (not inline) to keep the JSX readable; colors come from the
+ * @theme tokens above. Verified vs the #0A0D08 base, never canon #1E3903.
+ * -------------------------------------------------------------------- */
+.menu-canvas {
+  position: relative;
+  background:
+    radial-gradient(1100px 380px at 10% -10%, rgba(44, 77, 12, 0.45), transparent 60%),
+    radial-gradient(900px 340px at 100% -6%, rgba(30, 57, 3, 0.34), transparent 55%);
+}
+
+.shk-eyebrow {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-honey-300);
+}
+
+.shk-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(160deg, var(--color-royal-soft), var(--color-royal-green));
+  border: 1px solid rgba(240, 234, 214, 0.16);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--color-honey-300);
+}
+
+.shk-kpi {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 42%), var(--s-1);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+/* Segmented control (view switcher) — active segment fills royal-green */
+.shk-seg { display: inline-flex; background: var(--s-1); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 2px; }
+.shk-seg-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 30px; padding: 0 12px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--color-cream); opacity: 0.62;
+  font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: opacity 0.15s var(--e-out), background-color 0.15s var(--e-out);
+}
+.shk-seg-btn:hover { opacity: 0.92; }
+.shk-seg-btn[aria-pressed="true"] {
+  opacity: 1;
+  background: linear-gradient(180deg, var(--color-royal-soft), var(--color-royal-green));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+.shk-seg-btn[aria-pressed="true"] .shk-seg-ico { color: var(--color-honey-300); }
+
+/* Elevated content panel shared by table / station / preview */
+.shk-panel { background: var(--s-1); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
 

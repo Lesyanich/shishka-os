@@ -284,67 +284,66 @@ export function MenuPage() {
     }, 0) / fcDenom
 
   return (
-    <div className="space-y-5">
+    <div className="menu-canvas -mx-4 space-y-5 px-4 pt-5 pb-10 sm:-mx-6 sm:px-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-cream">Menu</h1>
-          <p className="text-xs text-cream/50">
-            {totalDishes} dishes &middot; {availableCount} available &middot; {featuredCount} featured &middot; avg food cost {avgFoodCost.toFixed(1)}%
-          </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <span className="shk-seal" aria-hidden>S</span>
+          <div>
+            <div className="shk-eyebrow">Menu control &middot; preview</div>
+            <h1 className="mt-1 font-display text-4xl font-bold leading-none tracking-tight text-cream">
+              Menu
+            </h1>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* New Dish button */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* New Dish — spice-red CTA */}
           <button
             onClick={() => setNewDishOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-surface-3 bg-surface-2 px-3 py-1.5 text-xs font-medium text-cream transition hover:border-surface-3 hover:bg-surface-3"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-royal-red)] px-4 py-2 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] transition hover:brightness-110"
             title="Create new dish"
           >
             <Plus className="h-3.5 w-3.5" />
             New dish
           </button>
 
-          {/* AI Chef button */}
+          {/* AI Chef — royal-green ghost */}
           <button
             onClick={() => setChefOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-forest-soft/40 bg-royal-green/25 px-3 py-1.5 text-xs font-medium text-forest-soft transition hover:border-forest-soft hover:bg-royal-green/30"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-forest-soft/40 bg-royal-green/30 px-4 py-2 text-xs font-semibold text-forest-soft transition hover:border-forest-soft hover:bg-royal-green/40"
             title="Open AI Chef"
           >
             <Sparkles className="h-3.5 w-3.5" />
             AI Chef
           </button>
 
-          {/* Owner layout toggle */}
+          {/* Owner layout toggle (table / gallery) */}
           {view === 'owner' && (
-            <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
+            <div className="shk-seg" role="group" aria-label="Owner layout">
               <button
                 onClick={() => setOwnerLayout('table')}
-                className={`flex items-center rounded-md p-1.5 transition ${
-                  ownerLayout === 'table'
-                    ? 'bg-surface-3 text-cream'
-                    : 'text-cream/50 hover:text-cream/80'
-                }`}
+                className="shk-seg-btn px-2"
+                aria-pressed={ownerLayout === 'table'}
+                aria-label="Table view"
                 title="Table view"
               >
-                <Table2 className="h-3.5 w-3.5" />
+                <Table2 className="shk-seg-ico h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => setOwnerLayout('gallery')}
-                className={`flex items-center rounded-md p-1.5 transition ${
-                  ownerLayout === 'gallery'
-                    ? 'bg-surface-3 text-cream'
-                    : 'text-cream/50 hover:text-cream/80'
-                }`}
+                className="shk-seg-btn px-2"
+                aria-pressed={ownerLayout === 'gallery'}
+                aria-label="Gallery view"
                 title="Gallery view"
               >
-                <LayoutGrid className="h-3.5 w-3.5" />
+                <LayoutGrid className="shk-seg-ico h-3.5 w-3.5" />
               </button>
             </div>
           )}
 
-          {/* View toggle (4 roles) */}
-          <div className="flex rounded-lg border border-surface-3 bg-surface-1 p-0.5">
+          {/* View switch (4 roles) */}
+          <div className="shk-seg" role="group" aria-label="View mode">
             {VIEW_MODES.map((v) => {
               const { label, icon: Icon } = VIEW_LABELS[v]
               const active = view === v
@@ -352,20 +351,43 @@ export function MenuPage() {
                 <button
                   key={v}
                   onClick={() => setView(v)}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-                    active
-                      ? 'bg-surface-3 text-cream'
-                      : 'text-cream/60 hover:text-cream'
-                  }`}
+                  className="shk-seg-btn"
                   title={`${label} view`}
                   aria-pressed={active}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className="shk-seg-ico h-3.5 w-3.5" />
                   {label}
                 </button>
               )
             })}
           </div>
+        </div>
+      </div>
+
+      {/* KPI cards — counts for the active view */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="shk-kpi">
+          <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-cream/60">Dishes</div>
+          <div className="mt-1.5 font-mono text-2xl font-semibold tabular-nums text-cream">{totalDishes}</div>
+          <div className="mt-0.5 text-[11px] text-cream/40">in this view</div>
+        </div>
+        <div className="shk-kpi">
+          <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-cream/60">Available</div>
+          <div className="mt-1.5 font-mono text-2xl font-semibold tabular-nums text-cream">{availableCount}</div>
+          <div className="mt-0.5 text-[11px] text-cream/40">
+            <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-forest-soft align-middle" />
+            {totalDishes > 0 ? Math.round((availableCount / totalDishes) * 100) : 0}% orderable
+          </div>
+        </div>
+        <div className="shk-kpi">
+          <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-cream/60">Featured</div>
+          <div className="mt-1.5 font-mono text-2xl font-semibold tabular-nums text-honey-300">{featuredCount}</div>
+          <div className="mt-0.5 text-[11px] text-cream/40">on the hero rail</div>
+        </div>
+        <div className="shk-kpi">
+          <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-cream/60">Avg food cost</div>
+          <div className="mt-1.5 font-mono text-2xl font-semibold tabular-nums text-honey-300">{avgFoodCost.toFixed(1)}%</div>
+          <div className="mt-0.5 text-[11px] text-cream/40">target &lt; 35%</div>
         </div>
       </div>
 
