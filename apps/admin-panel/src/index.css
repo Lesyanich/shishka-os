@@ -294,7 +294,13 @@ body {
  * stamp eyebrows, the seal mark, KPI cards and a segmented view switch.
  * Authored here (not inline) to keep the JSX readable; colors come from the
  * @theme tokens above. Verified vs the #0A0D08 base, never canon #1E3903.
+ *
+ * In @layer components so Tailwind utilities (a later layer) can override
+ * these — e.g. `.shk-panel overflow-x-auto` must keep horizontal scroll, and
+ * `.shk-seal h-8 w-8` must be able to shrink the seal in the collapsed sidebar.
+ * Unlayered, these rules would beat every utility regardless of source order.
  * -------------------------------------------------------------------- */
+@layer components {
 .menu-canvas {
   position: relative;
   background:
@@ -352,4 +358,5 @@ body {
 
 /* Elevated content panel shared by table / station / preview */
 .shk-panel { background: var(--s-1); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+}
 
