@@ -51,6 +51,16 @@
             "timeout": 15000
           }
         ]
+      },
+      {
+        "matcher": "Skill|SlashCommand|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh scripts/skill-advisor-usage.sh",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "PreToolUse": [
