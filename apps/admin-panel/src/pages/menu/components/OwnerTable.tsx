@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
+import { Fragment, startTransition, useEffect, useOptimistic, useState, useCallback, useMemo, useRef } from 'react'
 import { Check, X, Star, StarOff, ChevronDown, ChevronRight, GitBranch, PanelRightOpen, Upload, Loader2, CheckCircle2, AlertCircle, Globe, EyeOff } from 'lucide-react'
 import type { MenuDish, MenuSubcategory, PortionUnit } from '../../../hooks/useMenuDishes'
 import type { MenuBomChild, MenuItem, NomenclatureKind } from '../../../hooks/useMenuData'
@@ -332,7 +332,7 @@ export function OwnerTable({
    * the upstream refetch in useMenuData rewrites `items`, which flushes
    * the optimistic overlay. Row-level flash comes from `isFailed`. */
   const commitPatch = useCallback(
-    async (
+    (
       id: string,
       patch: Partial<
         Pick<
@@ -341,15 +341,19 @@ export function OwnerTable({
         > & { is_web_visible: boolean }
       >,
     ) => {
-      setOptimistic({ id, patch })
-      await onUpdate(id, patch)
+      // useOptimistic must dispatch inside a transition (React 19), otherwise it
+      // throws and the error boundary bounces the user off the page.
+      startTransition(async () => {
+        setOptimistic({ id, patch })
+        await onUpdate(id, patch)
+      })
     },
     [onUpdate, setOptimistic],
   )
 
   const toggleField = useCallback(
-    async (dish: MenuDish, field: 'is_available' | 'is_featured') => {
-      await commitPatch(dish.id, { [field]: !dish[field] })
+    (dish: MenuDish, field: 'is_available' | 'is_featured') => {
+      commitPatch(dish.id, { [field]: !dish[field] })
     },
     [commitPatch],
   )
@@ -357,8 +361,8 @@ export function OwnerTable({
   /** Toggle website visibility (mig 263). Decoupled from Loyverse: showing a
    * dish on the site no longer requires a POS push; hiding leaves it sellable. */
   const toggleWeb = useCallback(
-    async (dish: MenuItem) => {
-      await commitPatch(dish.id, { is_web_visible: !dish.is_web_visible })
+    (dish: MenuItem) => {
+      commitPatch(dish.id, { is_web_visible: !dish.is_web_visible })
     },
     [commitPatch],
   )

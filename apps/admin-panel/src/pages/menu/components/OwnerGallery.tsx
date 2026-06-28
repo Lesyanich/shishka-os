@@ -1,4 +1,4 @@
-import { useOptimistic, useCallback } from 'react'
+import { startTransition, useOptimistic, useCallback } from 'react'
 import { Star, StarOff, ImageOff, Eye, EyeOff } from 'lucide-react'
 import type { MenuDish } from '../../../hooks/useMenuDishes'
 import { NutritionBadges } from './NutritionBadge'
@@ -35,10 +35,13 @@ export function OwnerGallery({ dishes, selectedCategory, onUpdate, onOpenDrawer 
   )
 
   const toggleField = useCallback(
-    async (dish: MenuDish, field: 'is_available' | 'is_featured') => {
+    (dish: MenuDish, field: 'is_available' | 'is_featured') => {
       const newVal = !dish[field]
-      setOptimistic({ id: dish.id, patch: { [field]: newVal } })
-      await onUpdate(dish.id, { [field]: newVal })
+      // useOptimistic must dispatch inside a transition (React 19).
+      startTransition(async () => {
+        setOptimistic({ id: dish.id, patch: { [field]: newVal } })
+        await onUpdate(dish.id, { [field]: newVal })
+      })
     },
     [onUpdate, setOptimistic],
   )

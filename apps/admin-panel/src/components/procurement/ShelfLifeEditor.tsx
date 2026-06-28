@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useOptimistic, useState } from 'react'
+import { startTransition, useCallback, useMemo, useOptimistic, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
   useShelfLifeItems,
@@ -32,9 +32,14 @@ export function ShelfLifeEditor() {
   const [search, setSearch] = useState('')
 
   const commitDays = useCallback(
-    async (item: ShelfLifeItem, days: number | null) => {
-      setOptimistic({ id: item.id, days })
-      await inline.commit(item.id, { shelf_life_days: days })
+    (item: ShelfLifeItem, days: number | null) => {
+      // React 19 requires optimistic updates to run inside a transition/action,
+      // otherwise it throws "optimistic state update outside a transition" and
+      // the error boundary bounces the user off the page.
+      startTransition(async () => {
+        setOptimistic({ id: item.id, days })
+        await inline.commit(item.id, { shelf_life_days: days })
+      })
     },
     [inline, setOptimistic],
   )
