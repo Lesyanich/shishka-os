@@ -19,6 +19,18 @@
       "skillPath": "skills/playwright-automation/SKILL.md",
       "computedHash": "bbbb613ebc86099bac39a336ce6b72619503941718f928e23b9759aa22dd4976"
     },
+    "refactor-method-complexity-reduce": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/refactor-method-complexity-reduce/SKILL.md",
+      "computedHash": "a09a18f7b370e105c20480f9c772169948262fa07fdf5fbd4c5d45b2def958e0"
+    },
+    "request-refactor-plan": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/deprecated/request-refactor-plan/SKILL.md",
+      "computedHash": "176cf1d0c4dc4fc4d958c4bc4ed67f222f2656bda2f3f15e3a3e98b2e5edaf2f"
+    },
     "risk-based-testing": {
       "source": "petrkindlmann/qa-skills",
       "sourceType": "github",
