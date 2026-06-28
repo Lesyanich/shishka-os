@@ -263,6 +263,22 @@ LIMIT 20;
 
 Tech stack: React + Vite + Tailwind CSS v4 + Supabase + TypeScript strict mode.
 
+## RULE-DESIGN-SYSTEM
+
+The brand design system is **owned by the customer-site repo `shishka-health`**, not by the admin panel. Its home:
+- `design-system/index.html` — living style guide. Renders every `.shk-*` component (buttons, badges, tabs, dish cards, hero, order FAB, dialog) as a **real component** beside its className recipe + source file. It `<link>`s the real `src/styles/` CSS, so it **cannot drift** from production. Open it in a browser — zero build, zero subscription. The factory-floor blueprint every worker reads from the same wall.
+- `design-system/MASTER.md` — brand rules, palette, typography, component contract, anti-patterns, a11y checklist.
+
+Brand DNA: royal-green `#1E3903` canvas · cream `#FBF8F0` text · spice-red `#B62A23` CTA · gold `#F0CE83` prices · SF Pro / Albert Sans · "from the SOIL to the SOUL".
+
+1. **Check the guide before any front-end work** (site or admin). Reuse a `.shk-*` primitive; do not reinvent one. Reference **semantic tokens** (`var(--accent)`, `var(--royal-green)`, `var(--menu-price)`), never raw hex.
+2. **Every PR that touches UI updates `design-system/index.html` in the same commit.** New primitive/variant → new section with its recipe + source. Design system and code ship together or not at all.
+3. **Token source of truth** = `shishka-health/src/styles/tokens/` (`colors.css`, `fonts.css`, `spacing.css`, `theme-royal.css`).
+
+**Admin panel (this repo):** its `/menu` prototype uses default-Tailwind styling — that is NOT the design system. The admin is slated to be **re-skinned onto this brand**: the token block is ported into `apps/admin-panel/src/index.css` `@theme` (so `bg-royal-green`, `text-honey-300` utilities resolve), and components are matched to the guide. Until then, new admin UI should already lean on these brand tokens.
+
+> Origin: 2026-06-28. CEO mandate — design system as code, not SaaS. Built from the live shishka.health tokens (the admin's own styling was default-Tailwind, off-brand). "A factory floor blueprint that every worker reads from the same wall." Plan: maintain in shishka-health, port to admin.
+
 ## Routing
 NEVER use `useState` for page switching in ERP. Always use `react-router-dom` with `BrowserRouter` — deep linking is critical for B2B SaaS.
 
