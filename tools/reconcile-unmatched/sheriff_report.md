@@ -1,14 +1,14 @@
 # Data Health Sheriff Report
-**Date:** 2026-06-21  
+**Date:** 2026-06-28  
 **Run type:** Scheduled weekly audit  
-**Status:** ⛔ BLOCKED — No database credentials available
+**Status:** ⛔ BLOCKED — No database credentials available (2nd consecutive week)
 
 ---
 
 ## AUDIT BLOCKED: Missing Credentials
 
 The weekly data health audit **could not run** because no database credentials
-are available in the cloud execution environment (Linux, `IS_SANDBOX=yes`).
+are available in the cloud execution environment (Linux, remote cloud container).
 
 ### What was tried
 
@@ -17,24 +17,28 @@ are available in the cloud execution environment (Linux, `IS_SANDBOX=yes`).
 | `DATABASE_URL` env var | Not set |
 | macOS Keychain `shishka-database-url` | Unavailable (Linux, no `security` CLI) |
 | `SUPABASE_SERVICE_ROLE_KEY` env var | Not set |
-| `.env` / `services/lightrag/db-url.local` files | Gitignored — not present in clone |
+| `SUPABASE_URL` env var | Not set |
+| `.env` files in repo root | Gitignored — not present in clone |
+| `services/lightrag/db-url.local` | Gitignored — not present in clone |
 
-### What needs to be done
+### Fix Required (Action for Owner)
 
-**To fix this for future scheduled runs**, add the following to the scheduled
-routine's environment variables in the Claude Code web settings:
+**Add the following to the scheduled routine's environment variables**
+in Claude Code web settings at https://code.claude.com:
 
+**Option A — Direct Postgres connection:**
 ```
-DATABASE_URL=postgresql://postgres.[project-id]:[password]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+DATABASE_URL=postgresql://postgres.qcqgtcsjoacuktcewpvo:[password]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
 ```
-or
+
+**Option B — Supabase service role (allows REST API fallback):**
 ```
-SUPABASE_SERVICE_ROLE_KEY=<service role key from Supabase dashboard>
+SUPABASE_SERVICE_ROLE_KEY=<service role key from Supabase dashboard → Settings → API>
 SUPABASE_URL=https://qcqgtcsjoacuktcewpvo.supabase.co
 ```
 
-See: https://code.claude.com/docs/en/claude-code-on-the-web (environment configuration)  
-Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
+Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)  
+Docs: https://code.claude.com/docs/en/claude-code-on-the-web
 
 ---
 
@@ -50,49 +54,41 @@ Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
 
 ---
 
-## What the Audit Would Have Checked
+## What the Audit Will Check (Once Credentials Are Configured)
 
-Based on learned patterns from previous manual cleanup sessions:
+### Phase 1 — data_health_rules
+All active rules in `public.data_health_rules` where `is_active = TRUE`, ordered by severity.  
+Auto-fix rule `zero_cost_with_purchases` will recalculate WAC for zero-cost items with purchase history,
+**skipping** items where `notes` contains `'free'` / `'in-house'` / `'recipe'` (tahini, chili paste etc).
 
-### Active data_health_rules (from schema)
-All active rules in `public.data_health_rules` where `is_active = TRUE`,
-ordered by severity. Auto-fix rules (e.g. `zero_cost_with_purchases`) would
-have recalculated WAC for zero-cost items with purchase history, excluding
-items with `notes` containing `'free'` / `'in-house'` / `'recipe'`.
+### Phase 2 — Smart duplicate detection (OCR patterns)
+- **OCR name variants**: Multiple RAW/RAW-AUTO items with same supplier + similar price (±20%)
+  + overlapping purchase dates → likely same physical product
+  (e.g. the lamb case: AU Frozen Lamb Shoulder / Leg / Minced Lamb, barcode 831436)
+- **Unit confusion g vs kg**: Items with `cost_per_unit < 5` AND `base_unit = 'g'`
+  (Gouda cheese pattern: WAC=0.82/g should be 822/kg)
+- **Conversion factor drift >1000%**: `last_seen_price` vs `cost_per_unit` ratio > 10x
+  (Olive Oil 5L pattern: WAC=440/L but last_price=2200 for bottle)
 
-### Duplicate detection (learned patterns)
-- **OCR name variants**: Multiple RAW/RAW-AUTO items with same supplier +
-  similar price (±20%) + overlapping purchase dates → likely same physical
-  product (e.g. the lamb case: AU Frozen Lamb Shoulder / Leg / Minced Lamb,
-  barcode 831436).
-- **Unit confusion g vs kg**: Items with `cost_per_unit < 5` AND
-  `base_unit = 'g'` — likely misclassified (Gouda cheese pattern).
-- **Conversion factor drift >1000%**: `last_seen_price` vs `cost_per_unit`
-  ratio > 10x (Olive Oil 5L pattern: WAC=440/L but last_price=2200 for bottle).
+### Phase 3 — Makro barcode audit
+`tools/reconcile-unmatched/audit_makro_barcodes.py` against ~222 barcodes, checking
+NAME_MISMATCH / NAME_DIFF / NOT_FOUND against live Makro Typesense API.
 
-### Known safe zero-cost items (do NOT flag)
-- Tahini: supplied free from friend's factory (check `notes LIKE '%free%'`)
-- Chili paste: PF made in-house from recipe (check `notes LIKE '%in-house%'`)
+### Phase 4 — Price drift + conversion sanity
+Top 20 items with WAC vs last_seen_price drift >20%. Drift >1000% = broken conversion factor.
 
-### Makro barcode audit
-Would have run `tools/reconcile-unmatched/audit_makro_barcodes.py` against
-~222 barcodes in `supplier_catalog` + `purchase_logs` for Makro supplier
-(`c548db19-8a70-4f34-96af-d66162793cbf`), checking for NAME_MISMATCH /
-NAME_DIFF / NOT_FOUND against live Makro Typesense API.
+### Known safe zero-cost items (will NOT be flagged)
+- Tahini: supplied free from friend's factory (`notes LIKE '%free%'`)
+- Chili paste: PF made in-house from recipe (`notes LIKE '%in-house%'`)
 
 ---
 
 ## Health Score
 **N/A** — could not compute (no DB access)
 
-Last known report: none (first run, blocked before any data fetched)
+Previous run: 2026-06-21 — also blocked (credentials missing)  
+Consecutive blocked weeks: **2**
 
 ---
 
-## Action Required
-
-1. **Add `DATABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY` to the scheduled routine environment** — see fix above
-2. Re-run this audit after credentials are configured
-3. The audit will then run all 5 phases and produce a full report with health score
-
-_Report generated: 2026-06-21 | Session: claude-opus-session-a261e2ff_
+_Report generated: 2026-06-28 | Session: claude-opus-session-640769a4_
