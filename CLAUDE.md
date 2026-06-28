@@ -29,6 +29,7 @@ When unsure → ask: "This sounds like [domain]. Should I load [agent]?"
 - **BACKLOG-FIRST:** found work outside current task → log to MC, don't start it
 - **SOCRATIC-GATE:** new feature/migration → stop, ask 2-3 questions before code
 - **GRAPH-BEFORE-GREP:** for "what connects to / depends on / where does X live" questions, try `graphify_query_topic` first (cheaper than reading files) → see `operational-rules.md` § LK-GRAPH. Grep stays for exact strings & file contents.
+- **SKILL-ADVISOR:** at task start, check `docs/operations/skill-advisor.md` and proactively offer the fitting skill/command/MCP (don't hand-roll what a tool does better) → `operational-rules.md` § RULE-SKILL-ADVISOR. A `UserPromptSubmit` hook injects 💡 hints automatically.
 
 ## Rules (enforced)
 - **Commit Gate:** never push until MC task + CURRENT.md updated

@@ -121,6 +121,11 @@ Standard pickup flow:
   3. Before working: update_task(status='in_progress', assigned_to='$MY_SESSION_ID', related_ids={claimed_by:'$MY_SESSION_ID', claimed_at:NOW, phase:'context-loading', git_branch:'<branch>'})
 
 Agents: /chef · /finance · /coo · /techlead — or just say what you need.
+
+Skill Advisor (active — RULE-SKILL-ADVISOR):
+  • 💡 hints fire automatically per message (UserPromptSubmit hook); at task start, OFFER the fitting tool — do not hand-roll what a skill/MCP does better.
+  • Browse the full task→tool catalog any time: docs/operations/skill-advisor.md  (or run /skills <what you need>)
+  • For code tasks, the kind→skill REQUIRED/FORBIDDEN map is docs/operations/skills-services-policy.md § Task-Kind Taxonomy.
 === Ready ===
 EOF
 )

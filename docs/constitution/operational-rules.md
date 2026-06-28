@@ -488,6 +488,26 @@ When working in Claude Code (not Cowork), use subagents to keep the main context
 
 > Origin: 2026-04-09. Inspired by Boris Cherny's "Subagent Strategy".
 
+## RULE-SKILL-ADVISOR
+
+The CEO cannot memorize the full arsenal (dozens of skills, slash-commands, MCP servers).
+Code is responsible for surfacing the right tool — proactively, not "when it remembers".
+
+**At the start of a task** (and whenever the work shifts domain):
+- If a registered tool fits the job, **name it and offer to run it** — e.g. "для этого есть `/lawyer`, запустить?". Do not run it silently; the CEO decides.
+- **Never hand-roll** what a skill/MCP does more reliably (e.g. don't parse a receipt by eye when `/finance` exists; don't grep the codebase for "what depends on X" when `shishka-graphify` answers it — see GRAPH-BEFORE-GREP).
+- The catalog of "task → tool" is `docs/operations/skill-advisor.md`. For code tasks, the REQUIRED/RECOMMENDED/**FORBIDDEN** skill set per `kind:*` tag lives in `docs/operations/skills-services-policy.md` § Task-Kind Taxonomy — respect FORBIDDEN entries even if a tool seems to apply.
+
+**Automation.** The `UserPromptSubmit` hook `scripts/skill-advisor.sh` reads each message,
+matches it against the `ADVISOR-MAP` keywords in `skill-advisor.md`, and injects a quiet
+`💡` hint (once per tool per session). The hint is a prompt for Code to make the offer — it
+is not the offer itself. The hook is best-effort; this rule holds even when it stays silent.
+
+**Compound engineering.** When a tool would have helped but no hint fired, add a row to the
+`ADVISOR-MAP` table (bilingual RU+EN keywords) — per `RULE-COMPOUND-ENGINEERING`.
+
+> Origin: 2026-06-28. CEO: «я не могу запомнить все полезные фичи — хочу чтобы Клод сам подсказывал какими скиллами упростить работу».
+
 ---
 
 # PART III — Context Routing
