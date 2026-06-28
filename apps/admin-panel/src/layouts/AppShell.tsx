@@ -24,7 +24,6 @@ import {
   Timer,
   Trash2,
   Truck,
-  UtensilsCrossed,
   Brain,
   Settings,
   SlidersHorizontal,
@@ -131,9 +130,9 @@ const NAV_SECTIONS: NavSection[] = [
 /* ─── Role badge ─── */
 
 const ROLE_STYLE: Record<AppRole, string> = {
-  owner: 'bg-amber-500/15 text-amber-300',
-  task_manager: 'bg-violet-500/15 text-violet-300',
-  cook: 'bg-sky-500/15 text-sky-300',
+  owner: 'bg-honey-300/15 text-honey-300 ring-1 ring-inset ring-honey-300/25',
+  task_manager: 'bg-[var(--color-royal-green)]/30 text-[color:var(--color-forest-soft)] ring-1 ring-inset ring-[var(--color-forest-soft)]/30',
+  cook: 'bg-mint-200/12 text-mint-200 ring-1 ring-inset ring-mint-200/25',
 }
 
 const ROLE_LABEL: Record<AppRole, string> = {
@@ -157,7 +156,7 @@ function SidebarSection({
     <div>
       <button
         onClick={onToggle}
-        className="flex w-full items-center justify-between px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-400"
+        className="flex w-full items-center justify-between px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream/40 transition hover:text-cream/70"
       >
         <span className="hidden lg:block">{section.title}</span>
         <ChevronDown
@@ -178,13 +177,22 @@ function SidebarSection({
                 [
                   'flex items-center gap-3 rounded-lg px-2 py-2 text-xs font-medium transition',
                   isActive
-                    ? 'bg-emerald-500/15 text-emerald-300'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100',
+                    ? 'bg-[var(--color-royal-green)]/35 text-cream ring-1 ring-inset ring-[var(--color-forest-soft)]/30'
+                    : 'text-cream/55 hover:bg-surface-3 hover:text-cream',
                 ].join(' ')
               }
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="hidden lg:block">{label}</span>
+              {({ isActive }) => (
+                <>
+                  <Icon
+                    className={[
+                      'h-4 w-4 shrink-0',
+                      isActive ? 'text-honey-300' : '',
+                    ].join(' ')}
+                  />
+                  <span className="hidden lg:block">{label}</span>
+                </>
+              )}
             </NavLink>
           ))}
         </div>
@@ -228,24 +236,22 @@ export function AppShell() {
   })
 
   return (
-    <div className="flex min-h-screen bg-slate-950">
+    <div className="flex min-h-screen bg-[var(--s-0)]">
       {/* ─── Sidebar ─── */}
-      <aside className="flex w-14 shrink-0 flex-col border-r border-slate-800 bg-slate-950 lg:w-52">
+      <aside className="flex w-14 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--s-1)] lg:w-52">
         {/* Brand */}
-        <div className="flex items-center gap-2.5 border-b border-slate-800 px-3 py-4">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
-            <UtensilsCrossed className="h-4 w-4" />
-          </span>
+        <div className="flex items-center gap-2.5 border-b border-[var(--line)] px-3 py-4">
+          <span className="shk-seal h-8 w-8 text-[13px]" aria-hidden>S</span>
           <div className="hidden lg:block">
-            <p className="text-sm font-semibold text-slate-100">Shishka OS</p>
-            <p className="text-[10px] text-slate-500">Unified ERP / KDS</p>
+            <p className="font-display text-sm font-bold tracking-tight text-cream">Shishka OS</p>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-cream/40">Unified ERP / KDS</p>
           </div>
         </div>
 
         {/* Staff identity */}
         {!roleLoading && staffName && (
-          <div className="flex items-center gap-2 border-b border-slate-800 px-3 py-2.5">
-            <span className="hidden truncate text-xs font-medium text-slate-300 lg:block">
+          <div className="flex items-center gap-2 border-b border-[var(--line)] px-3 py-2.5">
+            <span className="hidden truncate text-xs font-medium text-cream/85 lg:block">
               {staffName}
             </span>
             <span
@@ -279,41 +285,45 @@ export function AppShell() {
                   [
                     'flex items-center gap-3 rounded-lg px-2 py-2 text-xs font-medium transition',
                     isActive
-                      ? 'bg-emerald-500/15 text-emerald-300'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100',
+                      ? 'bg-[var(--color-royal-green)]/35 text-cream ring-1 ring-inset ring-[var(--color-forest-soft)]/30'
+                      : 'text-cream/55 hover:bg-surface-3 hover:text-cream',
                   ].join(' ')
                 }
               >
-                <Settings className="h-4 w-4 shrink-0" />
-                <span className="hidden lg:block">Settings</span>
+                {({ isActive }) => (
+                  <>
+                    <Settings className={['h-4 w-4 shrink-0', isActive ? 'text-honey-300' : ''].join(' ')} />
+                    <span className="hidden lg:block">Settings</span>
+                  </>
+                )}
               </NavLink>
             </div>
           )}
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-slate-800 px-3 py-3">
-          <p className="hidden text-[10px] text-slate-700 lg:block">v0.7.0 · ERP</p>
+        <div className="border-t border-[var(--line)] px-3 py-3">
+          <p className="hidden text-[10px] text-cream/30 lg:block">v0.7.0 · ERP</p>
         </div>
       </aside>
 
       {/* ─── Main area ─── */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950/70 px-6 py-3 backdrop-blur">
+        <header className="flex shrink-0 items-center justify-between border-b border-[var(--line)] bg-[var(--s-0)]/75 px-6 py-3 backdrop-blur">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span className="text-xs text-slate-500">Supabase connected</span>
+            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-forest-soft" />
+            <span className="text-xs text-cream/50">Supabase connected</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-slate-500">{today}</span>
+            <span className="text-xs text-cream/50">{today}</span>
             {user && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">{user.email}</span>
+                <span className="text-xs text-cream/60">{user.email}</span>
                 <button
                   onClick={signOut}
                   title="Sign out"
-                  className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
+                  className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-cream/50 transition hover:bg-surface-3 hover:text-cream"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                 </button>

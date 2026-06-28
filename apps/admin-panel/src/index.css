@@ -92,8 +92,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #020617;
-  color: #e5e7eb;
+  background-color: #0A0D08;
+  color: var(--color-cream);
 }
 
 #root {
