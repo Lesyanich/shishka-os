@@ -117,7 +117,9 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
       setIsCreating(false)
 
       if (rpcError) return { ok: false, error: rpcError.message }
-      return data as CreatePOResult
+      // The RPC traps its own errors into { ok:false, error } (EXCEPTION WHEN
+      // OTHERS), so surface that verbatim; guard the null/unexpected case too.
+      return (data as CreatePOResult | null) ?? { ok: false, error: 'No response from server' }
     },
     [],
   )

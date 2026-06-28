@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useOptimistic, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useOptimistic, useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
@@ -110,9 +110,13 @@ export function SupplierManager() {
   const [createErr, setCreateErr] = useState<string | null>(null)
 
   const commitPatch = useCallback(
-    async (id: string, patch: SupplierPatch) => {
-      setOptimistic({ id, patch })
-      await inline.commit(id, patch)
+    (id: string, patch: SupplierPatch) => {
+      // useOptimistic must dispatch inside a transition (React 19) — otherwise
+      // it throws and the error boundary bounces the user off the page.
+      startTransition(async () => {
+        setOptimistic({ id, patch })
+        await inline.commit(id, patch)
+      })
     },
     [inline, setOptimistic],
   )

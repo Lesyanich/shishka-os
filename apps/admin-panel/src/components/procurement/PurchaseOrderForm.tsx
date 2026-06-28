@@ -116,18 +116,35 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
       return
     }
 
-    const validLines: POLineInput[] = lines
-      .filter((l) => l.nomenclature_id && l.qty_ordered)
-      .map((l) => ({
-        nomenclature_id: l.nomenclature_id,
-        qty_ordered: Number(l.qty_ordered),
-        unit_price_expected: l.unit_price_expected ? Number(l.unit_price_expected) : undefined,
-      }))
+    // Consider only lines the user has actually started (a product or a qty).
+    // Untouched empty rows are ignored; half-filled rows are validated, never
+    // silently dropped — so the user always learns why a submit was rejected.
+    const filledLines = lines.filter(
+      (l) => l.nomenclature_id || (l.qty_ordered !== '' && l.qty_ordered != null),
+    )
 
-    if (validLines.length === 0) {
+    if (filledLines.length === 0) {
       setError('Add at least one item')
       return
     }
+
+    for (const l of filledLines) {
+      if (!l.nomenclature_id) {
+        setError('Select a product for every line')
+        return
+      }
+      const qty = Number(l.qty_ordered)
+      if (l.qty_ordered === '' || Number.isNaN(qty) || qty <= 0) {
+        setError('Quantity must be greater than 0 for every item')
+        return
+      }
+    }
+
+    const validLines: POLineInput[] = filledLines.map((l) => ({
+      nomenclature_id: l.nomenclature_id,
+      qty_ordered: Number(l.qty_ordered),
+      unit_price_expected: l.unit_price_expected ? Number(l.unit_price_expected) : undefined,
+    }))
 
     const payload: CreatePOPayload = {
       supplier_id: supplierId,
@@ -136,7 +153,13 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
       lines: validLines,
     }
 
-    const result = await createPO(payload)
+    let result: CreatePOResult
+    try {
+      result = await createPO(payload)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create PO')
+      return
+    }
 
     if (!result.ok) {
       setError(result.error ?? 'Failed to create PO')
@@ -156,7 +179,7 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-700/50 bg-slate-800/30 p-4">
+    <form noValidate onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-700/50 bg-slate-800/30 p-4">
       <h3 className="text-sm font-bold text-slate-100">New Purchase Order</h3>
 
       {error && (

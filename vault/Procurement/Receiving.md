@@ -144,7 +144,8 @@ erDiagram
 
 | Function | Role | Purpose |
 |----------|------|---------|
-| `fn_create_purchase_order(JSONB)` | Admin | Creates PO + lines, auto-populates prices from supplier_catalog |
+| `fn_create_purchase_order(JSONB)` | Admin | Creates PO + lines, auto-populates prices from supplier_catalog. Pre-validates lines (rejects empty array / qty ≤ 0 / missing product) before any INSERT (mig 324) |
+| `fn_po_rollup_totals()` (trigger) | — | AFTER INS/UPD/DEL on po_lines → recomputes purchase_orders.subtotal/grand_total from line estimates; skips reconciled/cancelled (mig 323) |
 | `fn_receive_goods(JSONB)` | Admin/Cook | Physical receiving. NO inventory update. Sets partially_received or received |
 | `fn_approve_po(JSONB)` | Controller | Financial reconciliation. Creates expense_ledger + purchase_logs + sku_balances + WAC |
 | `fn_pending_deliveries()` | Admin/Cook | Returns pending POs for /receive screen. NO prices |
