@@ -484,7 +484,7 @@ erDiagram
 | `tags` | `id` UUID | slug (UNIQUE), name, name_th, tag_group (ENUM), color, sort_order | -- | 045 |
 | `nomenclature_tags` | `(nomenclature_id, tag_id)` composite | -- | nomenclature_id -> nomenclature (CASCADE), tag_id -> tags (CASCADE) | 045 |
 | `purchase_orders` | `id` UUID | po_number (UNIQUE), status (po_status), expected_date, subtotal, discount_total, vat_amount, delivery_fee, grand_total, created_by | supplier_id -> suppliers, source_plan_id -> production_plans, expense_id -> expense_ledger | 061 |
-| `po_lines` | `id` UUID | qty_ordered, unit, unit_price_expected, total_expected (GENERATED), sort_order, UNIQUE(po_id, nomenclature_id, sku_id) | po_id -> purchase_orders (CASCADE), nomenclature_id -> nomenclature, sku_id -> sku | 061 |
+| `po_lines` | `id` UUID | qty_ordered (CHECK > 0, mig 324), unit, unit_price_expected, total_expected (GENERATED), sort_order, UNIQUE(po_id, nomenclature_id, sku_id); trg_po_lines_rollup rolls totals up to purchase_orders | po_id -> purchase_orders (CASCADE), nomenclature_id -> nomenclature, sku_id -> sku | 061, 323, 324 |
 | `receiving_records` | `id` UUID | source (receiving_source), received_by, received_at, status ('received'/'reconciled') | po_id -> purchase_orders, expense_id -> expense_ledger | 062 |
 | `receiving_lines` | `id` UUID | qty_expected, qty_received, qty_rejected, reject_reason (reject_reason), unit_price_actual | receiving_id -> receiving_records (CASCADE), po_line_id -> po_lines, nomenclature_id -> nomenclature, sku_id -> sku | 062 |
 
@@ -528,7 +528,8 @@ erDiagram
 | `fn_set_created_by()` | TRIGGER FN | Auto-fills expense_ledger.created_by with auth.uid() on INSERT | 055 |
 | `fn_generate_po_number()` | UTIL FN | Generates next PO code: PO-0001, PO-0002, etc. | 061 |
 | `fn_po_set_number()` | TRIGGER FN | Auto-assigns po_number on INSERT if not provided | 061 |
-| `fn_create_purchase_order(JSONB)` | RPC | Creates PO with lines. Auto-populates prices from supplier_catalog | 064 |
+| `fn_po_rollup_totals()` | TRIGGER FN | AFTER INS/UPD/DEL on po_lines: recomputes purchase_orders.subtotal (Σ total_expected) + grand_total (− discount + vat + delivery). Skips reconciled/cancelled so fn_approve_po actuals are preserved | 323 |
+| `fn_create_purchase_order(JSONB)` | RPC | Creates PO with lines. Auto-populates prices from supplier_catalog. Pre-validates lines (rejects empty array, qty ≤ 0, missing product) before any INSERT — no orphan header | 064, 324 |
 | `fn_receive_goods(JSONB)` | RPC | Physical receiving by Admin/Cook. No inventory update. Sets partially_received/received | 064 |
 | `fn_approve_po(JSONB)` | RPC | Financial reconciliation → expense_ledger + purchase_logs + sku_balances + WAC | 064 |
 | `fn_pending_deliveries()` | RPC | Pending POs for /receive screen. No prices. Includes partial delivery aggregation | 064 |
