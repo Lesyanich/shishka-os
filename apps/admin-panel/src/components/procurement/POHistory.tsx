@@ -102,7 +102,7 @@ export function POHistory({ orders, isLoading, statusFilter, onFilterChange, onS
                       })}
                     </span>
                   )}
-                  {po.grand_total != null && (
+                  {po.grand_total != null && po.grand_total > 0 && (
                     <span>{po.grand_total.toLocaleString()} THB</span>
                   )}
                 </div>
