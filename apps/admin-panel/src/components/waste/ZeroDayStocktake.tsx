@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
-import { Save, PackageCheck } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
+import { Loader2, PackageCheck } from 'lucide-react'
 import type { InventoryItem } from '../../hooks/useInventory'
 
 interface ZeroDayStocktakeProps {
@@ -21,6 +21,10 @@ export function ZeroDayStocktake({
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({})
   const [filter, setFilter] = useState('')
+  // Synchronous re-entrancy guard (React `saving` state lags a render) and a
+  // flag to skip the save that Escape's blur would otherwise trigger.
+  const savingRef = useRef<Set<string>>(new Set())
+  const skipBlurRef = useRef(false)
 
   const filteredItems = items.filter(
     (item) =>
@@ -30,34 +34,42 @@ export function ZeroDayStocktake({
 
   const handleSave = useCallback(
     async (item: InventoryItem) => {
-      const rawValue = editValues[item.nomenclature_id]
-      const qty = rawValue !== undefined ? parseFloat(rawValue) : item.quantity
+      const id = item.nomenclature_id
+      const rawValue = editValues[id]
+      // Nothing typed in this row → blurring a merely-focused field must not
+      // record a phantom count.
+      if (rawValue === undefined) return
+      if (savingRef.current.has(id)) return
+
+      const qty = parseFloat(rawValue)
       if (isNaN(qty) || qty < 0) {
-        setSaveErrors((prev) => ({ ...prev, [item.nomenclature_id]: 'Invalid quantity' }))
+        setSaveErrors((prev) => ({ ...prev, [id]: 'Invalid quantity' }))
         return
       }
 
-      setSaving((prev) => ({ ...prev, [item.nomenclature_id]: true }))
+      savingRef.current.add(id)
+      setSaving((prev) => ({ ...prev, [id]: true }))
       setSaveErrors((prev) => {
         const next = { ...prev }
-        delete next[item.nomenclature_id]
+        delete next[id]
         return next
       })
 
-      const result = await onSave(item.nomenclature_id, qty)
+      const result = await onSave(id, qty)
+      savingRef.current.delete(id)
 
       if (!result.ok) {
-        setSaveErrors((prev) => ({ ...prev, [item.nomenclature_id]: result.error ?? 'Failed' }))
+        setSaveErrors((prev) => ({ ...prev, [id]: result.error ?? 'Failed' }))
       } else {
         setEditValues((prev) => {
           const next = { ...prev }
-          delete next[item.nomenclature_id]
+          delete next[id]
           return next
         })
         onRefetch()
       }
 
-      setSaving((prev) => ({ ...prev, [item.nomenclature_id]: false }))
+      setSaving((prev) => ({ ...prev, [id]: false }))
     },
     [editValues, onSave, onRefetch],
   )
@@ -138,6 +150,28 @@ export function ZeroDayStocktake({
                           [item.nomenclature_id]: e.target.value,
                         }))
                       }
+                      onBlur={() => {
+                        if (skipBlurRef.current) {
+                          skipBlurRef.current = false
+                          return
+                        }
+                        void handleSave(item)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          e.currentTarget.blur() // → onBlur commits the count
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault()
+                          skipBlurRef.current = true
+                          setEditValues((prev) => {
+                            const next = { ...prev }
+                            delete next[item.nomenclature_id]
+                            return next
+                          })
+                          e.currentTarget.blur()
+                        }
+                      }}
                       className={[
                         'w-full rounded border bg-slate-800 px-2 py-1 text-right text-slate-100 outline-none',
                         isEdited ? 'border-emerald-500/50' : 'border-slate-700',
@@ -152,15 +186,16 @@ export function ZeroDayStocktake({
                       : 'Never'}
                   </td>
                   <td className="px-4 py-2">
-                    {isEdited && (
-                      <button
-                        onClick={() => handleSave(item)}
-                        disabled={isSaving}
-                        className="rounded p-1 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
+                    {isSaving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                    ) : isEdited ? (
+                      <span
+                        title="Unsaved — press Enter or click away to save"
+                        className="text-[11px] leading-none text-emerald-400/80"
                       >
-                        <Save className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+                        ●
+                      </span>
+                    ) : null}
                   </td>
                 </tr>
               )
