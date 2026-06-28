@@ -33,7 +33,7 @@ export function PriceLabel({
   const alignCls = align === 'right' ? 'items-end text-right' : 'items-start text-left'
   const wrapCls =
     tone === 'overlay'
-      ? 'rounded-lg bg-slate-950/80 px-2.5 py-1 backdrop-blur'
+      ? 'rounded-lg bg-[var(--s-0)]/80 px-2.5 py-1 ring-1 ring-inset ring-[var(--line)] backdrop-blur'
       : ''
   return (
     <span className={`inline-flex flex-col ${alignCls} ${wrapCls}`}>
