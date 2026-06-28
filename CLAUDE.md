@@ -31,6 +31,7 @@ When unsure → ask: "This sounds like [domain]. Should I load [agent]?"
 - **GRAPH-BEFORE-GREP:** for "what connects to / depends on / where does X live" questions, try `graphify_query_topic` first (cheaper than reading files) → see `operational-rules.md` § LK-GRAPH. Grep stays for exact strings & file contents.
 
 ## Rules (enforced)
+- **Design System:** the brand DS lives in the **shishka-health repo** (`design-system/index.html` living guide + `design-system/MASTER.md` rules) — built from the live site's real tokens (royal-green `#1E3903`, spice-red CTA, gold prices, SF Pro/Albert Sans). Before ANY front-end work, check it; reuse `.shk-*` primitives, reference semantic tokens not raw hex. The admin panel is being migrated to this brand — don't treat the old default-Tailwind `/menu` styling as canon. Full rule: `docs/constitution/technical-rules.md` § RULE-DESIGN-SYSTEM
 - **Commit Gate:** never push until MC task + CURRENT.md updated
 - **Git:** branches `feature/{project}/description`, never commit to `main`
 - **Task lifecycle:** `.claude/skills/task-lifecycle/SKILL.md`

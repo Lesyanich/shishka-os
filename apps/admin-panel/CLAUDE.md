@@ -50,6 +50,7 @@ src/
 - Хуки: camelCase, префикс use-
 - Supabase запросы через lib/supabase.ts, не напрямую из компонентов
 - Tailwind для стилей, никаких CSS файлов
+- **Design System (обязательно):** бренд-дизайн живёт в репо **shishka-health** → `design-system/index.html` (живой гайд) + `design-system/MASTER.md` (правила). Собран из реальных токенов сайта: royal-green `#1E3903`, spice-red CTA `#B62A23`, золотые цены `#F0CE83`, SF Pro/Albert Sans. Перед UI-работой сверься с гайдом; цвета — семантическими токенами, не голым hex. Текущий `/menu` на дефолтном Tailwind — это НЕ дизайн-система; админку планово перекрашиваем под бренд (перенос токенов в `src/index.css @theme`). Полное правило: `../../docs/constitution/technical-rules.md` § RULE-DESIGN-SYSTEM
 - Новые npm зависимости — только после обсуждения
 
 ## Git
