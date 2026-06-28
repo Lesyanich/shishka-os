@@ -85,6 +85,15 @@ MATCHES=$(awk -v prompt="$PROMPT_LC" -v seenfile="$SEEN_FILE" '
 # --- Record suggested tools so they are not repeated this session ---
 printf '%s\n' "$MATCHES" | cut -f1 >> "$SEEN_FILE"
 
+# --- Append to the learning log (P4: feeds /skills-stats acceptance rates) ---
+LOG=".claude/.skill-advisor-log.jsonl"
+TS=$(date -u +%s 2>/dev/null || echo 0)
+TOOLS_JSON=$(printf '%s\n' "$MATCHES" | cut -f1 | jq -R . | jq -s -c .)
+printf '%s' "$PROMPT" | jq -Rsc \
+  --argjson ts "$TS" --arg sid "$SID" --argjson tools "$TOOLS_JSON" \
+  '{ts:$ts, session:$sid, kind:"suggest", tools:$tools, prompt:(.[0:80])}' \
+  >> "$LOG" 2>/dev/null || true
+
 # --- Build a single-line hint ---
 LINE=$(printf '%s\n' "$MATCHES" | awk -F'\t' '{ s = s (s ? "; " : "") $1 " — " $2 } END { print s }')
 CONTEXT="💡 Skill Advisor — this message matches ready-made tools: ${LINE}. Offer the user the most fitting one (per RULE-SKILL-ADVISOR); do not run it silently."

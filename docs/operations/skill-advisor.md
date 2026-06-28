@@ -25,6 +25,11 @@ duplicate it.
 registry against the skills/commands/MCP actually present and flag anything missing a trigger
 row. Run it after installing a new skill or connecting a new MCP server.
 
+**Learning.** The `UserPromptSubmit` hook logs every suggestion and a `PostToolUse` hook logs
+actual tool use to `.claude/.skill-advisor-log.jsonl` (local, gitignored). `/skills-stats`
+(`scripts/skill-advisor-stats.sh`) reports per-tool acceptance rates and flags noisy triggers
+to narrow — keyword edits stay human-confirmed.
+
 ---
 
 ## Domains
