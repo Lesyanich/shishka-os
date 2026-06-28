@@ -1,0 +1,12 @@
+import { chromium } from 'playwright-core';
+const exe = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+import fs from 'fs';
+const browser = await chromium.launch({ executablePath: fs.existsSync(exe)?exe:'/opt/pw-browsers/chromium/chrome-linux/chrome' });
+const page = await browser.newPage({ deviceScaleFactor: 2, viewport:{width:1240,height:2040} });
+await page.goto('file://' + process.cwd() + '/shishka-door-sign.html', { waitUntil:'networkidle' });
+await page.evaluate(async () => { await document.fonts.ready; });
+await page.waitForTimeout(500);
+const el = await page.$('#card');
+await el.screenshot({ path: 'shishka-door-sign.png' });
+await browser.close();
+console.log('done');
