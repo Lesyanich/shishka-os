@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "database-testing": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/database-testing/SKILL.md",
+      "computedHash": "9c7f61c9ccffc7f16c329890b4a8e0e56ba0eb6fec42bda669f77038bcc44db8"
+    },
+    "exploratory-testing": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/exploratory-testing/SKILL.md",
+      "computedHash": "da0c461f95642d67d621b550e73677094ed02990b51bf66fd9b927ade1a6ab2e"
+    },
+    "playwright-automation": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/playwright-automation/SKILL.md",
+      "computedHash": "bbbb613ebc86099bac39a336ce6b72619503941718f928e23b9759aa22dd4976"
+    },
+    "risk-based-testing": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/risk-based-testing/SKILL.md",
+      "computedHash": "ef821d7214ab6db9fbc3439a4d28ea23f16bf9a1dc41c3d24d57080109d05647"
+    },
+    "test-planning": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/test-planning/SKILL.md",
+      "computedHash": "01b1da11a6a9efde9cd49f79771ac08bb216ec8d0eb095c093fd6059b6afa372"
+    },
+    "test-strategy": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/test-strategy/SKILL.md",
+      "computedHash": "5ba58f1b0e0a389c46c1105f37e8b6f92c2c6c1e47f1ec931086e478855ef766"
+    }
+  }
+}

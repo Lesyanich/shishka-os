@@ -52,6 +52,13 @@ to narrow — keyword edits stay human-confirmed.
 - **`/simplify`** — reuse/simplify/refactor changed code (quality only, no bug hunt).
 - **`security-review`** — AppSec audit: injections, XSS, secret leaks, RLS gaps.
 
+### QA / testing (playbooks)
+_Installed 2026-06-28 from `petrkindlmann/qa-skills` (6 of 50; markdown-only; see `skills-lock.json`). These are **playbooks for writing/planning tests** — distinct from `mcp playwright`, which DRIVES a real browser at runtime._
+- **`playwright-automation`** — write production-grade Playwright E2E (Page Object Model, fixtures, parallel, CI). _e.g. "напиши e2e тест", "write a Playwright test"._
+- **`test-planning`** — single sprint/release test plan: scenarios, coverage map, estimation. **`test-strategy`** — multi-quarter QA strategy & test-pyramid. **`risk-based-testing`** — risk matrix (impact × probability), where to focus testing (run first).
+- **`database-testing`** — migration/rollback tests, schema constraints, data integrity, seed data.
+- **`exploratory-testing`** — session-based bug hunting (SBTM, charters, heuristics).
+
 ### Data / Supabase
 - **mcp `supabase`** — migrations (`apply_migration`), `execute_sql`, advisors, logs. Respect RULE-NO-DIRECT-DB-EDITS.
 
@@ -135,4 +142,10 @@ specific. The header and separator rows are skipped by the parser.
 | на интервал,каждые,keep running,run on a loop | `/loop` | run a prompt on a recurring interval |
 | несколько перспектив,red team,devil's advocate,стресс-тест иде,разнеси идею,poke holes | `polyclaude:council` | multi-perspective stress-test of an idea |
 | obsidian,заметк в обсидиан,vault,канвас,obsidian base | `obsidian skills` | Obsidian vault notes / bases / canvas |
+| напиши e2e,напиши тест,page object,playwright тест,write a test,generate test,автотест,test automation | `playwright-automation` | write Playwright E2E tests (POM, fixtures, CI) |
+| план тестов,тест-план,что тестировать,test plan,test planning,coverage map,test estimation | `test-planning` | sprint/release test plan & coverage map |
+| стратегия тестир,qa strategy,test strategy,тест-пирамид,test pyramid,qa roadmap | `test-strategy` | multi-quarter QA strategy & pyramid |
+| риск тестир,риск-матриц,что может сломаться,risk-based,risk matrix,where to focus testing,failure modes | `risk-based-testing` | risk matrix — prioritise what to test |
+| тест базы данн,тест миграц,database test,migration test,rollback test,data integrity,seed data | `database-testing` | DB migration/rollback & data-integrity tests |
+| исследовательск тестир,поиск багов,exploratory testing,bug hunting,sbtm,test charter | `exploratory-testing` | session-based exploratory bug hunting |
 <!-- ADVISOR-MAP-END -->
