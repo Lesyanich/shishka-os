@@ -37,7 +37,7 @@ export function PriceLabel({
       : ''
   return (
     <span className={`inline-flex flex-col ${alignCls} ${wrapCls}`}>
-      <span className="font-mono text-xs font-bold tabular-nums text-emerald-300">
+      <span className="font-mono text-xs font-bold tabular-nums text-honey-300">
         {BAHT}
         {price.toLocaleString()}
       </span>

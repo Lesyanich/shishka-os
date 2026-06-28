@@ -773,7 +773,7 @@ export function OwnerTable({
                     step={1}
                     align="right"
                     ariaLabel={`Edit price for ${dish.name}`}
-                    className="font-mono font-medium tabular-nums text-[color:var(--color-cream)]"
+                    className="font-mono font-medium tabular-nums text-honey-300"
                     format={(v) => (v == null ? '-' : formatThb(v))}
                     isFailed={rowFailed}
                   />
