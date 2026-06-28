@@ -731,6 +731,16 @@ Then paste these sections from GRAPH_REPORT.md directly into the chat:
 
 Do NOT paste the full report - just those three sections. Keep it concise.
 
+### Brain maintenance — Skill Advisor drift check
+
+A graph rebuild is the de-facto weekly brain maintenance, so piggyback the Skill Advisor registry audit here (Shishka OS only — skip if `scripts/skill-advisor-audit.sh` is absent):
+
+```bash
+[ -f scripts/skill-advisor-audit.sh ] && sh scripts/skill-advisor-audit.sh || true
+```
+
+This compares the registry (`docs/operations/skill-advisor.md`) against the skills/commands/MCP actually present. If it reports **MISSING** or **NO TRIGGER** items, the catalogue has drifted — surface them in one line and offer to add the trigger rows (bilingual RU+EN keywords) per RULE-SKILL-ADVISOR. If everything is ✅, say nothing (or a single "advisor registry in sync" line). Never block the graph flow on this.
+
 Then immediately offer to explore. Pick the single most interesting suggested question from the report - the one that crosses the most community boundaries or has the most surprising bridge node - and ask:
 
 > "The most interesting question this graph can answer: **[question]**. Want me to trace it?"
