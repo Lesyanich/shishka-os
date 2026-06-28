@@ -51,6 +51,9 @@ to narrow — keyword edits stay human-confirmed.
 - **`/code-review`** — review the current diff for correctness bugs (add `ultra` for deep cloud review).
 - **`/simplify`** — reuse/simplify/refactor changed code (quality only, no bug hunt).
 - **`security-review`** — AppSec audit: injections, XSS, secret leaks, RLS gaps.
+- **`codereview`** — hard architectural review: anti-patterns, duplication, code smells (whole files, not just diff).
+- **`request-refactor-plan`** _(mattpocock, 83K installs)_ — plan a BIG legacy refactor as tiny safe commits → files a GitHub issue/RFC. Use _before_ touching a large refactor, not for small edits.
+- **`refactor-method-complexity-reduce`** _(github/awesome-copilot, official)_ — cut one over-complex method's cognitive complexity by extracting helper methods.
 
 ### QA / testing (playbooks)
 _Installed 2026-06-28 from `petrkindlmann/qa-skills` (6 of 50; markdown-only; see `skills-lock.json`). These are **playbooks for writing/planning tests** — distinct from `mcp playwright`, which DRIVES a real browser at runtime._
@@ -123,6 +126,8 @@ specific. The header and separator rows are skipped by the parser.
 | упрост,рефактор,simplify,refactor,dead code,cleanup the code | `/simplify` | simplify & refactor changed code |
 | уязвим,инъекц,xss,sql injection,secret leak,security audit,безопасн | `security-review` | security audit (injections, secrets, RLS) |
 | архитектурн ревью,антипаттерн,дублирован,code smell,жёсткое ревью | `codereview` | hard architectural review (antipatterns, duplication) |
+| план рефактор,спланируй рефактор,refactor plan,refactor rfc,refactoring rfc,разбей рефактор на коммит,break refactor into commits | `request-refactor-plan` | plan a big legacy refactor as tiny safe commits (RFC) |
+| слишком сложн метод,сократи сложность,cognitive complexity,reduce complexity,extract method,извлеки метод | `refactor-method-complexity-reduce` | cut one method's cognitive complexity (extract-method) |
 | интерфейс,вёрстк,верстк,лендинг,дашборд,frontend,landing page,новый экран,react компонент,макет,мокап,mockup | `frontend-design` | build distinctive UI (code-first) |
 | скрейп,спарси сайт,открой сайт,браузер,lazada,scrape,browser automation,loyverse back office | `mcp claude-in-chrome` | browser automation & scraping |
 | playwright,e2e тест,end-to-end тест,headless browser,автотест браузер | `mcp playwright` | headless browser / E2E testing |
