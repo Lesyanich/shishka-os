@@ -21,6 +21,10 @@ tasks, the REQUIRED/RECOMMENDED/FORBIDDEN skill set per `kind:*` tag lives in
 `docs/operations/skills-services-policy.md` § Task-Kind Taxonomy — this registry does not
 duplicate it.
 
+**Anti-drift.** Run `sh scripts/skill-advisor-audit.sh` (or `/skills-audit`) to compare this
+registry against the skills/commands/MCP actually present and flag anything missing a trigger
+row. Run it after installing a new skill or connecting a new MCP server.
+
 ---
 
 ## Domains
@@ -50,9 +54,8 @@ duplicate it.
 - **mcp `shishka-graphify`** (`graphify_query_topic`) — "what connects to / depends on / where does X live". GRAPH-BEFORE-GREP.
 - **`Explore` agent** — broad read-only codebase search when scope is uncertain.
 
-### Design / UI / Figma
-- **`frontend-design`** / **`ui-ux-pro-max`** — build distinctive, production-grade UI; styles, palettes, font pairings.
-- **mcp `figma`** — design ↔ code, mockups, design-system sync.
+### Design / UI
+- **`frontend-design`** / **`ui-ux-pro-max`** — build distinctive, production-grade UI; styles, palettes, font pairings. Design is **code-first** (Figma is not used — CEO decision 2026-06-28).
 - **`emil-design-eng`** — UI polish, animation, microinteraction judgment.
 
 ### Browser / desktop automation
@@ -107,13 +110,15 @@ specific. The header and separator rows are skipped by the parser.
 | сделай ревью,проведи ревью,ревью кода,code review,review the diff,review changes,баги в коде | `/code-review` | review diff for correctness bugs |
 | упрост,рефактор,simplify,refactor,dead code,cleanup the code | `/simplify` | simplify & refactor changed code |
 | уязвим,инъекц,xss,sql injection,secret leak,security audit,безопасн | `security-review` | security audit (injections, secrets, RLS) |
-| интерфейс,вёрстк,верстк,лендинг,дашборд,frontend,landing page,новый экран,react компонент | `frontend-design` | build distinctive UI |
-| figma,макет,мокап,mockup,design file | `mcp figma` | Figma design ↔ code |
+| архитектурн ревью,антипаттерн,дублирован,code smell,жёсткое ревью | `codereview` | hard architectural review (antipatterns, duplication) |
+| интерфейс,вёрстк,верстк,лендинг,дашборд,frontend,landing page,новый экран,react компонент,макет,мокап,mockup | `frontend-design` | build distinctive UI (code-first) |
 | скрейп,спарси сайт,открой сайт,браузер,lazada,scrape,browser automation,loyverse back office | `mcp claude-in-chrome` | browser automation & scraping |
+| playwright,e2e тест,end-to-end тест,headless browser,автотест браузер | `mcp playwright` | headless browser / E2E testing |
 | pdf,пдф | `pdf` | read/merge/split PDF |
 | excel,эксель,xlsx,csv,spreadsheet,гугл-таблиц | `xlsx` | spreadsheets |
 | исследован,глубок research,deep research,сравни рынок,market research | `deep-research` | multi-source cited research report |
 | прочитай статью,прочитай страницу,документац,read this article,read this url,clean markdown | `defuddle` | extract clean markdown from a URL |
+| perplexity | `mcp perplexity-docs` | search Perplexity docs |
 | спринт,backlog,бэклог,mission control,list_tasks,новая задач | `mcp shishka-mission-control` | tasks & sprints |
 | создай pr,заверши задач,закончил задач,create pr,finish task,task done,закрой задач | `/task-lifecycle` | task → PR → MC closeout flow |
 | план фаз,execute phase,plan phase,gsd workflow | `gsd-*` | structured plan/execute/debug workflow |
