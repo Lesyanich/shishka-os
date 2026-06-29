@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["src/index.ts", "src/jobs/pack-info-sweep.ts"],
+  "project": ["src/**/*.ts"],
+  "ignore": ["dist/**"]
+}
