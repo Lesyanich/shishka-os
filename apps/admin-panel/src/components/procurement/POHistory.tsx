@@ -3,9 +3,9 @@ import type { PurchaseOrder, POStatus } from '../../types/procurement'
 
 const STATUS_COLORS: Record<POStatus, string> = {
   draft: 'bg-[var(--s-3)] text-cream/80',
-  submitted: 'bg-honey-300/20 text-honey-300',
-  confirmed: 'bg-honey-300/20 text-honey-300',
-  shipped: 'bg-nutri-car/20 text-nutri-car',
+  submitted: 'bg-honey-300/15 text-honey-300',
+  confirmed: 'bg-honey-600/30 text-honey-300',
+  shipped: 'bg-nutri-car/25 text-cream/90',
   partially_received: 'bg-amber-watch/20 text-amber-watch',
   received: 'bg-forest-soft/20 text-mint-200',
   reconciled: 'bg-forest-soft/20 text-mint-200',
@@ -56,7 +56,7 @@ export function POHistory({ orders, isLoading, statusFilter, onFilterChange, onS
             className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition active:scale-95 ${
               statusFilter === s
                 ? 'bg-honey-300/30 text-honey-300'
-                : 'bg-[var(--s-3)] text-cream/60 hover:bg-[var(--s-3)]'
+                : 'bg-[var(--s-2)] text-cream/60 hover:bg-[var(--s-3)]'
             }`}
           >
             {s === 'all' ? 'All' : STATUS_LABELS[s]}
@@ -88,7 +88,7 @@ export function POHistory({ orders, isLoading, statusFilter, onFilterChange, onS
             <button
               key={po.id}
               onClick={() => onSelect(po)}
-              className="group flex w-full items-center gap-3 rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] p-3 text-left transition hover:border-honey-300/30 hover:bg-[var(--s-2)] active:scale-[0.99]"
+              className="group flex w-full items-center gap-3 rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] p-3 text-left transition hover:border-honey-300/30 hover:bg-[var(--s-3)] active:scale-[0.99]"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">

@@ -5,7 +5,7 @@ import type { PriceSummaryRow, PriceQuoteRow, SourceFamily, RpcResult } from '..
 const SOURCE_BADGE: Record<SourceFamily, { label: string; cls: string }> = {
   quote: { label: 'Quote', cls: 'bg-forest-soft/20 text-mint-200 ring-forest-soft/40' },
   receipt: { label: 'Receipt', cls: 'bg-honey-300/20 text-honey-300 ring-honey-300/40' },
-  scrape: { label: 'Catalog', cls: 'bg-nutri-car/20 text-nutri-car ring-nutri-car/40' },
+  scrape: { label: 'Catalog', cls: 'bg-nutri-car/25 text-cream/90 ring-nutri-car/50' },
   manual: { label: 'Manual', cls: 'bg-[var(--s-3)] text-cream/80 ring-[var(--line-strong)]' },
 }
 

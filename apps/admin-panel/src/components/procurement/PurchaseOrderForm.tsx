@@ -287,7 +287,7 @@ export function PurchaseOrderForm({
         <button
           type="button"
           onClick={addLine}
-          className="flex items-center gap-1.5 text-xs text-honey-300 transition hover:text-honey-300"
+          className="flex items-center gap-1.5 text-xs text-honey-300/85 transition hover:text-honey-300"
         >
           <Plus className="h-3.5 w-3.5" />
           Add item

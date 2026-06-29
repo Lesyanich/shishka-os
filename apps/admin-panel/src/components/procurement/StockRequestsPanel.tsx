@@ -115,7 +115,7 @@ export function StockRequestsPanel({ onAddToPO }: Props) {
           >
             <button
               onClick={() => toggle(req.id)}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-[var(--s-2)]"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-[var(--s-3)]"
             >
               {isOpen ? (
                 <ChevronDown className="h-4 w-4 shrink-0 text-cream/45" />
@@ -176,7 +176,7 @@ export function StockRequestsPanel({ onAddToPO }: Props) {
                       </button>
                       <button
                         onClick={() => updateStatus(req.id, 'archived')}
-                        className="flex items-center justify-center gap-1.5 rounded-lg border border-[var(--line-strong)] px-3 py-2 text-xs text-cream/60 transition hover:bg-[var(--s-2)]"
+                        className="flex items-center justify-center gap-1.5 rounded-lg border border-[var(--line-strong)] px-3 py-2 text-xs text-cream/60 transition hover:bg-[var(--s-3)]"
                       >
                         <Archive className="h-3.5 w-3.5" />
                       </button>
