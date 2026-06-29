@@ -9,7 +9,7 @@ export type ShoppingStore =
   | 'tops'
   | 'other'
 
-export type ShoppingStatus = 'needed' | 'bought' | 'cancelled'
+export type ShoppingStatus = 'needed' | 'bought' | 'cancelled' | 'ordered'
 
 export const SHOPPING_STORES: ShoppingStore[] = [
   'makro',
