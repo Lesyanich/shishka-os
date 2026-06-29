@@ -23,7 +23,7 @@ const SEGMENTS: SegmentConfig[] = [
 
 export function SegmentBar({ active, onChange, counts }: SegmentBarProps) {
   return (
-    <div className="flex gap-1 rounded-xl border border-slate-800/50 bg-slate-900/50 p-1 w-fit">
+    <div className="flex gap-1 rounded-xl border border-[var(--line)] bg-[var(--s-1)] p-1 w-fit">
       {SEGMENTS.map(({ key, label, icon: Icon }) => {
         const isActive = active === key
         return (
@@ -33,9 +33,7 @@ export function SegmentBar({ active, onChange, counts }: SegmentBarProps) {
             onClick={() => onChange(key)}
             className={[
               'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors',
-              isActive
-                ? 'bg-slate-800 text-slate-100 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200',
+              isActive ? 'bg-[var(--s-2)] text-cream shadow-sm' : 'text-cream/60 hover:text-cream',
             ].join(' ')}
           >
             <Icon size={13} />
@@ -43,9 +41,7 @@ export function SegmentBar({ active, onChange, counts }: SegmentBarProps) {
             <span
               className={[
                 'rounded-md px-1.5 py-0.5 text-[10px] font-mono leading-none',
-                isActive
-                  ? 'bg-emerald-500/15 text-emerald-400'
-                  : 'bg-slate-700/50 text-slate-500',
+                isActive ? 'bg-forest-soft/15 text-mint-200' : 'bg-[var(--s-3)] text-cream/45',
               ].join(' ')}
             >
               {counts[key]}

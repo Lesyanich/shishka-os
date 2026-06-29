@@ -13,7 +13,11 @@ import {
   X,
 } from 'lucide-react'
 import { useAppRole } from '../../contexts/AppRoleContext'
-import { usePackInfoPending, type PendingCard, type PendingDecision } from '../../hooks/usePackInfoPending'
+import {
+  usePackInfoPending,
+  type PendingCard,
+  type PendingDecision,
+} from '../../hooks/usePackInfoPending'
 
 // ── Source labels (resolver Source enum) ──
 
@@ -27,10 +31,10 @@ const SOURCE_LABEL: Record<string, string> = {
 // ── Confidence presentation ──
 
 function confidenceTone(conf: number | null): string {
-  if (conf == null) return 'bg-slate-700/40 text-slate-300 border-slate-600/40'
-  if (conf >= 0.9) return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'
-  if (conf >= 0.5) return 'bg-amber-500/15 text-amber-300 border-amber-500/25'
-  return 'bg-rose-500/15 text-rose-300 border-rose-500/25'
+  if (conf == null) return 'bg-[var(--s-3)] text-cream/80 border-[var(--line-strong)]'
+  if (conf >= 0.9) return 'bg-forest-soft/15 text-mint-200 border-forest-soft/25'
+  if (conf >= 0.5) return 'bg-amber-watch/15 text-amber-watch border-amber-watch/25'
+  return 'bg-brick-soft/15 text-brick-bright border-brick-soft/25'
 }
 
 function formatConfidence(conf: number | null): string {
@@ -70,20 +74,20 @@ function DecisionRow({ decision }: DecisionRowProps) {
 
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-slate-400">
+      <span className="rounded bg-[var(--s-2)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-cream/60">
         {label}
       </span>
-      <span className="font-mono text-slate-400">{decision.old_value || '∅'}</span>
-      <span className="text-slate-600">→</span>
-      <span className="font-mono text-slate-200">{decision.new_value || '∅'}</span>
+      <span className="font-mono text-cream/60">{decision.old_value || '∅'}</span>
+      <span className="text-cream/30">→</span>
+      <span className="font-mono text-cream">{decision.new_value || '∅'}</span>
       {decision.decision_source === 'rule_auto_conflict' && (
-        <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
+        <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-amber-watch/15 px-1.5 py-0.5 text-[10px] text-amber-watch">
           <AlertTriangle size={10} />
           conflict
         </span>
       )}
       {decision.decision_source === 'rule_auto_cost_pending' && (
-        <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-300">
+        <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-honey-300/15 px-1.5 py-0.5 text-[10px] text-honey-300">
           <ShieldAlert size={10} />
           BOM-impact
         </span>
@@ -110,7 +114,7 @@ function PendingCardView({ card, approve, reject }: PendingCardViewProps) {
   const [actions, setActions] = useState<Record<string, CardActionState>>({})
 
   const setActionState = (id: string, state: CardActionState) =>
-    setActions(prev => ({ ...prev, [id]: state }))
+    setActions((prev) => ({ ...prev, [id]: state }))
 
   const handle = useCallback(
     async (decisionId: string, kind: 'approve' | 'reject') => {
@@ -127,32 +131,30 @@ function PendingCardView({ card, approve, reject }: PendingCardViewProps) {
 
   // Aggregate conflicts across all decisions in the card.
   const conflicts = useMemo(
-    () => card.decisions.flatMap(d => extractConflicts(d)),
+    () => card.decisions.flatMap((d) => extractConflicts(d)),
     [card.decisions],
   )
 
   return (
-    <div className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-3">
+    <div className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] p-3">
       {/* Header row */}
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <Package size={14} className="text-slate-500" />
+            <Package size={14} className="text-cream/45" />
             {card.product_code && (
-              <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
+              <span className="rounded bg-[var(--s-2)] px-1.5 py-0.5 font-mono text-[10px] text-cream/80">
                 {card.product_code}
               </span>
             )}
-            <span className="truncate text-sm font-medium text-slate-100">
-              {card.product_name}
-            </span>
+            <span className="truncate text-sm font-medium text-cream">{card.product_name}</span>
             {card.current_base_unit && (
-              <span className="rounded border border-slate-700 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
+              <span className="rounded border border-[var(--line-strong)] px-1.5 py-0.5 font-mono text-[10px] text-cream/60">
                 now: {card.current_base_unit}
               </span>
             )}
           </div>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-cream/45">
             <span
               className={[
                 'rounded border px-1.5 py-0.5 font-mono tabular-nums',
@@ -162,11 +164,11 @@ function PendingCardView({ card, approve, reject }: PendingCardViewProps) {
               conf {formatConfidence(card.max_confidence)}
             </span>
             {card.source && (
-              <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
+              <span className="rounded bg-[var(--s-2)] px-1.5 py-0.5 text-[10px] text-cream/60">
                 {SOURCE_LABEL[card.source] ?? card.source}
               </span>
             )}
-            <span className="text-slate-600">
+            <span className="text-cream/30">
               {new Date(card.latest_decided_at).toLocaleString()}
             </span>
           </div>
@@ -175,17 +177,20 @@ function PendingCardView({ card, approve, reject }: PendingCardViewProps) {
 
       {/* Decision rows */}
       <div className="mt-3 flex flex-col gap-1.5">
-        {card.decisions.map(d => {
+        {card.decisions.map((d) => {
           const action = actions[d.id] ?? { status: 'idle' as const }
           return (
             <div
               key={d.id}
-              className="flex items-center justify-between gap-2 rounded-lg border border-slate-800/40 bg-slate-950/40 px-2 py-1.5"
+              className="flex items-center justify-between gap-2 rounded-lg border border-[var(--line)] bg-black/70 px-2 py-1.5"
             >
               <DecisionRow decision={d} />
               <div className="flex shrink-0 items-center gap-1">
                 {action.status === 'error' && action.message && (
-                  <span className="max-w-[200px] truncate text-[10px] text-rose-400" title={action.message}>
+                  <span
+                    className="max-w-[200px] truncate text-[10px] text-brick-bright"
+                    title={action.message}
+                  >
                     {action.message}
                   </span>
                 )}
@@ -196,8 +201,8 @@ function PendingCardView({ card, approve, reject }: PendingCardViewProps) {
                   className={[
                     'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
                     action.status === 'working'
-                      ? 'bg-slate-700 text-slate-400'
-                      : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25',
+                      ? 'bg-[var(--s-3)] text-cream/60'
+                      : 'bg-forest-soft/15 text-mint-200 hover:bg-forest-soft/25',
                   ].join(' ')}
                 >
                   {action.status === 'working' ? (
@@ -214,8 +219,8 @@ function PendingCardView({ card, approve, reject }: PendingCardViewProps) {
                   className={[
                     'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
                     action.status === 'working'
-                      ? 'bg-slate-700 text-slate-400'
-                      : 'bg-rose-500/15 text-rose-300 hover:bg-rose-500/25',
+                      ? 'bg-[var(--s-3)] text-cream/60'
+                      : 'bg-brick-soft/15 text-brick-bright hover:bg-brick-soft/25',
                   ].join(' ')}
                 >
                   <X size={11} />
@@ -232,23 +237,21 @@ function PendingCardView({ card, approve, reject }: PendingCardViewProps) {
         <div className="mt-2">
           <button
             type="button"
-            onClick={() => setShowConflicts(prev => !prev)}
-            className="inline-flex items-center gap-1 text-[11px] text-amber-300 hover:text-amber-200"
+            onClick={() => setShowConflicts((prev) => !prev)}
+            className="inline-flex items-center gap-1 text-[11px] text-amber-watch/85 hover:text-amber-watch"
           >
             {showConflicts ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             {conflicts.length} conflicting candidate{conflicts.length === 1 ? '' : 's'}
           </button>
           {showConflicts && (
-            <div className="mt-2 flex flex-col gap-1 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2">
+            <div className="mt-2 flex flex-col gap-1 rounded-lg border border-amber-watch/20 bg-amber-watch/5 p-2">
               {conflicts.map((c, idx) => (
                 <div key={idx} className="flex items-center gap-2 text-[11px]">
-                  <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
+                  <span className="rounded bg-[var(--s-2)] px-1.5 py-0.5 font-mono text-[10px] text-cream/60">
                     {c.source ?? 'unknown'}
                   </span>
-                  <span className="font-mono text-slate-200">
-                    {c.pack_info?.package_weight ?? '—'}
-                  </span>
-                  <span className="text-slate-500">
+                  <span className="font-mono text-cream">{c.pack_info?.package_weight ?? '—'}</span>
+                  <span className="text-cream/45">
                     qty {c.pack_info?.package_qty ?? '?'} {c.pack_info?.package_unit ?? ''}
                   </span>
                 </div>
@@ -275,13 +278,13 @@ export function PackInfoPendingSection() {
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-cream/45">
           Pending review · Pack-Info
         </h3>
         <button
           type="button"
           onClick={() => void refetch()}
-          className="inline-flex items-center gap-1 rounded-md border border-slate-800 bg-slate-900/40 px-2 py-1 text-[10px] text-slate-400 hover:bg-slate-800"
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--s-1)] px-2 py-1 text-[10px] text-cream/60 hover:bg-[var(--s-2)]"
         >
           <RefreshCw size={10} />
           Refresh
@@ -289,35 +292,30 @@ export function PackInfoPendingSection() {
       </div>
 
       {isLoading && (
-        <div className="flex items-center gap-2 rounded-xl border border-slate-800/60 bg-slate-900/30 px-4 py-3 text-[11px] text-slate-500">
+        <div className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--s-1)] px-4 py-3 text-[11px] text-cream/45">
           <Loader2 size={12} className="animate-spin" />
           Loading pending decisions…
         </div>
       )}
 
       {error && !isLoading && (
-        <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/5 px-4 py-3 text-[11px] text-rose-300">
+        <div className="flex items-center gap-2 rounded-xl border border-brick-soft/30 bg-brick-soft/5 px-4 py-3 text-[11px] text-brick-bright">
           <AlertOctagon size={12} />
           {error}
         </div>
       )}
 
       {!isLoading && !error && cards.length === 0 && (
-        <div className="flex items-center gap-2 rounded-xl border border-slate-800/60 bg-slate-900/30 px-4 py-3 text-[11px] text-slate-500">
-          <CheckCircle2 size={12} className="text-emerald-400" />
+        <div className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--s-1)] px-4 py-3 text-[11px] text-cream/45">
+          <CheckCircle2 size={12} className="text-mint-200" />
           No pending pack-info decisions.
         </div>
       )}
 
       {!isLoading && !error && cards.length > 0 && (
         <div className="flex flex-col gap-2">
-          {cards.map(card => (
-            <PendingCardView
-              key={card.entity_id}
-              card={card}
-              approve={approve}
-              reject={reject}
-            />
+          {cards.map((card) => (
+            <PendingCardView key={card.entity_id} card={card} approve={approve} reject={reject} />
           ))}
         </div>
       )}

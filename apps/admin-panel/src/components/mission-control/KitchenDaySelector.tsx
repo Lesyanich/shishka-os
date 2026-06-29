@@ -7,7 +7,7 @@ export interface DayInfo {
 
 export interface KitchenDaySelectorProps {
   days: DayInfo[]
-  selectedDate: string  // YYYY-MM-DD
+  selectedDate: string // YYYY-MM-DD
   onSelect: (dateStr: string) => void
   todayStr: string
 }
@@ -47,8 +47,8 @@ export function KitchenDaySelector({
               'relative flex flex-col items-center gap-0.5 rounded-xl border px-3 py-2',
               'min-w-[64px] flex-shrink-0 transition-colors duration-150',
               isSelected
-                ? 'border-orange-500/25 bg-orange-500/10 text-orange-400'
-                : 'border-slate-800/60 bg-slate-900/40 text-slate-400 hover:border-slate-700/60 hover:text-slate-300',
+                ? 'border-amber-watch/25 bg-amber-watch/10 text-amber-watch'
+                : 'border-[var(--line)] bg-[var(--s-1)] text-cream/60 hover:border-[var(--line-strong)] hover:text-cream/80',
             ].join(' ')}
           >
             {/* Day name */}
@@ -57,26 +57,28 @@ export function KitchenDaySelector({
             </span>
 
             {/* Date number */}
-            <span className={[
-              'text-base font-bold leading-none',
-              isSelected ? 'text-orange-300' : 'text-slate-200',
-            ].join(' ')}>
+            <span
+              className={[
+                'text-base font-bold leading-none',
+                isSelected ? 'text-amber-watch' : 'text-cream',
+              ].join(' ')}
+            >
               {date.getDate()}
             </span>
 
             {/* Task count badge */}
-            <span className={[
-              'rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none',
-              isSelected
-                ? 'bg-orange-500/20 text-orange-300'
-                : 'bg-slate-800/80 text-slate-500',
-            ].join(' ')}>
+            <span
+              className={[
+                'rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none',
+                isSelected ? 'bg-amber-watch/20 text-amber-watch' : 'bg-[var(--s-2)] text-cream/45',
+              ].join(' ')}
+            >
               {taskCount}
             </span>
 
             {/* Today dot */}
             {isToday && (
-              <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-orange-400" />
+              <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-amber-watch" />
             )}
           </button>
         )

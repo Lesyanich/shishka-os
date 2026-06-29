@@ -43,10 +43,17 @@ export function QuickAddForm({ onSubmit, onCancel, activeDomain }: QuickAddFormP
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border border-slate-700/50 bg-slate-900/80 p-4 space-y-3">
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-xl border border-[var(--line-strong)] bg-[var(--s-1)] p-4 space-y-3"
+    >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-200">Quick Add Task</h3>
-        <button type="button" onClick={onCancel} className="text-slate-500 hover:text-slate-300 transition">
+        <h3 className="text-sm font-semibold text-cream">Quick Add Task</h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-cream/45 hover:text-cream/80 transition"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -57,7 +64,7 @@ export function QuickAddForm({ onSubmit, onCancel, activeDomain }: QuickAddFormP
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Task title..."
-        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+        className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] px-3 py-2 text-sm text-cream placeholder:text-cream/45 focus:border-forest-soft/50 focus:outline-none focus:ring-1 focus:ring-forest-soft/30"
       />
 
       {/* Domain + Priority row */}
@@ -65,16 +72,18 @@ export function QuickAddForm({ onSubmit, onCancel, activeDomain }: QuickAddFormP
         <select
           value={domain}
           onChange={(e) => setDomain(e.target.value as TaskDomain)}
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 focus:border-emerald-500/50 focus:outline-none"
+          className="flex-1 rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] px-3 py-2 text-sm text-cream focus:border-forest-soft/50 focus:outline-none"
         >
           {DOMAINS.map((d) => (
-            <option key={d.id} value={d.id}>{d.label}</option>
+            <option key={d.id} value={d.id}>
+              {d.label}
+            </option>
           ))}
         </select>
         <select
           value={priority}
           onChange={(e) => setPriority(e.target.value as TaskPriority)}
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 focus:border-emerald-500/50 focus:outline-none"
+          className="flex-1 rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] px-3 py-2 text-sm text-cream focus:border-forest-soft/50 focus:outline-none"
         >
           <option value="critical">🔴 Critical</option>
           <option value="high">🟠 High</option>
@@ -89,17 +98,17 @@ export function QuickAddForm({ onSubmit, onCancel, activeDomain }: QuickAddFormP
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)..."
         rows={2}
-        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none resize-none"
+        className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] px-3 py-2 text-sm text-cream placeholder:text-cream/45 focus:border-forest-soft/50 focus:outline-none resize-none"
       />
 
       {/* Assigned + Due date row */}
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <User className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
+          <User className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-cream/45" />
           <select
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
-            className="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800 pl-8 pr-3 py-2 text-sm text-slate-200 focus:border-emerald-500/50 focus:outline-none"
+            className="w-full appearance-none rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] pl-8 pr-3 py-2 text-sm text-cream focus:border-forest-soft/50 focus:outline-none"
           >
             <option value="">Unassigned</option>
             {people.map((p) => (
@@ -110,12 +119,12 @@ export function QuickAddForm({ onSubmit, onCancel, activeDomain }: QuickAddFormP
           </select>
         </div>
         <div className="relative flex-1">
-          <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
+          <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-cream/45" />
           <input
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 pl-8 pr-3 py-2 text-sm text-slate-200 focus:border-emerald-500/50 focus:outline-none"
+            className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] pl-8 pr-3 py-2 text-sm text-cream focus:border-forest-soft/50 focus:outline-none"
           />
         </div>
       </div>
@@ -125,14 +134,14 @@ export function QuickAddForm({ onSubmit, onCancel, activeDomain }: QuickAddFormP
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition"
+          className="rounded-lg px-3 py-1.5 text-xs text-cream/60 hover:text-cream transition"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!title.trim()}
-          className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          className="rounded-lg bg-[var(--color-royal-green)] px-4 py-1.5 text-xs font-medium text-white hover:bg-[var(--color-royal-soft)] disabled:opacity-40 disabled:cursor-not-allowed transition"
         >
           Add Task
         </button>

@@ -117,47 +117,47 @@ const SEVERITY_ORDER: HealthSeverity[] = ['error', 'warning', 'action', 'info']
 // ── Severity presentation ──
 
 function severityChip(severity: HealthSeverity, count: number): string {
-  if (count === 0) return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'
+  if (count === 0) return 'bg-forest-soft/15 text-mint-200 border-forest-soft/25'
   switch (severity) {
     case 'error':
-      return 'bg-rose-500/15 text-rose-300 border-rose-500/25'
+      return 'bg-brick-soft/15 text-brick-bright border-brick-soft/25'
     case 'warning':
-      return 'bg-amber-500/15 text-amber-300 border-amber-500/25'
+      return 'bg-amber-watch/15 text-amber-watch border-amber-watch/25'
     case 'action':
-      return 'bg-sky-500/15 text-sky-300 border-sky-500/25'
+      return 'bg-honey-300/15 text-honey-300 border-honey-300/25'
     case 'info':
     default:
-      return 'bg-slate-500/15 text-slate-300 border-slate-500/25'
+      return 'bg-[var(--s-3)] text-cream/80 border-[var(--line-strong)]'
   }
 }
 
 function severityIcon(severity: HealthSeverity, count: number) {
-  if (count === 0) return <CheckCircle2 size={14} className="text-emerald-400" />
+  if (count === 0) return <CheckCircle2 size={14} className="text-mint-200" />
   switch (severity) {
     case 'error':
-      return <AlertOctagon size={14} className="text-rose-400" />
+      return <AlertOctagon size={14} className="text-brick-bright" />
     case 'warning':
-      return <AlertTriangle size={14} className="text-amber-400" />
+      return <AlertTriangle size={14} className="text-amber-watch" />
     case 'action':
-      return <Wrench size={14} className="text-sky-400" />
+      return <Wrench size={14} className="text-honey-300" />
     case 'info':
     default:
-      return <Info size={14} className="text-slate-400" />
+      return <Info size={14} className="text-cream/60" />
   }
 }
 
 function scoreColor(score: number): string {
-  if (score >= 90) return 'text-emerald-400'
-  if (score >= 70) return 'text-amber-400'
-  if (score >= 40) return 'text-orange-400'
-  return 'text-rose-400'
+  if (score >= 90) return 'text-mint-200'
+  if (score >= 70) return 'text-amber-watch'
+  if (score >= 40) return 'text-nutri-fat'
+  return 'text-brick-bright'
 }
 
 function scoreStroke(score: number): string {
-  if (score >= 90) return 'stroke-emerald-400'
-  if (score >= 70) return 'stroke-amber-400'
-  if (score >= 40) return 'stroke-orange-400'
-  return 'stroke-rose-400'
+  if (score >= 90) return 'stroke-mint-200'
+  if (score >= 70) return 'stroke-amber-watch'
+  if (score >= 40) return 'stroke-nutri-fat'
+  return 'stroke-brick-bright'
 }
 
 // ── Score ring (SVG) ──
@@ -171,13 +171,7 @@ function ScoreRing({ score }: { score: number }) {
   return (
     <div className="relative inline-flex h-28 w-28 items-center justify-center">
       <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          className="fill-none stroke-slate-800"
-          strokeWidth="8"
-        />
+        <circle cx="50" cy="50" r={radius} className="fill-none stroke-cream/30" strokeWidth="8" />
         <circle
           cx="50"
           cy="50"
@@ -191,7 +185,7 @@ function ScoreRing({ score }: { score: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className={`text-2xl font-bold tabular-nums ${scoreColor(clamped)}`}>{clamped}</span>
-        <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-cream/45">
           of 100
         </span>
       </div>
@@ -222,18 +216,18 @@ function ItemRow({ item, metric, onCreateTask }: ItemRowProps) {
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-800/60 bg-slate-900/30 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--s-1)] px-3 py-2">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {item.product_code && (
-            <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
+            <span className="rounded bg-[var(--s-2)] px-1.5 py-0.5 font-mono text-[10px] text-cream/80">
               {item.product_code}
             </span>
           )}
-          <span className="truncate text-sm text-slate-200">{item.name}</span>
+          <span className="truncate text-sm text-cream">{item.name}</span>
         </div>
         {item.extra_json && Object.keys(item.extra_json).length > 0 && (
-          <div className="mt-0.5 truncate text-[11px] text-slate-500">
+          <div className="mt-0.5 truncate text-[11px] text-cream/45">
             {Object.entries(item.extra_json)
               .filter(([, v]) => v !== null && v !== undefined && v !== '')
               .map(([k, v]) => `${k}: ${String(v)}`)
@@ -248,10 +242,10 @@ function ItemRow({ item, metric, onCreateTask }: ItemRowProps) {
         className={[
           'shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
           state === 'done'
-            ? 'bg-emerald-500/15 text-emerald-300'
+            ? 'bg-forest-soft/15 text-mint-200'
             : state === 'creating'
-              ? 'bg-slate-700 text-slate-400'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-slate-100',
+              ? 'bg-[var(--s-3)] text-cream/60'
+              : 'bg-[var(--s-2)] text-cream/80 hover:bg-[var(--s-3)] hover:text-cream',
         ].join(' ')}
       >
         {state === 'creating' ? (
@@ -304,26 +298,26 @@ function MetricCard({ metric, fetchItems, onCreateTask }: MetricCardProps) {
   const clickable = metric.val > 0
 
   return (
-    <div className="rounded-xl border border-slate-800/60 bg-slate-900/30">
+    <div className="rounded-xl border border-[var(--line)] bg-[var(--s-1)]">
       <button
         type="button"
         onClick={toggle}
         disabled={!clickable}
         className={[
           'flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors',
-          clickable ? 'hover:bg-slate-900/60' : 'cursor-default',
+          clickable ? 'hover:bg-[var(--s-1)]' : 'cursor-default',
         ].join(' ')}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {severityIcon(metric.severity, metric.val)}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-100">{meta.label}</span>
-              <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-slate-500">
+              <span className="text-sm font-medium text-cream">{meta.label}</span>
+              <span className="rounded bg-[var(--s-2)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-cream/45">
                 {meta.entityScope}
               </span>
             </div>
-            <p className="truncate text-[11px] text-slate-500">{meta.description}</p>
+            <p className="truncate text-[11px] text-cream/45">{meta.description}</p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -337,27 +331,27 @@ function MetricCard({ metric, fetchItems, onCreateTask }: MetricCardProps) {
           </span>
           {clickable &&
             (expanded ? (
-              <ChevronDown size={14} className="text-slate-500" />
+              <ChevronDown size={14} className="text-cream/45" />
             ) : (
-              <ChevronRight size={14} className="text-slate-500" />
+              <ChevronRight size={14} className="text-cream/45" />
             ))}
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-800/60 px-3 py-2">
+        <div className="border-t border-[var(--line)] px-3 py-2">
           {loading && (
-            <div className="flex items-center gap-2 py-3 text-[11px] text-slate-500">
+            <div className="flex items-center gap-2 py-3 text-[11px] text-cream/45">
               <Loader2 size={12} className="animate-spin" />
               Loading items…
             </div>
           )}
           {!loading && items && items.length === 0 && (
-            <div className="py-3 text-[11px] text-slate-500">No items to show.</div>
+            <div className="py-3 text-[11px] text-cream/45">No items to show.</div>
           )}
           {!loading && items && items.length > 0 && (
             <div className="flex flex-col gap-1.5 py-1">
-              {items.map(item => (
+              {items.map((item) => (
                 <ItemRow
                   key={`${item.metric}-${item.entity_id}`}
                   item={item}
@@ -397,13 +391,11 @@ export function DataHealthTab({ addTask }: DataHealthTabProps) {
   }, [metrics])
 
   const stats = useMemo(() => {
-    const critical = metrics
-      .filter(m => m.severity === 'error')
-      .reduce((s, m) => s + m.val, 0)
+    const critical = metrics.filter((m) => m.severity === 'error').reduce((s, m) => s + m.val, 0)
     const warnings = metrics
-      .filter(m => m.severity === 'warning' || m.severity === 'action')
+      .filter((m) => m.severity === 'warning' || m.severity === 'action')
       .reduce((s, m) => s + m.val, 0)
-    const allClear = metrics.filter(m => m.val === 0).length
+    const allClear = metrics.filter((m) => m.val === 0).length
     return { critical, warnings, allClear }
   }, [metrics])
 
@@ -453,7 +445,7 @@ export function DataHealthTab({ addTask }: DataHealthTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 py-20 text-slate-500">
+      <div className="flex items-center gap-2 py-20 text-cream/45">
         <Loader2 size={14} className="animate-spin" />
         <span className="text-sm">Loading data health metrics…</span>
       </div>
@@ -462,13 +454,13 @@ export function DataHealthTab({ addTask }: DataHealthTabProps) {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center gap-2 py-20 text-rose-400">
+      <div className="flex flex-col items-center gap-2 py-20 text-brick-bright">
         <AlertOctagon size={22} />
         <p className="text-sm">Failed to load: {error}</p>
         <button
           type="button"
           onClick={() => refetch()}
-          className="mt-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-200 hover:bg-slate-700"
+          className="mt-2 rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 py-1 text-xs text-cream hover:bg-[var(--s-3)]"
         >
           Retry
         </button>
@@ -479,7 +471,7 @@ export function DataHealthTab({ addTask }: DataHealthTabProps) {
   return (
     <div className="flex flex-col gap-5">
       {/* Header: score ring + stats */}
-      <div className="flex flex-wrap items-center gap-6 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-5">
+      <div className="flex flex-wrap items-center gap-6 rounded-2xl border border-[var(--line)] bg-[var(--s-1)] p-5">
         <ScoreRing score={healthScore} />
         <div className="flex flex-1 flex-wrap gap-4">
           <StatBlock label="Critical" value={stats.critical} tone="error" />
@@ -489,7 +481,7 @@ export function DataHealthTab({ addTask }: DataHealthTabProps) {
         <button
           type="button"
           onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] px-3 py-1.5 text-xs text-cream hover:bg-[var(--s-3)]"
         >
           <RefreshCw size={12} />
           Refresh
@@ -497,12 +489,12 @@ export function DataHealthTab({ addTask }: DataHealthTabProps) {
       </div>
 
       {/* Sections by severity */}
-      {SEVERITY_ORDER.map(sev => {
+      {SEVERITY_ORDER.map((sev) => {
         const bucket = byGroup.get(sev) ?? []
         if (bucket.length === 0) return null
         return (
           <section key={sev} className="flex flex-col gap-2">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-cream/45">
               {sev === 'error'
                 ? 'Errors'
                 : sev === 'warning'
@@ -512,7 +504,7 @@ export function DataHealthTab({ addTask }: DataHealthTabProps) {
                     : 'Info'}
             </h3>
             <div className="flex flex-col gap-2">
-              {bucket.map(m => (
+              {bucket.map((m) => (
                 <MetricCard
                   key={m.metric}
                   metric={m}
@@ -544,13 +536,13 @@ function StatBlock({
 }) {
   const toneCls =
     tone === 'error'
-      ? 'text-rose-300'
+      ? 'text-brick-bright'
       : tone === 'warning'
-        ? 'text-amber-300'
-        : 'text-emerald-300'
+        ? 'text-amber-watch'
+        : 'text-mint-200'
   return (
-    <div className="min-w-[96px] rounded-lg border border-slate-800/60 bg-slate-900/40 px-3 py-2">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{label}</div>
+    <div className="min-w-[96px] rounded-lg border border-[var(--line)] bg-[var(--s-1)] px-3 py-2">
+      <div className="text-[10px] font-medium uppercase tracking-wider text-cream/45">{label}</div>
       <div className={`text-xl font-semibold tabular-nums ${toneCls}`}>{value}</div>
     </div>
   )
