@@ -3,7 +3,10 @@
 // Push categories + SALE-* menu items to Loyverse POS, and
 // pull / manage modifier lists.
 //
-// Auth: Bearer token from LOYVERSE_API_TOKEN env var
+// Outbound auth: Bearer token from LOYVERSE_API_TOKEN env var.
+// Inbound auth: requires an authenticated Supabase user (admin-panel session).
+// Runs with the service-role key + verify_jwt:false, so an inbound guard is
+// mandatory — see docs/security/service-role-isolation-audit-2026-06-29.md (F1).
 // ═══════════════════════════════════════════════════════════
 
 import { createClient } from "npm:@supabase/supabase-js@2"
@@ -920,8 +923,28 @@ async function handlePullItemsStatus() {
   return json({ ok: true, total: rows.length, with_photo: withPhoto, deleted, failed_chunks: failedChunks })
 }
 
+// ── Auth guard ──────────────────────────────────────────────
+// loyverse-sync runs with the service-role key (full RLS bypass) and is
+// deployed with verify_jwt:false. Every real caller is an admin-panel hook
+// that already sends the signed-in user's access token in the Authorization
+// header, so we require a real authenticated Supabase user. The bare anon
+// apikey is itself a valid JWT but maps to NO user, so getUser() rejects it —
+// closing the public-invocation hole.
+async function isAuthedUser(req: Request): Promise<boolean> {
+  const authz = req.headers.get("Authorization") ?? ""
+  const token = authz.startsWith("Bearer ") ? authz.slice(7).trim() : ""
+  if (!token) return false
+  try {
+    const { data, error } = await db.auth.getUser(token)
+    return !error && !!data?.user
+  } catch {
+    return false // fail closed: auth-server hiccup → unauthorized, never a bare 500
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
+  if (!(await isAuthedUser(req))) return json({ ok: false, error: "unauthorized" }, 401)
   try {
     if (!LOYVERSE_TOKEN) return json({ ok: false, error: "LOYVERSE_API_TOKEN not set" }, 500)
     const url = new URL(req.url)

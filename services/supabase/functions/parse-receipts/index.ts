@@ -1,12 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// DEPRECATED — 2026-04-06
-// This edge function is LEGACY code. DO NOT USE, DO NOT DEPLOY.
-// Was: proxy to GAS ReceiptParser. Replaced by Finance Agent.
-// See: agents/finance/AGENT.md, STATUS.md → Receipt Pipeline State
-// Tracking: Initiative 96f18092, Task a35ff4e5
-// ═══════════════════════════════════════════════════════════
 // Edge Function: parse-receipts (PROXY MODE v2)
 // Phase 5.0c: Zero Body-Read Architecture
+// ═══════════════════════════════════════════════════════════
+// Inbound auth: requires an authenticated Supabase user (the admin-panel
+// MagicDropzone calls this via supabase.functions.invoke, which sends the
+// signed-in user's JWT). Closes the service-role public-invocation hole —
+// see docs/security/service-role-isolation-audit-2026-06-29.md (F1).
 // ═══════════════════════════════════════════════════════════
 // CRITICAL: This function NEVER calls req.json() or req.text().
 // Supabase Edge Functions have a fatal bug where body parsing
@@ -39,10 +38,38 @@ const CORS_HEADERS = {
 
 console.log("[parse-receipts] PROXY v2 — ZERO BODY READ — module loaded")
 
+// ── Auth guard ──────────────────────────────────────────────
+// This function runs with the service-role key (full RLS bypass) and is
+// deployed with verify_jwt:false, so the gateway alone would let anyone
+// holding the public anon apikey trigger the receipt → GAS → LLM pipeline
+// (cost-abuse vector). The only caller is the admin-panel MagicDropzone via
+// supabase.functions.invoke, which already sends the signed-in user's access
+// token in the Authorization header. The bare anon apikey is itself a valid
+// JWT but maps to NO user, so auth.getUser() rejects it.
+async function isAuthedUser(req: Request): Promise<boolean> {
+  const authz = req.headers.get("Authorization") ?? ""
+  const token = authz.startsWith("Bearer ") ? authz.slice(7).trim() : ""
+  if (!token) return false
+  try {
+    const { data, error } = await supabaseAdmin.auth.getUser(token)
+    return !error && !!data?.user
+  } catch {
+    return false // fail closed: auth-server hiccup → unauthorized, never a bare 500
+  }
+}
+
 Deno.serve(async (req: Request) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS })
+  }
+
+  // Auth: authenticated Supabase user only (rejects the bare anon apikey).
+  if (!(await isAuthedUser(req))) {
+    return new Response(
+      JSON.stringify({ error: "unauthorized" }),
+      { status: 401, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+    )
   }
 
   try {

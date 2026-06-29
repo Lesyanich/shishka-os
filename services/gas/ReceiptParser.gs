@@ -61,12 +61,19 @@ function getConfig_() {
 // Replaces all raw PostgREST PATCH calls.
 // Uses POST to update-receipt-job Edge Function which has
 // --no-verify-jwt and uses admin client internally.
+// Auth: sends the shared FUNCTION_INTERNAL_SECRET (Script Property) in the
+// x-internal-secret header — the Edge Function rejects calls without it.
 // ═══════════════════════════════════════════════════════════
+function internalSecret_() {
+  return PropertiesService.getScriptProperties().getProperty("FUNCTION_INTERNAL_SECRET") || "";
+}
+
 function updateJob_(supabaseUrl, jobId, data) {
   var url = supabaseUrl + "/functions/v1/update-receipt-job?job_id=" + encodeURIComponent(jobId);
   var response = UrlFetchApp.fetch(url, {
     method: "post",
     contentType: "application/json",
+    headers: { "x-internal-secret": internalSecret_() },
     payload: JSON.stringify(data),
     muteHttpExceptions: true,
   });
@@ -94,6 +101,7 @@ function phoneHome_(supabaseUrl, jobId, message) {
     var response = UrlFetchApp.fetch(url, {
       method: "post",
       contentType: "application/json",
+      headers: { "x-internal-secret": internalSecret_() },
       payload: JSON.stringify({ error: message }),
       muteHttpExceptions: true,
     });
