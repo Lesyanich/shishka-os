@@ -31,11 +31,6 @@
 - **Port:** 5173
 - **Config:** `.claude/launch.json` → `shishka-os-dev`
 
-## GAS Deployment
-
-- **Script ID:** `14BpgyjV6qH1a2mL3u6zC7p6GJAmGDkfXR7Qi1b9ufU2ItxrvOW_pvI8P`
-- **Deploy:** `cd services/gas && npm run deploy`
-
 ## Secret Location Policy (SSoT)
 
 Every secret has exactly **one** file that holds the real value. Other services read that file at runtime — they do NOT copy it into their own `.env`.
