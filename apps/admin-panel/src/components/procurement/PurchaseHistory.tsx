@@ -50,10 +50,7 @@ export function PurchaseHistory({ refreshKey }: { refreshKey: number }) {
     const suppIds = [...new Set(logs.map((l) => l.supplier_id as string))]
 
     const [nomRes, suppRes] = await Promise.all([
-      supabase
-        .from('nomenclature')
-        .select('id, product_code, name')
-        .in('id', nomIds),
+      supabase.from('nomenclature').select('id, product_code, name').in('id', nomIds),
       supabase.from('suppliers').select('id, name').in('id', suppIds),
     ])
 
@@ -96,29 +93,26 @@ export function PurchaseHistory({ refreshKey }: { refreshKey: number }) {
   }, [fetchHistory])
 
   return (
-    <section className="rounded-xl border border-slate-800 bg-slate-900/50 shadow-sm">
-      <header className="border-b border-slate-800 px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-100">
-          Purchase History
-        </h2>
-        <p className="text-xs text-slate-500">Last 50 purchase entries</p>
+    <section className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] shadow-sm">
+      <header className="border-b border-[var(--line)] px-4 py-3">
+        <h2 className="text-sm font-semibold text-cream">Purchase History</h2>
+        <p className="text-xs text-cream/45">Last 50 purchase entries</p>
       </header>
 
       <div className="overflow-x-auto px-4 py-3">
         {isLoading ? (
-          <div className="flex items-center justify-center py-8 text-xs text-slate-500">
+          <div className="flex items-center justify-center py-8 text-xs text-cream/45">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Loading history...
           </div>
         ) : rows.length === 0 ? (
-          <div className="py-8 text-center text-xs text-slate-500">
-            No purchases logged yet. Use the form above to log your first
-            purchase.
+          <div className="py-8 text-center text-xs text-cream/45">
+            No purchases logged yet. Use the form above to log your first purchase.
           </div>
         ) : (
           <table className="w-full border-collapse text-left text-[11px]">
             <thead>
-              <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-[var(--line)] text-[10px] uppercase tracking-wide text-cream/45">
                 <th className="py-2 pr-2">Date</th>
                 <th className="py-2 pr-2">Item</th>
                 <th className="py-2 pr-2">Supplier</th>
@@ -130,35 +124,20 @@ export function PurchaseHistory({ refreshKey }: { refreshKey: number }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr
-                  key={r.id}
-                  className="border-b border-slate-800/50 last:border-none"
-                >
-                  <td className="py-2 pr-2 text-slate-300">
-                    {r.invoice_date}
-                  </td>
+                <tr key={r.id} className="border-b border-[var(--line)] last:border-none">
+                  <td className="py-2 pr-2 text-cream/80">{r.invoice_date}</td>
                   <td className="py-2 pr-2">
-                    <NomenclatureLabel
-                      productCode={r.item_code}
-                      name={r.item_name}
-                      size="md"
-                    />
+                    <NomenclatureLabel productCode={r.item_code} name={r.item_name} size="md" />
                   </td>
-                  <td className="py-2 pr-2 text-slate-300">
-                    {r.supplier_name}
-                  </td>
-                  <td className="py-2 pr-2 text-right text-slate-100">
-                    {r.quantity}
-                  </td>
-                  <td className="py-2 pr-2 text-right text-amber-300">
+                  <td className="py-2 pr-2 text-cream/80">{r.supplier_name}</td>
+                  <td className="py-2 pr-2 text-right text-cream">{r.quantity}</td>
+                  <td className="py-2 pr-2 text-right text-amber-watch">
                     {r.price_per_unit.toFixed(2)}
                   </td>
-                  <td className="py-2 pr-2 text-right font-medium text-slate-100">
+                  <td className="py-2 pr-2 text-right font-medium text-cream">
                     {r.total_price.toFixed(2)}
                   </td>
-                  <td className="max-w-[120px] truncate py-2 text-slate-500">
-                    {r.notes || '--'}
-                  </td>
+                  <td className="max-w-[120px] truncate py-2 text-cream/45">{r.notes || '--'}</td>
                 </tr>
               ))}
             </tbody>

@@ -15,7 +15,16 @@ import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
 import { useTabParam } from '../hooks/useTabParam'
 import type { PurchaseOrder } from '../types/procurement'
 
-const TABS = ['orders', 'suppliers', 'pricebook', 'shelf', 'stock', 'requests', 'items', 'purchases'] as const
+const TABS = [
+  'orders',
+  'suppliers',
+  'pricebook',
+  'shelf',
+  'stock',
+  'requests',
+  'items',
+  'purchases',
+] as const
 type Tab = (typeof TABS)[number]
 type Screen = 'list' | 'detail' | 'reconcile'
 
@@ -37,15 +46,25 @@ export function Procurement() {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null)
   const [poPrefill, setPoPrefill] = useState<{ lines: PrefillLine[]; notes: string } | null>(null)
 
-  const handleAddToPO = useCallback((lines: PrefillLine[], notes: string) => {
-    setPoPrefill({ lines, notes })
-    setActiveTab('orders')
-    setScreen('list')
-  }, [setActiveTab])
+  const handleAddToPO = useCallback(
+    (lines: PrefillLine[], notes: string) => {
+      setPoPrefill({ lines, notes })
+      setActiveTab('orders')
+      setScreen('list')
+    },
+    [setActiveTab],
+  )
 
   const {
-    orders, isLoading, statusFilter, setStatusFilter,
-    createPO, isCreating, updateStatus, fetchLines, refetch,
+    orders,
+    isLoading,
+    statusFilter,
+    setStatusFilter,
+    createPO,
+    isCreating,
+    updateStatus,
+    fetchLines,
+    refetch,
   } = usePurchaseOrders()
 
   const handlePOCreated = useCallback(() => {
@@ -75,27 +94,34 @@ export function Procurement() {
   }, [refetch])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-100">Procurement</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Suppliers, price comparison, shelf life, purchase orders &amp; stock — in one place.
-        </p>
+    <div className="menu-canvas -mx-4 space-y-6 px-4 pt-5 pb-10 sm:-mx-6 sm:px-6">
+      <div className="flex items-start gap-3.5">
+        <span className="shk-seal" aria-hidden>
+          S
+        </span>
+        <div>
+          <div className="shk-eyebrow">Procurement &middot; sourcing</div>
+          <h1 className="mt-1 font-display text-4xl font-bold leading-none tracking-tight text-cream">
+            Procurement
+          </h1>
+          <p className="mt-1.5 text-sm text-cream/45">
+            Suppliers, price comparison, shelf life, purchase orders &amp; stock — in one place.
+          </p>
+        </div>
       </div>
 
       {/* Tab switcher — hidden during detail/reconcile views */}
       {screen === 'list' && (
-        <div className="flex flex-wrap gap-1 rounded-xl bg-slate-800/60 p-1">
+        <div className="shk-seg flex flex-wrap" role="group" aria-label="Procurement section">
           {TABS.map((key) => (
             <button
               key={key}
-              onClick={() => { setActiveTab(key); setSelectedPO(null) }}
-              className={[
-                'rounded-lg px-3 py-2 text-xs font-semibold transition',
-                activeTab === key
-                  ? 'bg-slate-700 text-slate-100 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-300',
-              ].join(' ')}
+              onClick={() => {
+                setActiveTab(key)
+                setSelectedPO(null)
+              }}
+              className="shk-seg-btn"
+              aria-pressed={activeTab === key}
             >
               {TAB_LABELS[key]}
             </button>
@@ -138,7 +164,9 @@ export function Procurement() {
       {screen === 'reconcile' && selectedPO && (
         <ReconciliationPanel
           order={selectedPO}
-          onBack={() => { setScreen('detail') }}
+          onBack={() => {
+            setScreen('detail')
+          }}
           onReconciled={handleReconciled}
         />
       )}
@@ -172,9 +200,7 @@ export function Procurement() {
       {/* === Quick Purchase Tab (legacy) === */}
       {activeTab === 'purchases' && screen === 'list' && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)]">
-          <PurchaseForm
-            onPurchaseCreated={() => setRefreshKey((k) => k + 1)}
-          />
+          <PurchaseForm onPurchaseCreated={() => setRefreshKey((k) => k + 1)} />
           <PurchaseHistory refreshKey={refreshKey} />
         </div>
       )}

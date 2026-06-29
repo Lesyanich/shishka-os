@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  Archive,
-  ChevronDown,
-  ChevronRight,
-  Loader2,
-  ShoppingCart,
-} from 'lucide-react'
+import { Archive, ChevronDown, ChevronRight, Loader2, ShoppingCart } from 'lucide-react'
 import {
   useStockRequests,
   type StockRequestLine,
@@ -14,9 +8,9 @@ import {
 import type { StockStatus } from '../../types/stockSheet'
 
 const STATUS_CHIP: Record<StockStatus, { label: string; cls: string }> = {
-  out: { label: 'Out', cls: 'bg-rose-500/15 text-rose-300' },
-  low: { label: 'Low', cls: 'bg-amber-500/15 text-amber-300' },
-  in: { label: 'In', cls: 'bg-emerald-500/15 text-emerald-300' },
+  out: { label: 'Out', cls: 'bg-brick-soft/15 text-brick-bright' },
+  low: { label: 'Low', cls: 'bg-amber-watch/15 text-amber-watch' },
+  in: { label: 'In', cls: 'bg-forest-soft/15 text-mint-200' },
 }
 
 export interface PrefillLine {
@@ -31,11 +25,11 @@ interface Props {
 
 function statusBadge(status: StockRequestSummary['status']) {
   const map: Record<string, string> = {
-    open: 'bg-sky-500/15 text-sky-300',
-    converted: 'bg-emerald-500/15 text-emerald-300',
-    archived: 'bg-slate-700 text-slate-400',
+    open: 'bg-honey-300/15 text-honey-300',
+    converted: 'bg-forest-soft/15 text-mint-200',
+    archived: 'bg-[var(--s-3)] text-cream/60',
   }
-  return map[status] ?? 'bg-slate-700 text-slate-400'
+  return map[status] ?? 'bg-[var(--s-3)] text-cream/60'
 }
 
 export function StockRequestsPanel({ onAddToPO }: Props) {
@@ -89,26 +83,24 @@ export function StockRequestsPanel({ onAddToPO }: Props) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="text-sm font-bold text-slate-100">Stock Requests</h3>
-        <p className="text-xs text-slate-500">
-          What staff reported via the stock sheet (/stock).
-        </p>
+        <h3 className="text-sm font-bold text-cream">Stock Requests</h3>
+        <p className="text-xs text-cream/45">What staff reported via the stock sheet (/stock).</p>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <div className="rounded-lg border border-brick-soft/30 bg-brick-soft/10 px-3 py-2 text-xs text-brick-bright">
           {error}
         </div>
       )}
 
       {isLoading && (
-        <div className="flex justify-center py-12 text-slate-500">
-          <Loader2 className="h-5 w-5 animate-spin text-emerald-500" />
+        <div className="flex justify-center py-12 text-cream/45">
+          <Loader2 className="h-5 w-5 animate-spin text-mint-200" />
         </div>
       )}
 
       {!isLoading && requests.length === 0 && (
-        <p className="rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-8 text-center text-sm text-slate-500">
+        <p className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] px-3 py-8 text-center text-sm text-cream/45">
           No submissions yet.
         </p>
       )}
@@ -119,24 +111,24 @@ export function StockRequestsPanel({ onAddToPO }: Props) {
         return (
           <div
             key={req.id}
-            className="overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/30"
+            className="overflow-hidden rounded-xl border border-[var(--line-strong)] bg-[var(--s-2)]"
           >
             <button
               onClick={() => toggle(req.id)}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-slate-800/50"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-[var(--s-2)]"
             >
               {isOpen ? (
-                <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                <ChevronDown className="h-4 w-4 shrink-0 text-cream/45" />
               ) : (
-                <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-cream/45" />
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-slate-200">
+                <p className="text-xs font-medium text-cream">
                   {new Date(req.submitted_at).toLocaleString()}
                 </p>
-                {req.note && <p className="truncate text-[11px] text-slate-500">{req.note}</p>}
+                {req.note && <p className="truncate text-[11px] text-cream/45">{req.note}</p>}
               </div>
-              <span className="text-[11px] text-slate-500">{req.line_count} items</span>
+              <span className="text-[11px] text-cream/45">{req.line_count} items</span>
               <span
                 className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${statusBadge(req.status)}`}
               >
@@ -145,19 +137,16 @@ export function StockRequestsPanel({ onAddToPO }: Props) {
             </button>
 
             {isOpen && (
-              <div className="border-t border-slate-700/50 px-3 py-3">
+              <div className="border-t border-[var(--line-strong)] px-3 py-3">
                 {loadingLines && !lines[req.id] ? (
-                  <div className="flex justify-center py-4 text-slate-500">
+                  <div className="flex justify-center py-4 text-cream/45">
                     <Loader2 className="h-4 w-4 animate-spin" />
                   </div>
                 ) : (
                   <>
                     <div className="space-y-1.5">
                       {reqLines.map((l) => (
-                        <div
-                          key={l.id}
-                          className="flex items-center gap-2 text-xs text-slate-300"
-                        >
+                        <div key={l.id} className="flex items-center gap-2 text-xs text-cream/80">
                           <span
                             className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${STATUS_CHIP[l.status].cls}`}
                           >
@@ -165,12 +154,12 @@ export function StockRequestsPanel({ onAddToPO }: Props) {
                           </span>
                           <span className="min-w-0 flex-1 truncate">{l.product_name}</span>
                           {l.order_qty != null && l.order_qty > 0 && (
-                            <span className="shrink-0 font-semibold text-sky-300">
+                            <span className="shrink-0 font-semibold text-honey-300">
                               {l.order_qty} {l.base_unit ?? ''}
                             </span>
                           )}
                           {l.note && (
-                            <span className="shrink-0 text-[10px] text-slate-500">“{l.note}”</span>
+                            <span className="shrink-0 text-[10px] text-cream/45">“{l.note}”</span>
                           )}
                         </div>
                       ))}
@@ -180,14 +169,14 @@ export function StockRequestsPanel({ onAddToPO }: Props) {
                       <button
                         onClick={() => handleAddToPO(req)}
                         disabled={req.status === 'converted'}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500 active:scale-[0.99] disabled:opacity-40"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[var(--color-royal-green)] py-2 text-xs font-semibold text-white transition hover:bg-[var(--color-royal-soft)] active:scale-[0.99] disabled:opacity-40"
                       >
                         <ShoppingCart className="h-3.5 w-3.5" />
                         Add to Purchase Order
                       </button>
                       <button
                         onClick={() => updateStatus(req.id, 'archived')}
-                        className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 transition hover:bg-slate-800"
+                        className="flex items-center justify-center gap-1.5 rounded-lg border border-[var(--line-strong)] px-3 py-2 text-xs text-cream/60 transition hover:bg-[var(--s-2)]"
                       >
                         <Archive className="h-3.5 w-3.5" />
                       </button>
