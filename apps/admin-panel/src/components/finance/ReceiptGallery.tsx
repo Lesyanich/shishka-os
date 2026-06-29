@@ -99,7 +99,7 @@ export function ReceiptGallery({
       {/* ── Top bar ── */}
       <div className="flex items-center justify-between px-4 py-3">
         {/* Page counter */}
-        <span className="text-sm font-medium text-slate-300">
+        <span className="text-sm font-medium text-cream/80">
           {total > 1 ? `${current + 1} / ${total}` : 'Receipt'}
         </span>
 
@@ -110,7 +110,7 @@ export function ReceiptGallery({
               <button
                 type="button"
                 onClick={() => setZoom((z) => Math.min(z + 0.25, 4))}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="rounded-lg p-2 text-cream/60 hover:bg-[var(--s-2)] hover:text-white"
                 title="Zoom in (+)"
               >
                 <ZoomIn className="h-4 w-4" />
@@ -118,7 +118,7 @@ export function ReceiptGallery({
               <button
                 type="button"
                 onClick={() => setZoom((z) => Math.max(z - 0.25, 0.5))}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="rounded-lg p-2 text-cream/60 hover:bg-[var(--s-2)] hover:text-white"
                 title="Zoom out (-)"
               >
                 <ZoomOut className="h-4 w-4" />
@@ -126,19 +126,19 @@ export function ReceiptGallery({
               <button
                 type="button"
                 onClick={() => setRotation((r) => (r + 90) % 360)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="rounded-lg p-2 text-cream/60 hover:bg-[var(--s-2)] hover:text-white"
                 title="Rotate (R)"
               >
                 <RotateCw className="h-4 w-4" />
               </button>
-              <div className="mx-1 h-5 w-px bg-slate-700" />
+              <div className="mx-1 h-5 w-px bg-[var(--s-3)]" />
             </>
           )}
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="rounded-lg p-2 text-cream/60 hover:bg-[var(--s-2)] hover:text-white"
             title="Open in new tab"
             onClick={(e) => e.stopPropagation()}
           >
@@ -147,7 +147,7 @@ export function ReceiptGallery({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="rounded-lg p-2 text-cream/60 hover:bg-[var(--s-2)] hover:text-white"
             title="Close (Esc)"
           >
             <X className="h-5 w-5" />
@@ -162,7 +162,7 @@ export function ReceiptGallery({
           <button
             type="button"
             onClick={goPrev}
-            className="absolute left-3 z-10 rounded-full bg-slate-800/70 p-2 text-slate-300 hover:bg-slate-700 hover:text-white"
+            className="absolute left-3 z-10 rounded-full bg-[var(--s-2)] p-2 text-cream/80 hover:bg-[var(--s-3)] hover:text-white"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
@@ -180,14 +180,14 @@ export function ReceiptGallery({
             <iframe
               src={toGoogleDrivePreview(url)}
               title={`Receipt page ${current + 1}`}
-              className="h-[80vh] w-[70vw] rounded-lg border border-slate-700"
+              className="h-[80vh] w-[70vw] rounded-lg border border-[var(--line-strong)]"
               allow="autoplay"
             />
           ) : isPdf ? (
             <iframe
               src={url}
               title={`Receipt page ${current + 1}`}
-              className="h-[80vh] w-[70vw] rounded-lg border border-slate-700"
+              className="h-[80vh] w-[70vw] rounded-lg border border-[var(--line-strong)]"
             />
           ) : (
             <img
@@ -204,10 +204,10 @@ export function ReceiptGallery({
                 target.style.display = 'none'
                 target.insertAdjacentHTML(
                   'afterend',
-                  `<div class="flex flex-col items-center gap-3 p-12 text-slate-400">
+                  `<div class="flex flex-col items-center gap-3 p-12 text-cream/60">
                     <p class="text-sm">Could not load image</p>
                     <a href="${url}" target="_blank" rel="noopener noreferrer"
-                       class="text-xs text-emerald-400 hover:underline">Open in new tab</a>
+                       class="text-xs text-mint-200 hover:underline">Open in new tab</a>
                   </div>`,
                 )
               }}
@@ -220,7 +220,7 @@ export function ReceiptGallery({
           <button
             type="button"
             onClick={goNext}
-            className="absolute right-3 z-10 rounded-full bg-slate-800/70 p-2 text-slate-300 hover:bg-slate-700 hover:text-white"
+            className="absolute right-3 z-10 rounded-full bg-[var(--s-2)] p-2 text-cream/80 hover:bg-[var(--s-3)] hover:text-white"
           >
             <ChevronRight className="h-6 w-6" />
           </button>
@@ -237,12 +237,12 @@ export function ReceiptGallery({
               onClick={() => setCurrent(i)}
               className={`relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
                 i === current
-                  ? 'border-emerald-500 ring-1 ring-emerald-500/50'
-                  : 'border-slate-700 opacity-60 hover:opacity-100'
+                  ? 'border-forest-soft ring-1 ring-forest-soft/50'
+                  : 'border-[var(--line-strong)] opacity-60 hover:opacity-100'
               }`}
             >
               {isPdfUrl(pageUrl) || isGoogleDriveUrl(pageUrl) ? (
-                <div className="flex h-full w-full items-center justify-center bg-slate-800 text-[10px] font-medium text-slate-400">
+                <div className="flex h-full w-full items-center justify-center bg-[var(--s-2)] text-[10px] font-medium text-cream/60">
                   {isPdfUrl(pageUrl) ? 'PDF' : 'GDrive'}
                 </div>
               ) : (
@@ -252,7 +252,7 @@ export function ReceiptGallery({
                   className="h-full w-full object-cover"
                 />
               )}
-              <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[9px] text-slate-300">
+              <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[9px] text-cream/80">
                 {i + 1}
               </span>
             </button>

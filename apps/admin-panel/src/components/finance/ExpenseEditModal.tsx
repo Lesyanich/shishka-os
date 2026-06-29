@@ -205,21 +205,21 @@ export function ExpenseEditModal({
       onClick={onClose}
     >
       <div
-        className="mx-4 w-full max-w-2xl rounded-xl border border-slate-700 bg-slate-900 shadow-2xl"
+        className="mx-4 w-full max-w-2xl rounded-xl border border-[var(--line-strong)] bg-[var(--s-1)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
+        <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-slate-100">Edit Expense</h2>
-            <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[9px] text-slate-500" title={row.id}>
+            <h2 className="text-sm font-semibold text-cream">Edit Expense</h2>
+            <span className="rounded bg-[var(--s-2)] px-1.5 py-0.5 font-mono text-[9px] text-cream/45" title={row.id}>
               {row.id.slice(0, 8)}
             </span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-md p-1 text-cream/60 hover:bg-[var(--s-2)] hover:text-cream"
           >
             <X className="h-4 w-4" />
           </button>
@@ -228,7 +228,7 @@ export function ExpenseEditModal({
         {/* Body */}
         <div className="max-h-[75vh] space-y-4 overflow-y-auto px-5 py-4">
           {error && (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            <div className="rounded-md border border-brick-soft/40 bg-brick-soft/10 px-3 py-2 text-xs text-brick-bright">
               {error}
             </div>
           )}
@@ -236,16 +236,16 @@ export function ExpenseEditModal({
           {/* Date + Flow Type */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Date</label>
+              <label className="mb-1 block text-xs text-cream/60">Date</label>
               <input
                 type="date"
                 value={txDate}
                 onChange={(e) => setTxDate(e.target.value)}
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Type</label>
+              <label className="mb-1 block text-xs text-cream/60">Type</label>
               <div className="flex gap-2">
                 {(['OpEx', 'CapEx', 'COGS'] as const).map((ft) => (
                   <button
@@ -255,11 +255,11 @@ export function ExpenseEditModal({
                     className={`h-9 flex-1 rounded-md border text-xs font-medium transition ${
                       flowType === ft
                         ? ft === 'OpEx'
-                          ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-200'
+                          ? 'border-forest-soft/60 bg-forest-soft/15 text-mint-200'
                           : ft === 'CapEx'
-                            ? 'border-amber-500/60 bg-amber-500/15 text-amber-200'
-                            : 'border-blue-500/60 bg-blue-500/15 text-blue-200'
-                        : 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700'
+                            ? 'border-amber-watch/60 bg-amber-watch/15 text-amber-watch'
+                            : 'border-brick-soft/50 bg-brick-soft/15 text-brick-bright'
+                        : 'border-[var(--line-strong)] bg-[var(--s-2)] text-cream/60 hover:bg-[var(--s-3)]'
                     }`}
                   >
                     {ft}
@@ -272,7 +272,7 @@ export function ExpenseEditModal({
           {/* Category + Sub-category */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Category</label>
+              <label className="mb-1 block text-xs text-cream/60">Category</label>
               <select
                 value={categoryCode}
                 onChange={(e) => {
@@ -280,7 +280,7 @@ export function ExpenseEditModal({
                   setCategoryCode(v as number | '')
                   setSubCategoryCode('')
                 }}
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
               >
                 <option value="">Select category...</option>
                 {categories.map((c) => (
@@ -291,12 +291,12 @@ export function ExpenseEditModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Sub-category</label>
+              <label className="mb-1 block text-xs text-cream/60">Sub-category</label>
               <select
                 value={subCategoryCode}
                 onChange={(e) => setSubCategoryCode(e.target.value === '' ? '' : Number(e.target.value))}
                 disabled={filteredSubCats.length === 0}
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500 disabled:opacity-40"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft disabled:opacity-40"
               >
                 <option value="">
                   {filteredSubCats.length === 0 ? 'Select category first' : 'Select sub-category...'}
@@ -312,11 +312,11 @@ export function ExpenseEditModal({
 
           {/* Supplier */}
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Supplier</label>
+            <label className="mb-1 block text-xs text-cream/60">Supplier</label>
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
             >
               <option value="">No supplier</option>
               {suppliers.map((s) => (
@@ -330,43 +330,43 @@ export function ExpenseEditModal({
           {/* Details + Invoice # */}
           <div className="grid grid-cols-[1fr_140px] gap-3">
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Details</label>
+              <label className="mb-1 block text-xs text-cream/60">Details</label>
               <input
                 type="text"
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 placeholder="What was the payment for..."
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Invoice #</label>
+              <label className="mb-1 block text-xs text-cream/60">Invoice #</label>
               <input
                 type="text"
                 value={invoiceNumber}
                 onChange={(e) => setInvoiceNumber(e.target.value)}
                 placeholder="INV-001"
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs font-mono text-slate-100 outline-none focus:border-emerald-500"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs font-mono text-cream outline-none focus:border-forest-soft"
               />
             </div>
           </div>
 
           {/* Comments */}
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Comments</label>
+            <label className="mb-1 block text-xs text-cream/60">Comments</label>
             <input
               type="text"
               value={comments}
               onChange={(e) => setComments(e.target.value)}
               placeholder="Additional notes..."
-              className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
             />
           </div>
 
           {/* Amount + Currency + Exchange Rate */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Amount</label>
+              <label className="mb-1 block text-xs text-cream/60">Amount</label>
               <input
                 type="number"
                 step="0.01"
@@ -374,18 +374,18 @@ export function ExpenseEditModal({
                 onChange={(e) =>
                   setAmountOriginal(e.target.value === '' ? '' : Number(e.target.value))
                 }
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Currency</label>
+              <label className="mb-1 block text-xs text-cream/60">Currency</label>
               <select
                 value={currency}
                 onChange={(e) => {
                   setCurrency(e.target.value)
                   if (e.target.value === 'THB') setExchangeRate(1)
                 }}
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
               >
                 {CURRENCY_OPTIONS.map((c) => (
                   <option key={c} value={c}>
@@ -395,7 +395,7 @@ export function ExpenseEditModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-400">
+              <label className="mb-1 block text-xs text-cream/60">
                 {currency === 'THB' ? 'Rate (1.00)' : 'Rate -> THB'}
               </label>
               <input
@@ -406,18 +406,18 @@ export function ExpenseEditModal({
                   setExchangeRate(e.target.value === '' ? '' : Number(e.target.value))
                 }
                 disabled={currency === 'THB'}
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500 disabled:opacity-40"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft disabled:opacity-40"
               />
             </div>
           </div>
 
           {/* Auto-calculated THB */}
           {currency !== 'THB' && computedTHB !== null && (
-            <div className="rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-2">
-              <div className="text-[10px] uppercase tracking-wide text-slate-500">
+            <div className="rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] px-4 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-cream/45">
                 Total in THB (auto)
               </div>
-              <div className="mt-0.5 text-sm font-semibold text-amber-300">
+              <div className="mt-0.5 text-sm font-semibold text-amber-watch">
                 {Math.round(computedTHB).toLocaleString()}
               </div>
             </div>
@@ -426,20 +426,20 @@ export function ExpenseEditModal({
           {/* Paid by + Payment method + Status */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Paid by</label>
+              <label className="mb-1 block text-xs text-cream/60">Paid by</label>
               <input
                 type="text"
                 value={paidBy}
                 onChange={(e) => setPaidBy(e.target.value)}
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Payment</label>
+              <label className="mb-1 block text-xs text-cream/60">Payment</label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
               >
                 {PAYMENT_METHODS.map((m) => (
                   <option key={m.value} value={m.value}>
@@ -449,11 +449,11 @@ export function ExpenseEditModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-400">Status</label>
+              <label className="mb-1 block text-xs text-cream/60">Status</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as 'pending' | 'paid' | 'cancelled')}
-                className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
               >
                 <option value="paid">Paid</option>
                 <option value="pending">Pending</option>
@@ -468,23 +468,23 @@ export function ExpenseEditModal({
               type="checkbox"
               checked={hasTaxInvoice}
               onChange={(e) => setHasTaxInvoice(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-emerald-500 focus:ring-emerald-500"
+              className="h-4 w-4 rounded border-[var(--line-strong)] bg-[var(--s-2)] text-forest-soft focus:ring-forest-soft"
             />
-            <span className="text-xs text-slate-400">Has Tax Invoice</span>
+            <span className="text-xs text-cream/60">Has Tax Invoice</span>
           </label>
 
           {/* ── Documents section ── */}
-          <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
-            <div className="mb-2 text-xs font-medium text-slate-400">Documents</div>
+          <div className="rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] p-3">
+            <div className="mb-2 text-xs font-medium text-cream/60">Documents</div>
             <div className="grid gap-2 sm:grid-cols-3">
               {receiptSlots.map(({ label, url, slot, color }) => (
-                <div key={slot} className="flex items-center gap-2 rounded-md border border-slate-700/40 bg-slate-900/50 px-2.5 py-2">
+                <div key={slot} className="flex items-center gap-2 rounded-md border border-[var(--line-strong)] bg-[var(--s-1)] px-2.5 py-2">
                   {url ? (
                     <>
                       <button type="button" onClick={() => openGallery(url)} title={`View ${label}`} className="hover:opacity-70">
                         <Receipt className={`h-4 w-4 text-${color}-400`} />
                       </button>
-                      <span className="flex-1 truncate text-[10px] text-slate-300">{label}</span>
+                      <span className="flex-1 truncate text-[10px] text-cream/80">{label}</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -493,16 +493,16 @@ export function ExpenseEditModal({
                           else setTaxInvoiceUrl(null)
                         }}
                         title="Remove"
-                        className="text-slate-500 hover:text-rose-400"
+                        className="text-cream/45 hover:text-brick-bright"
                       >
                         <X className="h-3 w-3" />
                       </button>
                     </>
                   ) : (
                     <>
-                      <Receipt className="h-4 w-4 text-slate-600" />
-                      <span className="flex-1 text-[10px] text-slate-500">{label}</span>
-                      <label className={`inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[9px] text-slate-400 transition hover:bg-slate-700 hover:text-slate-200 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <Receipt className="h-4 w-4 text-cream/30" />
+                      <span className="flex-1 text-[10px] text-cream/45">{label}</span>
+                      <label className={`inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[9px] text-cream/60 transition hover:bg-[var(--s-3)] hover:text-cream ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
                         <Upload className="h-3 w-3" />
                         {isUploading ? '...' : 'Upload'}
                         <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, slot)} />
@@ -516,11 +516,11 @@ export function ExpenseEditModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 border-t border-slate-800 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-[var(--line)] px-5 py-3">
           <button
             type="button"
             onClick={onClose}
-            className="h-9 rounded-md border border-slate-700 bg-slate-800 px-4 text-xs text-slate-300 hover:bg-slate-700"
+            className="h-9 rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-4 text-xs text-cream/80 hover:bg-[var(--s-3)]"
           >
             Cancel
           </button>
@@ -528,7 +528,7 @@ export function ExpenseEditModal({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="inline-flex h-9 items-center gap-1 rounded-md border border-emerald-500/60 bg-emerald-500/15 px-4 text-xs font-medium text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-1 rounded-md border border-forest-soft/60 bg-forest-soft/15 px-4 text-xs font-medium text-mint-200 hover:bg-forest-soft/25 disabled:opacity-50"
           >
             {isSaving ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

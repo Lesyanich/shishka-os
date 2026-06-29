@@ -11,30 +11,25 @@ const TABS = [
 export function FinanceLayout() {
   return (
     <FinanceProvider>
-      <div className="space-y-4">
+      <div className="menu-canvas -mx-4 space-y-5 px-4 pt-5 pb-10 sm:-mx-6 sm:px-6">
         {/* Header + Tab Navigation */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-100">Finance</h1>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Expense ledger, receipt processing &amp; analytics
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <span className="shk-seal" aria-hidden>S</span>
+            <div>
+              <div className="shk-eyebrow">Finance &middot; control</div>
+              <h1 className="mt-1 font-display text-4xl font-bold leading-none tracking-tight text-cream">
+                Finance
+              </h1>
+              <p className="mt-1.5 text-sm text-cream/45">
+                Expense ledger, receipt processing &amp; analytics
+              </p>
+            </div>
           </div>
-          <nav className="flex gap-1 rounded-lg bg-slate-900/60 p-1 ring-1 ring-slate-800">
+          <nav className="shk-seg" role="group" aria-label="Finance view">
             {TABS.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  [
-                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition',
-                    isActive
-                      ? 'bg-emerald-500/15 text-emerald-300 shadow-sm'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
-                  ].join(' ')
-                }
-              >
-                <Icon className="h-3.5 w-3.5" />
+              <NavLink key={to} to={to} className="shk-seg-btn" title={`${label} view`}>
+                <Icon className="shk-seg-ico h-3.5 w-3.5" />
                 {label}
               </NavLink>
             ))}

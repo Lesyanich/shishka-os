@@ -27,9 +27,9 @@ export function FinanceDashboard() {
     <div className="space-y-4">
       {/* Error banner */}
       {error && (
-        <div className="rounded-lg border border-rose-800 bg-rose-950/50 px-4 py-2 text-xs text-rose-300">
+        <div className="rounded-lg border border-brick-soft/40 bg-brick-soft/15 px-4 py-2 text-xs text-brick-soft">
           {error}
-          <button onClick={refetch} className="ml-2 underline hover:text-rose-200">
+          <button onClick={refetch} className="ml-2 underline hover:text-cream">
             Retry
           </button>
         </div>
@@ -59,7 +59,7 @@ export function FinanceDashboard() {
         <button
           onClick={refetch}
           disabled={isLoading}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-1.5 text-[10px] text-slate-400 transition hover:bg-slate-800 hover:text-slate-200 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--s-1)] px-3 py-1.5 text-[10px] text-cream/60 transition hover:bg-[var(--s-2)] hover:text-cream disabled:opacity-50"
         >
           <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh

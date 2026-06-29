@@ -9,18 +9,18 @@ export interface KpiCardProps {
 
 export function KpiCard({ label, value, delta, isLoading }: KpiCardProps) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3">
+    <div className="shk-kpi">
       {isLoading ? (
-        <div className="h-12 animate-pulse rounded bg-slate-800" />
+        <div className="h-12 animate-pulse rounded bg-[var(--s-2)]" />
       ) : (
         <>
-          <p className="text-[10px] uppercase tracking-wide text-slate-500">{label}</p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-lg font-bold text-slate-100">{value}</span>
+          <p className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-cream/60">{label}</p>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <span className="font-mono text-xl font-semibold tabular-nums text-cream">{value}</span>
             {delta !== undefined && Math.abs(delta) > 0.5 && (
               <span
                 className={`flex items-center gap-0.5 text-[10px] font-medium ${
-                  delta > 0 ? 'text-rose-400' : 'text-emerald-400'
+                  delta > 0 ? 'text-brick-bright' : 'text-mint-200'
                 }`}
               >
                 {delta > 0 ? (

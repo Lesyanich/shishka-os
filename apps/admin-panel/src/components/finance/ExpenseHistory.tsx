@@ -150,19 +150,19 @@ export function ExpenseHistory({
 
   /* ── Sort icon helper ── */
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-slate-600" />
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-cream/30" />
     return sortDir === 'asc' ? (
-      <ArrowUp className="h-3 w-3 text-indigo-400" />
+      <ArrowUp className="h-3 w-3 text-honey-300" />
     ) : (
-      <ArrowDown className="h-3 w-3 text-indigo-400" />
+      <ArrowDown className="h-3 w-3 text-honey-300" />
     )
   }
 
   /* ── Error state ── */
   if (error) {
     return (
-      <section className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
-        <div className="text-xs text-rose-400">{error}</div>
+      <section className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] p-6">
+        <div className="text-xs text-brick-bright">{error}</div>
       </section>
     )
   }
@@ -170,8 +170,8 @@ export function ExpenseHistory({
   /* ── Loading state ── */
   if (isLoading) {
     return (
-      <section className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
-        <div className="flex items-center justify-center py-8 text-xs text-slate-500">
+      <section className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] p-6">
+        <div className="flex items-center justify-center py-8 text-xs text-cream/45">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           Loading expenses...
         </div>
@@ -180,17 +180,17 @@ export function ExpenseHistory({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50 shadow-sm">
+    <section className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--s-1)] shadow-sm">
       {/* ── Header ── */}
-      <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+      <header className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
         <div className="flex items-center gap-2">
-          <Receipt className="h-4 w-4 text-emerald-400" />
-          <h2 className="text-sm font-semibold text-slate-100">Expense Ledger</h2>
-          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+          <Receipt className="h-4 w-4 text-mint-200" />
+          <h2 className="text-sm font-semibold text-cream">Expense Ledger</h2>
+          <span className="rounded-full bg-[var(--s-2)] px-2 py-0.5 text-[10px] text-cream/60">
             {isFiltered ? (
               <>
-                <span className="font-semibold text-indigo-400">{filteredRows.length}</span>
-                <span className="text-slate-600"> / </span>
+                <span className="font-semibold text-honey-300">{filteredRows.length}</span>
+                <span className="text-cream/30"> / </span>
                 {rows.length}
               </>
             ) : (
@@ -202,7 +202,7 @@ export function ExpenseHistory({
           <button
             type="button"
             onClick={() => exportExpenses(sortedRows)}
-            className="inline-flex items-center gap-1 rounded-md bg-slate-700 px-2.5 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-slate-600"
+            className="inline-flex items-center gap-1 rounded-md bg-[var(--s-2)] px-2.5 py-1 text-[10px] font-medium text-cream/80 transition-colors hover:bg-[var(--s-3)]"
           >
             <Download className="h-4 w-4" />
             Export XLSX
@@ -210,7 +210,7 @@ export function ExpenseHistory({
           <button
             type="button"
             onClick={onRefetch}
-            className="text-[10px] text-slate-500 hover:text-slate-300"
+            className="text-[10px] text-cream/45 hover:text-cream/80"
           >
             Refresh
           </button>
@@ -218,7 +218,7 @@ export function ExpenseHistory({
       </header>
 
       {/* ── Filter Panel ── */}
-      <div className="border-b border-slate-800/60 px-4 py-3">
+      <div className="border-b border-[var(--line)] px-4 py-3">
         <ExpenseFilterPanel
           categories={categories}
           suppliers={suppliers}
@@ -230,34 +230,34 @@ export function ExpenseHistory({
 
       {/* ── Table or empty state ── */}
       {rows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-12 text-xs text-slate-500">
+        <div className="flex flex-col items-center justify-center gap-2 py-12 text-xs text-cream/45">
           No expenses yet. Add one using the form.
         </div>
       ) : sortedRows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-10 text-xs text-slate-500">
+        <div className="flex flex-col items-center justify-center gap-2 py-10 text-xs text-cream/45">
           No expenses match these filters.
         </div>
       ) : (
         <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
           <table className="w-full text-left text-xs">
-            <thead className="sticky top-0 z-10 bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500">
+            <thead className="sticky top-0 z-10 bg-[var(--s-1)] text-[10px] uppercase tracking-wide text-cream/45">
               <tr>
                 <th className="w-8 px-2 py-2" />
                 <th className="w-[110px] px-3 py-2">
-                  <button type="button" onClick={() => toggleSort('transaction_date')} className="inline-flex items-center gap-1 transition-colors hover:text-slate-300">
+                  <button type="button" onClick={() => toggleSort('transaction_date')} className="inline-flex items-center gap-1 transition-colors hover:text-cream/80">
                     Date <SortIcon field="transaction_date" />
                   </button>
                 </th>
                 <th className="w-[120px] px-2 py-2">Category</th>
                 <th className="w-[130px] px-2 py-2">
-                  <button type="button" onClick={() => toggleSort('supplier_name')} className="inline-flex items-center gap-1 transition-colors hover:text-slate-300">
+                  <button type="button" onClick={() => toggleSort('supplier_name')} className="inline-flex items-center gap-1 transition-colors hover:text-cream/80">
                     Supplier <SortIcon field="supplier_name" />
                   </button>
                 </th>
                 <th className="max-w-[220px] px-2 py-2">Details</th>
                 <th className="w-[90px] px-2 py-2">Invoice #</th>
                 <th className="w-[100px] px-2 py-2 text-right">
-                  <button type="button" onClick={() => toggleSort('amount_thb')} className="inline-flex items-center gap-1 transition-colors hover:text-slate-300">
+                  <button type="button" onClick={() => toggleSort('amount_thb')} className="inline-flex items-center gap-1 transition-colors hover:text-cream/80">
                     Amount <SortIcon field="amount_thb" />
                   </button>
                 </th>
@@ -269,7 +269,7 @@ export function ExpenseHistory({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-[var(--line)]">
               {sortedRows.map((r) => {
                 const isExpanded = expandedId === r.id
                 return (
@@ -294,22 +294,22 @@ export function ExpenseHistory({
             </tbody>
 
             {/* ── Sticky subtotal footer ── */}
-            <tfoot className="sticky bottom-0 z-10 border-t border-slate-700/60 bg-slate-900/95 backdrop-blur-sm">
+            <tfoot className="sticky bottom-0 z-10 border-t border-[var(--line-strong)] bg-[var(--s-1)] backdrop-blur-sm">
               <tr>
                 <td colSpan={6} className="px-4 py-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-medium tracking-wide text-slate-500 uppercase">
+                    <span className="text-[10px] font-medium tracking-wide text-cream/45 uppercase">
                       {isFiltered ? 'Filtered Total' : 'Total'}
                     </span>
                     {isFiltered && (
-                      <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[9px] font-semibold text-indigo-400 ring-1 ring-indigo-500/20">
+                      <span className="rounded-full bg-royal-green/30 px-2 py-0.5 text-[9px] font-semibold text-honey-300 ring-1 ring-forest-soft/20">
                         {filteredRows.length} of {rows.length}
                       </span>
                     )}
                   </div>
                 </td>
                 <td className="px-2 py-2.5 text-right">
-                  <span className="font-mono text-sm font-bold tracking-tight text-slate-100">
+                  <span className="font-mono text-sm font-bold tracking-tight text-cream">
                     {'\u0E3F'}
                     {Math.round(filteredTotal).toLocaleString()}
                   </span>
@@ -331,9 +331,9 @@ export function ExpenseHistory({
    ═════════════════════════════════════════════════════════════ */
 
 const FLOW_BADGE: Record<string, string> = {
-  OpEx: 'bg-emerald-500/15 text-emerald-400',
-  CapEx: 'bg-amber-500/15 text-amber-400',
-  COGS: 'bg-blue-900/30 text-blue-400',
+  OpEx: 'bg-forest-soft/15 text-mint-200',
+  CapEx: 'bg-amber-watch/15 text-amber-watch',
+  COGS: 'bg-brick-soft/15 text-brick-bright',
 }
 
 function TableRowWithSpoke({
@@ -369,17 +369,17 @@ function TableRowWithSpoke({
 
   return (
     <>
-      <tr className="group hover:bg-slate-800/30">
+      <tr className="group hover:bg-[var(--s-2)]">
         {/* Chevron */}
         <td className="w-8 px-2 py-2.5 text-center">
-          <button type="button" onClick={onToggleExpand} className="rounded-md p-0.5 text-slate-600 transition-colors hover:bg-slate-700/50 hover:text-slate-400">
-            {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-indigo-400" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          <button type="button" onClick={onToggleExpand} className="rounded-md p-0.5 text-cream/30 transition-colors hover:bg-[var(--s-3)] hover:text-cream/60">
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-honey-300" /> : <ChevronRight className="h-3.5 w-3.5" />}
           </button>
         </td>
 
         {/* Date + flow badge */}
         <td className="px-3 py-2.5">
-          <div className="text-slate-300">{r.transaction_date}</div>
+          <div className="text-cream/80">{r.transaction_date}</div>
           <span className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium ${FLOW_BADGE[r.flow_type] || FLOW_BADGE.COGS}`}>
             {r.flow_type}
           </span>
@@ -387,15 +387,15 @@ function TableRowWithSpoke({
 
         {/* Category */}
         <td className="px-2 py-2.5">
-          <div className="text-slate-300">{r.category_name ?? '\u2014'}</div>
-          {r.sub_category_name && <div className="text-[10px] text-slate-500">{r.sub_category_name}</div>}
+          <div className="text-cream/80">{r.category_name ?? '\u2014'}</div>
+          {r.sub_category_name && <div className="text-[10px] text-cream/45">{r.sub_category_name}</div>}
         </td>
 
         {/* Supplier */}
         <td className="px-2 py-2.5">
-          <div className="font-medium text-slate-200">{r.supplier_name ?? '\u2014'}</div>
+          <div className="font-medium text-cream">{r.supplier_name ?? '\u2014'}</div>
           {r.status !== 'paid' && (
-            <span className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] ${r.status === 'pending' ? 'bg-amber-500/15 text-amber-300' : 'bg-rose-500/15 text-rose-300'}`}>
+            <span className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] ${r.status === 'pending' ? 'bg-amber-watch/15 text-amber-watch' : 'bg-brick-soft/15 text-brick-bright'}`}>
               {r.status}
             </span>
           )}
@@ -403,37 +403,37 @@ function TableRowWithSpoke({
 
         {/* Details (constrained) */}
         <td className="max-w-[220px] px-2 py-2.5">
-          <div className="truncate text-slate-300">{r.details || '\u2014'}</div>
-          {r.comments && <div className="truncate text-[10px] text-slate-500">{r.comments}</div>}
+          <div className="truncate text-cream/80">{r.details || '\u2014'}</div>
+          {r.comments && <div className="truncate text-[10px] text-cream/45">{r.comments}</div>}
         </td>
 
         {/* Invoice # */}
         <td className="px-2 py-2.5">
-          <span className="font-mono text-[10px] text-slate-400">{r.invoice_number || '\u2014'}</span>
+          <span className="font-mono text-[10px] text-cream/60">{r.invoice_number || '\u2014'}</span>
         </td>
 
         {/* Amount */}
         <td className="px-2 py-2.5 text-right">
-          <div className="font-semibold text-slate-100">{'\u0E3F'}{Math.round(r.amount_thb).toLocaleString()}</div>
-          {r.currency !== 'THB' && <div className="text-[10px] text-slate-500">{Math.round(r.amount_original).toLocaleString()} {r.currency}</div>}
+          <div className="font-semibold text-cream">{'\u0E3F'}{Math.round(r.amount_thb).toLocaleString()}</div>
+          {r.currency !== 'THB' && <div className="text-[10px] text-cream/45">{Math.round(r.amount_original).toLocaleString()} {r.currency}</div>}
         </td>
 
         {/* Payment */}
         <td className="px-2 py-2.5">
-          <span className="text-[10px] text-slate-400 capitalize">{r.payment_method || '\u2014'}</span>
+          <span className="text-[10px] text-cream/60 capitalize">{r.payment_method || '\u2014'}</span>
         </td>
 
         {/* Paid by */}
         <td className="px-2 py-2.5">
-          <span className="text-[10px] text-slate-400">{r.paid_by || '\u2014'}</span>
+          <span className="text-[10px] text-cream/60">{r.paid_by || '\u2014'}</span>
         </td>
 
         {/* Tax invoice indicator */}
         <td className="px-2 py-2.5 text-center">
           {r.has_tax_invoice ? (
-            <Check className="mx-auto h-3.5 w-3.5 text-amber-400" />
+            <Check className="mx-auto h-3.5 w-3.5 text-amber-watch" />
           ) : (
-            <span className="text-[10px] text-slate-700">\u2014</span>
+            <span className="text-[10px] text-cream/30">\u2014</span>
           )}
         </td>
 
@@ -442,20 +442,20 @@ function TableRowWithSpoke({
           <div className="flex items-center justify-center gap-1">
             {docCount > 0 ? (
               <button type="button" onClick={() => onReceiptClick(pages[0])} title={`${docCount} document(s)`} className="relative hover:opacity-70">
-                <Receipt className="h-3.5 w-3.5 text-emerald-400" />
+                <Receipt className="h-3.5 w-3.5 text-mint-200" />
                 {docCount > 1 && (
-                  <span className="absolute -right-1.5 -top-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-indigo-500 text-[7px] font-bold text-white">{docCount}</span>
+                  <span className="absolute -right-1.5 -top-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-royal-green text-[7px] font-bold text-white">{docCount}</span>
                 )}
               </button>
             ) : (
-              <span className="text-[10px] text-slate-600">{'\u2014'}</span>
+              <span className="text-[10px] text-cream/30">{'\u2014'}</span>
             )}
           </div>
         </td>
 
         {/* Edit */}
         <td className="px-2 py-2.5 text-center">
-          <button type="button" onClick={() => onEditClick(r)} className="rounded-md p-1 text-slate-500 opacity-0 transition hover:bg-slate-700 hover:text-slate-300 group-hover:opacity-100" title="Edit expense">
+          <button type="button" onClick={() => onEditClick(r)} className="rounded-md p-1 text-cream/45 opacity-0 transition hover:bg-[var(--s-3)] hover:text-cream/80 group-hover:opacity-100" title="Edit expense">
             <Pencil className="h-3.5 w-3.5" />
           </button>
         </td>
@@ -464,7 +464,7 @@ function TableRowWithSpoke({
       {/* Expanded panel: Edit + Files + Spoke */}
       {isExpanded && (
         <tr>
-          <td colSpan={12} className="bg-slate-950/40 p-0">
+          <td colSpan={12} className="bg-[var(--s-0)] p-0">
             <ExpandedExpensePanel
               row={r}
               categories={categories}
@@ -591,19 +591,19 @@ function ExpandedExpensePanel({
   return (
     <div className="animate-expand space-y-3 px-4 py-4">
       {/* ── Metadata & Edit section ── */}
-      <div className="rounded-xl border border-slate-800/60 bg-slate-900/30 p-3">
+      <div className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] p-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-medium text-slate-400">Transaction Details</span>
+          <span className="text-[11px] font-medium text-cream/60">Transaction Details</span>
           {!isEditing ? (
-            <button type="button" onClick={() => setIsEditing(true)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+            <button type="button" onClick={() => setIsEditing(true)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-cream/60 hover:bg-[var(--s-2)] hover:text-cream transition">
               <Pencil className="h-3 w-3" /> Edit
             </button>
           ) : (
             <div className="flex gap-1">
-              <button type="button" onClick={handleSave} disabled={isSaving} className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-1 text-[10px] text-emerald-400 hover:bg-emerald-500/25 transition disabled:opacity-50">
+              <button type="button" onClick={handleSave} disabled={isSaving} className="inline-flex items-center gap-1 rounded-md bg-forest-soft/15 px-2 py-1 text-[10px] text-mint-200 hover:bg-forest-soft/25 transition disabled:opacity-50">
                 {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Save
               </button>
-              <button type="button" onClick={() => setIsEditing(false)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-800 transition">
+              <button type="button" onClick={() => setIsEditing(false)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-cream/45 hover:bg-[var(--s-2)] transition">
                 <X className="h-3 w-3" /> Cancel
               </button>
             </div>
@@ -613,71 +613,71 @@ function ExpandedExpensePanel({
         {isEditing ? (
           <div className="grid gap-2 sm:grid-cols-3">
             <div>
-              <label className="text-[9px] uppercase tracking-wider text-slate-500">Details</label>
-              <input value={details} onChange={(e) => setDetails(e.target.value)} className="mt-0.5 w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none" />
+              <label className="text-[9px] uppercase tracking-wider text-cream/45">Details</label>
+              <input value={details} onChange={(e) => setDetails(e.target.value)} className="mt-0.5 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 py-1 text-xs text-cream focus:border-forest-soft focus:outline-none" />
             </div>
             <div>
-              <label className="text-[9px] uppercase tracking-wider text-slate-500">Comments</label>
-              <input value={comments} onChange={(e) => setComments(e.target.value)} className="mt-0.5 w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none" />
+              <label className="text-[9px] uppercase tracking-wider text-cream/45">Comments</label>
+              <input value={comments} onChange={(e) => setComments(e.target.value)} className="mt-0.5 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 py-1 text-xs text-cream focus:border-forest-soft focus:outline-none" />
             </div>
             <div>
-              <label className="text-[9px] uppercase tracking-wider text-slate-500">Invoice #</label>
-              <input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="mt-0.5 w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs font-mono text-slate-200 focus:border-indigo-500 focus:outline-none" />
+              <label className="text-[9px] uppercase tracking-wider text-cream/45">Invoice #</label>
+              <input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="mt-0.5 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 py-1 text-xs font-mono text-cream focus:border-forest-soft focus:outline-none" />
             </div>
             <div>
-              <label className="text-[9px] uppercase tracking-wider text-slate-500">Payment</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="mt-0.5 w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none">
+              <label className="text-[9px] uppercase tracking-wider text-cream/45">Payment</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="mt-0.5 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 py-1 text-xs text-cream focus:border-forest-soft focus:outline-none">
                 {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[9px] uppercase tracking-wider text-slate-500">Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="mt-0.5 w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none">
+              <label className="text-[9px] uppercase tracking-wider text-cream/45">Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className="mt-0.5 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 py-1 text-xs text-cream focus:border-forest-soft focus:outline-none">
                 <option value="paid">Paid</option>
                 <option value="pending">Pending</option>
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>
             <div className="flex items-end gap-2 pb-1">
-              <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
-                <input type="checkbox" checked={hasTaxInvoice} onChange={(e) => setHasTaxInvoice(e.target.checked)} className="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-0" />
+              <label className="flex items-center gap-1.5 text-xs text-cream/80 cursor-pointer">
+                <input type="checkbox" checked={hasTaxInvoice} onChange={(e) => setHasTaxInvoice(e.target.checked)} className="h-3.5 w-3.5 rounded border-[var(--line-strong)] bg-[var(--s-2)] text-forest-soft focus:ring-0" />
                 Tax Invoice
               </label>
             </div>
           </div>
         ) : (
           <div className="grid gap-x-6 gap-y-1 text-[11px] sm:grid-cols-3">
-            <div><span className="text-slate-500">Details:</span> <span className="text-slate-300">{row.details || '\u2014'}</span></div>
-            <div><span className="text-slate-500">Comments:</span> <span className="text-slate-300">{row.comments || '\u2014'}</span></div>
-            <div><span className="text-slate-500">Invoice #:</span> <span className="font-mono text-slate-300">{row.invoice_number || '\u2014'}</span></div>
-            <div><span className="text-slate-500">Payment:</span> <span className="text-slate-300 capitalize">{row.payment_method}</span></div>
-            <div><span className="text-slate-500">Status:</span> <span className="text-slate-300 capitalize">{row.status}</span></div>
-            <div><span className="text-slate-500">Tax Invoice:</span> <span className="text-slate-300">{row.has_tax_invoice ? 'Yes' : 'No'}</span></div>
+            <div><span className="text-cream/45">Details:</span> <span className="text-cream/80">{row.details || '\u2014'}</span></div>
+            <div><span className="text-cream/45">Comments:</span> <span className="text-cream/80">{row.comments || '\u2014'}</span></div>
+            <div><span className="text-cream/45">Invoice #:</span> <span className="font-mono text-cream/80">{row.invoice_number || '\u2014'}</span></div>
+            <div><span className="text-cream/45">Payment:</span> <span className="text-cream/80 capitalize">{row.payment_method}</span></div>
+            <div><span className="text-cream/45">Status:</span> <span className="text-cream/80 capitalize">{row.status}</span></div>
+            <div><span className="text-cream/45">Tax Invoice:</span> <span className="text-cream/80">{row.has_tax_invoice ? 'Yes' : 'No'}</span></div>
           </div>
         )}
       </div>
 
       {/* ── Receipt files section ── */}
-      <div className="rounded-xl border border-slate-800/60 bg-slate-900/30 p-3">
-        <span className="text-[11px] font-medium text-slate-400">Documents</span>
+      <div className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] p-3">
+        <span className="text-[11px] font-medium text-cream/60">Documents</span>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           {receipts.map(({ label, url, slot, color }) => (
-            <div key={slot} className="flex items-center gap-2 rounded-lg border border-slate-800/40 bg-slate-900/50 px-2.5 py-2">
+            <div key={slot} className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--s-1)] px-2.5 py-2">
               {url ? (
                 <>
                   <button type="button" onClick={() => onReceiptClick(url)} className="hover:opacity-70" title={`View ${label}`}>
                     <Receipt className={`h-4 w-4 text-${color}-400`} />
                   </button>
-                  <button type="button" onClick={() => onReceiptClick(url)} className="flex-1 truncate text-[10px] text-slate-300 hover:text-slate-100 text-left">
+                  <button type="button" onClick={() => onReceiptClick(url)} className="flex-1 truncate text-[10px] text-cream/80 hover:text-cream text-left">
                     {label}
                   </button>
-                  <span className="rounded bg-emerald-500/10 px-1 py-0.5 text-[8px] text-emerald-400">Attached</span>
+                  <span className="rounded bg-forest-soft/10 px-1 py-0.5 text-[8px] text-mint-200">Attached</span>
                 </>
               ) : (
                 <>
-                  <Receipt className="h-4 w-4 text-slate-600" />
-                  <span className="flex-1 text-[10px] text-slate-500">{label}</span>
-                  <label className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] text-slate-400 transition hover:bg-slate-700 hover:text-slate-200 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <Receipt className="h-4 w-4 text-cream/30" />
+                  <span className="flex-1 text-[10px] text-cream/45">{label}</span>
+                  <label className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] text-cream/60 transition hover:bg-[var(--s-3)] hover:text-cream ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
                     <Upload className="h-3 w-3" />
                     {isUploading ? '...' : 'Upload'}
                     <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, slot)} />
@@ -694,7 +694,7 @@ function ExpandedExpensePanel({
 
       {/* ── Delete ── */}
       {onDeleteExpense && (
-        <div className="flex justify-end border-t border-slate-800/40 pt-3">
+        <div className="flex justify-end border-t border-[var(--line)] pt-3">
           <button
             type="button"
             disabled={isDeleting}
@@ -705,7 +705,7 @@ function ExpandedExpensePanel({
               setIsDeleting(false)
               if (err) console.error('[ExpandedExpensePanel] delete failed:', err)
             }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[10px] font-medium text-rose-400 transition hover:bg-rose-500/20 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md border border-brick-soft/40 bg-brick-soft/10 px-3 py-1.5 text-[10px] font-medium text-brick-bright transition hover:bg-brick-soft/20 disabled:opacity-50"
           >
             {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
             Delete expense

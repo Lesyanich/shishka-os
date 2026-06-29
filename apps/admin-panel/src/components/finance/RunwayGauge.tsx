@@ -10,8 +10,8 @@ interface RunwayGaugeProps {
 export function RunwayGauge({ runwayDays, totalCash, dailyBurn, isLoading }: RunwayGaugeProps) {
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-        <div className="h-20 animate-pulse rounded-lg bg-slate-800/50" />
+      <div className="shk-panel p-4">
+        <div className="h-20 animate-pulse rounded-lg bg-[var(--s-2)]" />
       </div>
     )
   }
@@ -23,16 +23,16 @@ export function RunwayGauge({ runwayDays, totalCash, dailyBurn, isLoading }: Run
   const zone = getZone(runwayDays)
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+    <div className="shk-panel p-4">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Clock className={`h-4 w-4 ${zone.iconColor}`} />
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-cream/60">
             Runway
           </h3>
         </div>
         {runwayDays < 30 && (
-          <span className="flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400">
+          <span className="flex items-center gap-1 rounded-full bg-brick-soft/15 px-2 py-0.5 text-[10px] font-semibold text-brick-bright">
             <AlertTriangle className="h-3 w-3" />
             Critical
           </span>
@@ -41,17 +41,17 @@ export function RunwayGauge({ runwayDays, totalCash, dailyBurn, isLoading }: Run
 
       {/* Days number — big */}
       <div className="mb-3 flex items-baseline gap-2">
-        <span className={`text-3xl font-bold tabular-nums ${zone.textColor}`}>
+        <span className={`font-mono text-3xl font-semibold tabular-nums ${zone.textColor}`}>
           {runwayDays > 365 ? '365+' : runwayDays}
         </span>
-        <span className="text-sm text-slate-500">days</span>
-        <span className="ml-auto text-[10px] text-slate-600">
+        <span className="text-sm text-cream/45">days</span>
+        <span className="ml-auto text-[10px] text-cream/30">
           at ฿{dailyBurn > 0 ? Math.round(dailyBurn).toLocaleString('en-US') : '—'}/day
         </span>
       </div>
 
       {/* Progress bar */}
-      <div className="relative h-3 overflow-hidden rounded-full bg-slate-800">
+      <div className="relative h-3 overflow-hidden rounded-full bg-[var(--s-2)]">
         {/* Gradient fill */}
         <div
           className={`h-full rounded-full transition-all duration-700 ease-out ${zone.barColor}`}
@@ -60,14 +60,14 @@ export function RunwayGauge({ runwayDays, totalCash, dailyBurn, isLoading }: Run
 
         {/* Zone markers */}
         <div className="absolute inset-0 flex">
-          <div className="w-[16.7%] border-r border-slate-700/50" />  {/* 30d */}
-          <div className="w-[16.7%] border-r border-slate-700/50" />  {/* 60d */}
-          <div className="w-[16.7%] border-r border-slate-700/50" />  {/* 90d */}
+          <div className="w-[16.7%] border-r border-[var(--line-strong)]" />  {/* 30d */}
+          <div className="w-[16.7%] border-r border-[var(--line-strong)]" />  {/* 60d */}
+          <div className="w-[16.7%] border-r border-[var(--line-strong)]" />  {/* 90d */}
         </div>
       </div>
 
       {/* Scale labels */}
-      <div className="mt-1 flex text-[9px] text-slate-600">
+      <div className="mt-1 flex text-[9px] text-cream/30">
         <span className="w-[16.7%]">30d</span>
         <span className="w-[16.7%]">60d</span>
         <span className="w-[16.7%]">90d</span>
@@ -76,7 +76,7 @@ export function RunwayGauge({ runwayDays, totalCash, dailyBurn, isLoading }: Run
 
       {/* Context line */}
       {totalCash > 0 && dailyBurn > 0 && (
-        <p className="mt-2 text-[10px] text-slate-600">
+        <p className="mt-2 text-[10px] text-cream/40">
           ฿{Math.round(totalCash).toLocaleString('en-US')} cash ÷ ฿{Math.round(dailyBurn).toLocaleString('en-US')}/day burn
         </p>
       )}
@@ -86,23 +86,23 @@ export function RunwayGauge({ runwayDays, totalCash, dailyBurn, isLoading }: Run
 
 function getZone(days: number) {
   if (days < 30) return {
-    textColor: 'text-rose-400',
-    iconColor: 'text-rose-400',
-    barColor: 'bg-gradient-to-r from-rose-600 to-rose-500',
+    textColor: 'text-brick-bright',
+    iconColor: 'text-brick-bright',
+    barColor: 'bg-gradient-to-r from-brick-soft to-brick-bright',
   }
   if (days < 60) return {
-    textColor: 'text-amber-400',
-    iconColor: 'text-amber-400',
-    barColor: 'bg-gradient-to-r from-rose-600 via-amber-500 to-amber-400',
+    textColor: 'text-amber-watch',
+    iconColor: 'text-amber-watch',
+    barColor: 'bg-gradient-to-r from-brick-soft via-amber-watch to-amber-watch',
   }
   if (days < 90) return {
-    textColor: 'text-yellow-300',
-    iconColor: 'text-yellow-400',
-    barColor: 'bg-gradient-to-r from-rose-600 via-amber-500 to-yellow-400',
+    textColor: 'text-honey-300',
+    iconColor: 'text-honey-300',
+    barColor: 'bg-gradient-to-r from-amber-watch via-honey-600 to-honey-300',
   }
   return {
-    textColor: 'text-emerald-400',
-    iconColor: 'text-emerald-400',
-    barColor: 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400',
+    textColor: 'text-mint-200',
+    iconColor: 'text-forest-soft',
+    barColor: 'bg-gradient-to-r from-royal-green via-forest-soft to-mint-200',
   }
 }
