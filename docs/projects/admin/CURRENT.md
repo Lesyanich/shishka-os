@@ -15,6 +15,12 @@
 
 ## In-flight (backend foundation)
 
+- **2026-06-29 — Finance pages re-skinned onto brand DS (epic MC d8b8438b continues, branch `feature/admin/finance-brand`).**
+  - Repainted all 3 Finance tabs (Dashboard/Ledger/Analytics) + their components from default-Tailwind slate onto brand tokens + `.shk-*` primitives — matches the `/menu` look (PRs os#432/436). 15 files, no logic changes.
+  - Surfaces → `.shk-panel`/`.shk-kpi`/`bg-[var(--s-*)]`/`border-[var(--line)]`; text → `text-cream` opacity ladder; chrome → `.menu-canvas` glow + seal/eyebrow/display title + `.shk-seg` tabs (NavLink `aria-current`). Semantic financial colors PRESERVED but retoned to brand analogs (healthy=forest/mint, warn=amber-watch, critical=brick-bright, accent=honey/royal-green). Food-cost thresholds + nutrition untouched; the 10-color categorical chart palette kept for legibility (only chart chrome rebranded).
+  - `src/index.css`: promoted `--brick-bright` → `--color-brick-bright` (Tailwind v4 only generates color utilities from the `--color-*` namespace — was silently dropping every `text-/bg-/border-brick-bright`); extended `.shk-seg-btn` active selector to also match `[aria-current="page"]` so NavLink tab strips light up. `FinanceAnalytics`: dropped a redundant outer panel that double-wrapped MonthlyChart's own header.
+  - Verified: full `npm run build` (tsc -b + vite) green; every brand utility confirmed present in compiled CSS; visual self-check via dist-CSS harness + Playwright (Vercel preview is behind SSO); `/code-review` (3 finders) → 1 finding fixed (Export-XLSX hover affordance collapse).
+
 - **2026-06-24 — Receipts tab for managers + expense_ledger locked owner-only (MC 49ffbe68, branch `feature/admin/receipts-task-manager-access`).**
   - CEO: open ONLY `/receipts` to Mint (task_manager) so she can upload receipts + verify OCR, without exposing full expenses.
   - Frontend: `/receipts` route (App.tsx) + AppShell nav lowered `minRole` owner → task_manager. Finance dashboard/ledger/analytics/api-costs stay owner-only; Mint's "Finance" section now shows just Receipt Inbox.

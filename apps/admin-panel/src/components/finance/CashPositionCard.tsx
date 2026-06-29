@@ -10,8 +10,8 @@ interface CashPositionCardProps {
 export function CashPositionCard({ cash, isLoading }: CashPositionCardProps) {
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-        <div className="h-32 animate-pulse rounded-lg bg-slate-800/50" />
+      <div className="shk-panel p-4">
+        <div className="h-32 animate-pulse rounded-lg bg-[var(--s-2)]" />
       </div>
     )
   }
@@ -21,14 +21,14 @@ export function CashPositionCard({ cash, isLoading }: CashPositionCardProps) {
     : 0
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+    <div className="shk-panel p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Wallet className="h-4 w-4 text-emerald-400" />
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <Wallet className="h-4 w-4 text-forest-soft" />
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-cream/60">
           Cash Position
         </h3>
         {cash && (
-          <span className="ml-auto text-[10px] text-slate-600">
+          <span className="ml-auto text-[10px] text-cream/30">
             {new Date(cash.snapshot_date).toLocaleDateString('en-GB', {
               day: 'numeric',
               month: 'short',
@@ -38,34 +38,34 @@ export function CashPositionCard({ cash, isLoading }: CashPositionCardProps) {
       </div>
 
       {!cash ? (
-        <p className="text-xs text-slate-500">No cash snapshot recorded yet</p>
+        <p className="text-xs text-cream/45">No cash snapshot recorded yet</p>
       ) : (
         <div className="space-y-3">
           {/* Business total — hero number */}
           <div>
-            <span className="text-2xl font-bold tabular-nums text-slate-100">
+            <span className="font-mono text-2xl font-semibold tabular-nums text-cream">
               ฿{formatTHBFull(businessTotal)}
             </span>
-            <p className="mt-0.5 text-[10px] text-slate-500">Business available</p>
+            <p className="mt-0.5 text-[10px] text-cream/45">Business available</p>
           </div>
 
           {/* Breakdown */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-slate-800/40 px-3 py-2">
+            <div className="rounded-lg border border-[var(--line)] bg-[var(--s-2)] px-3 py-2">
               <div className="flex items-center gap-1.5">
-                <ArrowDownCircle className="h-3 w-3 text-emerald-500" />
-                <span className="text-[10px] text-slate-500">Cash</span>
+                <ArrowDownCircle className="h-3 w-3 text-forest-soft" />
+                <span className="text-[10px] text-cream/45">Cash</span>
               </div>
-              <span className="text-sm font-semibold tabular-nums text-slate-200">
+              <span className="font-mono text-sm font-semibold tabular-nums text-cream">
                 ฿{formatTHBFull(cash.business_cash_thb)}
               </span>
             </div>
-            <div className="rounded-lg bg-slate-800/40 px-3 py-2">
+            <div className="rounded-lg border border-[var(--line)] bg-[var(--s-2)] px-3 py-2">
               <div className="flex items-center gap-1.5">
-                <Building2 className="h-3 w-3 text-sky-500" />
-                <span className="text-[10px] text-slate-500">Bank</span>
+                <Building2 className="h-3 w-3 text-honey-300" />
+                <span className="text-[10px] text-cream/45">Bank</span>
               </div>
-              <span className="text-sm font-semibold tabular-nums text-slate-200">
+              <span className="font-mono text-sm font-semibold tabular-nums text-cream">
                 ฿{formatTHBFull(cash.business_bank_thb)}
               </span>
             </div>
@@ -73,14 +73,14 @@ export function CashPositionCard({ cash, isLoading }: CashPositionCardProps) {
 
           {/* Personal reserve — isolated */}
           {cash.personal_reserve_thb > 0 && (
-            <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/30 px-3 py-2">
+            <div className="rounded-lg border border-dashed border-[var(--line-strong)] bg-[var(--s-1)] px-3 py-2">
               <div className="flex items-center gap-1.5">
-                <ShieldAlert className="h-3 w-3 text-amber-500" />
-                <span className="text-[10px] font-medium text-amber-400/70">
+                <ShieldAlert className="h-3 w-3 text-amber-watch" />
+                <span className="text-[10px] font-medium text-amber-watch/80">
                   Personal (isolated)
                 </span>
               </div>
-              <span className="text-sm font-semibold tabular-nums text-slate-400">
+              <span className="font-mono text-sm font-semibold tabular-nums text-cream/60">
                 ฿{formatTHBFull(cash.personal_reserve_thb)}
               </span>
             </div>
@@ -88,7 +88,7 @@ export function CashPositionCard({ cash, isLoading }: CashPositionCardProps) {
 
           {/* Notes */}
           {cash.notes && (
-            <p className="text-[10px] leading-relaxed text-slate-600">
+            <p className="text-[10px] leading-relaxed text-cream/40">
               {cash.notes}
             </p>
           )}

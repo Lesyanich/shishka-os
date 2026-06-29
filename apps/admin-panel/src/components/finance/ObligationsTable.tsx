@@ -10,19 +10,19 @@ interface ObligationsTableProps {
 }
 
 const STATUS_STYLE: Record<Obligation['status'], { bg: string; text: string; label: string }> = {
-  pending:   { bg: 'bg-amber-500/15',   text: 'text-amber-300',   label: 'Pending' },
-  partial:   { bg: 'bg-sky-500/15',     text: 'text-sky-300',     label: 'Partial' },
-  paid:      { bg: 'bg-emerald-500/15', text: 'text-emerald-300', label: 'Paid' },
-  overdue:   { bg: 'bg-rose-500/15',    text: 'text-rose-300',    label: 'Overdue' },
-  on_hold:   { bg: 'bg-slate-500/15',   text: 'text-slate-400',   label: 'On Hold' },
-  cancelled: { bg: 'bg-slate-500/15',   text: 'text-slate-500',   label: 'Cancelled' },
+  pending:   { bg: 'bg-amber-watch/15',  text: 'text-amber-watch',  label: 'Pending' },
+  partial:   { bg: 'bg-honey-300/15',    text: 'text-honey-300',    label: 'Partial' },
+  paid:      { bg: 'bg-forest-soft/20',  text: 'text-mint-200',     label: 'Paid' },
+  overdue:   { bg: 'bg-brick-soft/15',   text: 'text-brick-bright', label: 'Overdue' },
+  on_hold:   { bg: 'bg-cream/10',        text: 'text-cream/60',     label: 'On Hold' },
+  cancelled: { bg: 'bg-cream/10',        text: 'text-cream/40',     label: 'Cancelled' },
 }
 
 const PRIORITY_DOT: Record<Obligation['priority'], string> = {
-  critical: 'bg-rose-400',
-  high:     'bg-amber-400',
-  medium:   'bg-sky-400',
-  low:      'bg-slate-500',
+  critical: 'bg-brick-bright',
+  high:     'bg-amber-watch',
+  medium:   'bg-honey-300',
+  low:      'bg-cream/40',
 }
 
 export function ObligationsTable({ obligations, totalOutstanding, isLoading }: ObligationsTableProps) {
@@ -30,8 +30,8 @@ export function ObligationsTable({ obligations, totalOutstanding, isLoading }: O
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-        <div className="h-48 animate-pulse rounded-lg bg-slate-800/50" />
+      <div className="shk-panel p-4">
+        <div className="h-48 animate-pulse rounded-lg bg-[var(--s-2)]" />
       </div>
     )
   }
@@ -40,15 +40,15 @@ export function ObligationsTable({ obligations, totalOutstanding, isLoading }: O
   const paid = obligations.filter(o => o.status === 'paid')
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50">
+    <div className="shk-panel">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-cream/60">
           Obligations
         </h3>
         <div className="flex items-baseline gap-1">
-          <span className="text-xs text-slate-500">Outstanding:</span>
-          <span className="text-sm font-bold tabular-nums text-rose-400">
+          <span className="text-xs text-cream/45">Outstanding:</span>
+          <span className="font-mono text-sm font-bold tabular-nums text-brick-bright">
             ฿{formatTHBFull(totalOutstanding)}
           </span>
         </div>
@@ -56,9 +56,9 @@ export function ObligationsTable({ obligations, totalOutstanding, isLoading }: O
 
       {/* Active obligations */}
       {active.length === 0 ? (
-        <p className="px-4 py-6 text-center text-xs text-slate-500">No active obligations</p>
+        <p className="px-4 py-6 text-center text-xs text-cream/45">No active obligations</p>
       ) : (
-        <div className="divide-y divide-slate-800/50">
+        <div className="divide-y divide-[var(--line)]">
           {active.map(obl => (
             <ObligationRow
               key={obl.id}
@@ -72,10 +72,10 @@ export function ObligationsTable({ obligations, totalOutstanding, isLoading }: O
 
       {/* Paid section (collapsed) */}
       {paid.length > 0 && (
-        <div className="border-t border-slate-800">
+        <div className="border-t border-[var(--line)]">
           <button
             onClick={() => setExpandedId(expandedId === '__paid__' ? null : '__paid__')}
-            className="flex w-full items-center gap-2 px-4 py-2.5 text-[10px] text-slate-500 hover:bg-slate-800/30"
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-[10px] text-cream/45 hover:bg-[var(--s-2)]"
           >
             {expandedId === '__paid__' ? (
               <ChevronDown className="h-3 w-3" />
@@ -85,7 +85,7 @@ export function ObligationsTable({ obligations, totalOutstanding, isLoading }: O
             {paid.length} paid obligation{paid.length > 1 ? 's' : ''}
           </button>
           {expandedId === '__paid__' && (
-            <div className="divide-y divide-slate-800/30">
+            <div className="divide-y divide-[var(--line)]">
               {paid.map(obl => (
                 <ObligationRow
                   key={obl.id}
@@ -122,7 +122,7 @@ function ObligationRow({
     <div>
       <button
         onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-800/30"
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--s-2)]"
       >
         {/* Priority dot */}
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[obl.priority]}`} />
@@ -130,7 +130,7 @@ function ObligationRow({
         {/* Creditor + description */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-xs font-medium text-slate-200">
+            <span className="truncate text-xs font-medium text-cream">
               {obl.creditor}
             </span>
             <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${style.bg} ${style.text}`}>
@@ -138,17 +138,17 @@ function ObligationRow({
             </span>
           </div>
           {obl.description && (
-            <p className="mt-0.5 truncate text-[10px] text-slate-500">{obl.description}</p>
+            <p className="mt-0.5 truncate text-[10px] text-cream/45">{obl.description}</p>
           )}
         </div>
 
         {/* Amount */}
         <div className="shrink-0 text-right">
-          <span className={`text-sm font-semibold tabular-nums ${obl.status === 'paid' ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+          <span className={`font-mono text-sm font-semibold tabular-nums ${obl.status === 'paid' ? 'text-cream/40 line-through' : 'text-cream'}`}>
             ฿{formatTHBFull(obl.amount_thb)}
           </span>
           {obl.paid_thb > 0 && obl.status !== 'paid' && (
-            <p className="text-[10px] text-emerald-500">
+            <p className="text-[10px] text-mint-200">
               ฿{formatTHBFull(obl.paid_thb)} paid
             </p>
           )}
@@ -157,33 +157,33 @@ function ObligationRow({
         {/* Due date */}
         <div className="w-16 shrink-0 text-right">
           {obl.due_date ? (
-            <span className={`text-[10px] ${isOverdue ? 'font-semibold text-rose-400' : 'text-slate-500'}`}>
+            <span className={`text-[10px] ${isOverdue ? 'font-semibold text-brick-bright' : 'text-cream/45'}`}>
               {new Date(obl.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
             </span>
           ) : (
-            <span className="text-[10px] text-slate-600">—</span>
+            <span className="text-[10px] text-cream/30">—</span>
           )}
         </div>
 
         {/* Expand chevron */}
         {obl.status !== 'paid' && (
-          <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-slate-600 transition ${isExpanded ? 'rotate-90' : ''}`} />
+          <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-cream/30 transition ${isExpanded ? 'rotate-90' : ''}`} />
         )}
       </button>
 
       {/* Expanded detail */}
       {isExpanded && (
-        <div className="border-t border-slate-800/50 bg-slate-900/30 px-4 py-3 space-y-2">
+        <div className="border-t border-[var(--line)] bg-[var(--s-1)] px-4 py-3 space-y-2">
           {/* Progress bar for partial payments */}
           {obl.paid_thb > 0 && (
             <div>
-              <div className="mb-1 flex justify-between text-[10px] text-slate-500">
+              <div className="mb-1 flex justify-between text-[10px] text-cream/45">
                 <span>Paid: ฿{formatTHBFull(obl.paid_thb)}</span>
                 <span>Remaining: ฿{formatTHBFull(remaining)}</span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+              <div className="h-1.5 overflow-hidden rounded-full bg-[var(--s-2)]">
                 <div
-                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  className="h-full rounded-full bg-forest-soft transition-all"
                   style={{ width: `${paidPct}%` }}
                 />
               </div>
@@ -191,10 +191,10 @@ function ObligationRow({
           )}
 
           {obl.notes && (
-            <p className="text-[10px] leading-relaxed text-slate-500">{obl.notes}</p>
+            <p className="text-[10px] leading-relaxed text-cream/45">{obl.notes}</p>
           )}
 
-          <div className="flex gap-4 text-[10px] text-slate-600">
+          <div className="flex gap-4 text-[10px] text-cream/40">
             <span>Priority: {obl.priority}</span>
             {obl.source && <span>Source: {obl.source}</span>}
           </div>

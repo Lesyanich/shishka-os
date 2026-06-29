@@ -18,7 +18,7 @@
  *   • cream #FBF8F0 .................... 18.2:1  ✓ (AAA)
  *   • gold price honey-300 #F0CE83 .... 12.9:1  ✓ (AAA)
  *   • accent-red #B62A23 AS TEXT ...... 3.1:1   ✗  → tint/background ONLY
- *     red text uses --brick-bright #E27A7F (6.8:1 ✓), never the raw accent.
+ *     red text uses --color-brick-bright #E27A7F (6.8:1 ✓), never the raw accent.
  * Reusable on future customer site — see src/components/menu/shared/. */
 @theme {
   /* Brand */
@@ -69,8 +69,10 @@
   --line:        rgba(240, 234, 214, 0.09);
   --line-strong: rgba(240, 234, 214, 0.18);
 
-  /* AA-safe semantic red, 6.82:1 contrast on --s-0 */
-  --brick-bright: #E27A7F;
+  /* AA-safe semantic red, 6.82:1 contrast on --s-0. In the --color-* namespace
+   * so Tailwind generates text-/bg-/border-brick-bright utilities (used for
+   * critical/overdue/burn-high numerics across Finance). */
+  --color-brick-bright: #E27A7F;
 
   /* Motion easing (prototype-aligned) */
   --e-out:  cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -349,12 +351,16 @@ body {
   transition: opacity 0.15s var(--e-out), background-color 0.15s var(--e-out);
 }
 .shk-seg-btn:hover { opacity: 0.92; }
-.shk-seg-btn[aria-pressed="true"] {
+/* Active fill for both <button> usage (aria-pressed) and NavLink routing
+ * usage (aria-current="page", e.g. the Finance tab strip). */
+.shk-seg-btn[aria-pressed="true"],
+.shk-seg-btn[aria-current="page"] {
   opacity: 1;
   background: linear-gradient(180deg, var(--color-royal-soft), var(--color-royal-green));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
-.shk-seg-btn[aria-pressed="true"] .shk-seg-ico { color: var(--color-honey-300); }
+.shk-seg-btn[aria-pressed="true"] .shk-seg-ico,
+.shk-seg-btn[aria-current="page"] .shk-seg-ico { color: var(--color-honey-300); }
 
 /* Elevated content panel shared by table / station / preview */
 .shk-panel { background: var(--s-1); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }

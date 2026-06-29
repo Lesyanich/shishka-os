@@ -50,14 +50,14 @@ export function CategoryBreakdown({ rows, isLoading }: CategoryBreakdownProps) {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="h-40 w-40 animate-pulse rounded-full bg-slate-800/50" />
+        <div className="h-40 w-40 animate-pulse rounded-full bg-[var(--s-2)]" />
       </div>
     )
   }
 
   if (slices.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-slate-500">
+      <div className="flex h-full items-center justify-center text-xs text-cream/45">
         No data
       </div>
     )
@@ -67,8 +67,8 @@ export function CategoryBreakdown({ rows, isLoading }: CategoryBreakdownProps) {
     <div className="flex h-full flex-col">
       {/* Header with toggle */}
       <div className="flex items-center justify-between px-4 pt-3 pb-1">
-        <h3 className="text-sm font-semibold text-slate-300">Category Breakdown</h3>
-        <div className="flex rounded-md border border-slate-700 bg-slate-800/50">
+        <h3 className="text-sm font-semibold text-cream/80">Category Breakdown</h3>
+        <div className="flex rounded-md border border-[var(--line)] bg-[var(--s-2)]">
           {(['category', 'flow_type'] as const).map((g) => (
             <button
               key={g}
@@ -76,8 +76,8 @@ export function CategoryBreakdown({ rows, isLoading }: CategoryBreakdownProps) {
               onClick={() => setGroupBy(g)}
               className={`px-2 py-0.5 text-[10px] font-medium transition ${
                 groupBy === g
-                  ? 'bg-slate-700 text-slate-200'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'bg-[var(--s-3)] text-cream'
+                  : 'text-cream/45 hover:text-cream/80'
               }`}
             >
               {g === 'category' ? 'Category' : 'Type'}
@@ -122,7 +122,7 @@ export function CategoryBreakdown({ rows, isLoading }: CategoryBreakdownProps) {
           {slices.map((s, i) => (
             <div
               key={s.name}
-              className="flex items-center gap-2 rounded px-1.5 py-0.5 transition hover:bg-slate-800/50"
+              className="flex items-center gap-2 rounded px-1.5 py-0.5 transition hover:bg-[var(--s-2)]"
               onMouseEnter={() => setActiveIndex(i)}
               onMouseLeave={() => setActiveIndex(undefined)}
             >
@@ -130,8 +130,8 @@ export function CategoryBreakdown({ rows, isLoading }: CategoryBreakdownProps) {
                 className="h-2 w-2 flex-shrink-0 rounded-full"
                 style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }}
               />
-              <span className="flex-1 truncate text-[10px] text-slate-400">{s.name}</span>
-              <span className="text-[10px] font-medium text-slate-300">
+              <span className="flex-1 truncate text-[10px] text-cream/60">{s.name}</span>
+              <span className="text-[10px] font-medium text-cream/80">
                 {s.pct.toFixed(1)}%
               </span>
             </div>
@@ -159,10 +159,10 @@ function renderActiveShape(props: any) {
 
   return (
     <g>
-      <text x={cx} y={cy - 6} textAnchor="middle" fill="#e2e8f0" fontSize={11} fontWeight={600}>
+      <text x={cx} y={cy - 6} textAnchor="middle" fill="#FBF8F0" fontSize={11} fontWeight={600}>
         {payload.name.length > 12 ? payload.name.slice(0, 12) + '…' : payload.name}
       </text>
-      <text x={cx} y={cy + 10} textAnchor="middle" fill="#94a3b8" fontSize={10}>
+      <text x={cx} y={cy + 10} textAnchor="middle" fill="rgba(240,234,214,0.55)" fontSize={10}>
         {(percent * 100).toFixed(1)}%
       </text>
       <Sector

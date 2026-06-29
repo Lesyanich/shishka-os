@@ -71,20 +71,17 @@ export function FinanceAnalytics() {
         />
       </div>
 
-      {/* Monthly trend chart — larger */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-300">Monthly Expenses</h2>
-        <Suspense fallback={<div className="h-80 animate-pulse rounded-lg bg-slate-800/50" />}>
-          <MonthlyChart summaries={monthlySummaries} isLoading={isLoading} error={error} />
-        </Suspense>
-      </div>
+      {/* Monthly trend chart — MonthlyChart renders its own branded panel + header */}
+      <Suspense fallback={<div className="h-80 animate-pulse rounded-2xl bg-[var(--s-1)]" />}>
+        <MonthlyChart summaries={monthlySummaries} isLoading={isLoading} error={error} />
+      </Suspense>
 
       {/* Category Breakdown + Top Suppliers */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="min-h-[280px] rounded-xl border border-slate-800 bg-slate-900/50">
+        <div className="min-h-[280px] shk-panel">
           <CategoryBreakdown rows={rows} isLoading={isLoading} />
         </div>
-        <div className="min-h-[280px] rounded-xl border border-slate-800 bg-slate-900/50">
+        <div className="min-h-[280px] shk-panel">
           <TopSuppliers rows={rows} isLoading={isLoading} />
         </div>
       </div>
