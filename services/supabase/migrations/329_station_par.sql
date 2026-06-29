@@ -4,7 +4,7 @@
 -- HYBRID par levels. CEO decision (A): a PF that lives at more than one station can
 -- carry a per-station par override here; everything else falls back to the GLOBAL
 -- nomenclature.min_stock/par_stock/reorder_qty (mig 319). An empty table = pure
--- global behaviour, so v_station_replenishment (mig 329) is correct from day one and
+-- global behaviour, so v_station_replenishment (mig 331) is correct from day one and
 -- overrides are added incrementally via the station dashboard / a seed.
 --
 -- Same column family + types as nomenclature par (numeric(12,3), base_unit). No CHECK
