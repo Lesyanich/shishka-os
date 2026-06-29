@@ -1,12 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// DEPRECATED — 2026-04-06
-// This edge function is LEGACY code. DO NOT USE, DO NOT DEPLOY.
-// Was: callback endpoint for GAS ReceiptParser. Replaced by Finance Agent.
-// See: agents/finance/AGENT.md, STATUS.md → Receipt Pipeline State
-// Tracking: Initiative 96f18092, Task a35ff4e5
-// ═══════════════════════════════════════════════════════════
 // Edge Function: update-receipt-job (Callback from GAS)
 // Phase 5.0e: Solves RLS bypass for GAS → Supabase writes
+// ═══════════════════════════════════════════════════════════
+// Inbound auth: server-to-server only. Requires the shared FUNCTION_INTERNAL_SECRET
+// in the x-internal-secret header (the GAS ReceiptParser callback sends it from
+// Script Properties). Closes the service-role public-invocation hole — see
+// docs/security/service-role-isolation-audit-2026-06-29.md (F1).
 // ═══════════════════════════════════════════════════════════
 // WHY: GAS uses raw HTTP PATCH to PostgREST, but the
 // service role key is NOT recognized as a JWT by PostgREST
@@ -39,6 +38,18 @@ Deno.serve(async (req: Request) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS })
+  }
+
+  // Auth: shared internal secret — server-to-server only (GAS callback).
+  // Without this, the public anon apikey could mutate any receipt_jobs row via
+  // the service-role client. Mirrors telegram-ai's secret-token guard.
+  const expectedSecret = Deno.env.get("FUNCTION_INTERNAL_SECRET") ?? ""
+  const gotSecret = req.headers.get("x-internal-secret") ?? ""
+  if (!expectedSecret || gotSecret !== expectedSecret) {
+    return new Response(
+      JSON.stringify({ error: "unauthorized" }),
+      { status: 401, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+    )
   }
 
   try {
