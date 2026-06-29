@@ -1,4 +1,4 @@
--- 331_fn_apply_stocktake.sql
+-- 333_fn_apply_stocktake.sql
 -- W1 Connected Stock Model (spec §4 / §4.1, CEO decision §10-C, MC c605e2ca).
 --
 -- The single unified count sink for BOTH the Telegram bot AND the admin Stocktake UI.
@@ -143,7 +143,7 @@ GRANT EXECUTE ON FUNCTION public.fn_apply_stocktake(
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '331_fn_apply_stocktake.sql',
+  '333_fn_apply_stocktake.sql',
   'claude-code',
   NULL,
   'W1 (c605e2ca): fn_apply_stocktake — unified count sink for bot AND admin; appends stocktake_entries audit + posts one location-scoped stocktake_adj stock_movements row (spec §4.1). Unit-integrity guard, L1/L2/general<->location map. SECURITY DEFINER.'

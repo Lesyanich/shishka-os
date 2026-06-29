@@ -1,4 +1,4 @@
--- 328_v_stock_on_hand_by_location.sql
+-- 330_v_stock_on_hand_by_location.sql
 -- W1 Connected Stock Model (spec §3.1 / §5 M2, CEO decision §10-C, MC c605e2ca).
 --
 -- The foundation primitive: "how much of X sits at station Y, right now."
@@ -29,7 +29,7 @@ GRANT SELECT ON public.v_stock_on_hand_by_location TO authenticated;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '328_v_stock_on_hand_by_location.sql',
+  '330_v_stock_on_hand_by_location.sql',
   'claude-code',
   NULL,
   'W1 (c605e2ca): v_stock_on_hand_by_location — per-(nomenclature, location) on-hand derived from live inventory_batches (CEO §10-C: batches = source of truth). Carries batch/expiry rollup.'

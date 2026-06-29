@@ -1,4 +1,4 @@
--- 330_v_stock_reconciliation.sql
+-- 332_v_stock_reconciliation.sql
 -- W1 Connected Stock Model (spec §5.1 / CEO decision §10-C, MC c605e2ca).
 --
 -- The parallel-run safety net. CEO decision (C): make inventory_batches the source of
@@ -49,7 +49,7 @@ GRANT SELECT ON public.v_stock_reconciliation TO authenticated;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '330_v_stock_reconciliation.sql',
+  '332_v_stock_reconciliation.sql',
   'claude-code',
   NULL,
   'W1 (c605e2ca): v_stock_reconciliation — diff global sku_balances vs batch-derived on-hand per nomenclature (drift + recon_status) to validate before demoting sku_balances (CEO §10-C parallel-run).'

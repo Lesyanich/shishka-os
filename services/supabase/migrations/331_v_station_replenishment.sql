@@ -1,4 +1,4 @@
--- 329_v_station_replenishment.sql
+-- 331_v_station_replenishment.sql
 -- W1 Connected Stock Model (spec §3.2 / §5 M4, CEO decisions §10-A/§10-D, MC c605e2ca).
 --
 -- Station-aware reorder/production view: extends the global v_stock_status (mig 320)
@@ -75,7 +75,7 @@ GRANT SELECT ON public.v_station_replenishment TO authenticated;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '329_v_station_replenishment.sql',
+  '331_v_station_replenishment.sql',
   'claude-code',
   NULL,
   'W1 (c605e2ca): v_station_replenishment — per-station on_hand vs hybrid par (station_par over global, §10-A) + stock_status + suggested_qty + replenish_action (RAW=purchase / PF=produce, §10-B button target).'

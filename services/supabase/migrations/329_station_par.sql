@@ -1,4 +1,4 @@
--- 327_station_par.sql
+-- 329_station_par.sql
 -- W1 Connected Stock Model (spec §5 M3, CEO decision §10-A, MC c605e2ca).
 --
 -- HYBRID par levels. CEO decision (A): a PF that lives at more than one station can
@@ -34,7 +34,7 @@ CREATE POLICY station_par_write ON public.station_par
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '327_station_par.sql',
+  '329_station_par.sql',
   'claude-code',
   NULL,
   'W1 (c605e2ca): station_par table (PK nomenclature_id+location_id) for hybrid per-station par overrides; empty => global nomenclature par fallback (CEO §10-A). RLS authenticated r/w.'
