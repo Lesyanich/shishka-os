@@ -61,7 +61,7 @@ BEGIN
 
   -- ── 2. Resolve location (prefer explicit id; else map bot station code) ──
   IF p_location_id IS NOT NULL THEN
-    SELECT id, type INTO v_location_id, v_loc_type
+    SELECT id, type::text INTO v_location_id, v_loc_type
     FROM public.locations WHERE id = p_location_id;
     IF NOT FOUND THEN
       RETURN jsonb_build_object('ok', false, 'error', 'unknown location_id');
@@ -73,7 +73,7 @@ BEGIN
                     ELSE 'storage'         -- 'general' / anything else
                   END;
     SELECT id INTO v_location_id
-    FROM public.locations WHERE type = v_loc_type ORDER BY name LIMIT 1;
+    FROM public.locations WHERE type::text = v_loc_type ORDER BY name LIMIT 1;
     IF v_location_id IS NULL THEN
       RETURN jsonb_build_object('ok', false, 'error',
         format('no location of type %s for station %s', v_loc_type, p_station));
