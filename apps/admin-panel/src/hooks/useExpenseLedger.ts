@@ -209,14 +209,46 @@ export function useExpenseLedger(): UseExpenseLedgerResult {
   /** Update a single expense row. Returns error message or null on success. */
   const updateExpense = useCallback(
     async (id: string, payload: ExpenseUpdatePayload): Promise<string | null> => {
-      const { error: updateErr } = await supabase
-        .from('expense_ledger')
-        .update(payload)
-        .eq('id', id)
+      // `amount_original` and `exchange_rate` column UPDATE is revoked from authenticated
+      // (column-level RLS) — route those through the owner-gated SECURITY DEFINER RPC,
+      // which also audits the change. Everything else stays a direct update.
+      const { amount_original, exchange_rate, ...rest } = payload
 
-      if (updateErr) {
-        console.error('[useExpenseLedger] update error', updateErr)
-        return updateErr.message
+      if (amount_original !== undefined || exchange_rate !== undefined) {
+        // The RPC writes both columns together; backfill any side the caller omitted
+        // from the current row so we never overwrite it with a stale value.
+        let amt = amount_original
+        let fx = exchange_rate
+        if (amt === undefined || fx === undefined) {
+          const { data: cur } = await supabase
+            .from('expense_ledger')
+            .select('amount_original, exchange_rate')
+            .eq('id', id)
+            .single()
+          if (amt === undefined) amt = Number(cur?.amount_original ?? 0)
+          if (fx === undefined) fx = Number(cur?.exchange_rate ?? 1)
+        }
+        const { error: rpcErr } = await supabase.rpc('fn_set_expense_amount', {
+          p_id: id,
+          p_amount_original: amt,
+          p_exchange_rate: fx,
+        })
+        if (rpcErr) {
+          console.error('[useExpenseLedger] set amount error', rpcErr)
+          return rpcErr.message
+        }
+      }
+
+      if (Object.keys(rest).length > 0) {
+        const { error: updateErr } = await supabase
+          .from('expense_ledger')
+          .update(rest)
+          .eq('id', id)
+
+        if (updateErr) {
+          console.error('[useExpenseLedger] update error', updateErr)
+          return updateErr.message
+        }
       }
 
       await fetchData()

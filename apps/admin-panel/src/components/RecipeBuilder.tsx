@@ -292,9 +292,22 @@ function NomenclatureModal({
 
     try {
       if (isEdit) {
+        // `price` column UPDATE is revoked from authenticated (column-level RLS) —
+        // route it through the owner-gated SECURITY DEFINER RPC, and only when it
+        // actually changed so non-price edits (e.g. RAW cost) don't hit the owner gate.
+        if (price !== item.price) {
+          const { error: priceError } = await supabase.rpc('fn_set_dish_price', {
+            p_id: item.id,
+            p_price: price,
+          })
+          if (priceError) throw priceError
+        }
+        // Strip price from the direct update — the column is no longer writable here.
+        const rest: Record<string, unknown> = { ...payload }
+        delete rest.price
         const { error: updateError } = await supabase
           .from('nomenclature')
-          .update(payload)
+          .update(rest)
           .eq('id', item.id)
 
         if (updateError) throw updateError
