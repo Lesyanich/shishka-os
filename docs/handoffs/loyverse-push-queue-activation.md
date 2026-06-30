@@ -68,14 +68,19 @@ and no JWT → `401`.
 
 ## How the agent uses it afterwards
 ```sql
--- push one dish
+-- push one dish (name/price/description/category/photo; preserves modifiers)
 INSERT INTO loyverse_push_queue (action, target_id) VALUES ('dish', '<dish-uuid>');
+-- sync ONE dish's modifier attachments DB→POS (mig 334; targeted)
+INSERT INTO loyverse_push_queue (action, target_id) VALUES ('modifiers', '<dish-uuid>');
+-- remove a dish's item from Loyverse + unlink the DB row (mig 335; soft-delete)
+INSERT INTO loyverse_push_queue (action, target_id) VALUES ('delete', '<dish-uuid>');
 -- reconcile all SALE prices DB→POS
 INSERT INTO loyverse_push_queue (action) VALUES ('prices');
 -- resync all names + staff-code prefixes
 INSERT INTO loyverse_push_queue (action) VALUES ('names');
 ```
-Then read the row back to confirm `status='done'`.
+Then read the row back to confirm `status='done'`. Note: `action='dish'` also moves the
+item to its DB-linked Loyverse category (fixes mis-categorized items).
 
 ## Rollback
 ```sql

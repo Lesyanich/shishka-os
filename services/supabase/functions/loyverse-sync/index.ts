@@ -168,6 +168,22 @@ async function handleDeleteItem(itemId: string) {
   }
 }
 
+// Delete by DISH id (queue action='delete'): resolve the dish's loyverse_item_id and
+// remove it from Loyverse (soft-delete; recoverable in Back Office), unlinking the DB row.
+async function handleDeleteDish(dishId: string) {
+  if (!dishId) return json({ ok: false, error: "dish_id required" }, 400)
+  const { data: dish, error } = await db
+    .from("nomenclature")
+    .select("id, name, loyverse_item_id")
+    .eq("id", dishId)
+    .single()
+  if (error || !dish) return json({ ok: false, error: error?.message ?? "dish not found" }, 404)
+  // deno-lint-ignore no-explicit-any
+  const d = dish as any
+  if (!d.loyverse_item_id) return json({ ok: true, skipped: true, dish: d.name, message: "not in Loyverse (already unlinked)" })
+  return await handleDeleteItem(d.loyverse_item_id)
+}
+
 async function handleRecreateItem(req: Request) {
   const body = await req.json()
   if (!body.dish_id) return json({ ok: false, error: "dish_id required" }, 400)
@@ -1038,6 +1054,10 @@ async function handleInternalPush(req: Request) {
     case "modifiers":
       // Targeted per-dish modifier attachment sync (NOT the global reattach).
       resp = await handlePushDishModifiers(targetId)
+      break
+    case "delete":
+      // Remove the dish's item from Loyverse (soft-delete) + unlink the DB row.
+      resp = await handleDeleteDish(targetId)
       break
     default:
       resp = json({ ok: false, error: `unsupported queue action: ${act || "(empty)"}` }, 400)
