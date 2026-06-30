@@ -15,11 +15,7 @@ type NomItem = {
   cost_per_unit: number
 }
 
-export function PurchaseForm({
-  onPurchaseCreated,
-}: {
-  onPurchaseCreated: () => void
-}) {
+export function PurchaseForm({ onPurchaseCreated }: { onPurchaseCreated: () => void }) {
   // Lookups
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [items, setItems] = useState<NomItem[]>([])
@@ -30,9 +26,7 @@ export function PurchaseForm({
   const [nomenclatureId, setNomenclatureId] = useState('')
   const [quantity, setQuantity] = useState<number | ''>('')
   const [totalPrice, setTotalPrice] = useState<number | ''>('')
-  const [invoiceDate, setInvoiceDate] = useState(
-    new Date().toISOString().split('T')[0],
-  )
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
 
   const [isSaving, setIsSaving] = useState(false)
@@ -41,9 +35,7 @@ export function PurchaseForm({
 
   // Computed: price per unit
   const pricePerUnit =
-    typeof quantity === 'number' &&
-    typeof totalPrice === 'number' &&
-    quantity > 0
+    typeof quantity === 'number' && typeof totalPrice === 'number' && quantity > 0
       ? totalPrice / quantity
       : null
 
@@ -56,11 +48,7 @@ export function PurchaseForm({
       setIsLoadingLookups(true)
 
       const [suppRes, nomRes] = await Promise.all([
-        supabase
-          .from('suppliers')
-          .select('id, name')
-          .eq('is_deleted', false)
-          .order('name'),
+        supabase.from('suppliers').select('id, name').eq('is_deleted', false).order('name'),
         supabase
           .from('nomenclature')
           .select('id, product_code, name, base_unit, cost_per_unit')
@@ -69,10 +57,8 @@ export function PurchaseForm({
           .order('product_code'),
       ])
 
-      if (suppRes.error)
-        console.error('[PurchaseForm] suppliers error', suppRes.error)
-      if (nomRes.error)
-        console.error('[PurchaseForm] nomenclature error', nomRes.error)
+      if (suppRes.error) console.error('[PurchaseForm] suppliers error', suppRes.error)
+      if (nomRes.error) console.error('[PurchaseForm] nomenclature error', nomRes.error)
 
       setSuppliers((suppRes.data ?? []) as Supplier[])
       setItems(
@@ -114,23 +100,20 @@ export function PurchaseForm({
     setSuccess(null)
 
     try {
-      const { error: insertErr } = await supabase
-        .from('purchase_logs')
-        .insert({
-          supplier_id: supplierId,
-          nomenclature_id: nomenclatureId,
-          quantity: quantity,
-          price_per_unit: Math.round(pricePerUnit * 100) / 100,
-          total_price: totalPrice,
-          invoice_date: invoiceDate,
-          notes: notes.trim() || null,
-        })
+      const { error: insertErr } = await supabase.from('purchase_logs').insert({
+        supplier_id: supplierId,
+        nomenclature_id: nomenclatureId,
+        quantity: quantity,
+        price_per_unit: Math.round(pricePerUnit * 100) / 100,
+        total_price: totalPrice,
+        invoice_date: invoiceDate,
+        notes: notes.trim() || null,
+      })
 
       if (insertErr) throw insertErr
 
       // Show success and reset form
-      const itemName =
-        items.find((i) => i.id === nomenclatureId)?.product_code ?? ''
+      const itemName = items.find((i) => i.id === nomenclatureId)?.product_code ?? ''
       setSuccess(
         `Logged: ${itemName} — ${quantity} units @ ${pricePerUnit.toFixed(2)} THB/unit. Cost updated!`,
       )
@@ -151,8 +134,8 @@ export function PurchaseForm({
 
   if (isLoadingLookups) {
     return (
-      <section className="rounded-xl border border-slate-800 bg-slate-900/50 p-6 shadow-sm">
-        <div className="flex items-center justify-center py-8 text-xs text-slate-500">
+      <section className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] p-6 shadow-sm">
+        <div className="flex items-center justify-center py-8 text-xs text-cream/45">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           Loading form data...
         </div>
@@ -161,30 +144,26 @@ export function PurchaseForm({
   }
 
   return (
-    <section className="rounded-xl border border-slate-800 bg-slate-900/50 shadow-sm">
-      <header className="border-b border-slate-800 px-4 py-3">
+    <section className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] shadow-sm">
+      <header className="border-b border-[var(--line)] px-4 py-3">
         <div className="flex items-center gap-2">
-          <Receipt className="h-4 w-4 text-emerald-400" />
+          <Receipt className="h-4 w-4 text-mint-200" />
           <div>
-            <h2 className="text-sm font-semibold text-slate-100">
-              Log Purchase
-            </h2>
-            <p className="text-xs text-slate-500">
-              Enter invoice data. Cost auto-updates on save.
-            </p>
+            <h2 className="text-sm font-semibold text-cream">Log Purchase</h2>
+            <p className="text-xs text-cream/45">Enter invoice data. Cost auto-updates on save.</p>
           </div>
         </div>
       </header>
 
       <div className="space-y-4 px-4 py-4">
         {error && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          <div className="rounded-md border border-brick-soft/30 bg-brick-soft/10 px-3 py-2 text-xs text-brick-bright">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+          <div className="rounded-md border border-forest-soft/30 bg-forest-soft/10 px-3 py-2 text-xs text-mint-200">
             {success}
           </div>
         )}
@@ -192,13 +171,11 @@ export function PurchaseForm({
         {/* Supplier + Date row */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs text-slate-400">
-              Supplier
-            </label>
+            <label className="mb-1 block text-xs text-cream/60">Supplier</label>
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
             >
               <option value="">Select supplier...</option>
               {suppliers.map((s) => (
@@ -209,36 +186,30 @@ export function PurchaseForm({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">
-              Invoice Date
-            </label>
+            <label className="mb-1 block text-xs text-cream/60">Invoice Date</label>
             <input
               type="date"
               value={invoiceDate}
               onChange={(e) => setInvoiceDate(e.target.value)}
-              className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
             />
           </div>
         </div>
 
         {/* Item selector */}
         <div>
-          <label className="mb-1 block text-xs text-slate-400">
-            Item (RAW / PF only)
-          </label>
+          <label className="mb-1 block text-xs text-cream/60">Item (RAW / PF only)</label>
           <select
             value={nomenclatureId}
             onChange={(e) => setNomenclatureId(e.target.value)}
-            className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+            className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
           >
             <option value="">Select item...</option>
             {items.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.product_code} — {i.name}
                 {i.base_unit ? ` [${i.base_unit}]` : ''}
-                {i.cost_per_unit > 0
-                  ? ` (current: ${i.cost_per_unit} THB)`
-                  : ''}
+                {i.cost_per_unit > 0 ? ` (current: ${i.cost_per_unit} THB)` : ''}
               </option>
             ))}
           </select>
@@ -247,70 +218,60 @@ export function PurchaseForm({
         {/* Quantity + Total Price row */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs text-slate-400">
+            <label className="mb-1 block text-xs text-cream/60">
               Quantity ({selectedItem?.base_unit ?? 'units'})
             </label>
             <input
               type="number"
               step="0.001"
               value={quantity}
-              onChange={(e) =>
-                setQuantity(e.target.value === '' ? '' : Number(e.target.value))
-              }
+              onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
               placeholder="e.g. 10"
-              className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">
-              Total Price (THB)
-            </label>
+            <label className="mb-1 block text-xs text-cream/60">Total Price (THB)</label>
             <input
               type="number"
               step="0.01"
               value={totalPrice}
-              onChange={(e) =>
-                setTotalPrice(
-                  e.target.value === '' ? '' : Number(e.target.value),
-                )
-              }
+              onChange={(e) => setTotalPrice(e.target.value === '' ? '' : Number(e.target.value))}
               placeholder="e.g. 500"
-              className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
             />
           </div>
         </div>
 
         {/* Price per unit (auto-calc) + cost comparison */}
         {pricePerUnit !== null && (
-          <div className="rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-3">
+          <div className="rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] px-4 py-3">
             <div className="flex items-baseline justify-between">
               <div>
-                <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                <div className="text-[10px] uppercase tracking-wide text-cream/45">
                   Price per Unit (auto)
                 </div>
-                <div className="mt-1 text-lg font-semibold text-amber-300">
+                <div className="mt-1 text-lg font-semibold text-amber-watch">
                   {pricePerUnit.toFixed(2)} THB
                 </div>
               </div>
               {selectedItem && selectedItem.cost_per_unit > 0 && (
                 <div className="text-right">
-                  <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                  <div className="text-[10px] uppercase tracking-wide text-cream/45">
                     Current Cost
                   </div>
-                  <div className="mt-1 text-sm text-slate-300">
+                  <div className="mt-1 text-sm text-cream/80">
                     {selectedItem.cost_per_unit.toFixed(2)} THB
                   </div>
                   {(() => {
                     const diff = pricePerUnit - selectedItem.cost_per_unit
                     const pct =
-                      selectedItem.cost_per_unit > 0
-                        ? (diff / selectedItem.cost_per_unit) * 100
-                        : 0
+                      selectedItem.cost_per_unit > 0 ? (diff / selectedItem.cost_per_unit) * 100 : 0
                     if (Math.abs(pct) < 0.5) return null
                     return (
                       <div
                         className={`mt-0.5 text-[10px] font-medium ${
-                          diff > 0 ? 'text-rose-400' : 'text-emerald-400'
+                          diff > 0 ? 'text-brick-bright' : 'text-mint-200'
                         }`}
                       >
                         {diff > 0 ? '+' : ''}
@@ -326,15 +287,13 @@ export function PurchaseForm({
 
         {/* Notes */}
         <div>
-          <label className="mb-1 block text-xs text-slate-400">
-            Notes (optional)
-          </label>
+          <label className="mb-1 block text-xs text-cream/60">Notes (optional)</label>
           <input
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Invoice #, batch note..."
-            className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+            className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
           />
         </div>
 
@@ -343,7 +302,7 @@ export function PurchaseForm({
           type="button"
           onClick={handleSubmit}
           disabled={isSaving}
-          className="inline-flex h-9 w-full items-center justify-center rounded-md border border-emerald-500/60 bg-emerald-500/15 text-xs font-medium text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-50"
+          className="inline-flex h-9 w-full items-center justify-center rounded-md border border-forest-soft/60 bg-forest-soft/15 text-xs font-medium text-mint-200 hover:bg-forest-soft/25 disabled:opacity-50"
         >
           {isSaving ? (
             <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />

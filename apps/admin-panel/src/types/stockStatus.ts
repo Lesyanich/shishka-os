@@ -55,10 +55,10 @@ export interface StatusMeta {
 }
 
 export const STOCK_STATUS_META: Record<StockStatusValue, StatusMeta> = {
-  out: { label: 'Out', badgeCls: 'bg-rose-500/15 text-rose-300', rank: 0 },
-  low: { label: 'Low', badgeCls: 'bg-amber-500/15 text-amber-300', rank: 1 },
-  ok: { label: 'OK', badgeCls: 'bg-emerald-500/15 text-emerald-300', rank: 2 },
-  untracked: { label: 'Untracked', badgeCls: 'bg-slate-700 text-slate-400', rank: 3 },
+  out: { label: 'Out', badgeCls: 'bg-brick-soft/15 text-brick-bright', rank: 0 },
+  low: { label: 'Low', badgeCls: 'bg-amber-watch/15 text-amber-watch', rank: 1 },
+  ok: { label: 'OK', badgeCls: 'bg-forest-soft/15 text-mint-200', rank: 2 },
+  untracked: { label: 'Untracked', badgeCls: 'bg-[var(--s-3)] text-cream/45', rank: 3 },
 }
 
 /** Sort comparator: by status severity, then name. */
