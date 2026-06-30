@@ -3,6 +3,18 @@
 **Epic:** `2a8b06a4` (Code Cleanup & Security) · **Branch:** `feature/security/service-role-fn-guards`
 **Related:** [`rls-audit-report.md`](./rls-audit-report.md), gotcha `gotcha_rls_authenticated_not_role_gated`
 
+> **STATUS — 2026-06-30: SHIPPED & VERIFIED.** All three functions deployed to prod with guards.
+> `FUNCTION_INTERNAL_SECRET` set in Supabase secrets **and** GAS Script Properties; GAS `ReceiptParser`
+> redeployed to send `x-internal-secret`. Live verification (curl): outsider/anon/no-secret → 401,
+> legitimate caller → passes. PR #450 merged.
+>
+> **Follow-up finding (2026-06-30):** the live `/receipts` feature runs on the **Finance Agent →
+> `receipt_inbox`** pipeline, NOT on `parse-receipts`→GAS→`update-receipt-job`→`receipt_jobs`
+> (last `receipt_jobs` row: 2026-03-31; that pipeline is effectively retired). Guarding it was still
+> correct (it was an open service-role door), but the cleanest end-state is to **undeploy
+> `parse-receipts` + `update-receipt-job`** and retire the GAS `ReceiptParser`. `loyverse-sync`
+> stays — actively used by the admin panel. Confirm with the finance owner before removing.
+
 ## Scope
 
 Supabase Edge Functions deployed with `verify_jwt: false` **and** holding the
