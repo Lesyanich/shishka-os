@@ -97,14 +97,38 @@ const UNIT_OPTIONS = ['kg', 'g', 'L', 'ml', 'pcs', 'portion']
 // ─── Slug Generator (Cyrillic → Latin transliteration) ───────
 
 const CYRILLIC_MAP: Record<string, string> = {
-  '\u0430': 'a', '\u0431': 'b', '\u0432': 'v', '\u0433': 'g',
-  '\u0434': 'd', '\u0435': 'e', '\u0451': 'yo', '\u0436': 'zh',
-  '\u0437': 'z', '\u0438': 'i', '\u0439': 'y', '\u043a': 'k',
-  '\u043b': 'l', '\u043c': 'm', '\u043d': 'n', '\u043e': 'o',
-  '\u043f': 'p', '\u0440': 'r', '\u0441': 's', '\u0442': 't',
-  '\u0443': 'u', '\u0444': 'f', '\u0445': 'kh', '\u0446': 'ts',
-  '\u0447': 'ch', '\u0448': 'sh', '\u0449': 'shch', '\u044a': '',
-  '\u044b': 'y', '\u044c': '', '\u044d': 'e', '\u044e': 'yu',
+  '\u0430': 'a',
+  '\u0431': 'b',
+  '\u0432': 'v',
+  '\u0433': 'g',
+  '\u0434': 'd',
+  '\u0435': 'e',
+  '\u0451': 'yo',
+  '\u0436': 'zh',
+  '\u0437': 'z',
+  '\u0438': 'i',
+  '\u0439': 'y',
+  '\u043a': 'k',
+  '\u043b': 'l',
+  '\u043c': 'm',
+  '\u043d': 'n',
+  '\u043e': 'o',
+  '\u043f': 'p',
+  '\u0440': 'r',
+  '\u0441': 's',
+  '\u0442': 't',
+  '\u0443': 'u',
+  '\u0444': 'f',
+  '\u0445': 'kh',
+  '\u0446': 'ts',
+  '\u0447': 'ch',
+  '\u0448': 'sh',
+  '\u0449': 'shch',
+  '\u044a': '',
+  '\u044b': 'y',
+  '\u044c': '',
+  '\u044d': 'e',
+  '\u044e': 'yu',
   '\u044f': 'ya',
 }
 
@@ -127,9 +151,7 @@ function MarginBadge({ price, cost }: { price: number | null; cost: number }) {
   return (
     <span
       className={`rounded px-1 py-0.5 text-[9px] font-semibold ${
-        isHealthy
-          ? 'bg-emerald-500/15 text-emerald-400'
-          : 'bg-rose-500/15 text-rose-400'
+        isHealthy ? 'bg-forest-soft/15 text-mint-200' : 'bg-brick-soft/15 text-brick-bright'
       }`}
     >
       {margin.toFixed(0)}%
@@ -181,9 +203,7 @@ function NomenclatureModal({
 
   // ── Basic fields ──
   const [name, setName] = useState(item?.name ?? '')
-  const [productCode, setProductCode] = useState(
-    item?.product_code ?? `${activePrefix}-`,
-  )
+  const [productCode, setProductCode] = useState(item?.product_code ?? `${activePrefix}-`)
   const [type, setType] = useState(
     item?.type ??
       (activePrefix === 'SALE'
@@ -210,23 +230,17 @@ function NomenclatureModal({
   const [notes, setNotes] = useState(item?.notes ?? '')
 
   // ── Nutrition fields ──
-  const [calories, setCalories] = useState<number | null>(
-    item?.calories ?? null,
-  )
+  const [calories, setCalories] = useState<number | null>(item?.calories ?? null)
   const [protein, setProtein] = useState<number | null>(item?.protein ?? null)
   const [carbs, setCarbs] = useState<number | null>(item?.carbs ?? null)
   const [fat, setFat] = useState<number | null>(item?.fat ?? null)
-  const [allergensStr, setAllergensStr] = useState(
-    (item?.allergens ?? []).join(', '),
-  )
+  const [allergensStr, setAllergensStr] = useState((item?.allergens ?? []).join(', '))
 
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Auto-generate slug when name changes (only if not manually edited)
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(
-    isEdit && !!item?.slug,
-  )
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(isEdit && !!item?.slug)
   useEffect(() => {
     if (!slugManuallyEdited && name.trim()) {
       setSlug(generateSlug(name))
@@ -235,9 +249,7 @@ function NomenclatureModal({
 
   // ── Reactive pricing calculator ──
   const recommendedPrice =
-    costPerUnit > 0 && markupPct > 0
-      ? costPerUnit * (1 + markupPct / 100)
-      : null
+    costPerUnit > 0 && markupPct > 0 ? costPerUnit * (1 + markupPct / 100) : null
 
   const effectivePrice = price ?? recommendedPrice ?? 0
   const margin =
@@ -299,9 +311,7 @@ function NomenclatureModal({
 
         if (updateError) throw updateError
       } else {
-        const { error: insertError } = await supabase
-          .from('nomenclature')
-          .insert(payload)
+        const { error: insertError } = await supabase.from('nomenclature').insert(payload)
 
         if (insertError) throw insertError
       }
@@ -324,23 +334,23 @@ function NomenclatureModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
+      <div className="w-full max-w-2xl rounded-xl border border-[var(--line-strong)] bg-[var(--s-1)] shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
-          <h3 className="text-sm font-semibold text-slate-100">
+        <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
+          <h3 className="text-sm font-semibold text-cream">
             {isEdit ? 'Edit Item' : 'Create New Item'}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-md p-1 text-cream/60 hover:bg-[var(--s-2)] hover:text-cream"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Section Tabs */}
-        <div className="flex gap-1 border-b border-slate-800 px-5 pt-2">
+        <div className="flex gap-1 border-b border-[var(--line)] px-5 pt-2">
           {sections.map((s) => (
             <button
               key={s.id}
@@ -349,8 +359,8 @@ function NomenclatureModal({
               className={[
                 'rounded-t-md px-4 py-2 text-xs font-medium transition',
                 section === s.id
-                  ? 'border-b-2 border-emerald-500 text-emerald-200'
-                  : 'text-slate-400 hover:text-slate-200',
+                  ? 'border-b-2 border-forest-soft text-mint-200'
+                  : 'text-cream/60 hover:text-cream',
               ].join(' ')}
             >
               {s.label}
@@ -361,7 +371,7 @@ function NomenclatureModal({
         {/* Body */}
         <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
           {error && (
-            <div className="mb-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            <div className="mb-4 rounded-md border border-brick-soft/30 bg-brick-soft/10 px-3 py-2 text-xs text-brick-bright">
               {error}
             </div>
           )}
@@ -370,40 +380,34 @@ function NomenclatureModal({
           {section === 'basic' && (
             <div className="space-y-4">
               <div>
-                <label className="mb-1 block text-xs text-slate-400">
-                  Product Code
-                </label>
+                <label className="mb-1 block text-xs text-cream/60">Product Code</label>
                 <input
                   type="text"
                   value={productCode}
                   onChange={(e) => setProductCode(e.target.value.toUpperCase())}
                   placeholder="e.g. SALE-BUDDHA_BOWL"
-                  className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                  className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-slate-400">
-                  Name
-                </label>
+                <label className="mb-1 block text-xs text-cream/60">Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Buddha Bowl"
-                  className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                  className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-slate-400">
-                    Type
-                  </label>
+                  <label className="mb-1 block text-xs text-cream/60">Type</label>
                   <select
                     value={type}
                     onChange={(e) => setType(e.target.value)}
-                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none"
+                    className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none"
                   >
                     {TYPE_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -413,13 +417,11 @@ function NomenclatureModal({
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-slate-400">
-                    Unit
-                  </label>
+                  <label className="mb-1 block text-xs text-cream/60">Unit</label>
                   <select
                     value={baseUnit}
                     onChange={(e) => setBaseUnit(e.target.value)}
-                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none"
+                    className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none"
                   >
                     {UNIT_OPTIONS.map((u) => (
                       <option key={u} value={u}>
@@ -431,7 +433,7 @@ function NomenclatureModal({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-slate-400">
+                <label className="mb-1 block text-xs text-cream/60">
                   Slug (URL path, auto-generated from name)
                 </label>
                 <input
@@ -442,55 +444,51 @@ function NomenclatureModal({
                     setSlugManuallyEdited(true)
                   }}
                   placeholder="auto-generated-slug"
-                  className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-500"
+                  className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 font-mono text-xs text-cream outline-none focus:border-forest-soft"
                 />
                 {!slugManuallyEdited && slug && (
-                  <p className="mt-1 text-[10px] text-slate-500">
+                  <p className="mt-1 text-[10px] text-cream/45">
                     Auto-generated. Edit to override.
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-slate-400">
-                  Image URL
-                </label>
+                <label className="mb-1 block text-xs text-cream/60">Image URL</label>
                 <input
                   type="url"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
                   placeholder="https://..."
-                  className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                  className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-slate-400">
-                    Display Order
-                  </label>
+                  <label className="mb-1 block text-xs text-cream/60">Display Order</label>
                   <input
                     type="number"
                     value={displayOrder}
                     onChange={(e) => setDisplayOrder(Number(e.target.value))}
-                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                    className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                   />
                 </div>
-                <label className="flex items-center gap-2 self-end pb-1.5 text-xs text-slate-300">
+                <label className="flex items-center gap-2 self-end pb-1.5 text-xs text-cream/80">
                   <input
                     type="checkbox"
                     checked={isAvailable}
                     onChange={(e) => setIsAvailable(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-600 bg-slate-800 accent-emerald-500"
+                    className="h-4 w-4 rounded border-[var(--line-strong)] bg-[var(--s-2)] accent-forest-soft"
                   />
                   Available
                 </label>
-                <label className="flex items-center gap-2 self-end pb-1.5 text-xs text-slate-300">
+                <label className="flex items-center gap-2 self-end pb-1.5 text-xs text-cream/80">
                   <input
                     type="checkbox"
                     checked={isFeatured}
                     onChange={(e) => setIsFeatured(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-600 bg-slate-800 accent-emerald-500"
+                    className="h-4 w-4 rounded border-[var(--line-strong)] bg-[var(--s-2)] accent-forest-soft"
                   />
                   Featured
                 </label>
@@ -503,18 +501,16 @@ function NomenclatureModal({
             <div className="space-y-4">
               {/* Cost per unit */}
               <div>
-                <label className="mb-1 block text-xs text-slate-400">
-                  Cost per Unit (THB)
-                </label>
+                <label className="mb-1 block text-xs text-cream/60">Cost per Unit (THB)</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
                     step="0.01"
                     value={costPerUnit}
                     onChange={(e) => setCostPerUnit(Number(e.target.value))}
-                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                    className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                   />
-                  <span className="whitespace-nowrap text-[10px] text-slate-500">
+                  <span className="whitespace-nowrap text-[10px] text-cream/45">
                     RAW = manual, PF/SALE = BOM
                   </span>
                 </div>
@@ -522,29 +518,27 @@ function NomenclatureModal({
 
               {/* Markup % */}
               <div>
-                <label className="mb-1 block text-xs text-slate-400">
-                  Markup %
-                </label>
+                <label className="mb-1 block text-xs text-cream/60">Markup %</label>
                 <input
                   type="number"
                   step="1"
                   value={markupPct}
                   onChange={(e) => setMarkupPct(Number(e.target.value))}
                   placeholder="e.g. 60"
-                  className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                  className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                 />
               </div>
 
               {/* Recommended price (reactive auto-calc) */}
               {recommendedPrice !== null && (
-                <div className="rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                <div className="rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-wide text-cream/45">
                     Recommended Price
                   </div>
-                  <div className="mt-1 text-lg font-semibold text-amber-300">
+                  <div className="mt-1 text-lg font-semibold text-amber-watch">
                     {recommendedPrice.toFixed(2)} THB
                   </div>
-                  <div className="mt-0.5 text-[10px] text-slate-500">
+                  <div className="mt-0.5 text-[10px] text-cream/45">
                     = {costPerUnit.toFixed(2)} x (1 + {markupPct}%)
                   </div>
                 </div>
@@ -552,24 +546,18 @@ function NomenclatureModal({
 
               {/* Final selling price */}
               <div>
-                <label className="mb-1 block text-xs text-slate-400">
-                  Final Price (THB)
-                </label>
+                <label className="mb-1 block text-xs text-cream/60">Final Price (THB)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={price ?? ''}
-                  onChange={(e) =>
-                    setPrice(
-                      e.target.value === '' ? null : Number(e.target.value),
-                    )
-                  }
+                  onChange={(e) => setPrice(e.target.value === '' ? null : Number(e.target.value))}
                   placeholder={
                     recommendedPrice
                       ? `Recommended: ${recommendedPrice.toFixed(2)}`
                       : 'Set selling price'
                   }
-                  className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                  className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                 />
               </div>
 
@@ -578,27 +566,23 @@ function NomenclatureModal({
                 <div
                   className={`rounded-lg border px-4 py-3 ${
                     margin >= 30
-                      ? 'border-emerald-500/30 bg-emerald-500/10'
-                      : 'border-rose-500/30 bg-rose-500/10'
+                      ? 'border-forest-soft/30 bg-forest-soft/10'
+                      : 'border-brick-soft/30 bg-brick-soft/10'
                   }`}
                 >
-                  <div className="text-[10px] uppercase tracking-wide text-slate-400">
-                    Margin
-                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-cream/60">Margin</div>
                   <div
                     className={`mt-1 text-lg font-semibold ${
-                      margin >= 30 ? 'text-emerald-300' : 'text-rose-300'
+                      margin >= 30 ? 'text-mint-200' : 'text-brick-bright'
                     }`}
                   >
                     {margin.toFixed(1)}%
                   </div>
-                  <div className="mt-0.5 text-[10px] text-slate-500">
+                  <div className="mt-0.5 text-[10px] text-cream/45">
                     ({effectivePrice.toFixed(2)} - {costPerUnit.toFixed(2)}) /{' '}
                     {effectivePrice.toFixed(2)}
                     {margin < 30 && (
-                      <span className="ml-2 text-rose-400">
-                        Below 30% target
-                      </span>
+                      <span className="ml-2 text-brick-bright">Below 30% target</span>
                     )}
                   </div>
                 </div>
@@ -606,15 +590,13 @@ function NomenclatureModal({
 
               {/* Notes */}
               <div>
-                <label className="mb-1 block text-xs text-slate-400">
-                  Notes
-                </label>
+                <label className="mb-1 block text-xs text-cream/60">Notes</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   placeholder="Optional notes..."
-                  className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                  className="w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 py-2 text-xs text-cream outline-none focus:border-forest-soft"
                 />
               </div>
             </div>
@@ -625,103 +607,84 @@ function NomenclatureModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-slate-400">
-                    Calories (kcal)
-                  </label>
+                  <label className="mb-1 block text-xs text-cream/60">Calories (kcal)</label>
                   <input
                     type="number"
                     value={calories ?? ''}
                     onChange={(e) =>
-                      setCalories(
-                        e.target.value === '' ? null : Number(e.target.value),
-                      )
+                      setCalories(e.target.value === '' ? null : Number(e.target.value))
                     }
                     placeholder="--"
-                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                    className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-slate-400">
-                    Protein (g)
-                  </label>
+                  <label className="mb-1 block text-xs text-cream/60">Protein (g)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={protein ?? ''}
                     onChange={(e) =>
-                      setProtein(
-                        e.target.value === '' ? null : Number(e.target.value),
-                      )
+                      setProtein(e.target.value === '' ? null : Number(e.target.value))
                     }
                     placeholder="--"
-                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                    className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-slate-400">
-                    Carbs (g)
-                  </label>
+                  <label className="mb-1 block text-xs text-cream/60">Carbs (g)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={carbs ?? ''}
                     onChange={(e) =>
-                      setCarbs(
-                        e.target.value === '' ? null : Number(e.target.value),
-                      )
+                      setCarbs(e.target.value === '' ? null : Number(e.target.value))
                     }
                     placeholder="--"
-                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                    className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-slate-400">
-                    Fat (g)
-                  </label>
+                  <label className="mb-1 block text-xs text-cream/60">Fat (g)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={fat ?? ''}
-                    onChange={(e) =>
-                      setFat(
-                        e.target.value === '' ? null : Number(e.target.value),
-                      )
-                    }
+                    onChange={(e) => setFat(e.target.value === '' ? null : Number(e.target.value))}
                     placeholder="--"
-                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                    className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                   />
                 </div>
               </div>
 
               {/* КБЖУ Summary Card */}
               {(calories || protein || carbs || fat) && (
-                <div className="rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                <div className="rounded-lg border border-[var(--line-strong)] bg-[var(--s-2)] px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-wide text-cream/45">
                     KBZHU per portion
                   </div>
                   <div className="mt-2 flex items-baseline gap-4 text-sm">
-                    <span className="text-amber-300">
-                      {calories ?? '--'}{' '}
-                      <span className="text-[10px] text-slate-500">kcal</span>
+                    <span className="text-amber-watch">
+                      {calories ?? '--'} <span className="text-[10px] text-cream/45">kcal</span>
                     </span>
-                    <span className="text-blue-300">
+                    <span className="text-honey-300">
                       {protein ?? '--'}
-                      <span className="text-[10px] text-slate-500">g P</span>
+                      <span className="text-[10px] text-cream/45">g P</span>
                     </span>
-                    <span className="text-orange-300">
+                    <span className="text-amber-watch">
                       {carbs ?? '--'}
-                      <span className="text-[10px] text-slate-500">g C</span>
+                      <span className="text-[10px] text-cream/45">g C</span>
                     </span>
-                    <span className="text-yellow-300">
+                    <span className="text-amber-watch">
                       {fat ?? '--'}
-                      <span className="text-[10px] text-slate-500">g F</span>
+                      <span className="text-[10px] text-cream/45">g F</span>
                     </span>
                   </div>
                 </div>
               )}
 
               <div>
-                <label className="mb-1 block text-xs text-slate-400">
+                <label className="mb-1 block text-xs text-cream/60">
                   Allergens (comma-separated)
                 </label>
                 <input
@@ -729,7 +692,7 @@ function NomenclatureModal({
                   value={allergensStr}
                   onChange={(e) => setAllergensStr(e.target.value)}
                   placeholder="e.g. gluten, dairy, nuts"
-                  className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                  className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
                 />
                 {allergensStr.trim() && (
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -740,7 +703,7 @@ function NomenclatureModal({
                       .map((a, i) => (
                         <span
                           key={`${a}-${i}`}
-                          className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] text-rose-300"
+                          className="rounded-full bg-brick-soft/15 px-2 py-0.5 text-[10px] text-brick-bright"
                         >
                           {a}
                         </span>
@@ -753,11 +716,11 @@ function NomenclatureModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-slate-800 px-5 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--line)] px-5 py-3">
           <button
             type="button"
             onClick={onClose}
-            className="h-8 rounded-md border border-slate-700 bg-slate-800 px-4 text-xs text-slate-300 hover:bg-slate-700"
+            className="h-8 rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-4 text-xs text-cream/80 hover:bg-[var(--s-3)]"
           >
             Cancel
           </button>
@@ -765,7 +728,7 @@ function NomenclatureModal({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="inline-flex h-8 items-center rounded-md border border-emerald-500/60 bg-emerald-500/15 px-4 text-xs font-medium text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-50"
+            className="inline-flex h-8 items-center rounded-md border border-forest-soft/60 bg-forest-soft/15 px-4 text-xs font-medium text-mint-200 hover:bg-forest-soft/25 disabled:opacity-50"
           >
             {isSaving ? (
               <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -799,9 +762,9 @@ function CostBadge({
   if (bomItems.length === 0) return null
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5">
-      <Calculator className="h-3.5 w-3.5 text-amber-400" />
-      <span className="text-xs font-medium text-amber-200">
+    <div className="inline-flex items-center gap-1.5 rounded-lg border border-amber-watch/30 bg-amber-watch/10 px-3 py-1.5">
+      <Calculator className="h-3.5 w-3.5 text-amber-watch" />
+      <span className="text-xs font-medium text-amber-watch">
         Cost: {totalCost > 0 ? `${totalCost.toFixed(2)} THB` : '--'}
       </span>
     </div>
@@ -823,13 +786,9 @@ export function RecipeBuilder() {
   const [isLoadingBom, setIsLoadingBom] = useState(false)
   const [isSavingBom, setIsSavingBom] = useState(false)
 
-  const [availableIngredients, setAvailableIngredients] = useState<
-    Ingredient[]
-  >([])
+  const [availableIngredients, setAvailableIngredients] = useState<Ingredient[]>([])
   const [isLoadingIngredients, setIsLoadingIngredients] = useState(false)
-  const [ingredientCosts, setIngredientCosts] = useState<
-    Record<string, number>
-  >({})
+  const [ingredientCosts, setIngredientCosts] = useState<Record<string, number>>({})
 
   const [newIngredientId, setNewIngredientId] = useState<string>('')
 
@@ -847,8 +806,7 @@ export function RecipeBuilder() {
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState<NomItem | null>(null)
 
-  const activePrefix =
-    FILTERS.find((f) => f.id === activeFilter)?.prefix ?? 'SALE'
+  const activePrefix = FILTERS.find((f) => f.id === activeFilter)?.prefix ?? 'SALE'
 
   const selectedDish = useMemo(
     () => dishes.find((d) => d.id === selectedDishId) ?? null,
@@ -892,7 +850,11 @@ export function RecipeBuilder() {
     } else {
       setDishes(
         (data ?? []).map((d) => {
-          const cat = d.product_categories as unknown as { id: string; code: string; name: string } | null
+          const cat = d.product_categories as unknown as {
+            id: string
+            code: string
+            name: string
+          } | null
           return {
             ...d,
             cost_per_unit: Number(d.cost_per_unit ?? 0),
@@ -957,9 +919,7 @@ export function RecipeBuilder() {
       const { data, error } = await supabase
         .from('nomenclature')
         .select('id, product_code, name, type, base_unit, cost_per_unit')
-        .or(
-          'product_code.ilike.PF-%,product_code.ilike.MOD-%,product_code.ilike.RAW-%',
-        )
+        .or('product_code.ilike.PF-%,product_code.ilike.MOD-%,product_code.ilike.RAW-%')
         .eq('is_deleted', false)
         .order('product_code', { ascending: true })
 
@@ -997,9 +957,7 @@ export function RecipeBuilder() {
 
       const { data: bomRows, error: bomError } = await supabase
         .from('bom_structures')
-        .select(
-          'id, parent_id, ingredient_id, quantity_per_unit, yield_loss_pct, notes',
-        )
+        .select('id, parent_id, ingredient_id, quantity_per_unit, yield_loss_pct, notes')
         .eq('parent_id', selectedDishId)
         .order('created_at', { ascending: true })
 
@@ -1022,10 +980,7 @@ export function RecipeBuilder() {
           .in('id', ingredientIds)
 
         if (ingredientError) {
-          console.error(
-            '[RecipeBuilder] Failed to load ingredient details',
-            ingredientError,
-          )
+          console.error('[RecipeBuilder] Failed to load ingredient details', ingredientError)
         } else {
           ingredientsById = Object.fromEntries(
             (ingredientRows ?? []).map((row) => [
@@ -1053,10 +1008,7 @@ export function RecipeBuilder() {
           parentId: row.parent_id as string,
           ingredientId: row.ingredient_id as string,
           quantityPerUnit: Number(row.quantity_per_unit ?? 0),
-          yieldLossPct:
-            row.yield_loss_pct === null
-              ? null
-              : Number(row.yield_loss_pct as number),
+          yieldLossPct: row.yield_loss_pct === null ? null : Number(row.yield_loss_pct as number),
           notes: (row.notes as string | null) ?? null,
           ingredient: ingredientsById[row.ingredient_id as string],
         })) ?? []
@@ -1074,13 +1026,18 @@ export function RecipeBuilder() {
 
     return dishes.filter(
       (dish) =>
-        dish.product_code.toLowerCase().includes(term) ||
-        dish.name.toLowerCase().includes(term),
+        dish.product_code.toLowerCase().includes(term) || dish.name.toLowerCase().includes(term),
     )
   }, [dishes, dishesFilter])
 
   // Group filtered dishes by L2 category (parent of their L3 category)
-  type CategoryGroup = { id: string; name: string; code: string; sortOrder: number; items: NomItem[] }
+  type CategoryGroup = {
+    id: string
+    name: string
+    code: string
+    sortOrder: number
+    items: NomItem[]
+  }
 
   const groupedByCategory = useMemo((): CategoryGroup[] => {
     // Build lookup: category id → node
@@ -1120,7 +1077,13 @@ export function RecipeBuilder() {
 
     const groups = Array.from(buckets.values()).sort((a, b) => a.sortOrder - b.sortOrder)
     if (uncategorized.length > 0) {
-      groups.push({ id: '__uncategorized', name: 'Uncategorized', code: '', sortOrder: 9999, items: uncategorized })
+      groups.push({
+        id: '__uncategorized',
+        name: 'Uncategorized',
+        code: '',
+        sortOrder: 9999,
+        items: uncategorized,
+      })
     }
     return groups
   }, [filteredDishes, allCategories])
@@ -1140,9 +1103,7 @@ export function RecipeBuilder() {
     const numeric = Number(value)
     if (Number.isNaN(numeric)) return
     setBomItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, quantityPerUnit: numeric } : item,
-      ),
+      prev.map((item) => (item.id === id ? { ...item, quantityPerUnit: numeric } : item)),
     )
   }
 
@@ -1150,25 +1111,19 @@ export function RecipeBuilder() {
     const numeric = value === '' ? null : Number(value)
     if (numeric !== null && Number.isNaN(numeric)) return
     setBomItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, yieldLossPct: numeric } : item,
-      ),
+      prev.map((item) => (item.id === id ? { ...item, yieldLossPct: numeric } : item)),
     )
   }
 
   const handleNoteChange = (id: string, value: string) => {
     setBomItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, notes: value || null } : item,
-      ),
+      prev.map((item) => (item.id === id ? { ...item, notes: value || null } : item)),
     )
   }
 
   const handleAddIngredient = () => {
     if (!selectedDishId || !newIngredientId) return
-    const ingredient = availableIngredients.find(
-      (i) => i.id === newIngredientId,
-    )
+    const ingredient = availableIngredients.find((i) => i.id === newIngredientId)
     if (!ingredient) return
 
     const tempId = `local-${crypto.randomUUID()}`
@@ -1217,9 +1172,7 @@ export function RecipeBuilder() {
           notes: item.notes,
         }))
 
-        const { error: insertError } = await supabase
-          .from('bom_structures')
-          .insert(payload)
+        const { error: insertError } = await supabase.from('bom_structures').insert(payload)
 
         if (insertError) {
           console.error('[RecipeBuilder] Insert error', insertError)
@@ -1257,21 +1210,19 @@ export function RecipeBuilder() {
     <>
       <div className="grid gap-6 md:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)]">
         {/* Left: Nomenclature levels */}
-        <section className="flex min-h-[480px] flex-col rounded-xl border border-slate-800 bg-slate-900/50 shadow-sm">
-          <header className="border-b border-slate-800 px-4 py-3">
+        <section className="flex min-h-[480px] flex-col rounded-xl border border-[var(--line)] bg-[var(--s-1)] shadow-sm">
+          <header className="border-b border-[var(--line)] px-4 py-3">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-slate-100">
-                  Nomenclature Levels
-                </h2>
-                <p className="text-xs text-slate-500">
+                <h2 className="text-sm font-semibold text-cream">Nomenclature Levels</h2>
+                <p className="text-xs text-cream/45">
                   Pick a node to edit its BOM, or create a new item.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleOpenCreate}
-                className="inline-flex h-8 items-center rounded-md border border-emerald-500/60 bg-emerald-500/10 px-3 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/20"
+                className="inline-flex h-8 items-center rounded-md border border-forest-soft/60 bg-forest-soft/10 px-3 text-[11px] font-medium text-mint-200 hover:bg-forest-soft/20"
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
                 Add Item
@@ -1288,8 +1239,8 @@ export function RecipeBuilder() {
                     className={[
                       'inline-flex items-center rounded-full border px-3 py-1 transition',
                       isActive
-                        ? 'border-emerald-500/80 bg-emerald-500/15 text-emerald-100'
-                        : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800',
+                        ? 'border-forest-soft/80 bg-forest-soft/15 text-mint-200'
+                        : 'border-[var(--line-strong)] bg-[var(--s-1)] text-cream/80 hover:border-[var(--line-strong)] hover:bg-[var(--s-2)]',
                     ].join(' ')}
                   >
                     {filter.label}
@@ -1299,32 +1250,32 @@ export function RecipeBuilder() {
             </div>
           </header>
 
-          <div className="border-b border-slate-800 px-4 py-3">
-            <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100">
-              <Search className="h-4 w-4 text-slate-500" />
+          <div className="border-b border-[var(--line)] px-4 py-3">
+            <div className="flex items-center gap-2 rounded-lg border border-[var(--line-strong)] bg-[var(--s-1)] px-2 py-1.5 text-sm text-cream">
+              <Search className="h-4 w-4 text-cream/45" />
               <input
                 type="text"
                 value={dishesFilter}
                 onChange={(e) => setDishesFilter(e.target.value)}
                 placeholder="Filter by product code or name..."
-                className="h-7 w-full bg-transparent text-xs outline-none placeholder:text-slate-500"
+                className="h-7 w-full bg-transparent text-xs outline-none placeholder:text-cream/45"
               />
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto px-2 pb-2 pt-1">
             {isLoadingDishes ? (
-              <div className="flex h-full items-center justify-center text-xs text-slate-500">
+              <div className="flex h-full items-center justify-center text-xs text-cream/45">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Loading items...
               </div>
             ) : filteredDishes.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-slate-500">
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-cream/45">
                 <p>No items found.</p>
                 <button
                   type="button"
                   onClick={handleOpenCreate}
-                  className="inline-flex items-center rounded-md border border-slate-700 px-3 py-1.5 text-slate-400 hover:border-emerald-500/50 hover:text-emerald-300"
+                  className="inline-flex items-center rounded-md border border-[var(--line-strong)] px-3 py-1.5 text-cream/60 hover:border-forest-soft/50 hover:text-mint-200"
                 >
                   <Plus className="mr-1 h-3 w-3" />
                   Create first {activePrefix} item
@@ -1340,19 +1291,21 @@ export function RecipeBuilder() {
                       <button
                         type="button"
                         onClick={() => toggleGroup(group.id)}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-slate-800/40"
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-[var(--s-2)]"
                       >
                         {isCollapsed ? (
-                          <ChevronRight className="h-3 w-3 text-slate-500" />
+                          <ChevronRight className="h-3 w-3 text-cream/45" />
                         ) : (
-                          <ChevronDown className="h-3 w-3 text-slate-500" />
+                          <ChevronDown className="h-3 w-3 text-cream/45" />
                         )}
-                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                          group.id === '__uncategorized' ? 'text-amber-400' : 'text-slate-400'
-                        }`}>
+                        <span
+                          className={`text-[10px] font-semibold uppercase tracking-wider ${
+                            group.id === '__uncategorized' ? 'text-amber-watch' : 'text-cream/60'
+                          }`}
+                        >
                           {group.name}
                         </span>
-                        <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-500">
+                        <span className="rounded-full bg-[var(--s-2)] px-1.5 py-0.5 text-[9px] text-cream/45">
                           {group.items.length}
                         </span>
                       </button>
@@ -1371,8 +1324,8 @@ export function RecipeBuilder() {
                                   className={[
                                     'flex w-full flex-col items-start rounded-lg border px-3 py-2 text-left text-xs transition',
                                     isSelected
-                                      ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-50'
-                                      : 'border-transparent bg-slate-900/60 text-slate-100 hover:border-slate-700 hover:bg-slate-900',
+                                      ? 'border-forest-soft/60 bg-forest-soft/10 text-mint-200'
+                                      : 'border-transparent bg-[var(--s-1)] text-cream hover:border-[var(--line-strong)] hover:bg-[var(--s-1)]',
                                   ].join(' ')}
                                 >
                                   <div className="flex w-full items-center justify-between gap-2">
@@ -1384,8 +1337,8 @@ export function RecipeBuilder() {
                                         <span
                                           className={`h-2 w-2 shrink-0 rounded-full ${
                                             (processStepCounts[dish.id] ?? 0) > 0
-                                              ? 'bg-emerald-500'
-                                              : 'bg-rose-500'
+                                              ? 'bg-forest-soft'
+                                              : 'bg-brick-soft'
                                           }`}
                                           title={
                                             (processStepCounts[dish.id] ?? 0) > 0
@@ -1395,18 +1348,15 @@ export function RecipeBuilder() {
                                         />
                                       )}
                                       {dish.cost_per_unit > 0 && (
-                                        <span className="text-[10px] text-amber-400">
+                                        <span className="text-[10px] text-amber-watch">
                                           {dish.cost_per_unit.toFixed(0)} THB
                                         </span>
                                       )}
-                                      <MarginBadge
-                                        price={dish.price}
-                                        cost={dish.cost_per_unit}
-                                      />
+                                      <MarginBadge price={dish.price} cost={dish.cost_per_unit} />
                                     </div>
                                   </div>
-                                  <span className="mt-0.5 flex items-center gap-2 text-[10px] text-slate-500">
-                                    <span className="font-mono uppercase tracking-wide text-slate-600">
+                                  <span className="mt-0.5 flex items-center gap-2 text-[10px] text-cream/45">
+                                    <span className="font-mono uppercase tracking-wide text-cream/30">
                                       {dish.product_code}
                                     </span>
                                     <span>·</span>
@@ -1414,7 +1364,7 @@ export function RecipeBuilder() {
                                     {p100 && (
                                       <>
                                         <span>·</span>
-                                        <span className="text-sky-400">{p100}</span>
+                                        <span className="text-honey-300">{p100}</span>
                                       </>
                                     )}
                                   </span>
@@ -1431,19 +1381,20 @@ export function RecipeBuilder() {
             )}
           </div>
 
-          <div className="border-t border-slate-800 px-4 py-2 text-[10px] text-slate-500">
+          <div className="border-t border-[var(--line)] px-4 py-2 text-[10px] text-cream/45">
             {filteredDishes.length} items · {groupedByCategory.length} groups
             {groupedByCategory.find((g) => g.id === '__uncategorized') && (
-              <span className="ml-1 text-amber-400">
-                · {groupedByCategory.find((g) => g.id === '__uncategorized')!.items.length} uncategorized
+              <span className="ml-1 text-amber-watch">
+                · {groupedByCategory.find((g) => g.id === '__uncategorized')!.items.length}{' '}
+                uncategorized
               </span>
             )}
           </div>
         </section>
 
         {/* Right: BOM / Process */}
-        <section className="flex min-h-[480px] flex-col rounded-xl border border-slate-800 bg-slate-900/50 shadow-sm">
-          <header className="border-b border-slate-800 px-4 py-3">
+        <section className="flex min-h-[480px] flex-col rounded-xl border border-[var(--line)] bg-[var(--s-1)] shadow-sm">
+          <header className="border-b border-[var(--line)] px-4 py-3">
             <div className="flex items-center gap-4">
               {(['bom', 'process'] as const).map((tab) => (
                 <button
@@ -1452,15 +1403,15 @@ export function RecipeBuilder() {
                   onClick={() => setRightTab(tab)}
                   className={`pb-1 text-sm font-semibold transition ${
                     rightTab === tab
-                      ? 'border-b-2 border-emerald-500 text-slate-100'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'border-b-2 border-forest-soft text-cream'
+                      : 'text-cream/60 hover:text-cream'
                   }`}
                 >
                   {tab === 'bom' ? 'BOM' : 'Process'}
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-cream/45">
               {rightTab === 'bom'
                 ? 'Edit ingredients, quantities, and cost breakdown.'
                 : 'Recipe flow timeline and equipment.'}
@@ -1468,56 +1419,47 @@ export function RecipeBuilder() {
           </header>
 
           {!selectedDish ? (
-            <div className="flex flex-1 items-center justify-center px-6 text-center text-xs text-slate-500">
-              Select a node on the left to inspect or edit its {rightTab === 'bom' ? 'BOM' : 'process'}.
+            <div className="flex flex-1 items-center justify-center px-6 text-center text-xs text-cream/45">
+              Select a node on the left to inspect or edit its{' '}
+              {rightTab === 'bom' ? 'BOM' : 'process'}.
             </div>
           ) : rightTab === 'process' ? (
             <ProcessTab nomenclatureId={selectedDish.id} />
           ) : (
             <>
               {/* Selected item header */}
-              <div className="border-b border-slate-800 px-4 py-3 text-xs">
+              <div className="border-b border-[var(--line)] px-4 py-3 text-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[11px] uppercase tracking-wide text-emerald-300">
+                      <span className="font-mono text-[11px] uppercase tracking-wide text-mint-200">
                         {selectedDish.product_code}
                       </span>
                       <button
                         type="button"
                         onClick={handleOpenEdit}
-                        className="inline-flex h-5 items-center rounded border border-slate-700 px-1.5 text-[10px] text-slate-400 hover:border-emerald-500/50 hover:text-emerald-300"
+                        className="inline-flex h-5 items-center rounded border border-[var(--line-strong)] px-1.5 text-[10px] text-cream/60 hover:border-forest-soft/50 hover:text-mint-200"
                       >
                         <Edit3 className="mr-0.5 h-2.5 w-2.5" />
                         Edit
                       </button>
                     </div>
-                    <div className="mt-0.5 text-[11px] text-slate-400">
-                      {selectedDish.name}
-                    </div>
-                    <div className="mt-1 flex items-center gap-3 text-[10px] text-slate-500">
+                    <div className="mt-0.5 text-[11px] text-cream/60">{selectedDish.name}</div>
+                    <div className="mt-1 flex items-center gap-3 text-[10px] text-cream/45">
                       <span>Unit: {selectedDish.base_unit ?? '--'}</span>
-                      {selectedDish.price !== null &&
-                        selectedDish.price > 0 && (
-                          <span className="text-emerald-400">
-                            Price: {selectedDish.price} THB
-                          </span>
-                        )}
-                      {selectedDish.notes && (
-                        <span className="italic">{selectedDish.notes}</span>
+                      {selectedDish.price !== null && selectedDish.price > 0 && (
+                        <span className="text-mint-200">Price: {selectedDish.price} THB</span>
                       )}
+                      {selectedDish.notes && <span className="italic">{selectedDish.notes}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <CostBadge
-                      bomItems={bomItems}
-                      ingredientCosts={ingredientCosts}
-                    />
+                    <CostBadge bomItems={bomItems} ingredientCosts={ingredientCosts} />
                     <button
                       type="button"
                       onClick={handleSaveBom}
                       disabled={isSavingBom}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-emerald-500/60 bg-emerald-500/10 px-3 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/20 disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-forest-soft/60 bg-forest-soft/10 px-3 text-[11px] font-medium text-mint-200 hover:bg-forest-soft/20 disabled:border-[var(--line-strong)] disabled:bg-[var(--s-1)] disabled:text-cream/45"
                     >
                       {isSavingBom ? (
                         <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -1531,9 +1473,9 @@ export function RecipeBuilder() {
               </div>
 
               {/* Add ingredient row */}
-              <div className="flex items-end gap-2 border-b border-slate-800 px-4 py-3 text-xs">
+              <div className="flex items-end gap-2 border-b border-[var(--line)] px-4 py-3 text-xs">
                 <div className="flex-1">
-                  <label className="mb-1 block text-[11px] text-slate-400">
+                  <label className="mb-1 block text-[11px] text-cream/60">
                     Add Ingredient (PF- / MOD- / RAW-)
                   </label>
                   <IngredientSearchPicker
@@ -1547,7 +1489,7 @@ export function RecipeBuilder() {
                   type="button"
                   onClick={handleAddIngredient}
                   disabled={!newIngredientId}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-emerald-500/60 bg-emerald-500/10 px-3 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/20 disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-forest-soft/60 bg-forest-soft/10 px-3 text-[11px] font-medium text-mint-200 hover:bg-forest-soft/20 disabled:border-[var(--line-strong)] disabled:bg-[var(--s-1)] disabled:text-cream/45"
                 >
                   <Plus className="mr-1 h-3 w-3" />
                   Add
@@ -1557,19 +1499,19 @@ export function RecipeBuilder() {
               {/* BOM table */}
               <div className="flex-1 overflow-y-auto px-4 py-3 text-xs">
                 {isLoadingBom ? (
-                  <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                  <div className="flex h-full items-center justify-center text-xs text-cream/45">
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Loading BOM...
                   </div>
                 ) : bomItems.length === 0 ? (
-                  <p className="text-xs text-slate-500">
-                    No ingredients linked yet. Use &quot;Add Ingredient&quot; to
-                    start composing this node.
+                  <p className="text-xs text-cream/45">
+                    No ingredients linked yet. Use &quot;Add Ingredient&quot; to start composing
+                    this node.
                   </p>
                 ) : (
                   <table className="w-full border-collapse text-left text-[11px]">
                     <thead>
-                      <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wide text-slate-500">
+                      <tr className="border-b border-[var(--line)] text-[10px] uppercase tracking-wide text-cream/45">
                         <th className="py-1 pr-2">Ingredient</th>
                         <th className="py-1 pr-2 text-right">Qty</th>
                         <th className="py-1 pr-1 text-right">Yield%</th>
@@ -1580,19 +1522,15 @@ export function RecipeBuilder() {
                     </thead>
                     <tbody>
                       {bomItems.map((item) => {
-                        const unitCost =
-                          ingredientCosts[item.ingredientId] ?? 0
+                        const unitCost = ingredientCosts[item.ingredientId] ?? 0
                         const lineCost = unitCost * item.quantityPerUnit
                         return (
-                          <tr
-                            key={item.id}
-                            className="border-b border-slate-900"
-                          >
+                          <tr key={item.id} className="border-b border-[var(--line)]">
                             <td className="py-1.5 pr-2 align-top">
                               <div className="font-mono text-[11px]">
                                 {item.ingredient?.product_code ?? 'UNKNOWN'}
                               </div>
-                              <div className="text-[10px] text-slate-400">
+                              <div className="text-[10px] text-cream/60">
                                 {item.ingredient?.name ?? 'Missing'}
                               </div>
                             </td>
@@ -1602,15 +1540,10 @@ export function RecipeBuilder() {
                                   type="number"
                                   step="0.001"
                                   value={item.quantityPerUnit}
-                                  onChange={(e) =>
-                                    handleQuantityChange(
-                                      item.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="h-7 w-16 rounded-md border border-slate-700 bg-slate-900 px-1 text-right text-[11px] text-slate-100 outline-none"
+                                  onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                                  className="h-7 w-16 rounded-md border border-[var(--line-strong)] bg-[var(--s-1)] px-1 text-right text-[11px] text-cream outline-none"
                                 />
-                                <span className="min-w-[2rem] text-left text-[10px] text-slate-500">
+                                <span className="min-w-[2rem] text-left text-[10px] text-cream/45">
                                   {item.ingredient?.base_unit ?? ''}
                                 </span>
                               </div>
@@ -1620,38 +1553,32 @@ export function RecipeBuilder() {
                                 type="number"
                                 step="0.1"
                                 value={item.yieldLossPct ?? ''}
-                                onChange={(e) =>
-                                  handleYieldChange(item.id, e.target.value)
-                                }
+                                onChange={(e) => handleYieldChange(item.id, e.target.value)}
                                 placeholder="--"
-                                className="h-7 w-14 rounded-md border border-slate-700 bg-slate-900 px-1 text-right text-[11px] text-slate-100 outline-none placeholder:text-slate-600"
+                                className="h-7 w-14 rounded-md border border-[var(--line-strong)] bg-[var(--s-1)] px-1 text-right text-[11px] text-cream outline-none placeholder:text-cream/30"
                               />
                             </td>
                             <td className="py-1.5 pr-1 align-top text-right">
                               <span
-                                className={`text-[11px] ${lineCost > 0 ? 'text-amber-300' : 'text-slate-600'}`}
+                                className={`text-[11px] ${lineCost > 0 ? 'text-amber-watch' : 'text-cream/30'}`}
                               >
-                                {lineCost > 0
-                                  ? `${lineCost.toFixed(2)}`
-                                  : '--'}
+                                {lineCost > 0 ? `${lineCost.toFixed(2)}` : '--'}
                               </span>
                             </td>
                             <td className="py-1.5 pr-2 align-top">
                               <input
                                 type="text"
                                 value={item.notes ?? ''}
-                                onChange={(e) =>
-                                  handleNoteChange(item.id, e.target.value)
-                                }
+                                onChange={(e) => handleNoteChange(item.id, e.target.value)}
                                 placeholder="--"
-                                className="h-7 w-full max-w-[140px] rounded-md border border-slate-700 bg-slate-900 px-1 text-[11px] text-slate-100 outline-none placeholder:text-slate-600"
+                                className="h-7 w-full max-w-[140px] rounded-md border border-[var(--line-strong)] bg-[var(--s-1)] px-1 text-[11px] text-cream outline-none placeholder:text-cream/30"
                               />
                             </td>
                             <td className="py-1.5 pl-1 pr-0 align-top text-right">
                               <button
                                 type="button"
                                 onClick={() => handleRemoveItem(item.id)}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-400 hover:border-red-500/60 hover:bg-red-500/10 hover:text-red-300"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--line-strong)] bg-[var(--s-1)] text-cream/60 hover:border-brick-soft/60 hover:bg-brick-soft/10 hover:text-brick-bright"
                                 aria-label="Remove ingredient"
                               >
                                 <Trash2 className="h-3 w-3" />
@@ -1696,9 +1623,9 @@ function ingredientGroupKey(i: Ingredient): IngredientGroupKey {
 }
 
 const GROUP_BADGE: Record<IngredientGroupKey, string> = {
-  RAW: 'bg-slate-700 text-slate-300',
-  PF: 'bg-violet-500/15 text-violet-300',
-  MOD: 'bg-amber-500/15 text-amber-300',
+  RAW: 'bg-[var(--s-3)] text-cream/80',
+  PF: 'bg-nutri-car/20 text-cream/90',
+  MOD: 'bg-amber-watch/15 text-amber-watch',
 }
 
 const GROUP_ORDER: IngredientGroupKey[] = ['RAW', 'PF', 'MOD']
@@ -1728,9 +1655,7 @@ function IngredientSearchPicker({
     const q = query.trim().toLowerCase()
     const filtered = q
       ? ingredients.filter(
-          (i) =>
-            i.name.toLowerCase().includes(q) ||
-            i.product_code.toLowerCase().includes(q),
+          (i) => i.name.toLowerCase().includes(q) || i.product_code.toLowerCase().includes(q),
         )
       : ingredients
 
@@ -1746,8 +1671,7 @@ function IngredientSearchPicker({
     return buckets
   }, [ingredients, query])
 
-  const totalMatches =
-    grouped.RAW.length + grouped.PF.length + grouped.MOD.length
+  const totalMatches = grouped.RAW.length + grouped.PF.length + grouped.MOD.length
 
   const handlePick = (id: string) => {
     onSelect(id)
@@ -1761,7 +1685,7 @@ function IngredientSearchPicker({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex h-8 w-full items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 text-left text-[11px] text-slate-100 hover:border-slate-600"
+          className="flex h-8 w-full items-center gap-2 rounded-md border border-[var(--line-strong)] bg-[var(--s-1)] px-2 text-left text-[11px] text-cream hover:border-[var(--line-strong)]"
           disabled={isLoading}
         >
           <span
@@ -1770,16 +1694,14 @@ function IngredientSearchPicker({
             {ingredientGroupKey(selected)}
           </span>
           <span className="flex-1 truncate">{selected.name}</span>
-          <span className="text-[10px] text-slate-500">
-            {selected.base_unit ?? ''}
-          </span>
+          <span className="text-[10px] text-cream/45">{selected.base_unit ?? ''}</span>
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation()
               onSelect('')
             }}
-            className="rounded p-0.5 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+            className="rounded p-0.5 text-cream/45 hover:bg-[var(--s-2)] hover:text-cream/80"
             aria-label="Clear selection"
           >
             <X className="h-3 w-3" />
@@ -1787,7 +1709,7 @@ function IngredientSearchPicker({
         </button>
       ) : (
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-500" />
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-cream/45" />
           <input
             type="text"
             value={query}
@@ -1797,30 +1719,24 @@ function IngredientSearchPicker({
             }}
             onFocus={() => setOpen(true)}
             onBlur={() => setTimeout(() => setOpen(false), 150)}
-            placeholder={
-              isLoading
-                ? 'Loading ingredients…'
-                : 'Search by name or code…'
-            }
+            placeholder={isLoading ? 'Loading ingredients…' : 'Search by name or code…'}
             disabled={isLoading}
-            className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 pl-7 pr-2 text-[11px] text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500"
+            className="h-8 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-1)] pl-7 pr-2 text-[11px] text-cream placeholder-cream/45 outline-none focus:border-forest-soft"
           />
         </div>
       )}
 
       {open && !isLoading && (
-        <div className="absolute left-0 right-0 top-9 z-10 max-h-64 overflow-y-auto rounded-md border border-slate-700 bg-slate-900 shadow-xl">
+        <div className="absolute left-0 right-0 top-9 z-10 max-h-64 overflow-y-auto rounded-md border border-[var(--line-strong)] bg-[var(--s-1)] shadow-xl">
           {totalMatches === 0 ? (
-            <div className="px-3 py-4 text-center text-[11px] text-slate-500">
-              No matches
-            </div>
+            <div className="px-3 py-4 text-center text-[11px] text-cream/45">No matches</div>
           ) : (
             GROUP_ORDER.map((g) => {
               const items = grouped[g]
               if (items.length === 0) return null
               return (
                 <div key={g}>
-                  <div className="sticky top-0 border-b border-slate-800 bg-slate-950/90 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+                  <div className="sticky top-0 border-b border-[var(--line)] bg-[var(--s-0)] px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-cream/45">
                     {g} · {items.length}
                   </div>
                   {items.map((i) => (
@@ -1829,27 +1745,19 @@ function IngredientSearchPicker({
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handlePick(i.id)}
-                      className="flex w-full items-center gap-2 border-b border-slate-800/60 px-2 py-1.5 text-left text-[11px] transition last:border-b-0 hover:bg-slate-800"
+                      className="flex w-full items-center gap-2 border-b border-[var(--line)] px-2 py-1.5 text-left text-[11px] transition last:border-b-0 hover:bg-[var(--s-2)]"
                     >
                       <span
                         className={`rounded px-1 py-0.5 text-[9px] font-bold ${GROUP_BADGE[g]}`}
                       >
                         {g}
                       </span>
-                      <span className="flex-1 truncate text-slate-100">
-                        {i.name}
+                      <span className="flex-1 truncate text-cream">{i.name}</span>
+                      <span className="text-[10px] text-cream/45">{i.base_unit ?? ''}</span>
+                      <span className="text-[10px] tabular-nums text-cream/45">
+                        {i.cost_per_unit > 0 ? `฿${i.cost_per_unit}` : ''}
                       </span>
-                      <span className="text-[10px] text-slate-500">
-                        {i.base_unit ?? ''}
-                      </span>
-                      <span className="text-[10px] tabular-nums text-slate-500">
-                        {i.cost_per_unit > 0
-                          ? `฿${i.cost_per_unit}`
-                          : ''}
-                      </span>
-                      <span className="font-mono text-[9px] text-slate-600">
-                        {i.product_code}
-                      </span>
+                      <span className="font-mono text-[9px] text-cream/30">{i.product_code}</span>
                     </button>
                   ))}
                 </div>
