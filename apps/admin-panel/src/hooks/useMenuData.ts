@@ -448,7 +448,6 @@ export function useMenuData(): UseMenuDataResult {
     ): Promise<{ ok: boolean; error?: string }> => {
       const updates: Record<string, unknown> = {}
       if (patch.name !== undefined) updates.name = patch.name.trim()
-      if (patch.price !== undefined) updates.price = patch.price
       if (patch.is_available !== undefined) updates.is_available = patch.is_available
       if (patch.is_featured !== undefined) updates.is_featured = patch.is_featured
       if (patch.portion_size !== undefined) updates.portion_size = patch.portion_size
@@ -457,11 +456,23 @@ export function useMenuData(): UseMenuDataResult {
       if (patch.stock_state !== undefined) updates.stock_state = patch.stock_state
       if (patch.is_web_visible !== undefined) updates.is_web_visible = patch.is_web_visible
 
-      const { error: updateErr } = await supabase
-        .from('nomenclature')
-        .update(updates)
-        .eq('id', id)
-      if (updateErr) return { ok: false, error: updateErr.message }
+      // `price` column UPDATE is revoked from authenticated (column-level RLS) —
+      // route through the owner-gated SECURITY DEFINER RPC, which also audits the change.
+      if (patch.price !== undefined) {
+        const { error: priceErr } = await supabase.rpc('fn_set_dish_price', {
+          p_id: id,
+          p_price: patch.price,
+        })
+        if (priceErr) return { ok: false, error: priceErr.message }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        const { error: updateErr } = await supabase
+          .from('nomenclature')
+          .update(updates)
+          .eq('id', id)
+        if (updateErr) return { ok: false, error: updateErr.message }
+      }
 
       await fetchData()
       return { ok: true }
