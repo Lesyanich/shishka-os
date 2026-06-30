@@ -18,9 +18,14 @@ const db = createClient(supabaseUrl, supabaseKey)
 const LOYVERSE_TOKEN = Deno.env.get("LOYVERSE_API_TOKEN") ?? ""
 const LOYVERSE_BASE = "https://api.loyverse.com/v1.0"
 
+// Server-to-server trigger secret. Set as an edge-function secret (same place as
+// LOYVERSE_API_TOKEN). Used only by the pg_cron push-queue drain, which reads the
+// matching value from supabase_vault and sends it in the x-internal-secret header.
+const INTERNAL_SECRET = Deno.env.get("LOYVERSE_INTERNAL_SECRET") ?? ""
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
 }
 
 function json(data: unknown, status = 200) {
@@ -942,9 +947,70 @@ async function isAuthedUser(req: Request): Promise<boolean> {
   }
 }
 
+// ── Server-to-server guard ──────────────────────────────────
+// The pg_cron push-queue drain (migration 334) calls us with the shared secret in
+// the x-internal-secret header. No Supabase user is involved. Fails closed when the
+// secret is unset (never matches "") and uses a constant-time compare.
+function isInternalCall(req: Request): boolean {
+  if (!INTERNAL_SECRET) return false
+  const got = req.headers.get("x-internal-secret") ?? ""
+  if (got.length !== INTERNAL_SECRET.length) return false
+  let diff = 0
+  for (let i = 0; i < got.length; i++) diff |= got.charCodeAt(i) ^ INTERNAL_SECRET.charCodeAt(i)
+  return diff === 0
+}
+
+// Drain one loyverse_push_queue row: dispatch to the existing push handler, then
+// write the row's terminal state back (net.http_post is fire-and-forget, so the
+// cron caller can't read our response — we record the outcome ourselves).
+async function handleInternalPush(req: Request) {
+  let body: { queue_id?: string; action?: string; target_id?: string | null }
+  try {
+    body = await req.json()
+  } catch {
+    return json({ ok: false, error: "invalid JSON body" }, 400)
+  }
+  const queueId = body.queue_id ?? ""
+  const act = body.action ?? ""
+  const targetId = body.target_id ?? ""
+  if (!queueId) return json({ ok: false, error: "queue_id required" }, 400)
+
+  let resp: Response
+  switch (act) {
+    case "dish":
+      resp = await handlePushDish(targetId)
+      break
+    case "prices":
+      resp = await handleReconcilePrices()
+      break
+    case "names":
+      resp = await handleResyncNames()
+      break
+    // Phase 3 (after the modifier-mirror reconcile) wires action="modifiers" here.
+    default:
+      resp = json({ ok: false, error: `unsupported queue action: ${act || "(empty)"}` }, 400)
+  }
+
+  let parsed: Record<string, unknown> = {}
+  try {
+    parsed = await resp.clone().json()
+  } catch {
+    parsed = { ok: false, error: "non-JSON handler response" }
+  }
+  const ok = parsed.ok === true
+  await db.from("loyverse_push_queue").update({
+    status: ok ? "done" : "error",
+    result: parsed,
+    error_message: ok ? null : (typeof parsed.error === "string" ? parsed.error : "unknown"),
+    processed_at: new Date().toISOString(),
+  }).eq("id", queueId)
+
+  return resp
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
-  if (!(await isAuthedUser(req))) return json({ ok: false, error: "unauthorized" }, 401)
+  if (!isInternalCall(req) && !(await isAuthedUser(req))) return json({ ok: false, error: "unauthorized" }, 401)
   try {
     if (!LOYVERSE_TOKEN) return json({ ok: false, error: "LOYVERSE_API_TOKEN not set" }, 500)
     const url = new URL(req.url)
@@ -952,6 +1018,13 @@ Deno.serve(async (req) => {
     switch (action) {
       case "status":
         return await handleStatus()
+      case "internal_push": {
+        // Server-to-server only — the push-queue drain. Re-check the secret so a
+        // browser session JWT (which passed the gate above) can never reach this.
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        if (!isInternalCall(req)) return json({ ok: false, error: "unauthorized" }, 401)
+        return await handleInternalPush(req)
+      }
       case "categories":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handleCategories()
