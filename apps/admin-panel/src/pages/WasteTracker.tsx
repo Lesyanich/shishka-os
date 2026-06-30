@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react'
 import { useInventory } from '../hooks/useInventory'
+import { useLocations } from '../hooks/useLocations'
 import { useWasteLog } from '../hooks/useWasteLog'
 import { usePredictivePO } from '../hooks/usePredictivePO'
 import { ZeroDayStocktake } from '../components/waste/ZeroDayStocktake'
@@ -8,6 +9,7 @@ import { PredictivePO } from '../components/waste/PredictivePO'
 
 export function WasteTracker() {
   const inventory = useInventory()
+  const locations = useLocations()
   const waste = useWasteLog()
   const po = usePredictivePO()
 
@@ -35,6 +37,7 @@ export function WasteTracker() {
           error={inventory.error}
           onSave={inventory.upsertBalance}
           onRefetch={inventory.refetch}
+          locations={locations.locations}
         />
 
         {/* Right column: Waste Log + Predictive PO */}

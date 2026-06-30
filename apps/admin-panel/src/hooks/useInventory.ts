@@ -42,10 +42,16 @@ export interface UseInventoryResult {
   isLoading: boolean
   error: string | null
   refetch: () => void
-  /** Backward-compat: upsert at nomenclature level (finds primary SKU) */
+  /**
+   * Backward-compat: upsert at nomenclature level (finds primary SKU).
+   * W2 (connected stock model): when `opts.locationId` is given, the count is ALSO
+   * routed through `fn_apply_stocktake` (source='admin') so it lands in the
+   * station-aware model. The `sku_balances` write is kept in parallel (spec §10-C).
+   */
   upsertBalance: (
     nomenclatureId: string,
     quantity: number,
+    opts?: { locationId?: string; unit?: string | null },
   ) => Promise<{ ok: boolean; error?: string }>
   /** Phase 10: Upsert balance at SKU level */
   upsertSkuBalance: (
@@ -205,6 +211,7 @@ export function useInventory(): UseInventoryResult {
     async (
       nomenclatureId: string,
       quantity: number,
+      opts?: { locationId?: string; unit?: string | null },
     ): Promise<{ ok: boolean; error?: string }> => {
       // Find primary SKU for this nomenclature
       const { data: skus, error: skuError } = await supabase
@@ -218,6 +225,7 @@ export function useInventory(): UseInventoryResult {
         return { ok: false, error: skuError.message }
       }
 
+      let balanceResult: { ok: boolean; error?: string }
       if (!skus || skus.length === 0) {
         // No SKU exists for this nomenclature — create a generic one
         const { data: nom } = await supabase
@@ -240,10 +248,37 @@ export function useInventory(): UseInventoryResult {
           return { ok: false, error: createError?.message ?? 'Failed to create SKU' }
         }
 
-        return upsertSkuBalance(newSku.id, quantity)
+        balanceResult = await upsertSkuBalance(newSku.id, quantity)
+      } else {
+        balanceResult = await upsertSkuBalance(skus[0].id, quantity)
       }
 
-      return upsertSkuBalance(skus[0].id, quantity)
+      // W2 (connected stock model): the sku_balances write above is the legacy,
+      // still-authoritative store kept running in parallel (spec §10-C). ALSO route
+      // the count through fn_apply_stocktake so it reaches the station-aware model
+      // (a stocktake_entries audit row + a location-scoped stock_movements
+      // adjustment). This call is intentionally NON-FATAL during the parallel-run
+      // phase: a failure here must not block a count that sku_balances already
+      // recorded — reconciliation is validated DB-side via v_stock_reconciliation,
+      // not via UI errors. When sku_balances is later demoted, make this the primary.
+      if (balanceResult.ok && opts?.locationId) {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('fn_apply_stocktake', {
+          p_nomenclature_id: nomenclatureId,
+          p_counted_qty: quantity,
+          p_location_id: opts.locationId,
+          p_unit: opts.unit ?? null,
+          p_source: 'admin',
+        })
+        const applied = rpcData as { ok?: boolean; error?: string } | null
+        if (rpcError || !applied?.ok) {
+          console.warn(
+            '[useInventory] fn_apply_stocktake (admin) did not apply:',
+            rpcError?.message ?? applied?.error ?? 'unknown error',
+          )
+        }
+      }
+
+      return balanceResult
     },
     [upsertSkuBalance],
   )

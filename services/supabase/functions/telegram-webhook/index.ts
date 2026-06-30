@@ -141,30 +141,79 @@ async function handleStocktakeStart(chatId: string) {
   )
 }
 
-/** Confirm a parsed stocktake (flip pending → confirmed) and summarise. */
+/**
+ * Confirm a parsed stocktake and summarise.
+ *
+ * W2 (connected stock model): instead of merely flipping pending → confirmed, every
+ * staged count is routed through the single sink `fn_apply_stocktake` (source='bot').
+ * That RPC writes a *fresh* `confirmed` stocktake_entries audit row AND a
+ * location-scoped `stock_movements` adjustment, so the count actually reaches the
+ * station-aware model. We then drop the original `pending` staging rows that were
+ * superseded — keeping any that failed (e.g. unit mismatch) as a record so the count
+ * can be re-done. Only this edge function changed; redeploy telegram-webhook.
+ */
 async function confirmStocktake(session: string, msgChatId: string, messageId: number, cbId: string) {
-  await db.from("stocktake_entries")
-    .update({ status: "confirmed" })
+  const { data: pendingData } = await db
+    .from("stocktake_entries")
+    .select("id, nomenclature_id, counted_qty, unit, station, counted_by, source_text, nomenclature:nomenclature(name)")
     .eq("session_id", session)
     .eq("status", "pending")
-  const { data } = await db
-    .from("stocktake_entries")
-    .select("counted_qty, unit, nomenclature:nomenclature(name)")
-    .eq("session_id", session)
-    .eq("status", "confirmed")
     .order("created_at", { ascending: true })
-  const rows = (data ?? []) as Array<{ counted_qty: number; unit: string | null; nomenclature: { name?: string } | { name?: string }[] | null }>
-  const name = (r: typeof rows[number]) => {
+  const pending = (pendingData ?? []) as Array<{
+    id: string
+    nomenclature_id: string
+    counted_qty: number
+    unit: string | null
+    station: string | null
+    counted_by: string | null
+    source_text: string | null
+    nomenclature: { name?: string } | { name?: string }[] | null
+  }>
+  const nameOf = (r: typeof pending[number]) => {
     const n = Array.isArray(r.nomenclature) ? r.nomenclature[0] : r.nomenclature
     return n?.name ?? "—"
   }
-  const lines = [`✅ <b>Stocktake saved · บันทึกแล้ว</b> (${rows.length})`]
+
+  const saved: { name: string; qty: number; unit: string | null }[] = []
+  const failed: { name: string; error: string }[] = []
+  const appliedIds: string[] = []
+  for (const r of pending) {
+    const { data: res, error } = await db.rpc("fn_apply_stocktake", {
+      p_nomenclature_id: r.nomenclature_id,
+      p_counted_qty: r.counted_qty,
+      p_station: r.station ?? "general",
+      p_unit: r.unit,
+      p_counted_by: r.counted_by,
+      p_source: "bot",
+      p_source_text: r.source_text,
+      p_session_id: session,
+    })
+    const j = res as { ok?: boolean; error?: string } | null
+    if (error || !j?.ok) {
+      failed.push({ name: nameOf(r), error: error?.message ?? j?.error ?? "failed" })
+    } else {
+      saved.push({ name: nameOf(r), qty: Number(r.counted_qty), unit: r.unit })
+      appliedIds.push(r.id)
+    }
+  }
+
+  // Drop only the staging rows that fn_apply_stocktake superseded with a fresh
+  // 'confirmed' row; failed ones stay 'pending' as an audit trail.
+  if (appliedIds.length) {
+    await db.from("stocktake_entries").delete().in("id", appliedIds)
+  }
+
+  const lines = [`✅ <b>Stocktake saved · บันทึกแล้ว</b> (${saved.length})`]
   const out: string[] = []
-  rows.forEach((r) => {
-    lines.push(`• ${escapeHtml(name(r))} — ${r.counted_qty} ${r.unit ?? ""}`)
-    if (Number(r.counted_qty) === 0) out.push(escapeHtml(name(r)))
+  saved.forEach((r) => {
+    lines.push(`• ${escapeHtml(r.name)} — ${r.qty} ${r.unit ?? ""}`)
+    if (r.qty === 0) out.push(escapeHtml(r.name))
   })
   if (out.length) lines.push(`\n🔴 <b>Out of stock · หมด:</b> ${out.join(", ")}`)
+  if (failed.length) {
+    lines.push(`\n⚠️ <b>Not saved · ไม่ได้บันทึก:</b>`)
+    failed.forEach((f) => lines.push(`• ${escapeHtml(f.name)} — ${escapeHtml(f.error)}`))
+  }
   await editMessageText(msgChatId, messageId, lines.join("\n"))
   await answerCallbackQuery(cbId, "✅ Saved")
 }
