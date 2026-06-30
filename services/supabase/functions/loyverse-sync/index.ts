@@ -965,9 +965,18 @@ async function handlePushDishModifiers(dishId: string) {
     .from("dish_modifier_groups")
     .select("loyverse_modifier_list_id")
     .eq("dish_id", dishId)
+  const rawCount = (dmgRows ?? []).length
   const listIds = (dmgRows ?? [])
     .map((r: { loyverse_modifier_list_id: string }) => r.loyverse_modifier_list_id)
     .filter(isLoyverseModifierId)
+
+  // Safety: if the dish has ONLY web-only sentinel groups (e.g. WEB-DIP-BREAD on the
+  // dips) and no real Loyverse-UUID group, pushing would set modifier_ids=[] and CLEAR
+  // the dish's real Loyverse modifier (which the DB tracks only as a web sentinel).
+  // Skip rather than clobber. A dish with genuinely zero groups (rawCount=0) still syncs.
+  if (rawCount > 0 && listIds.length === 0) {
+    return json({ ok: true, skipped: true, dish: d.name, message: "web-only modifier sentinels only — skipped to avoid clearing the dish's real Loyverse modifiers" })
+  }
 
   const logId = await logStart("dish_modifiers_push", 1)
   try {
