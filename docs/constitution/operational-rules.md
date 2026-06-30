@@ -332,6 +332,15 @@ Every routing comment from one agent to another on a task with `executor_type = 
 - Questions or clarifications between agents
 - Closing comments (SHA + summary, not new scope)
 
+### CEO delivery gate (front-end tasks: `apps/admin-panel`, `apps/web`, `apps/kds`)
+
+Any task that changes a user-facing surface closes to the CEO with a **working Vercel preview link** plus a one-line *"what changed / where to click"* (the exact route, e.g. `/menu` → Owner tab). This is an **acceptance criterion**, not a courtesy.
+
+- A bare PR diff with **no live preview link** is an **incomplete handoff** — the CEO rejects it with "where's the preview?". Treat it like a missing required field.
+- The full deploy build (`npm run build` = `tsc -b && vite build`, not bare `vite build`) **must pass before handoff**, so the Vercel preview actually renders. A failed build = no preview = blocked handoff.
+- Local `npm run dev` is the **on-demand interactive option** (CEO drives changes live in-session) — it does **not** substitute for the preview link on closure.
+- Decided 2026-06-30 (CEO via `/techlead`). Rationale + setup gotchas: feedback memory `feedback_preview_before_pr`.
+
 ### Rejection protocol
 
 If receiving agent sees a packet missing required fields:
