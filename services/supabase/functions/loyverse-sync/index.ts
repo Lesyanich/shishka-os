@@ -192,7 +192,7 @@ async function handleRecreateItem(req: Request) {
 
   const { data: dish, error: dishErr } = await db
     .from("nomenclature")
-    .select("id, name, staff_code, customer_short_name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
+    .select("id, name, product_code, staff_code, customer_short_name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
     .eq("id", body.dish_id)
     .single()
   if (dishErr || !dish) return json({ ok: false, error: dishErr?.message ?? "dish not found" }, 404)
@@ -214,6 +214,7 @@ async function handleRecreateItem(req: Request) {
       variant_name: "Regular",
       default_pricing_type: "FIXED",
       default_price: price,
+      sku: d.product_code ?? undefined,
       stores: [{ store_id: storeId, pricing_type: "FIXED", price, available_for_sale: true }],
     }],
   }
@@ -363,7 +364,7 @@ async function handlePushDish(dishId: string) {
 
   const { data: dishRow, error: dishErr } = await db
     .from("nomenclature")
-    .select("id, name, loyverse_item_id, category_id, product_categories!category_id(loyverse_category_id)")
+    .select("id, name, product_code, loyverse_item_id, category_id, product_categories!category_id(loyverse_category_id)")
     .eq("id", dishId)
     .single()
   if (dishErr) return json({ ok: false, error: dishErr.message }, 500)
@@ -371,6 +372,8 @@ async function handlePushDish(dishId: string) {
   const linkedCategoryId = (dishRow as any).product_categories?.loyverse_category_id ?? null
   // deno-lint-ignore no-explicit-any
   let loyverseItemId = (dishRow as any).loyverse_item_id
+  // deno-lint-ignore no-explicit-any
+  const productCode = (dishRow as any).product_code as string | null
 
   const logId = await logStart("dish_push", 1)
   try {
@@ -420,6 +423,13 @@ async function handlePushDish(dishId: string) {
       if (rpc.payload.image_url) itemBody.image_url = rpc.payload.image_url
     }
 
+    // Stamp a stable, unique SKU = product_code on the single variant. Prevents
+    // Loyverse from auto-assigning the SAME numeric SKU to items created concurrently
+    // (the dup-10126 bug on the 5 Thai teas). Overrides any existing auto-SKU on update.
+    if (productCode && Array.isArray(itemBody.variants) && (itemBody.variants as unknown[]).length === 1) {
+      // deno-lint-ignore no-explicit-any
+      ;((itemBody.variants as any[])[0]).sku = productCode
+    }
     const result = await loyversePost("/items", itemBody)
     loyverseItemId = result.id ?? loyverseItemId
     if (loyverseItemId) {
