@@ -928,6 +928,55 @@ async function handlePullItemsStatus() {
   return json({ ok: true, total: rows.length, with_photo: withPhoto, deleted, failed_chunks: failedChunks })
 }
 
+// Targeted, per-dish modifier sync: set ONE dish's Loyverse modifier_ids to its
+// dish_modifier_groups in the DB (UUID-valid lists only; WEB sentinels skipped).
+// Unlike push_modifiers' global reattachAllDishes(), this touches only the named
+// dish — safe to run autonomously from the push queue (action='modifiers'). The DB
+// is the source of truth, so an empty group set clears the dish's POS modifiers.
+async function handlePushDishModifiers(dishId: string) {
+  if (!dishId) return json({ ok: false, error: "dish_id required" }, 400)
+  const { data: dish, error: dishErr } = await db
+    .from("nomenclature")
+    .select("id, name, loyverse_item_id")
+    .eq("id", dishId)
+    .single()
+  if (dishErr || !dish) return json({ ok: false, error: dishErr?.message ?? "dish not found" }, 404)
+  // deno-lint-ignore no-explicit-any
+  const d = dish as any
+  if (!d.loyverse_item_id) return json({ ok: false, error: "dish not synced yet (no loyverse_item_id)" }, 400)
+
+  const { data: dmgRows } = await db
+    .from("dish_modifier_groups")
+    .select("loyverse_modifier_list_id")
+    .eq("dish_id", dishId)
+  const listIds = (dmgRows ?? [])
+    .map((r: { loyverse_modifier_list_id: string }) => r.loyverse_modifier_list_id)
+    .filter(isLoyverseModifierId)
+
+  const logId = await logStart("dish_modifiers_push", 1)
+  try {
+    const current = await loyverseGet(`/items/${d.loyverse_item_id}`)
+    const before: string[] = current.modifier_ids ?? current.modifiers_ids ?? []
+    const itemBody: Record<string, unknown> = {
+      id: d.loyverse_item_id,
+      item_name: current.item_name,
+      variants: current.variants,
+      modifier_ids: listIds,
+    }
+    if (current.category_id) itemBody.category_id = current.category_id
+    if (current.description) itemBody.description = current.description
+    if (current.image_url) itemBody.image_url = current.image_url
+    const result = await loyversePost("/items", itemBody)
+    await db.from("nomenclature").update({ loyverse_synced_at: new Date().toISOString() }).eq("id", dishId)
+    await logFinish(logId, "success", 1, 0)
+    return json({ ok: true, dish: d.name, loyverse_item_id: result.id, before, after: listIds })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    await logFinish(logId, "error", 0, 1, msg)
+    return json({ ok: false, error: msg }, 502)
+  }
+}
+
 // ── Auth guard ──────────────────────────────────────────────
 // loyverse-sync runs with the service-role key (full RLS bypass) and is
 // deployed with verify_jwt:false. Every real caller is an admin-panel hook
@@ -986,7 +1035,10 @@ async function handleInternalPush(req: Request) {
     case "names":
       resp = await handleResyncNames()
       break
-    // Phase 3 (after the modifier-mirror reconcile) wires action="modifiers" here.
+    case "modifiers":
+      // Targeted per-dish modifier attachment sync (NOT the global reattach).
+      resp = await handlePushDishModifiers(targetId)
+      break
     default:
       resp = json({ ok: false, error: `unsupported queue action: ${act || "(empty)"}` }, 400)
   }
@@ -1031,6 +1083,10 @@ Deno.serve(async (req) => {
       case "push_dish": {
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handlePushDish(url.searchParams.get("dish_id") ?? "")
+      }
+      case "push_dish_modifiers": {
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handlePushDishModifiers(url.searchParams.get("dish_id") ?? "")
       }
       case "reconcile_prices":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)

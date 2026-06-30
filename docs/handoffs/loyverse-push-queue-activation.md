@@ -86,10 +86,20 @@ SELECT cron.unschedule('loyverse-push-watchdog');
 Unsetting `LOYVERSE_INTERNAL_SECRET` on the function instantly closes the server-to-server
 path (`isInternalCall` fails closed when the secret is empty).
 
+## Modifiers — per-dish sync (enabled 2026-06-30)
+`action='modifiers'` with `target_id=<dish-uuid>` is now live. It runs
+`handlePushDishModifiers`: sets ONE dish's Loyverse `modifier_ids` to that dish's
+`dish_modifier_groups` in the DB (UUID-valid lists only; WEB sentinels skipped),
+preserving name/variants/category/description/image. Targeted — it touches only the
+named dish, so it is safe to run from the queue.
+```sql
+INSERT INTO loyverse_push_queue (action, target_id) VALUES ('modifiers', '<dish-uuid>');
+```
+Note: the DB is the source of truth, so a dish with NO groups will have its POS modifiers
+**cleared**. The global `push_modifiers` (reattachAllDishes across every dish) is
+deliberately NOT wired into the queue — it stays an owner-initiated browser action because
+a stale mirror can corrupt unrelated dishes.
+
 ## Not yet enabled
-- **Modifiers** (`action='modifiers'`) — the `internal_push` dispatch returns
-  `unsupported queue action` for it. Enable only after the one-time modifier-mirror
-  reconcile (the mirror has been stale since 2026-06-15; a blind global push/pull can
-  corrupt POS attachments). See the plan's Phase 3.
 - **Admin queue-status panel** (Phase 2) — optional follow-up so the owner can see what the
   agent enqueued and whether it succeeded.
