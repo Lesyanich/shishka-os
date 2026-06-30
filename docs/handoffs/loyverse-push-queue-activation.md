@@ -101,9 +101,16 @@ named dish, so it is safe to run from the queue.
 INSERT INTO loyverse_push_queue (action, target_id) VALUES ('modifiers', '<dish-uuid>');
 ```
 Note: the DB is the source of truth, so a dish with NO groups will have its POS modifiers
-**cleared**. The global `push_modifiers` (reattachAllDishes across every dish) is
-deliberately NOT wired into the queue — it stays an owner-initiated browser action because
-a stale mirror can corrupt unrelated dishes.
+**cleared** — EXCEPT a dish whose only groups are web-only sentinels (e.g. `WEB-DIP-BREAD`
+on the dips), which is skipped to avoid wiping its real Loyverse modifier. The global
+`push_modifiers` (reattachAllDishes across every dish) is deliberately NOT wired into the
+queue — it stays an owner-initiated browser action because a stale mirror can corrupt
+unrelated dishes.
+
+## Photos are NOT pushable here
+Loyverse `POST /items` silently drops `image_url` (confirmed live). The queue/API syncs
+everything EXCEPT photos. POS photos go only via Back Office UI / browser automation
+(Claude-in-Chrome). Website photos are unaffected (served from Supabase Storage).
 
 ## Not yet enabled
 - **Admin queue-status panel** (Phase 2) — optional follow-up so the owner can see what the
