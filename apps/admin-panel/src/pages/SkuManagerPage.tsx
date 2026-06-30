@@ -19,63 +19,54 @@ function StatCard({
   color: string
 }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-3">
+    <div className="shk-kpi">
       <div className="flex items-center gap-2">
         <Icon className={`h-4 w-4 ${color}`} />
-        <span className="text-[10px] uppercase tracking-wide text-slate-500">{label}</span>
+        <span className="text-[10px] uppercase tracking-[0.14em] text-cream/60">{label}</span>
       </div>
-      <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{value}</p>
+      <p className="mt-1.5 font-mono text-xl font-semibold tabular-nums text-cream">{value}</p>
     </div>
   )
 }
 
 export function SkuManagerPage() {
-  const {
-    skus,
-    nomenclatureOptions,
-    stats,
-    isLoading,
-    createSku,
-    updateSku,
-    deactivateSku,
-  } = useSkuManager()
+  const { skus, nomenclatureOptions, stats, isLoading, createSku, updateSku, deactivateSku } =
+    useSkuManager()
 
   return (
-    <div className="space-y-5">
+    <div className="menu-canvas -mx-4 space-y-5 px-4 pt-5 pb-10 sm:-mx-6 sm:px-6">
       {/* Header */}
-      <div>
-        <h1 className="text-lg font-bold text-slate-100">SKU Manager</h1>
-        <p className="text-xs text-slate-500">
-          Physical product catalog — barcodes, brands, packaging
-        </p>
+      <div className="flex items-start gap-3.5">
+        <span className="shk-seal" aria-hidden>
+          S
+        </span>
+        <div>
+          <div className="shk-eyebrow">SKU &middot; catalog</div>
+          <h1 className="mt-1 font-display text-4xl font-bold leading-none tracking-tight text-cream">
+            SKU Manager
+          </h1>
+          <p className="mt-1.5 text-sm text-cream/45">
+            Physical product catalog — barcodes, brands, packaging
+          </p>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          icon={Package}
-          label="Total SKUs"
-          value={stats.total}
-          color="text-emerald-400"
-        />
+        <StatCard icon={Package} label="Total SKUs" value={stats.total} color="text-forest-soft" />
         <StatCard
           icon={Barcode}
           label="With barcode"
           value={`${stats.withBarcode} / ${stats.total}`}
-          color="text-sky-400"
+          color="text-honey-300"
         />
         <StatCard
           icon={Truck}
           label="Linked to supplier"
           value={stats.withSupplier}
-          color="text-amber-400"
+          color="text-amber-watch"
         />
-        <StatCard
-          icon={Box}
-          label="Inactive"
-          value={stats.inactive}
-          color="text-slate-500"
-        />
+        <StatCard icon={Box} label="Inactive" value={stats.inactive} color="text-cream/40" />
       </div>
 
       {/* Table */}
