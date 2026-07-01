@@ -48,6 +48,8 @@ interface L2AssemblerViewProps {
   /** Leaf subcategory drill-down within the selected section. When set, only
    *  dishes whose own category_id matches are shown. null = whole section. */
   selectedSubcategory: string | null
+  /** Free-text name search — narrows cards by dish name (case-insensitive). */
+  searchQuery?: string
   /** null = all, true = active only, false = inactive only */
   availableFilter: boolean | null
   dishCardById: Map<string, DishCardData>
@@ -751,6 +753,7 @@ export function L2AssemblerView({
   typeFilter,
   selectedCategory,
   selectedSubcategory,
+  searchQuery,
   availableFilter,
   dishCardById,
   componentsByDish,
@@ -780,12 +783,14 @@ export function L2AssemblerView({
   // Seed order: persisted display_order first, then build-your-own dishes (no
   // fixed BOM, e.g. the Custom smoothie) last, with original order as tiebreak.
   const seed = useMemo(() => {
+    const q = searchQuery?.trim().toLowerCase() ?? ''
     const filtered = items.filter(
       (i) =>
         matchesType(i, typeFilter) &&
         (!selectedCategory || (i.section_id ?? i.category_id) === selectedCategory) &&
         (!selectedSubcategory || i.category_id === selectedSubcategory) &&
-        (availableFilter === null || i.is_available === availableFilter),
+        (availableFilter === null || i.is_available === availableFilter) &&
+        (!q || i.name.toLowerCase().includes(q)),
     )
     return filtered
       .map((item, idx) => ({ item, idx }))
@@ -798,7 +803,15 @@ export function L2AssemblerView({
         return aByo - bByo || a.idx - b.idx
       })
       .map((x) => x.item)
-  }, [items, typeFilter, selectedCategory, selectedSubcategory, availableFilter, componentsByDish])
+  }, [
+    items,
+    typeFilter,
+    selectedCategory,
+    selectedSubcategory,
+    availableFilter,
+    searchQuery,
+    componentsByDish,
+  ])
 
   // Local order drives instant drag feedback; it re-syncs whenever the seed
   // (item set or persisted order) changes — e.g. category switch or saved drop.
@@ -866,11 +879,13 @@ export function L2AssemblerView({
       <div className="flex flex-col items-center justify-center gap-2 py-20 text-cream/50">
         <Package className="h-10 w-10 text-cream/30" />
         <p className="text-sm">
-          {hiddenByFilter
-            ? availableFilter === true
-              ? 'All dishes in this category are deactivated. Switch to "All" or "Inactive" to see them.'
-              : 'No deactivated dishes in this category.'
-            : `No ${typeFilter === 'all' ? '' : `${typeFilter} `}items in this category.`}
+          {searchQuery?.trim()
+            ? `No dishes match "${searchQuery.trim()}".`
+            : hiddenByFilter
+              ? availableFilter === true
+                ? 'All dishes in this category are deactivated. Switch to "All" or "Inactive" to see them.'
+                : 'No deactivated dishes in this category.'
+              : `No ${typeFilter === 'all' ? '' : `${typeFilter} `}items in this category.`}
         </p>
       </div>
     )

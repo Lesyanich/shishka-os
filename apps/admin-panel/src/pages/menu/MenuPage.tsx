@@ -10,6 +10,8 @@ import {
   Plus,
   Package,
   Shield,
+  Search,
+  X,
 } from 'lucide-react'
 import { useMenuData } from '../../hooks/useMenuData'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
@@ -155,6 +157,23 @@ export function MenuPage() {
     [updateParam],
   )
 
+  // L1/L2 station name search (?q=) — shareable/refresh-safe like the other filters.
+  // Uses history replace (not push) so every keystroke doesn't spam the back button.
+  const searchQuery = searchParams.get('q') ?? ''
+  const setSearchQuery = useCallback(
+    (q: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (q) next.set('q', q); else next.delete('q')
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
+
   // Availability filter for L1 Cook view (URL-driven: ?available=yes|no)
   const availableParam = searchParams.get('available')
   const availableFilter: boolean | null =
@@ -219,11 +238,13 @@ export function MenuPage() {
   // Apply user filters ONLY in Owner view; L1/L2/Customer keep their cat-strip
   const ownerFilteredItems = useMemo(() => {
     if (view !== 'owner') return typeFilteredItems
-    return applyFilters(
+    const filtered = applyFilters(
       typeFilteredItems.map((i) => ({ ...i, hasBom: hasBomById.get(i.id) ?? false })),
       filters,
     )
-  }, [typeFilteredItems, filters, view, hasBomById])
+    const q = searchQuery.trim().toLowerCase()
+    return q ? filtered.filter((i) => i.name.toLowerCase().includes(q)) : filtered
+  }, [typeFilteredItems, filters, view, hasBomById, searchQuery])
 
   // Filtered dishes (SALE only) for OwnerGallery
   const ownerFilteredDishes = useMemo(
@@ -394,7 +415,29 @@ export function MenuPage() {
       {/* Owner: TypeFilter + FilterBar (replaces old TypeFilter + CategoryTabs) */}
       {view === 'owner' && (
         <div className="space-y-2">
-          <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
+          <div className="flex flex-wrap items-center gap-3">
+            <TypeFilter value={typeFilter} onChange={setTypeFilter} counts={typeCounts} />
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream/40" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name…"
+                className="w-56 rounded-lg border border-surface-3 bg-surface-1 py-1.5 pl-8 pr-7 text-xs text-cream placeholder:text-cream/35 focus:outline-none focus:ring-1 focus:ring-forest-soft"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-cream/40 hover:text-cream/70"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
           <FilterBar
             filters={filters}
             categories={categories}
@@ -464,6 +507,8 @@ export function MenuPage() {
           onSelectCategory={setSelectedCategory}
           selectedSubcategory={selectedSubcategory}
           onSelectSubcategory={setSelectedSubcategory}
+          searchQuery={searchQuery}
+          onSearchQuery={setSearchQuery}
           onOpenDish={openDrawer}
           onReorder={reorderItems}
         />
@@ -484,6 +529,8 @@ export function MenuPage() {
           onSelectCategory={setSelectedCategory}
           selectedSubcategory={selectedSubcategory}
           onSelectSubcategory={setSelectedSubcategory}
+          searchQuery={searchQuery}
+          onSearchQuery={setSearchQuery}
           onOpenDish={openDrawer}
           onReorder={reorderItems}
         />

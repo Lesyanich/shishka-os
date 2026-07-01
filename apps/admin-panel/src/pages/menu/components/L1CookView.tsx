@@ -38,6 +38,8 @@ interface L1CookViewProps {
   /** Leaf subcategory drill-down within the selected section (matches on the
    *  dish's own category_id). null = whole section. */
   selectedSubcategory: string | null
+  /** Free-text name search — narrows cards by dish name (case-insensitive). */
+  searchQuery?: string
   /** null = show all, true = available only, false = unavailable only */
   availableFilter: boolean | null
   pfPackCardById: Map<string, PfPackCardData>
@@ -569,6 +571,7 @@ export function L1CookView({
   typeFilter,
   selectedCategory,
   selectedSubcategory,
+  searchQuery,
   availableFilter,
   pfPackCardById,
   recipeStatsById,
@@ -583,14 +586,16 @@ export function L1CookView({
   // L1 = kitchen prep station. Honor the type filter (defaults to PF upstream,
   // so заготовки lead) plus category, subcategory drill-down, and availability.
   const filtered = useMemo(() => {
+    const q = searchQuery?.trim().toLowerCase() ?? ''
     return items.filter((i) => {
       if (!matchesType(i, typeFilter)) return false
       if (selectedCategory && (i.section_id ?? i.category_id) !== selectedCategory) return false
       if (selectedSubcategory && i.category_id !== selectedSubcategory) return false
       if (availableFilter !== null && i.is_available !== availableFilter) return false
+      if (q && !i.name.toLowerCase().includes(q)) return false
       return true
     })
-  }, [items, typeFilter, selectedCategory, selectedSubcategory, availableFilter])
+  }, [items, typeFilter, selectedCategory, selectedSubcategory, availableFilter, searchQuery])
 
   // Group by category for structured rendering
   const grouped = useMemo(() => {
@@ -620,7 +625,11 @@ export function L1CookView({
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-20 text-cream/50">
         <ChefHat className="h-10 w-10 text-cream/30" />
-        <p className="text-sm">No items in this category.</p>
+        <p className="text-sm">
+          {searchQuery?.trim()
+            ? `No dishes match "${searchQuery.trim()}".`
+            : 'No items in this category.'}
+        </p>
       </div>
     )
   }
