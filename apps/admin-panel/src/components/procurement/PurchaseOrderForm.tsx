@@ -32,7 +32,13 @@ interface DraftLine {
 
 const defaultToday = new Date().toISOString().slice(0, 10)
 
-export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLines, initialNotes }: Props) {
+export function PurchaseOrderForm({
+  onCreated,
+  createPO,
+  isCreating,
+  initialLines,
+  initialNotes,
+}: Props) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [items, setItems] = useState<NomItem[]>([])
   const [isLoadingLookups, setIsLoadingLookups] = useState(true)
@@ -91,11 +97,14 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
   }, [initialLines, initialNotes])
 
   const addLine = useCallback(() => {
-    setLines((prev) => [...prev, { nomenclature_id: '', qty_ordered: '', unit_price_expected: null }])
+    setLines((prev) => [
+      ...prev,
+      { nomenclature_id: '', qty_ordered: '', unit_price_expected: null },
+    ])
   }, [])
 
   const removeLine = useCallback((idx: number) => {
-    setLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev)
+    setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev))
   }, [])
 
   const updateLine = useCallback((idx: number, patch: Partial<DraftLine>) => {
@@ -175,20 +184,24 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
   }
 
   if (isLoadingLookups) {
-    return <div className="h-40 animate-pulse rounded-xl bg-slate-800/50" />
+    return <div className="h-40 animate-pulse rounded-xl bg-[var(--s-2)]" />
   }
 
   return (
-    <form noValidate onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-700/50 bg-slate-800/30 p-4">
-      <h3 className="text-sm font-bold text-slate-100">New Purchase Order</h3>
+    <form
+      noValidate
+      onSubmit={handleSubmit}
+      className="space-y-4 rounded-xl border border-[var(--line-strong)] bg-[var(--s-2)] p-4"
+    >
+      <h3 className="text-sm font-bold text-cream">New Purchase Order</h3>
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <div className="rounded-lg border border-brick-soft/30 bg-brick-soft/10 px-3 py-2 text-xs text-brick-bright">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+        <div className="rounded-lg border border-forest-soft/30 bg-forest-soft/10 px-3 py-2 text-xs text-mint-200">
           {success}
         </div>
       )}
@@ -196,38 +209,40 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
       {/* Supplier + Date */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-[11px] text-slate-500">Supplier</label>
+          <label className="mb-1 block text-[11px] text-cream/45">Supplier</label>
           <select
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
-            className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+            className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
           >
             <option value="">Select...</option>
             {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
             ))}
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-[11px] text-slate-500">Expected Date</label>
+          <label className="mb-1 block text-[11px] text-cream/45">Expected Date</label>
           <input
             type="date"
             value={expectedDate}
             onChange={(e) => setExpectedDate(e.target.value)}
-            className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+            className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
           />
         </div>
       </div>
 
       {/* Line items */}
       <div className="space-y-2">
-        <label className="block text-[11px] text-slate-500">Items</label>
+        <label className="block text-[11px] text-cream/45">Items</label>
         {lines.map((line, idx) => (
           <div key={idx} className="flex items-start gap-2">
             <select
               value={line.nomenclature_id}
               onChange={(e) => updateLine(idx, { nomenclature_id: e.target.value })}
-              className="h-9 min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="h-9 min-w-0 flex-1 rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
             >
               <option value="">Select item...</option>
               {items.map((i) => (
@@ -239,25 +254,31 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
             <input
               type="number"
               value={line.qty_ordered}
-              onChange={(e) => updateLine(idx, { qty_ordered: e.target.value ? Number(e.target.value) : '' })}
+              onChange={(e) =>
+                updateLine(idx, { qty_ordered: e.target.value ? Number(e.target.value) : '' })
+              }
               placeholder="Qty"
               min={0.01}
               step="any"
-              className="h-9 w-20 rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="h-9 w-20 rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
             />
             <input
               type="number"
               value={line.unit_price_expected ?? ''}
-              onChange={(e) => updateLine(idx, { unit_price_expected: e.target.value ? Number(e.target.value) : null })}
+              onChange={(e) =>
+                updateLine(idx, {
+                  unit_price_expected: e.target.value ? Number(e.target.value) : null,
+                })
+              }
               placeholder="Price"
               min={0}
               step="any"
-              className="h-9 w-20 rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+              className="h-9 w-20 rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
             />
             <button
               type="button"
               onClick={() => removeLine(idx)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-600 transition hover:bg-red-500/10 hover:text-red-400"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-cream/30 transition hover:bg-brick-soft/10 hover:text-brick-bright"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -266,7 +287,7 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
         <button
           type="button"
           onClick={addLine}
-          className="flex items-center gap-1.5 text-xs text-sky-400 transition hover:text-sky-300"
+          className="flex items-center gap-1.5 text-xs text-honey-300/85 transition hover:text-honey-300"
         >
           <Plus className="h-3.5 w-3.5" />
           Add item
@@ -275,13 +296,13 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
 
       {/* Notes */}
       <div>
-        <label className="mb-1 block text-[11px] text-slate-500">Notes</label>
+        <label className="mb-1 block text-[11px] text-cream/45">Notes</label>
         <input
           type="text"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Optional notes..."
-          className="h-9 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-xs text-slate-100 outline-none focus:border-emerald-500"
+          className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
         />
       </div>
 
@@ -289,7 +310,7 @@ export function PurchaseOrderForm({ onCreated, createPO, isCreating, initialLine
       <button
         type="submit"
         disabled={isCreating}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-500 active:scale-[0.99] disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-royal-green)] py-2.5 text-xs font-semibold text-white transition hover:bg-[var(--color-royal-soft)] active:scale-[0.99] disabled:opacity-50"
       >
         <Send className="h-3.5 w-3.5" />
         {isCreating ? 'Creating...' : 'Create Purchase Order'}

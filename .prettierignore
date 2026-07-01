@@ -1,0 +1,20 @@
+# Dependencies & build output
+node_modules
+dist
+build
+coverage
+*.min.js
+*.min.css
+
+# Lockfiles & generated artifacts
+package-lock.json
+graphify-out
+**/public/vault.json
+**/public/graph.json
+
+# Generated / vendored data
+vault/**/*.json
+.planning
+
+# SQL migrations are owned by the migration-canary gate, not prettier
+services/supabase/migrations

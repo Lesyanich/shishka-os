@@ -11,7 +11,6 @@ Consolidated from all phases. Items marked with phase of origin.
 
 ### Phase 6.6: Pending Migrations & Deploys
 - Migration 041 needs SQL execution in Dashboard (Supabase CLI not linked)
-- GAS needs `clasp push && npm run deploy` from `services/gas/`
 
 ### ~~Phase 5: Bundle Size~~ → RESOLVED (Phase 9)
 - ~~recharts adds ~300KB to bundle → use `React.lazy()` + `Suspense` for CapExMiniChart~~ → **DONE: MonthlyChart + CapExMiniChart lazy loaded**

@@ -19,35 +19,33 @@ function StepRow({ step, isLast }: { step: RecipeStep; isLast: boolean }) {
         <div
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
             step.is_passive
-              ? 'border-sky-500/50 bg-sky-500/15 text-sky-300'
-              : 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+              ? 'border-honey-300/50 bg-honey-300/15 text-honey-300'
+              : 'border-forest-soft/50 bg-forest-soft/15 text-mint-200'
           }`}
         >
           {step.step_order}
         </div>
-        {!isLast && (
-          <div className="w-px flex-1 bg-slate-700" />
-        )}
+        {!isLast && <div className="w-px flex-1 bg-[var(--s-3)]" />}
       </div>
 
       {/* Step content */}
-      <div className={`mb-3 flex-1 rounded-lg border px-3 py-2 ${
-        step.is_passive
-          ? 'border-sky-500/20 bg-sky-500/5'
-          : 'border-slate-700/50 bg-slate-800/30'
-      }`}>
+      <div
+        className={`mb-3 flex-1 rounded-lg border px-3 py-2 ${
+          step.is_passive
+            ? 'border-honey-300/20 bg-honey-300/5'
+            : 'border-[var(--line-strong)] bg-[var(--s-2)]'
+        }`}
+      >
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium text-slate-100">
-            {step.operation_name}
-          </span>
+          <span className="text-xs font-medium text-cream">{step.operation_name}</span>
           <div className="flex items-center gap-2">
             {step.is_passive ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] text-sky-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-honey-300/15 px-2 py-0.5 text-[10px] text-honey-300">
                 <Pause className="h-2.5 w-2.5" />
                 Passive
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-watch/15 px-2 py-0.5 text-[10px] text-amber-watch">
                 <Play className="h-2.5 w-2.5" />
                 Active
               </span>
@@ -56,12 +54,10 @@ function StepRow({ step, isLast }: { step: RecipeStep; isLast: boolean }) {
         </div>
 
         {step.description && (
-          <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-            {step.description}
-          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-cream/60">{step.description}</p>
         )}
 
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-cream/45">
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3 w-3" />
             {formatDuration(step.duration_min)}
@@ -75,7 +71,7 @@ function StepRow({ step, isLast }: { step: RecipeStep; isLast: boolean }) {
           )}
 
           {hasTemp && (
-            <span className="inline-flex items-center gap-1 text-rose-400">
+            <span className="inline-flex items-center gap-1 text-brick-bright">
               <Thermometer className="h-3 w-3" />
               {step.temperature_c !== null && `${step.temperature_c}°C`}
               {step.temperature_c !== null && step.internal_temp_c !== null && ' / '}
@@ -84,11 +80,7 @@ function StepRow({ step, isLast }: { step: RecipeStep; isLast: boolean }) {
           )}
         </div>
 
-        {step.notes && (
-          <p className="mt-1.5 text-[10px] italic text-slate-500">
-            {step.notes}
-          </p>
-        )}
+        {step.notes && <p className="mt-1.5 text-[10px] italic text-cream/45">{step.notes}</p>}
       </div>
     </div>
   )
@@ -130,7 +122,7 @@ export function ProcessTab({ nomenclatureId, steps: controlledSteps }: ProcessTa
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-xs text-slate-500">
+      <div className="flex flex-1 items-center justify-center text-xs text-cream/45">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         Loading process steps...
       </div>
@@ -139,7 +131,7 @@ export function ProcessTab({ nomenclatureId, steps: controlledSteps }: ProcessTa
 
   if (error) {
     return (
-      <div className="flex flex-1 items-center justify-center px-6 text-center text-xs text-rose-400">
+      <div className="flex flex-1 items-center justify-center px-6 text-center text-xs text-brick-bright">
         Failed to load process: {error}
       </div>
     )
@@ -147,7 +139,7 @@ export function ProcessTab({ nomenclatureId, steps: controlledSteps }: ProcessTa
 
   if (steps.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center px-6 text-center text-xs text-slate-500">
+      <div className="flex flex-1 items-center justify-center px-6 text-center text-xs text-cream/45">
         No process steps defined yet.
       </div>
     )
@@ -157,26 +149,24 @@ export function ProcessTab({ nomenclatureId, steps: controlledSteps }: ProcessTa
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Summary header */}
       {summary && (
-        <div className="border-b border-slate-800 px-4 py-3">
+        <div className="border-b border-[var(--line)] px-4 py-3">
           <div className="flex flex-wrap items-center gap-4 text-[11px]">
             <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-slate-400" />
-              <span className="text-slate-300">Total:</span>
-              <span className="font-medium text-slate-100">
-                {formatDuration(summary.totalMin)}
-              </span>
+              <Clock className="h-3.5 w-3.5 text-cream/60" />
+              <span className="text-cream/80">Total:</span>
+              <span className="font-medium text-cream">{formatDuration(summary.totalMin)}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Play className="h-3 w-3 text-amber-400" />
-              <span className="text-slate-300">Active:</span>
-              <span className="font-medium text-amber-200">
+              <Play className="h-3 w-3 text-amber-watch" />
+              <span className="text-cream/80">Active:</span>
+              <span className="font-medium text-amber-watch">
                 {formatDuration(summary.activeMin)}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Pause className="h-3 w-3 text-sky-400" />
-              <span className="text-slate-300">Passive:</span>
-              <span className="font-medium text-sky-200">
+              <Pause className="h-3 w-3 text-honey-300" />
+              <span className="text-cream/80">Passive:</span>
+              <span className="font-medium text-honey-300">
                 {formatDuration(summary.passiveMin)}
               </span>
             </div>
@@ -186,9 +176,9 @@ export function ProcessTab({ nomenclatureId, steps: controlledSteps }: ProcessTa
               {summary.equipment.map((eq) => (
                 <span
                   key={eq}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300"
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--line-strong)] bg-[var(--s-2)] px-2 py-0.5 text-[10px] text-cream/80"
                 >
-                  <Wrench className="h-2.5 w-2.5 text-slate-500" />
+                  <Wrench className="h-2.5 w-2.5 text-cream/45" />
                   {eq}
                 </span>
               ))}
@@ -204,7 +194,7 @@ export function ProcessTab({ nomenclatureId, steps: controlledSteps }: ProcessTa
         ))}
       </div>
 
-      <div className="border-t border-slate-800 px-4 py-2 text-[10px] text-slate-500">
+      <div className="border-t border-[var(--line)] px-4 py-2 text-[10px] text-cream/45">
         {steps.length} steps
       </div>
     </div>

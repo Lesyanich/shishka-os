@@ -144,10 +144,13 @@ function updateDishPrice(supa: SupabaseClient) {
         })
       }
 
-      const { error: updateErr } = await supa
-        .from('nomenclature')
-        .update({ price: new_price })
-        .eq('id', product.id as string)
+      // `price` column UPDATE is revoked from authenticated (column-level RLS) —
+      // route through the owner-gated SECURITY DEFINER RPC, which also audits the change.
+      const { error: updateErr } = await supa.rpc('fn_set_dish_price', {
+        p_id: product.id as string,
+        p_price: new_price,
+        p_reason: 'chef:update_dish_price',
+      })
 
       if (updateErr) return { status: 'error' as const, error: updateErr.message }
 

@@ -14,35 +14,35 @@ import {
 const TOPIC_EMOJI: Record<string, string> = {
   'admin-panel': '⚡',
   'mc-ui': '🎛️',
-  'kds': '📺',
-  'kitchen': '🍳',
-  'finance': '💰',
-  'procurement': '📦',
-  'receipt': '🧾',
-  'brain': '🧠',
-  'menu': '📖',
-  'schedule': '📅',
-  'bom': '🧱',
-  'ux': '🎨',
-  'ops': '⚙️',
-  'tech': '💻',
-  'marketing': '📢',
-  'sales': '💎',
-  'strategy': '🧭',
-  'security': '🔒',
-  'inventory': '📊',
-  'equipment': '🔧',
+  kds: '📺',
+  kitchen: '🍳',
+  finance: '💰',
+  procurement: '📦',
+  receipt: '🧾',
+  brain: '🧠',
+  menu: '📖',
+  schedule: '📅',
+  bom: '🧱',
+  ux: '🎨',
+  ops: '⚙️',
+  tech: '💻',
+  marketing: '📢',
+  sales: '💎',
+  strategy: '🧭',
+  security: '🔒',
+  inventory: '📊',
+  equipment: '🔧',
 }
 
 const AGENT_EMOJI: Record<string, string> = {
-  'lesia': '👑',
-  'bas': '👤',
+  lesia: '👑',
+  bas: '👤',
   'tech-lead': '🤖',
-  'coo': '🎯',
-  'code': '💻',
-  'chef': '👨‍🍳',
-  'finance': '💰',
-  'owner': '👑',
+  coo: '🎯',
+  code: '💻',
+  chef: '👨‍🍳',
+  finance: '💰',
+  owner: '👑',
 }
 
 function topicEmoji(key: string): string {
@@ -60,12 +60,12 @@ function agentEmoji(key: string): string {
 // ── Status breakdown ────────────────────────────────────────────────────────
 
 const STATUS_DOT_COLORS: Record<TaskStatus, string> = {
-  inbox: 'bg-slate-400',
-  backlog: 'bg-blue-400',
-  in_progress: 'bg-amber-400',
-  blocked: 'bg-red-400',
-  done: 'bg-emerald-400',
-  cancelled: 'bg-slate-600',
+  inbox: 'bg-[var(--s-3)]',
+  backlog: 'bg-honey-300',
+  in_progress: 'bg-amber-watch',
+  blocked: 'bg-[var(--color-royal-red)]',
+  done: 'bg-[var(--color-royal-soft)]',
+  cancelled: 'bg-[var(--s-3)]',
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -85,7 +85,7 @@ function StatusBreakdownBadges({ tasks }: { tasks: BusinessTask[] }) {
   if (entries.length === 0) return null
 
   return (
-    <span className="flex items-center gap-2 text-[10px] text-slate-500">
+    <span className="flex items-center gap-2 text-[10px] text-cream/45">
       {entries.map(([status, count]) => (
         <span key={status} className="inline-flex items-center gap-1">
           <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT_COLORS[status]}`} />
@@ -115,21 +115,23 @@ function GroupSection({
   const Icon = expanded ? ChevronDown : ChevronRight
 
   return (
-    <div className="rounded-xl border border-slate-800/40 bg-slate-900/20 overflow-hidden">
+    <div className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2.5 px-4 py-3 text-left hover:bg-slate-800/20 transition"
+        className="flex w-full items-center gap-2.5 px-4 py-3 text-left hover:bg-[var(--s-2)] transition"
       >
-        <span className="text-base leading-none" role="img">{emoji}</span>
-        <Icon className="h-4 w-4 text-slate-500 shrink-0" />
-        <span className="text-[13px] font-semibold text-slate-100 capitalize">{groupKey}</span>
-        <span className="rounded-full bg-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
+        <span className="text-base leading-none" role="img">
+          {emoji}
+        </span>
+        <Icon className="h-4 w-4 text-cream/45 shrink-0" />
+        <span className="text-[13px] font-semibold text-cream capitalize">{groupKey}</span>
+        <span className="rounded-full bg-[var(--s-3)] px-2 py-0.5 text-[10px] font-semibold text-cream/80">
           {tasks.length}
         </span>
         <StatusBreakdownBadges tasks={tasks} />
       </button>
       {expanded && (
-        <div className="space-y-1 px-4 pb-3 pt-1 border-t border-slate-800/20">
+        <div className="space-y-1 px-4 pb-3 pt-1 border-t border-[var(--line)]">
           {tasks.map((task) => renderItem(task))}
         </div>
       )}
@@ -155,15 +157,11 @@ export function GroupedTaskList({
   }, [tasks, groupBy])
 
   if (groupBy === 'none' || groupBy === 'project' || !groups) {
-    return (
-      <div className="space-y-2">
-        {tasks.map((task) => renderItem(task))}
-      </div>
-    )
+    return <div className="space-y-2">{tasks.map((task) => renderItem(task))}</div>
   }
 
   if (tasks.length === 0) {
-    return <p className="py-10 text-center text-sm text-slate-600">No tasks match this filter</p>
+    return <p className="py-10 text-center text-sm text-cream/30">No tasks match this filter</p>
   }
 
   const emojiFn = groupBy === 'agent' ? agentEmoji : topicEmoji

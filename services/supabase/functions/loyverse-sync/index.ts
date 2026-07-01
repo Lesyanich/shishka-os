@@ -18,9 +18,14 @@ const db = createClient(supabaseUrl, supabaseKey)
 const LOYVERSE_TOKEN = Deno.env.get("LOYVERSE_API_TOKEN") ?? ""
 const LOYVERSE_BASE = "https://api.loyverse.com/v1.0"
 
+// Server-to-server trigger secret. Set as an edge-function secret (same place as
+// LOYVERSE_API_TOKEN). Used only by the pg_cron push-queue drain, which reads the
+// matching value from supabase_vault and sends it in the x-internal-secret header.
+const INTERNAL_SECRET = Deno.env.get("LOYVERSE_INTERNAL_SECRET") ?? ""
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
 }
 
 function json(data: unknown, status = 200) {
@@ -163,6 +168,22 @@ async function handleDeleteItem(itemId: string) {
   }
 }
 
+// Delete by DISH id (queue action='delete'): resolve the dish's loyverse_item_id and
+// remove it from Loyverse (soft-delete; recoverable in Back Office), unlinking the DB row.
+async function handleDeleteDish(dishId: string) {
+  if (!dishId) return json({ ok: false, error: "dish_id required" }, 400)
+  const { data: dish, error } = await db
+    .from("nomenclature")
+    .select("id, name, loyverse_item_id")
+    .eq("id", dishId)
+    .single()
+  if (error || !dish) return json({ ok: false, error: error?.message ?? "dish not found" }, 404)
+  // deno-lint-ignore no-explicit-any
+  const d = dish as any
+  if (!d.loyverse_item_id) return json({ ok: true, skipped: true, dish: d.name, message: "not in Loyverse (already unlinked)" })
+  return await handleDeleteItem(d.loyverse_item_id)
+}
+
 async function handleRecreateItem(req: Request) {
   const body = await req.json()
   if (!body.dish_id) return json({ ok: false, error: "dish_id required" }, 400)
@@ -171,7 +192,7 @@ async function handleRecreateItem(req: Request) {
 
   const { data: dish, error: dishErr } = await db
     .from("nomenclature")
-    .select("id, name, staff_code, customer_short_name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
+    .select("id, name, product_code, staff_code, customer_short_name, price, loyverse_item_id, customer_description, image_url, customer_photo_url, product_categories!category_id(loyverse_category_id)")
     .eq("id", body.dish_id)
     .single()
   if (dishErr || !dish) return json({ ok: false, error: dishErr?.message ?? "dish not found" }, 404)
@@ -193,6 +214,7 @@ async function handleRecreateItem(req: Request) {
       variant_name: "Regular",
       default_pricing_type: "FIXED",
       default_price: price,
+      sku: d.product_code ?? undefined,
       stores: [{ store_id: storeId, pricing_type: "FIXED", price, available_for_sale: true }],
     }],
   }
@@ -342,7 +364,7 @@ async function handlePushDish(dishId: string) {
 
   const { data: dishRow, error: dishErr } = await db
     .from("nomenclature")
-    .select("id, name, loyverse_item_id, category_id, product_categories!category_id(loyverse_category_id)")
+    .select("id, name, product_code, loyverse_item_id, category_id, product_categories!category_id(loyverse_category_id)")
     .eq("id", dishId)
     .single()
   if (dishErr) return json({ ok: false, error: dishErr.message }, 500)
@@ -350,6 +372,8 @@ async function handlePushDish(dishId: string) {
   const linkedCategoryId = (dishRow as any).product_categories?.loyverse_category_id ?? null
   // deno-lint-ignore no-explicit-any
   let loyverseItemId = (dishRow as any).loyverse_item_id
+  // deno-lint-ignore no-explicit-any
+  const productCode = (dishRow as any).product_code as string | null
 
   const logId = await logStart("dish_push", 1)
   try {
@@ -399,6 +423,13 @@ async function handlePushDish(dishId: string) {
       if (rpc.payload.image_url) itemBody.image_url = rpc.payload.image_url
     }
 
+    // Stamp a stable, unique SKU = product_code on the single variant. Prevents
+    // Loyverse from auto-assigning the SAME numeric SKU to items created concurrently
+    // (the dup-10126 bug on the 5 Thai teas). Overrides any existing auto-SKU on update.
+    if (productCode && Array.isArray(itemBody.variants) && (itemBody.variants as unknown[]).length === 1) {
+      // deno-lint-ignore no-explicit-any
+      ;((itemBody.variants as any[])[0]).sku = productCode
+    }
     const result = await loyversePost("/items", itemBody)
     loyverseItemId = result.id ?? loyverseItemId
     if (loyverseItemId) {
@@ -923,6 +954,64 @@ async function handlePullItemsStatus() {
   return json({ ok: true, total: rows.length, with_photo: withPhoto, deleted, failed_chunks: failedChunks })
 }
 
+// Targeted, per-dish modifier sync: set ONE dish's Loyverse modifier_ids to its
+// dish_modifier_groups in the DB (UUID-valid lists only; WEB sentinels skipped).
+// Unlike push_modifiers' global reattachAllDishes(), this touches only the named
+// dish — safe to run autonomously from the push queue (action='modifiers'). The DB
+// is the source of truth, so an empty group set clears the dish's POS modifiers.
+async function handlePushDishModifiers(dishId: string) {
+  if (!dishId) return json({ ok: false, error: "dish_id required" }, 400)
+  const { data: dish, error: dishErr } = await db
+    .from("nomenclature")
+    .select("id, name, loyverse_item_id")
+    .eq("id", dishId)
+    .single()
+  if (dishErr || !dish) return json({ ok: false, error: dishErr?.message ?? "dish not found" }, 404)
+  // deno-lint-ignore no-explicit-any
+  const d = dish as any
+  if (!d.loyverse_item_id) return json({ ok: false, error: "dish not synced yet (no loyverse_item_id)" }, 400)
+
+  const { data: dmgRows } = await db
+    .from("dish_modifier_groups")
+    .select("loyverse_modifier_list_id")
+    .eq("dish_id", dishId)
+  const rawCount = (dmgRows ?? []).length
+  const listIds = (dmgRows ?? [])
+    .map((r: { loyverse_modifier_list_id: string }) => r.loyverse_modifier_list_id)
+    .filter(isLoyverseModifierId)
+
+  // Safety: if the dish has ONLY web-only sentinel groups (e.g. WEB-DIP-BREAD on the
+  // dips) and no real Loyverse-UUID group, pushing would set modifier_ids=[] and CLEAR
+  // the dish's real Loyverse modifier (which the DB tracks only as a web sentinel).
+  // Skip rather than clobber. A dish with genuinely zero groups (rawCount=0) still syncs.
+  if (rawCount > 0 && listIds.length === 0) {
+    return json({ ok: true, skipped: true, dish: d.name, message: "web-only modifier sentinels only — skipped to avoid clearing the dish's real Loyverse modifiers" })
+  }
+
+  const logId = await logStart("dish_modifiers_push", 1)
+  try {
+    const current = await loyverseGet(`/items/${d.loyverse_item_id}`)
+    const before: string[] = current.modifier_ids ?? current.modifiers_ids ?? []
+    const itemBody: Record<string, unknown> = {
+      id: d.loyverse_item_id,
+      item_name: current.item_name,
+      variants: current.variants,
+      modifier_ids: listIds,
+    }
+    if (current.category_id) itemBody.category_id = current.category_id
+    if (current.description) itemBody.description = current.description
+    if (current.image_url) itemBody.image_url = current.image_url
+    const result = await loyversePost("/items", itemBody)
+    await db.from("nomenclature").update({ loyverse_synced_at: new Date().toISOString() }).eq("id", dishId)
+    await logFinish(logId, "success", 1, 0)
+    return json({ ok: true, dish: d.name, loyverse_item_id: result.id, before, after: listIds })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    await logFinish(logId, "error", 0, 1, msg)
+    return json({ ok: false, error: msg }, 502)
+  }
+}
+
 // ── Auth guard ──────────────────────────────────────────────
 // loyverse-sync runs with the service-role key (full RLS bypass) and is
 // deployed with verify_jwt:false. Every real caller is an admin-panel hook
@@ -942,9 +1031,77 @@ async function isAuthedUser(req: Request): Promise<boolean> {
   }
 }
 
+// ── Server-to-server guard ──────────────────────────────────
+// The pg_cron push-queue drain (migration 334) calls us with the shared secret in
+// the x-internal-secret header. No Supabase user is involved. Fails closed when the
+// secret is unset (never matches "") and uses a constant-time compare.
+function isInternalCall(req: Request): boolean {
+  if (!INTERNAL_SECRET) return false
+  const got = req.headers.get("x-internal-secret") ?? ""
+  if (got.length !== INTERNAL_SECRET.length) return false
+  let diff = 0
+  for (let i = 0; i < got.length; i++) diff |= got.charCodeAt(i) ^ INTERNAL_SECRET.charCodeAt(i)
+  return diff === 0
+}
+
+// Drain one loyverse_push_queue row: dispatch to the existing push handler, then
+// write the row's terminal state back (net.http_post is fire-and-forget, so the
+// cron caller can't read our response — we record the outcome ourselves).
+async function handleInternalPush(req: Request) {
+  let body: { queue_id?: string; action?: string; target_id?: string | null }
+  try {
+    body = await req.json()
+  } catch {
+    return json({ ok: false, error: "invalid JSON body" }, 400)
+  }
+  const queueId = body.queue_id ?? ""
+  const act = body.action ?? ""
+  const targetId = body.target_id ?? ""
+  if (!queueId) return json({ ok: false, error: "queue_id required" }, 400)
+
+  let resp: Response
+  switch (act) {
+    case "dish":
+      resp = await handlePushDish(targetId)
+      break
+    case "prices":
+      resp = await handleReconcilePrices()
+      break
+    case "names":
+      resp = await handleResyncNames()
+      break
+    case "modifiers":
+      // Targeted per-dish modifier attachment sync (NOT the global reattach).
+      resp = await handlePushDishModifiers(targetId)
+      break
+    case "delete":
+      // Remove the dish's item from Loyverse (soft-delete) + unlink the DB row.
+      resp = await handleDeleteDish(targetId)
+      break
+    default:
+      resp = json({ ok: false, error: `unsupported queue action: ${act || "(empty)"}` }, 400)
+  }
+
+  let parsed: Record<string, unknown> = {}
+  try {
+    parsed = await resp.clone().json()
+  } catch {
+    parsed = { ok: false, error: "non-JSON handler response" }
+  }
+  const ok = parsed.ok === true
+  await db.from("loyverse_push_queue").update({
+    status: ok ? "done" : "error",
+    result: parsed,
+    error_message: ok ? null : (typeof parsed.error === "string" ? parsed.error : "unknown"),
+    processed_at: new Date().toISOString(),
+  }).eq("id", queueId)
+
+  return resp
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
-  if (!(await isAuthedUser(req))) return json({ ok: false, error: "unauthorized" }, 401)
+  if (!isInternalCall(req) && !(await isAuthedUser(req))) return json({ ok: false, error: "unauthorized" }, 401)
   try {
     if (!LOYVERSE_TOKEN) return json({ ok: false, error: "LOYVERSE_API_TOKEN not set" }, 500)
     const url = new URL(req.url)
@@ -952,12 +1109,23 @@ Deno.serve(async (req) => {
     switch (action) {
       case "status":
         return await handleStatus()
+      case "internal_push": {
+        // Server-to-server only — the push-queue drain. Re-check the secret so a
+        // browser session JWT (which passed the gate above) can never reach this.
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        if (!isInternalCall(req)) return json({ ok: false, error: "unauthorized" }, 401)
+        return await handleInternalPush(req)
+      }
       case "categories":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handleCategories()
       case "push_dish": {
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
         return await handlePushDish(url.searchParams.get("dish_id") ?? "")
+      }
+      case "push_dish_modifiers": {
+        if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)
+        return await handlePushDishModifiers(url.searchParams.get("dish_id") ?? "")
       }
       case "reconcile_prices":
         if (req.method !== "POST") return json({ ok: false, error: "POST required" }, 405)

@@ -1,13 +1,20 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, PackageCheck } from 'lucide-react'
 import type { InventoryItem } from '../../hooks/useInventory'
+import type { Location } from '../../hooks/useLocations'
 
 interface ZeroDayStocktakeProps {
   items: InventoryItem[]
   isLoading: boolean
   error: string | null
-  onSave: (nomenclatureId: string, quantity: number) => Promise<{ ok: boolean; error?: string }>
+  onSave: (
+    nomenclatureId: string,
+    quantity: number,
+    opts: { locationId?: string; unit?: string | null },
+  ) => Promise<{ ok: boolean; error?: string }>
   onRefetch: () => void
+  /** Warehouses the count can be recorded against (W2: count → fn_apply_stocktake). */
+  locations: Location[]
 }
 
 export function ZeroDayStocktake({
@@ -16,11 +23,23 @@ export function ZeroDayStocktake({
   error,
   onSave,
   onRefetch,
+  locations,
 }: ZeroDayStocktakeProps) {
   const [editValues, setEditValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({})
   const [filter, setFilter] = useState('')
+  // Which warehouse the counts apply to. Default to Storage (raw store), where most
+  // tracked SKUs live; the counter switches to Kitchen/Assembly when standing there.
+  const [stationId, setStationId] = useState('')
+  const stations = locations.filter((l) => l.type !== 'delivery')
+  useEffect(() => {
+    if (stationId) return
+    const avail = locations.filter((l) => l.type !== 'delivery')
+    if (avail.length === 0) return
+    const def = avail.find((l) => l.type === 'storage') ?? avail[0]
+    setStationId(def.id)
+  }, [locations, stationId])
   // Synchronous re-entrancy guard (React `saving` state lags a render) and a
   // flag to skip the save that Escape's blur would otherwise trigger.
   const savingRef = useRef<Set<string>>(new Set())
@@ -55,7 +74,10 @@ export function ZeroDayStocktake({
         return next
       })
 
-      const result = await onSave(id, qty)
+      const result = await onSave(id, qty, {
+        locationId: stationId || undefined,
+        unit: item.base_unit,
+      })
       savingRef.current.delete(id)
 
       if (!result.ok) {
@@ -71,7 +93,7 @@ export function ZeroDayStocktake({
 
       setSaving((prev) => ({ ...prev, [id]: false }))
     },
-    [editValues, onSave, onRefetch],
+    [editValues, onSave, onRefetch, stationId],
   )
 
   if (error) {
@@ -109,6 +131,33 @@ export function ZeroDayStocktake({
           className="w-40 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-emerald-500"
         />
       </div>
+
+      {/* Station selector — the count is recorded against this warehouse (W2) */}
+      {stations.length > 0 && (
+        <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-2">
+          <span className="text-[11px] uppercase tracking-wide text-slate-500">Station</span>
+          <div className="flex gap-1">
+            {stations.map((loc) => {
+              const active = loc.id === stationId
+              return (
+                <button
+                  key={loc.id}
+                  type="button"
+                  onClick={() => setStationId(loc.id)}
+                  className={[
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                    active
+                      ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40'
+                      : 'text-slate-400 hover:bg-slate-800',
+                  ].join(' ')}
+                >
+                  {loc.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="max-h-[400px] overflow-y-auto">

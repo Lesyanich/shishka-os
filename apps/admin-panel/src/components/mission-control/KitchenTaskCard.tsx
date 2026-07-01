@@ -8,24 +8,28 @@ type Category = 'prep' | 'service' | 'cleaning' | 'order' | 'other'
 
 interface CategoryConfig {
   label: string
-  accent: string        // left bar color class
-  badge: string         // badge bg+text classes
+  accent: string // left bar color class
+  badge: string // badge bg+text classes
 }
 
 const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
-  prep:     { label: 'Prep',     accent: 'bg-orange-500',  badge: 'bg-orange-500/15 text-orange-300' },
-  service:  { label: 'Service',  accent: 'bg-emerald-500', badge: 'bg-emerald-500/15 text-emerald-300' },
-  cleaning: { label: 'Cleaning', accent: 'bg-blue-500',    badge: 'bg-blue-500/15 text-blue-300' },
-  order:    { label: 'Orders',   accent: 'bg-violet-500',  badge: 'bg-violet-500/15 text-violet-300' },
-  other:    { label: 'Other',    accent: 'bg-slate-500',   badge: 'bg-slate-500/15 text-slate-300' },
+  prep: { label: 'Prep', accent: 'bg-amber-watch', badge: 'bg-amber-watch/15 text-amber-watch' },
+  service: {
+    label: 'Service',
+    accent: 'bg-[var(--color-royal-soft)]',
+    badge: 'bg-forest-soft/15 text-mint-200',
+  },
+  cleaning: { label: 'Cleaning', accent: 'bg-honey-300', badge: 'bg-honey-300/15 text-honey-300' },
+  order: { label: 'Orders', accent: 'bg-brick-soft', badge: 'bg-brick-soft/15 text-brick-bright' },
+  other: { label: 'Other', accent: 'bg-[var(--s-3)]', badge: 'bg-[var(--s-3)] text-cream/80' },
 }
 
 function detectCategory(tags: string[]): Category {
-  const lower = tags.map(t => t.toLowerCase())
-  if (lower.includes('prep'))     return 'prep'
-  if (lower.includes('service'))  return 'service'
+  const lower = tags.map((t) => t.toLowerCase())
+  if (lower.includes('prep')) return 'prep'
+  if (lower.includes('service')) return 'service'
   if (lower.includes('cleaning')) return 'cleaning'
-  if (lower.includes('order'))    return 'order'
+  if (lower.includes('order')) return 'order'
   return 'other'
 }
 
@@ -48,11 +52,11 @@ function assigneeInitial(assignedTo: string | null): string {
 }
 
 function assigneeBg(assignedTo: string | null): string {
-  if (!assignedTo) return 'bg-slate-700 text-slate-400'
+  if (!assignedTo) return 'bg-[var(--s-3)] text-cream/60'
   const key = assignedTo.toLowerCase()
-  if (key === 'lesia') return 'bg-emerald-500/20 text-emerald-300'
-  if (key === 'bas')   return 'bg-cyan-500/20 text-cyan-300'
-  return 'bg-slate-600/40 text-slate-300'
+  if (key === 'lesia') return 'bg-forest-soft/20 text-mint-200'
+  if (key === 'bas') return 'bg-honey-300/20 text-honey-300'
+  return 'bg-[var(--s-3)] text-cream/80'
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -70,7 +74,7 @@ export function KitchenTaskCard({ task, onClick }: KitchenTaskCardProps) {
   const category = detectCategory(task.tags)
   const config = CATEGORY_CONFIG[category]
   const timeStr = formatTime(task.due_date)
-  const isRecurring = task.tags.map(t => t.toLowerCase()).includes('recurring')
+  const isRecurring = task.tags.map((t) => t.toLowerCase()).includes('recurring')
   const avatarColors = assigneeBg(task.assigned_to)
 
   return (
@@ -78,14 +82,16 @@ export function KitchenTaskCard({ task, onClick }: KitchenTaskCardProps) {
       role="button"
       tabIndex={0}
       onClick={() => onClick?.(task)}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onClick?.(task) }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClick?.(task)
+      }}
       className={[
         'relative flex flex-col gap-2 cursor-pointer select-none',
-        'rounded-xl border border-slate-800/50 bg-slate-900/60',
+        'rounded-xl border border-[var(--line)] bg-[var(--s-1)]',
         'px-4 py-3 pl-5 overflow-hidden',
         'transition-all duration-150',
         'hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri-fat/40',
         done ? 'opacity-50' : '',
       ].join(' ')}
     >
@@ -94,14 +100,16 @@ export function KitchenTaskCard({ task, onClick }: KitchenTaskCardProps) {
 
       {/* Row 1: title + time */}
       <div className="flex items-start justify-between gap-2">
-        <p className={[
-          'line-clamp-2 text-sm font-medium leading-snug flex-1',
-          done ? 'line-through text-slate-500' : 'text-slate-100',
-        ].join(' ')}>
+        <p
+          className={[
+            'line-clamp-2 text-sm font-medium leading-snug flex-1',
+            done ? 'line-through text-cream/45' : 'text-cream',
+          ].join(' ')}
+        >
           {task.title}
         </p>
         {timeStr && (
-          <span className="shrink-0 rounded-full bg-slate-800/80 px-2 py-0.5 font-mono text-[10px] text-slate-400">
+          <span className="shrink-0 rounded-full bg-[var(--s-2)] px-2 py-0.5 font-mono text-[10px] text-cream/60">
             {timeStr}
           </span>
         )}
@@ -113,7 +121,7 @@ export function KitchenTaskCard({ task, onClick }: KitchenTaskCardProps) {
           {config.label}
         </span>
         {isRecurring && (
-          <span className="rounded-full bg-slate-700/60 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+          <span className="rounded-full bg-[var(--s-3)] px-2 py-0.5 text-[10px] font-medium text-cream/60">
             Recurring
           </span>
         )}
@@ -122,13 +130,15 @@ export function KitchenTaskCard({ task, onClick }: KitchenTaskCardProps) {
       {/* Bottom row: assignee + checkbox */}
       <div className="flex items-center gap-2 mt-auto pt-0.5">
         {/* Avatar */}
-        <span className={[
-          'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0',
-          avatarColors,
-        ].join(' ')}>
+        <span
+          className={[
+            'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0',
+            avatarColors,
+          ].join(' ')}
+        >
           {assigneeInitial(task.assigned_to)}
         </span>
-        <span className="flex-1 truncate text-[11px] text-slate-400">
+        <span className="flex-1 truncate text-[11px] text-cream/60">
           {task.assigned_to ?? 'Unassigned'}
         </span>
 
@@ -136,15 +146,15 @@ export function KitchenTaskCard({ task, onClick }: KitchenTaskCardProps) {
         <button
           type="button"
           aria-label={done ? 'Mark as not done' : 'Mark as done'}
-          onClick={e => {
+          onClick={(e) => {
             e.stopPropagation()
-            setDone(prev => !prev)
+            setDone((prev) => !prev)
           }}
           className={[
             'flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors duration-150',
             done
-              ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-400'
-              : 'border-slate-700/60 bg-transparent text-transparent hover:border-slate-500',
+              ? 'border-forest-soft/50 bg-forest-soft/20 text-mint-200'
+              : 'border-[var(--line-strong)] bg-transparent text-transparent hover:border-[var(--line-strong)]',
           ].join(' ')}
         >
           <Check className="h-3 w-3" />

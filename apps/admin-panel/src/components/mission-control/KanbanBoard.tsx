@@ -20,17 +20,22 @@ import {
   Calendar,
   ChevronRight,
 } from 'lucide-react'
-import type { BusinessTask, TaskDomain, TaskStatus, TaskPriority } from '../../hooks/useBusinessTasks'
+import type {
+  BusinessTask,
+  TaskDomain,
+  TaskStatus,
+  TaskPriority,
+} from '../../hooks/useBusinessTasks'
 
 // ── Tag colors ──
 
 const TAG_COLORS: Record<string, string> = {
-  'has-spec': 'bg-emerald-900/40 text-emerald-400 border-emerald-500/30',
-  'blocked': 'bg-red-900/40 text-red-400 border-red-500/30',
-  'needs-hardware': 'bg-yellow-900/40 text-yellow-400 border-yellow-500/30',
-  'quick-win': 'bg-blue-900/40 text-blue-400 border-blue-500/30',
+  'has-spec': 'bg-forest-soft/40 text-mint-200 border-forest-soft/30',
+  blocked: 'bg-brick-soft/40 text-brick-bright border-brick-soft/30',
+  'needs-hardware': 'bg-amber-watch/40 text-amber-watch border-amber-watch/30',
+  'quick-win': 'bg-honey-300/40 text-honey-300 border-honey-300/30',
 }
-const DEFAULT_TAG_COLOR = 'bg-slate-800 text-slate-500 border-slate-700/50'
+const DEFAULT_TAG_COLOR = 'bg-[var(--s-2)] text-cream/45 border-[var(--line-strong)]'
 
 // ── Column config ──
 
@@ -48,41 +53,41 @@ const KANBAN_COLUMNS: ColumnDef[] = [
     status: 'inbox',
     label: 'Inbox',
     icon: Inbox,
-    borderColor: 'border-slate-500/30',
-    dotColor: 'bg-slate-400',
-    badgeColor: 'bg-slate-500/10 text-slate-300 border-slate-500/20',
+    borderColor: 'border-[var(--line-strong)]',
+    dotColor: 'bg-[var(--s-3)]',
+    badgeColor: 'bg-[var(--s-3)] text-cream/80 border-[var(--line-strong)]',
   },
   {
     status: 'backlog',
     label: 'Backlog',
     icon: ListTodo,
-    borderColor: 'border-blue-500/30',
-    dotColor: 'bg-blue-400',
-    badgeColor: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
+    borderColor: 'border-honey-300/30',
+    dotColor: 'bg-honey-300',
+    badgeColor: 'bg-honey-300/10 text-honey-300 border-honey-300/20',
   },
   {
     status: 'in_progress',
     label: 'In Progress',
     icon: PlayCircle,
-    borderColor: 'border-amber-500/30',
-    dotColor: 'bg-amber-400 animate-pulse',
-    badgeColor: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
+    borderColor: 'border-amber-watch/30',
+    dotColor: 'bg-amber-watch animate-pulse',
+    badgeColor: 'bg-amber-watch/10 text-amber-watch border-amber-watch/20',
   },
   {
     status: 'blocked',
     label: 'Blocked',
     icon: Ban,
-    borderColor: 'border-red-500/30',
-    dotColor: 'bg-red-400',
-    badgeColor: 'bg-red-500/10 text-red-300 border-red-500/20',
+    borderColor: 'border-brick-soft/30',
+    dotColor: 'bg-[var(--color-royal-red)]',
+    badgeColor: 'bg-brick-soft/10 text-brick-bright border-brick-soft/20',
   },
   {
     status: 'done',
     label: 'Done',
     icon: CheckCircle2,
-    borderColor: 'border-emerald-500/30',
-    dotColor: 'bg-emerald-400',
-    badgeColor: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
+    borderColor: 'border-forest-soft/30',
+    dotColor: 'bg-[var(--color-royal-soft)]',
+    badgeColor: 'bg-forest-soft/10 text-mint-200 border-forest-soft/20',
   },
 ]
 
@@ -98,21 +103,32 @@ const DOMAIN_ICONS: Record<TaskDomain, typeof ChefHat> = {
 }
 
 const DOMAIN_DOT_COLORS: Record<TaskDomain, string> = {
-  kitchen: 'bg-orange-400',
-  procurement: 'bg-blue-400',
-  finance: 'bg-emerald-400',
-  marketing: 'bg-pink-400',
-  ops: 'bg-yellow-400',
-  sales: 'bg-violet-400',
-  strategy: 'bg-cyan-400',
-  tech: 'bg-slate-400',
+  kitchen: 'bg-nutri-fat',
+  procurement: 'bg-amber-watch',
+  finance: 'bg-forest-soft',
+  marketing: 'bg-nutri-car',
+  ops: 'bg-honey-300',
+  sales: 'bg-brick-soft',
+  strategy: 'bg-honey-600',
+  tech: 'bg-nutri-pro',
 }
 
-const PRIORITY_ICONS: Record<TaskPriority, { icon: typeof AlertTriangle; color: string; badgeColor: string }> = {
-  critical: { icon: AlertTriangle, color: 'text-red-400', badgeColor: 'bg-red-900/30 text-red-400' },
-  high: { icon: ArrowUp, color: 'text-orange-400', badgeColor: 'bg-orange-900/30 text-orange-400' },
-  medium: { icon: Minus, color: 'text-blue-400', badgeColor: 'bg-blue-900/30 text-blue-400' },
-  low: { icon: ArrowDown, color: 'text-gray-400', badgeColor: 'bg-gray-800 text-gray-400' },
+const PRIORITY_ICONS: Record<
+  TaskPriority,
+  { icon: typeof AlertTriangle; color: string; badgeColor: string }
+> = {
+  critical: {
+    icon: AlertTriangle,
+    color: 'text-brick-bright',
+    badgeColor: 'bg-brick-soft/30 text-brick-bright',
+  },
+  high: {
+    icon: ArrowUp,
+    color: 'text-amber-watch',
+    badgeColor: 'bg-amber-watch/25 text-amber-watch',
+  },
+  medium: { icon: Minus, color: 'text-honey-300', badgeColor: 'bg-honey-300/30 text-honey-300' },
+  low: { icon: ArrowDown, color: 'text-cream/60', badgeColor: 'bg-[var(--s-2)] text-cream/60' },
 }
 
 // ── Status transition: next logical status ──
@@ -145,19 +161,21 @@ function KanbanCard({
   return (
     <div
       onClick={() => onOpenDetail(task)}
-      className="group cursor-pointer rounded-lg border border-slate-800 bg-slate-900/60 p-3 transition hover:border-slate-700 hover:bg-slate-900/90"
+      className="group cursor-pointer rounded-lg border border-[var(--line)] bg-[var(--s-1)] p-3 transition hover:border-[var(--line-strong)] hover:bg-[var(--s-2)]"
     >
       {/* Top row: priority badge + title */}
       <div className="flex items-start gap-2">
-        <span className={`mt-0.5 inline-flex shrink-0 rounded p-0.5 ${PRIORITY_ICONS[task.priority].badgeColor}`}>
+        <span
+          className={`mt-0.5 inline-flex shrink-0 rounded p-0.5 ${PRIORITY_ICONS[task.priority].badgeColor}`}
+        >
           <PriorityIcon className="h-3 w-3" />
         </span>
-        <p className="text-xs font-medium leading-snug text-slate-200 line-clamp-2">{task.title}</p>
+        <p className="text-xs font-medium leading-snug text-cream line-clamp-2">{task.title}</p>
       </div>
 
       {/* Description */}
       {task.description && (
-        <p className="mt-1 pl-5 text-[11px] text-slate-500 line-clamp-1">{task.description}</p>
+        <p className="mt-1 pl-5 text-[11px] text-cream/45 line-clamp-1">{task.description}</p>
       )}
 
       {/* Tags */}
@@ -172,7 +190,7 @@ function KanbanCard({
             </span>
           ))}
           {task.tags.length > 3 && (
-            <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-500">
+            <span className="rounded-full bg-[var(--s-2)] px-1.5 py-0.5 text-[9px] text-cream/45">
               +{task.tags.length - 3}
             </span>
           )}
@@ -182,20 +200,23 @@ function KanbanCard({
       {/* Bottom row: domain + assigned + move button */}
       <div className="mt-2.5 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+          <span className="inline-flex items-center gap-1 text-[10px] text-cream/60">
             <span className={`h-1.5 w-1.5 rounded-full ${domainDot}`} />
             <DomainIcon className="h-2.5 w-2.5" />
           </span>
           {task.assigned_to && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500">
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-cream/45">
               <User className="h-2.5 w-2.5" />
               {task.assigned_to}
             </span>
           )}
           {task.due_date && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500">
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-cream/45">
               <Calendar className="h-2.5 w-2.5" />
-              {new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+              {new Date(task.due_date).toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'short',
+              })}
             </span>
           )}
         </div>
@@ -208,7 +229,7 @@ function KanbanCard({
               onMoveForward(task.id, nextStatus)
             }}
             title={`Move to ${nextStatus.replace('_', ' ')}`}
-            className="rounded p-0.5 text-slate-600 opacity-0 transition hover:bg-slate-800 hover:text-emerald-400 group-hover:opacity-100"
+            className="rounded p-0.5 text-cream/30 opacity-0 transition hover:bg-[var(--s-2)] hover:text-mint-200 group-hover:opacity-100"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
@@ -222,9 +243,9 @@ function KanbanCard({
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse rounded-lg border border-slate-800 bg-slate-900/50 p-3">
-      <div className="mb-2 h-3 w-3/4 rounded bg-slate-800" />
-      <div className="h-2.5 w-1/2 rounded bg-slate-800" />
+    <div className="animate-pulse rounded-lg border border-[var(--line)] bg-[var(--s-1)] p-3">
+      <div className="mb-2 h-3 w-3/4 rounded bg-[var(--s-2)]" />
+      <div className="h-2.5 w-1/2 rounded bg-[var(--s-2)]" />
     </div>
   )
 }
@@ -240,7 +261,14 @@ interface KanbanBoardProps {
   activeStatus?: TaskStatus | null
 }
 
-export function KanbanBoard({ tasks, isLoading, onMoveTask, onOpenDetail, showDone, activeStatus }: KanbanBoardProps) {
+export function KanbanBoard({
+  tasks,
+  isLoading,
+  onMoveTask,
+  onOpenDetail,
+  showDone,
+  activeStatus,
+}: KanbanBoardProps) {
   const byStatus: Record<string, BusinessTask[]> = {}
   for (const task of tasks) {
     const s = task.status
@@ -255,11 +283,12 @@ export function KanbanBoard({ tasks, isLoading, onMoveTask, onOpenDetail, showDo
     return true
   })
 
-  const gridCols = visibleColumns.length <= 3
-    ? 'md:grid-cols-3'
-    : visibleColumns.length === 4
-      ? 'md:grid-cols-2 lg:grid-cols-4'
-      : 'md:grid-cols-3 lg:grid-cols-5'
+  const gridCols =
+    visibleColumns.length <= 3
+      ? 'md:grid-cols-3'
+      : visibleColumns.length === 4
+        ? 'md:grid-cols-2 lg:grid-cols-4'
+        : 'md:grid-cols-3 lg:grid-cols-5'
 
   return (
     <div className={`grid grid-cols-1 gap-3 ${gridCols}`}>
@@ -270,13 +299,17 @@ export function KanbanBoard({ tasks, isLoading, onMoveTask, onOpenDetail, showDo
         return (
           <div key={col.status} className="flex flex-col gap-2">
             {/* Column header */}
-            <div className={`flex items-center justify-between rounded-lg border ${col.borderColor} bg-slate-900/50 px-3 py-2`}>
+            <div
+              className={`flex items-center justify-between rounded-lg border ${col.borderColor} bg-[var(--s-1)] px-3 py-2`}
+            >
               <div className="flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${col.dotColor}`} />
-                <Icon className="h-3.5 w-3.5 text-slate-400" />
-                <span className="text-xs font-medium text-slate-200">{col.label}</span>
+                <Icon className="h-3.5 w-3.5 text-cream/60" />
+                <span className="text-xs font-medium text-cream">{col.label}</span>
               </div>
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${col.badgeColor}`}>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${col.badgeColor}`}
+              >
                 {isLoading ? '-' : colTasks.length}
               </span>
             </div>
@@ -289,9 +322,7 @@ export function KanbanBoard({ tasks, isLoading, onMoveTask, onOpenDetail, showDo
                   <SkeletonCard />
                 </>
               ) : colTasks.length === 0 ? (
-                <p className="px-2 py-6 text-center text-[11px] text-slate-600">
-                  Empty
-                </p>
+                <p className="px-2 py-6 text-center text-[11px] text-cream/30">Empty</p>
               ) : (
                 colTasks.map((task) => (
                   <KanbanCard
