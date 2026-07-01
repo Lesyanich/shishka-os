@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Search, X } from 'lucide-react'
 import type { MenuItem, MenuBomChild } from '../../../hooks/useMenuData'
 import type { MenuCategory, MenuSubcategory } from '../../../hooks/useMenuDishes'
 import type { useMenuListEnrichment } from '../../../hooks/useMenuListEnrichment'
@@ -44,6 +45,9 @@ export interface RecipeStationPanelProps {
   onSelectCategory: (id: string | null) => void
   selectedSubcategory: string | null
   onSelectSubcategory: (id: string | null) => void
+  /** Free-text name search — narrows the station's cards by dish name. */
+  searchQuery?: string
+  onSearchQuery?: (q: string) => void
   /** Cook mode: hide cost/margin, disable editing, show comment button. */
   staffMode?: boolean
   onOpenDish?: (id: string) => void
@@ -74,6 +78,8 @@ export function RecipeStationPanel({
   onSelectCategory,
   selectedSubcategory,
   onSelectSubcategory,
+  searchQuery = '',
+  onSearchQuery,
   staffMode,
   onOpenDish,
   onReorder,
@@ -152,6 +158,28 @@ export function RecipeStationPanel({
             </button>
           ))}
         </div>
+        {onSearchQuery && (
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream/40" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchQuery(e.target.value)}
+              placeholder="Search by name…"
+              className="w-56 rounded-lg border border-surface-3 bg-surface-1 py-1.5 pl-8 pr-7 text-xs text-cream placeholder:text-cream/35 focus:outline-none focus:ring-1 focus:ring-forest-soft"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => onSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-cream/40 hover:text-cream/70"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Data-driven section chips */}
@@ -180,6 +208,7 @@ export function RecipeStationPanel({
           typeFilter={typeFilter}
           selectedCategory={selectedCategory}
           selectedSubcategory={selectedSubcategory}
+          searchQuery={searchQuery}
           availableFilter={availableFilter}
           pfPackCardById={enrichment.pfPackCardById}
           recipeStatsById={enrichment.recipeStatsById}
@@ -197,6 +226,7 @@ export function RecipeStationPanel({
           typeFilter={typeFilter}
           selectedCategory={selectedCategory}
           selectedSubcategory={selectedSubcategory}
+          searchQuery={searchQuery}
           availableFilter={availableFilter}
           dishCardById={enrichment.dishCardById}
           componentsByDish={enrichment.componentsByDish}

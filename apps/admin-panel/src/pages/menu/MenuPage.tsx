@@ -155,6 +155,23 @@ export function MenuPage() {
     [updateParam],
   )
 
+  // L1/L2 station name search (?q=) — shareable/refresh-safe like the other filters.
+  // Uses history replace (not push) so every keystroke doesn't spam the back button.
+  const searchQuery = searchParams.get('q') ?? ''
+  const setSearchQuery = useCallback(
+    (q: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (q) next.set('q', q); else next.delete('q')
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
+
   // Availability filter for L1 Cook view (URL-driven: ?available=yes|no)
   const availableParam = searchParams.get('available')
   const availableFilter: boolean | null =
@@ -464,6 +481,8 @@ export function MenuPage() {
           onSelectCategory={setSelectedCategory}
           selectedSubcategory={selectedSubcategory}
           onSelectSubcategory={setSelectedSubcategory}
+          searchQuery={searchQuery}
+          onSearchQuery={setSearchQuery}
           onOpenDish={openDrawer}
           onReorder={reorderItems}
         />
@@ -484,6 +503,8 @@ export function MenuPage() {
           onSelectCategory={setSelectedCategory}
           selectedSubcategory={selectedSubcategory}
           onSelectSubcategory={setSelectedSubcategory}
+          searchQuery={searchQuery}
+          onSearchQuery={setSearchQuery}
           onOpenDish={openDrawer}
           onReorder={reorderItems}
         />
