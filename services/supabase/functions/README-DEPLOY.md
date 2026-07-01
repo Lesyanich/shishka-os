@@ -89,5 +89,5 @@ curl -X POST \
 |------|----------|--------|-------|
 | 2026-04-12 | `receipt-batch-process` | Initial deploy | New function from commit 42e6187. `--no-verify-jwt` |
 | 2026-04-12 | `ocr-receipt` | Redeploy | Refactored to use `_shared/` imports (commit 42e6187). `--no-verify-jwt` |
-| 2026-06-29 | `loyverse-sync`, `parse-receipts` | Redeploy (pending) | Add in-handler JWT auth guard (F1). `--no-verify-jwt` |
-| 2026-06-29 | `update-receipt-job` | Redeploy (pending) | Add `x-internal-secret` guard (F1). Set `FUNCTION_INTERNAL_SECRET` first. `--no-verify-jwt` |
+| 2026-06-30 | `loyverse-sync`, `parse-receipts` | Deployed ✓ | In-handler JWT auth guard (F1). `--no-verify-jwt`. Verified: anon→401, logged-in user→pass. |
+| 2026-06-30 | `update-receipt-job` | Deployed ✓ | `x-internal-secret` guard (F1). `FUNCTION_INTERNAL_SECRET` set in Supabase + GAS Script Properties. Verified: no/wrong secret→401, correct→pass. |
