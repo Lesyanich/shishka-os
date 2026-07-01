@@ -15,6 +15,10 @@
 
 ## In-flight (backend foundation)
 
+- **2026-07-01 — L1 cook view: clickable child-PF links (frontend, branch `claude/suspicious-knuth-b1b00c`).**
+  - CEO couldn't tell which marinade/base a prep uses without opening a separate PF. On `/menu?view=l1-cook`, the child semi-finished components shown in a prep's expanded recipe (`PfRecipeDetail` 🧂 Ingredients) and in a SALE dish's BOM tree — e.g. `PF-MARINADE_GARLIC_HERB` inside `PF-SHRIMP_MARINATED_FZ` — are now **clickable links** (amber text + row hover) that open that PF in the drawer. No more hunting it down.
+  - Purely UI, one file (`src/pages/menu/components/L1CookView.tsx`): new `ClickableIngredientRow` helper + an `onOpenRelated` handler threaded through `PfCard`→`PfRecipeDetail` and `SaleRecipeCard`. Child-PF ids were already in the data (`useBomIngredients` / `childrenByParent.childId`) — no data-layer change. Clickable only when a drawer handler exists (not in staff mode). `tsc -b` + `vite build` + eslint all green.
+
 - **2026-07-01 — Prep taxonomy split by food family; kill the "Cooked Components" catch-all (mig 341, branch `claude/suspicious-knuth-b1b00c`).**
   - Follows the shrimp precedent (mig 340). After shrimp left, `KP-PRP-RCK` "Cooked Components" still held **26 preps doing ~9 jobs** — a single unscannable L1 prep chip. CEO 2026-07-01: **maximal split** — each food family its own cook-legible bucket.
   - Mig **341**: created 9 new L3 families under `KP-PRP` — `KP-PRP-CHK` 🐔 Chicken (4), `KP-PRP-MEA` 🥩 Beef & Lamb (3), `KP-PRP-FSH` 🐟 Fish (1), `KP-PRP-GRN` 🌾 Cooked Grains (4), `KP-PRP-LEG` 🫘 Legumes (3), `KP-PRP-VEG` 🥔 Roasted & Baked Veg (6), `KP-PRP-MSH` 🥣 Mash & Purée (2), `KP-PRP-DAI` 🥛 Cultured Dairy (2), `KP-PRP-CRN` 🥜 Crunch (1). All 26 moved; **`KP-PRP-RCK` left active-but-empty** (deprecated landing zone — deactivate later if wanted). Manakish fillings grouped by protein (beef/lamb→Meat, salmon→Fish).

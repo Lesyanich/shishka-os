@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import {
   Package,
   Clock,
@@ -57,12 +57,49 @@ interface L1CookViewProps {
   onComment?: (dishId: string) => void
 }
 
+/* ── Clickable child-PF row (jump to a related prep) ───────── */
+
+/** A BOM/ingredient row that becomes a click-through link when the child is a
+ *  semi-finished PF (e.g. a marinade/base) and a navigation handler is available —
+ *  clicking opens that PF in the drawer so the cook doesn't have to hunt it down. */
+function ClickableIngredientRow({
+  clickable,
+  onClick,
+  title,
+  children,
+}: {
+  clickable: boolean
+  onClick?: () => void
+  title?: string
+  children: ReactNode
+}) {
+  if (clickable) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={title}
+        className="-mx-1 flex w-full items-center gap-2 rounded px-1 text-left text-[11px] transition hover:bg-surface-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-amber-watch)]/60"
+      >
+        {children}
+      </button>
+    )
+  }
+  return <div className="flex items-center gap-2 text-[11px]">{children}</div>
+}
+
 /* ── PF recipe detail (lazy-loaded on expand) ──────────────── */
 
 /** Full L1 cooking recipe — ingredients with proportions + process steps.
  * Lazy-loaded: mounted only when the card is expanded, so the BOM + recipe
  * queries fire on demand (same data path as the drawer's L1CookTab). */
-function PfRecipeDetail({ itemId }: { itemId: string }) {
+function PfRecipeDetail({
+  itemId,
+  onOpenRelated,
+}: {
+  itemId: string
+  onOpenRelated?: (id: string) => void
+}) {
   const { ingredients, isLoading: ingLoading } = useBomIngredients(itemId)
   const { steps, isLoading: stepLoading } = useDishRecipeSteps(itemId)
 
@@ -88,21 +125,29 @@ function PfRecipeDetail({ itemId }: { itemId: string }) {
                   ? 'bg-violet-900/40 text-violet-300'
                   : 'bg-slate-700 text-slate-300'
               const badgeLabel = isPf ? 'PF' : isMod ? 'MOD' : 'RAW'
+              const clickable = isPf && !!onOpenRelated
               return (
-                <li
-                  key={ing.ingredient_id}
-                  className="flex items-center gap-2 text-[11px]"
-                >
-                  <span
-                    className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider ${badgeColor}`}
+                <li key={ing.ingredient_id}>
+                  <ClickableIngredientRow
+                    clickable={clickable}
+                    onClick={() => onOpenRelated?.(ing.ingredient_id)}
+                    title={clickable ? `Open ${ing.name}` : undefined}
                   >
-                    {badgeLabel}
-                  </span>
-                  <span className="min-w-0 truncate text-cream/70">{ing.name}</span>
-                  <span className="ml-auto shrink-0 font-mono text-[10px] text-cream/50">
-                    {ing.quantity}
-                    {ing.base_unit ? ` ${ing.base_unit}` : ''}
-                  </span>
+                    <span
+                      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider ${badgeColor}`}
+                    >
+                      {badgeLabel}
+                    </span>
+                    <span
+                      className={`min-w-0 truncate ${clickable ? 'text-[color:var(--color-amber-watch)]' : 'text-cream/70'}`}
+                    >
+                      {ing.name}
+                    </span>
+                    <span className="ml-auto shrink-0 font-mono text-[10px] text-cream/50">
+                      {ing.quantity}
+                      {ing.base_unit ? ` ${ing.base_unit}` : ''}
+                    </span>
+                  </ClickableIngredientRow>
                 </li>
               )
             })}
@@ -188,12 +233,14 @@ interface PfCardProps {
   card: PfPackCardData | undefined
   stats: RecipeStepStats | undefined
   onOpen?: () => void
+  /** Opens a related child PF (e.g. its marinade/base) in the drawer. */
+  onOpenRelated?: (id: string) => void
   staffMode?: boolean
   feedbackCount?: number
   onComment?: () => void
 }
 
-function PfCard({ item, card, stats, onOpen, staffMode, feedbackCount, onComment }: PfCardProps) {
+function PfCard({ item, card, stats, onOpen, onOpenRelated, staffMode, feedbackCount, onComment }: PfCardProps) {
   // Default expanded: the cook station shows recipes like a prep sheet.
   const [expanded, setExpanded] = useState(true)
   const portionInfo =
@@ -318,7 +365,9 @@ function PfCard({ item, card, stats, onOpen, staffMode, feedbackCount, onComment
             {expanded ? 'hide' : 'view recipe'}
           </span>
         </button>
-        {expanded && <PfRecipeDetail itemId={item.id} />}
+        {expanded && (
+          <PfRecipeDetail itemId={item.id} onOpenRelated={onOpenRelated} />
+        )}
       </div>
 
       {/* Staff comment button */}
@@ -353,12 +402,14 @@ interface SaleRecipeCardProps {
   bomChildren: MenuBomChild[]
   steps?: MenuRecipeStep[]
   onOpen?: () => void
+  /** Opens a related child PF (e.g. a marinade/base/component) in the drawer. */
+  onOpenRelated?: (id: string) => void
   staffMode?: boolean
   feedbackCount?: number
   onComment?: () => void
 }
 
-function SaleRecipeCard({ item, stats, bomChildren, steps, onOpen, staffMode, feedbackCount, onComment }: SaleRecipeCardProps) {
+function SaleRecipeCard({ item, stats, bomChildren, steps, onOpen, onOpenRelated, staffMode, feedbackCount, onComment }: SaleRecipeCardProps) {
   // Default expanded: the cook station shows recipes like a prep sheet.
   const [expanded, setExpanded] = useState(true)
   // L1 production flow: for a station-tagged manakish this is the prep half
@@ -479,24 +530,30 @@ function SaleRecipeCard({ item, stats, bomChildren, steps, onOpen, staffMode, fe
                     : kindBadge === 'MOD'
                       ? 'bg-violet-900/40 text-violet-300'
                       : 'bg-slate-700 text-slate-300'
+                const clickable = kindBadge === 'PF' && !!onOpenRelated
                 return (
-                  <li
-                    key={bom.id}
-                    className="flex items-center gap-2 text-[11px]"
-                  >
-                    <span
-                      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider ${badgeColor}`}
+                  <li key={bom.id}>
+                    <ClickableIngredientRow
+                      clickable={clickable}
+                      onClick={() => onOpenRelated?.(bom.childId)}
+                      title={clickable ? `Open ${bom.childName ?? ''}` : undefined}
                     >
-                      {kindBadge}
-                    </span>
-                    <span className="min-w-0 truncate text-cream/70">
-                      {bom.childName ?? bom.childId}
-                    </span>
-                    <span className="ml-auto shrink-0 font-mono text-[10px] text-cream/40">
-                      ×{bom.quantityPerUnit}
-                      {bom.childBaseUnit ? ` ${bom.childBaseUnit}` : ''}
-                      {bom.yieldLossPct ? ` (−${bom.yieldLossPct}%)` : ''}
-                    </span>
+                      <span
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider ${badgeColor}`}
+                      >
+                        {kindBadge}
+                      </span>
+                      <span
+                        className={`min-w-0 truncate ${clickable ? 'text-[color:var(--color-amber-watch)]' : 'text-cream/70'}`}
+                      >
+                        {bom.childName ?? bom.childId}
+                      </span>
+                      <span className="ml-auto shrink-0 font-mono text-[10px] text-cream/40">
+                        ×{bom.quantityPerUnit}
+                        {bom.childBaseUnit ? ` ${bom.childBaseUnit}` : ''}
+                        {bom.yieldLossPct ? ` (−${bom.yieldLossPct}%)` : ''}
+                      </span>
+                    </ClickableIngredientRow>
                   </li>
                 )
               })}
@@ -645,6 +702,7 @@ export function L1CookView({
           bomChildren={childrenByParent.get(item.id) ?? []}
           steps={recipeStepsByDish?.get(item.id)}
           onOpen={onOpenDish ? () => onOpenDish(item.id) : undefined}
+          onOpenRelated={onOpenDish}
           staffMode={staffMode}
           feedbackCount={feedbackCountById?.get(item.id)}
           onComment={onComment ? () => onComment(item.id) : undefined}
@@ -658,6 +716,7 @@ export function L1CookView({
         card={pfPackCardById.get(item.id)}
         stats={recipeStatsById.get(item.id)}
         onOpen={onOpenDish ? () => onOpenDish(item.id) : undefined}
+        onOpenRelated={onOpenDish}
         staffMode={staffMode}
         feedbackCount={feedbackCountById?.get(item.id)}
         onComment={onComment ? () => onComment(item.id) : undefined}
