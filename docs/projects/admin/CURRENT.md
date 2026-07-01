@@ -15,6 +15,11 @@
 
 ## In-flight (backend foundation)
 
+- **2026-07-01 — 🦐 Shrimp prep category; consolidate shrimp preps (mig 340, branch `claude/suspicious-knuth-b1b00c`).**
+  - The three shrimp semi-finished preps were scattered: `PF-SHRIMP_GRILLED` + `PF-SHRIMP_SOUSVIDE` in Cooked Components (`KP-PRP-RCK`), `PF-SHRIMP_MARINATED_FZ` in **Uncategorized** (`category_id = NULL`). The raw marinated portion had no home ("Cooked Components" is the wrong axis for a raw sear-path prep) and the dual-prep model's two halves sat in different buckets.
+  - Mig **340** (`340_shrimp_prep_category.sql`): new L3 prep category `KP-PRP-SHR` **"🦐 Shrimp"** (`name_th กุ้ง`) under `KP-PRP`; moved all 3 shrimp preps into it; nulled stale legacy `product_category="fish"` on the sous-vide row (`category_id` is authoritative). Applied to prod + verified (3/3 in `KP-PRP-SHR`, no orphans). Idempotent + reversible. **Supersedes** mig 301's note that kept cooked proteins flat in `KP-PRP-RCK`. CEO 2026-07-01: category names must be cook-legible → group protein preps by protein.
+  - Raw shrimp *ingredients* (`RAW-SHRIMP*`) stay in Seafood `F-PRO-SEA` (ingredient taxonomy, separate branch). Reuse: when the dual-prep model replicates to chicken/fish, give each its own `KP-PRP-*` protein bucket.
+
 - **2026-06-30 — Browser-free Loyverse push via DB queue + pg_cron (branch `feature/menu/loyverse-push-queue`).**
   - Problem: the security audit moved `LOYVERSE_API_TOKEN` into the `loyverse-sync` edge-function secrets, so the agent can no longer push menu/modifier changes to the POS — the owner was retyping by hand. We do NOT hand the key back.
   - Mechanism: agent (or admin) `INSERT`s a request into new `loyverse_push_queue`; a `loyverse-push-drain` pg_cron job (every min, `FOR UPDATE SKIP LOCKED`, LIMIT 5) calls `loyverse-sync?action=internal_push` via `net.http_post`, reading `loyverse_internal_secret` from `supabase_vault` and sending it as `x-internal-secret`. Edge fn dispatches to the existing `handlePushDish`/`handleReconcilePrices`/`handleResyncNames` and writes the row's terminal status back (net.http_post is fire-and-forget). `loyverse-push-watchdog` (*/5) retries stuck rows up to 3× then parks them as `error`. Reuses the exact cron+vault+pg_net pattern of mig 276.
