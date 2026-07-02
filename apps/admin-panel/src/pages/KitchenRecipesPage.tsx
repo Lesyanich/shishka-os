@@ -61,6 +61,7 @@ export function KitchenRecipesPage() {
   )
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // When deep-linked to a specific dish, surface it: show All availability and
   // narrow to the dish's type + section so its card (with steps) is at the top.
@@ -84,6 +85,7 @@ export function KitchenRecipesPage() {
     setAvailableFilter(defaultAvailable(next))
     setSelectedCategory(null)
     setSelectedSubcategory(null)
+    setSearchQuery('')
   }
 
   const handleCategorySelect = useCallback((id: string | null) => {
@@ -156,6 +158,8 @@ export function KitchenRecipesPage() {
         onSelectCategory={handleCategorySelect}
         selectedSubcategory={selectedSubcategory}
         onSelectSubcategory={setSelectedSubcategory}
+        searchQuery={searchQuery}
+        onSearchQuery={setSearchQuery}
         onReorder={reorderItems}
         staffMode
         feedbackCountById={feedbackCounts}
