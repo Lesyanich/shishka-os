@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X, Save, Loader2 } from 'lucide-react'
 import type { MenuItem } from '../../../hooks/useMenuData'
 import { useDishCard } from '../../../hooks/useDishCard'
@@ -10,20 +10,23 @@ import { useDishScorecard } from '../../../hooks/useDishScorecard'
 import { useDishCardSave } from '../../../hooks/useDishCardSave'
 import type { MerrychefProgram } from '../../../hooks/useDishCardSave'
 import { useDishRecipeSteps } from '../../../hooks/useDishRecipeSteps'
+import { useComponentRecipeSteps } from '../../../hooks/useComponentRecipeSteps'
 import { useBomIngredients } from '../../../hooks/useBomIngredients'
 import { usePfPackCard } from '../../../hooks/usePfPackCard'
 import { DrawerHero } from '../owner/DrawerHero'
 import { CustomerTab } from './tabs/CustomerTab'
 import { L1CookTab } from './tabs/L1CookTab'
 import { L2AssemblerTab } from './tabs/L2AssemblerTab'
+import { ProcessTab } from './tabs/ProcessTab'
 import { OwnerTab } from './tabs/OwnerTab'
 
-type DrawerTab = 'customer' | 'l1-cook' | 'l2-assembler' | 'owner'
+type DrawerTab = 'customer' | 'l1-cook' | 'l2-assembler' | 'process' | 'owner'
 
 const TABS: readonly { key: DrawerTab; label: string }[] = [
   { key: 'customer', label: 'Customer' },
   { key: 'l1-cook', label: 'L1 Cook' },
   { key: 'l2-assembler', label: 'L2 Assembler' },
+  { key: 'process', label: 'Full Process' },
   { key: 'owner', label: 'Owner' },
 ]
 
@@ -37,6 +40,8 @@ interface DishDrawerProps {
   modifierOptions?: DishModifierOption[]
   /** Toggle website visibility (is_web_visible, mig 263) from the Owner tab. */
   onToggleWeb?: (id: string, next: boolean) => void | Promise<void>
+  /** Open another menu item's card (e.g. click a nested sub-prep to jump to it). */
+  onNavigateToItem?: (id: string) => void
 }
 
 export function DishDrawer({
@@ -46,6 +51,7 @@ export function DishDrawer({
   returnFocusToId,
   modifierOptions = [],
   onToggleWeb,
+  onNavigateToItem,
 }: DishDrawerProps) {
   const open = item != null
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -67,6 +73,18 @@ export function DishDrawer({
   const bomIngredients = useBomIngredients(dishId)
   const pfPackCard = usePfPackCard(isPf ? dishId : null)
   const { saveDishCard, isSaving } = useDishCardSave()
+
+  // Nested PF sub-preps of this item — fetch their recipe steps in one batch so
+  // the L1 sub-prep expander, the L2 auto-pull, and the Full Process view can
+  // all stitch component make-steps + service handling from the same source.
+  const componentPfIds = useMemo(
+    () =>
+      bomIngredients.ingredients
+        .filter((i) => i.type === 'semi_finished')
+        .map((i) => i.ingredient_id),
+    [bomIngredients.ingredients],
+  )
+  const componentSteps = useComponentRecipeSteps(componentPfIds)
 
   // Local form state for tab edits (held until Save)
   const [formCard, setFormCard] = useState<Partial<DishCardData> | null>(null)
@@ -296,6 +314,21 @@ export function DishDrawer({
                 recipeStepsLoading={recipeSteps.isLoading}
                 pfPackCard={pfPackCard.card}
                 dishCard={dishCard.card}
+                stepsByComponent={componentSteps.stepsByComponent}
+                onNavigateToItem={onNavigateToItem}
+              />
+            )}
+            {resolvedTab === 'process' && (
+              <ProcessTab
+                item={item}
+                dishCard={dishCard.card}
+                components={dishCard.components}
+                packaging={dishCard.packaging}
+                recipeSteps={recipeSteps.steps}
+                recipeStepsLoading={recipeSteps.isLoading}
+                stepsByComponent={componentSteps.stepsByComponent}
+                componentStepsLoading={componentSteps.isLoading}
+                onNavigateToItem={onNavigateToItem}
               />
             )}
             {resolvedTab === 'l2-assembler' && (
@@ -304,6 +337,11 @@ export function DishDrawer({
                 dishCard={dishCard.card}
                 components={dishCard.components}
                 isLoading={dishCard.isLoading}
+                recipeSteps={recipeSteps.steps}
+                recipeStepsLoading={recipeSteps.isLoading}
+                stepsByComponent={componentSteps.stepsByComponent}
+                componentStepsLoading={componentSteps.isLoading}
+                onNavigateToItem={onNavigateToItem}
                 formCard={
                   formCard
                     ? ({

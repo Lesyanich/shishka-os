@@ -1,5 +1,14 @@
 import { useState } from 'react'
-import { Package, Utensils, StickyNote, AlertTriangle, Plus, Trash2 } from 'lucide-react'
+import {
+  Package,
+  Utensils,
+  StickyNote,
+  AlertTriangle,
+  Plus,
+  Trash2,
+  ChevronRight,
+  UtensilsCrossed,
+} from 'lucide-react'
 import type { MenuItem } from '../../../../hooks/useMenuData'
 import type {
   DishCardData,
@@ -7,16 +16,29 @@ import type {
   DishPackagingLine,
   PackagingCatalogItem,
 } from '../../../../hooks/useDishCard'
+import type { DishRecipeStep } from '../../../../hooks/useDishRecipeSteps'
 import type { MerrychefProgram } from '../../../../hooks/useDishCardSave'
+import { bucketStepsByStation } from '../../../../lib/recipeStation'
 import { AssemblyOrderEditor } from '../sections/AssemblyOrderEditor'
 import { MerrychefProgramForm } from '../sections/MerrychefProgramForm'
 import { PhotoUpload } from '../sections/PhotoUpload'
+import { StepCard } from '../sections/StepCard'
+import { WasteExpiryStrip } from '../sections/WasteExpiryStrip'
 
 interface L2AssemblerTabProps {
   item: MenuItem
   dishCard: DishCardData | null
   components: AssemblyComponent[]
   isLoading: boolean
+  /** Dish's own recipe steps — the read-first Service-steps block renders the
+   *  L2 (Assembly) slice. */
+  recipeSteps: DishRecipeStep[]
+  recipeStepsLoading: boolean
+  /** Each frozen component's steps, keyed by id — auto-pull its L2 handling. */
+  stepsByComponent: Map<string, DishRecipeStep[]>
+  componentStepsLoading: boolean
+  /** Click a component to jump to its card. */
+  onNavigateToItem?: (id: string) => void
   /** Controlled form state — changes here are held until Save & Verify. */
   formCard: DishCardData | null
   onFormChange: (patch: Partial<DishCardData>) => void
@@ -29,6 +51,90 @@ interface L2AssemblerTabProps {
   onAddPackaging: (packagingId: string, qty: number) => Promise<{ ok: boolean; error?: string }>
   onUpdatePackagingQty: (bomId: string, qty: number) => Promise<{ ok: boolean; error?: string }>
   onRemovePackaging: (bomId: string) => Promise<{ ok: boolean; error?: string }>
+}
+
+/** Read-first "Service steps" block — the L2 slice of the dish's own recipe
+ * PLUS each frozen component's Assembly handling (thaw/butterfly) auto-pulled
+ * from that component PF via the BOM. Pure read: the editor fields below remain
+ * the source for owner setup. */
+function ServiceSteps({
+  dishName,
+  dishL2Steps,
+  pfComponents,
+  stepsByComponent,
+  isLoading,
+  onNavigate,
+}: {
+  dishName: string
+  dishL2Steps: DishRecipeStep[]
+  pfComponents: AssemblyComponent[]
+  stepsByComponent: Map<string, DishRecipeStep[]>
+  isLoading: boolean
+  onNavigate?: (id: string) => void
+}) {
+  const compBlocks = pfComponents
+    .map((c) => ({
+      c,
+      l2: bucketStepsByStation(stepsByComponent.get(c.component_id) ?? []).l2,
+    }))
+    .filter((b) => b.l2.length > 0)
+
+  const nothing = dishL2Steps.length === 0 && compBlocks.length === 0
+
+  return (
+    <section className="space-y-2">
+      <h4 className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-cream/50">
+        <UtensilsCrossed className="h-3 w-3" />
+        Service steps
+        <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-[8px] font-bold text-cream/50">
+          read-first
+        </span>
+      </h4>
+      {isLoading ? (
+        <span className="text-xs text-cream/40">Loading service steps…</span>
+      ) : nothing ? (
+        <span className="text-xs italic text-cream/40">
+          No service steps documented yet — set them up in the fields below.
+        </span>
+      ) : (
+        <div className="space-y-3">
+          {/* Auto-pulled frozen-component handling (thaw / butterfly / sear) */}
+          {compBlocks.map((b) => (
+            <div key={b.c.component_id} className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => onNavigate?.(b.c.component_id)}
+                disabled={!onNavigate}
+                className="flex items-center gap-1 text-[11px] font-medium text-cream/75 underline-offset-2 transition enabled:hover:text-forest-soft enabled:hover:underline disabled:cursor-default"
+                title={onNavigate ? 'Open this component card' : undefined}
+              >
+                <ChevronRight className="h-3 w-3 text-cream/40" />
+                Handle · {b.c.component_short_name ?? b.c.component_name}
+              </button>
+              <div className="space-y-1.5 pl-4">
+                {b.l2.map((s) => (
+                  <StepCard key={s.id} step={s} compact />
+                ))}
+              </div>
+            </div>
+          ))}
+          {/* Dish's own assembly steps */}
+          {dishL2Steps.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-medium text-cream/75">
+                Assemble · {dishName}
+              </div>
+              <div className="space-y-1.5">
+                {dishL2Steps.map((s) => (
+                  <StepCard key={s.id} step={s} compact />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
 }
 
 /** Packaging editor — lists NF-PKG BOM lines and lets the user add/remove them.
@@ -157,6 +263,11 @@ export function L2AssemblerTab({
   dishCard,
   components,
   isLoading,
+  recipeSteps,
+  recipeStepsLoading,
+  stepsByComponent,
+  componentStepsLoading,
+  onNavigateToItem,
   formCard,
   onFormChange,
   merrychefProgram,
@@ -176,8 +287,26 @@ export function L2AssemblerTab({
 
   const card = formCard ?? dishCard
 
+  // L2 slice of the dish's own steps. Untagged dishes → all steps are assembly.
+  const dishBuckets = bucketStepsByStation(recipeSteps)
+  const dishL2Steps = dishBuckets.tagged ? dishBuckets.l2 : recipeSteps
+  const pfComponents = components.filter((c) => c.component_type === 'semi_finished')
+
   return (
     <div className="space-y-6">
+      {/* Read-first service steps (dish L2 + auto-pulled component handling) */}
+      <ServiceSteps
+        dishName={item.name}
+        dishL2Steps={dishL2Steps}
+        pfComponents={pfComponents}
+        stepsByComponent={stepsByComponent}
+        isLoading={recipeStepsLoading || componentStepsLoading}
+        onNavigate={onNavigateToItem}
+      />
+
+      {/* Standard waste / expiry guidance */}
+      <WasteExpiryStrip shelfLifeDays={item.shelf_life_days} />
+
       {/* Assembler note */}
       <section className="space-y-1">
         <h4 className="text-[10px] uppercase tracking-widest text-cream/50">

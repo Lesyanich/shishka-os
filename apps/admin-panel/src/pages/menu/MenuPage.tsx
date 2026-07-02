@@ -563,6 +563,7 @@ export function MenuPage() {
         onToggleWeb={(id, next) => {
           void updateItem(id, { is_web_visible: next })
         }}
+        onNavigateToItem={openDrawer}
         returnFocusToId={drawerItem?.id ?? null}
         modifierOptions={
           drawerItem ? (enrichment.modifierOptionsByDish.get(drawerItem.id) ?? []) : []
