@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 Phase: 1 of 4 (Data Foundation + Owner Table)
 Plan: 0 of ? in current phase
 Status: Ready to plan
-Last activity: 2026-04-13 — Roadmap created, 4 phases defined, 26/26 requirements mapped
+Last activity: 2026-07-03 — Completed quick task 260702-xao: Wire name-search into cook /kitchen/recipes view
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -56,6 +56,12 @@ None yet.
 - Phase 1: Verify `cost_updated_at` column existence before implementing freshness label (may need to use `updated_at` as proxy)
 - Phase 3: Verify Supabase RLS write policy on `nomenclature` before building mutations (`SELECT * FROM pg_policies WHERE tablename = 'nomenclature'`)
 - Phase 4: Check actual `markup_pct` population rate in live data — if all zeroes, skip recommended price hint
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260702-xao | Wire name-search into cook /kitchen/recipes view | 2026-07-03 | f8e94ef | [260702-xao-wire-search-into-kitchen-recipes](./quick/260702-xao-wire-search-into-kitchen-recipes/) |
 
 ## Session Continuity
 
