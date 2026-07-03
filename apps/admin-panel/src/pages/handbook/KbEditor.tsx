@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { AlertCircle, ImagePlus, Loader2, Sparkles, Trash2 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { AlertCircle, ImagePlus, Loader2, Trash2 } from 'lucide-react'
 import { slugifyHeading } from '../../lib/vault'
 import { useKbImageUpload } from '../../hooks/useKbImageUpload'
 import type { AppRole } from '../../contexts/AppRoleContext'
@@ -74,7 +73,6 @@ export function KbEditor() {
   const [activeTab, setActiveTab] = useState<KbLang>('en')
 
   const [saving, setSaving] = useState(false)
-  const [translating, setTranslating] = useState<KbLang | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
   const bodyRef = useRef<HTMLTextAreaElement>(null)
@@ -149,33 +147,6 @@ export function KbEditor() {
     insertAtCursor(`\n![image](${res.url})\n`)
   }
 
-  const handleTranslate = async (target: KbLang) => {
-    if (target === 'en') return
-    setErr(null)
-    setTranslating(target)
-    try {
-      const { data, error } = await supabase.functions.invoke('kb-translate', {
-        body: {
-          title_en: content.en.title,
-          body_md_en: content.en.body_md,
-          target_lang: target,
-        },
-      })
-      if (error) throw new Error(error.message)
-      if (data?.error) throw new Error(data.error)
-      setContent((c) => ({
-        ...c,
-        [target]: {
-          title: typeof data?.title === 'string' ? data.title : c[target].title,
-          body_md: typeof data?.body_md === 'string' ? data.body_md : c[target].body_md,
-        },
-      }))
-    } catch (e) {
-      setErr(`Translation failed: ${e instanceof Error ? e.message : String(e)}`)
-    } finally {
-      setTranslating(null)
-    }
-  }
 
   const handleSave = async () => {
     setErr(null)
@@ -351,6 +322,8 @@ export function KbEditor() {
         </label>
       </div>
 
+      {/* Access (who sees this page/section) is managed centrally in the Registry. */}
+
       {/* ── Language tabs ── */}
       <div className="shk-seg mb-3">
         {KB_LANGS.map((l) => (
@@ -371,20 +344,9 @@ export function KbEditor() {
 
       <div className="mb-2 flex flex-wrap items-center gap-2">
         {activeTab !== 'en' && (
-          <button
-            type="button"
-            onClick={() => handleTranslate(activeTab)}
-            disabled={translating !== null || !content.en.body_md.trim()}
-            title="Draft this language from the English version"
-            className="flex items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-1 text-[11px] text-cream/70 transition hover:border-honey-300/40 hover:text-honey-300 disabled:opacity-40"
-          >
-            {translating === activeTab ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5" />
-            )}
-            AI draft from English
-          </button>
+          <span className="text-[11px] text-cream/40">
+            Translated offline and stored — edit here if needed.
+          </span>
         )}
         <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-1 text-[11px] text-cream/70 transition hover:text-cream">
           {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
