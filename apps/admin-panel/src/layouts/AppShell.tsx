@@ -3,7 +3,6 @@ import { NavLink, Outlet } from 'react-router-dom'
 import {
   BarChart3,
   BookOpen,
-  CalendarClock,
   CalendarDays,
   ChefHat,
   ChevronDown,
@@ -84,13 +83,12 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/kitchen/my-tasks', icon: ListTodo, label: 'Tasks', minRole: 'cook' },
       { path: '/kitchen/recipes', icon: BookOpen, label: 'Recipes', minRole: 'cook' },
       { path: '/kitchen/labels', icon: Tag, label: 'Labels', minRole: 'cook' },
-      { path: '/staff/schedule', icon: CalendarDays, label: 'Schedule', minRole: 'cook' },
+      { path: '/staff/schedule', icon: CalendarDays, label: 'My Schedule', minRole: 'cook' },
     ],
   },
   {
     title: 'Production & Planning',
     items: [
-      { path: '/schedule', icon: CalendarClock, label: 'Schedule', minRole: 'task_manager' },
       { path: '/planner', icon: CalendarDays, label: 'Planner', minRole: 'task_manager' },
       { path: '/planner/batch', icon: Rewind, label: 'Batch Plan', minRole: 'task_manager' },
       { path: '/production', icon: Factory, label: 'Production', minRole: 'task_manager' },

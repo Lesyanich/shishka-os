@@ -32,7 +32,6 @@ const FinanceAnalytics = lazyWithReload(() => import('./pages/FinanceAnalytics')
 const FinanceDashboard = lazyWithReload(() => import('./pages/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })))
 const ReceivingStation = lazyWithReload(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
 const Settings = lazyWithReload(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
-const ScheduleManager = lazyWithReload(() => import('./pages/ScheduleManager').then(m => ({ default: m.ScheduleManager })))
 const BatchPlanner = lazyWithReload(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
 const ProductionOrdersPage = lazyWithReload(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
 const ReceiptInbox = lazyWithReload(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
@@ -157,7 +156,6 @@ function App() {
                   <Route path="/staff-tasks" element={<Suspense fallback={<PageLoader />}><StaffTasksPage /></Suspense>} />
                   <Route path="/salad-bar" element={<Suspense fallback={<PageLoader />}><SaladBarPage /></Suspense>} />
                   <Route path="/cashier" element={<Suspense fallback={<PageLoader />}><CashierPage /></Suspense>} />
-                  <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><ScheduleManager /></Suspense>} />
                   <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
                   <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
                   <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
