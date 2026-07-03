@@ -74,7 +74,8 @@ function confidenceBadge(level?: 'high' | 'medium' | 'low') {
 }
 
 const inputCls = 'w-full rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-200 outline-none focus:border-indigo-500'
-const numInputCls = `${inputCls} text-right`
+// Hide the native up/down spin buttons — in narrow numeric columns they cover the value.
+const numInputCls = `${inputCls} text-right [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`
 
 function emptyItem(flowType: FlowType = 'COGS'): UnifiedItem {
   return { name: '', quantity: 1, unit: 'pcs', unit_price: 0, total_price: 0, flow_type: flowType }
