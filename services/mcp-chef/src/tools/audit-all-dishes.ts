@@ -5,6 +5,7 @@ import {
   calculateTreeCost,
   calculateTreeNutrition,
 } from "../lib/bom-walker.js";
+import { checkBrandCompliance } from "../lib/brand-rules.js";
 
 export const auditAllDishesSchema = {
   name: "audit_all_dishes",
@@ -142,6 +143,20 @@ export async function auditAllDishes(args: {
         }
       }
 
+      // Brand red line sweep: banned ingredients anywhere in the tree (legacy data)
+      if (tree) {
+        const banned: string[] = [];
+        function checkBrand(node: any) {
+          const b = checkBrandCompliance(node.item.product_code, node.item.name);
+          if (b.status === "banned") banned.push(node.item.product_code);
+          for (const c of node.children) checkBrand(c);
+        }
+        for (const c of tree.children) checkBrand(c);
+        if (banned.length > 0) {
+          issues.push(`RED LINE: banned ingredient(s) — ${[...new Set(banned)].join(", ")}`);
+        }
+      }
+
       // Count leaf ingredients
       function countLeaves(node: any): number {
         if (node.children.length === 0) return 1;
@@ -172,6 +187,9 @@ export async function auditAllDishes(args: {
     // Summary stats
     const totalDishes = results.length;
     const withIssues = results.filter((r) => r.issues.length > 0).length;
+    const redLineViolations = results.filter((r) =>
+      r.issues.some((i) => i.startsWith("RED LINE:"))
+    ).length;
     const avgMargin =
       results.filter((r) => r.margin_pct !== null).length > 0
         ? Math.round(
@@ -209,6 +227,7 @@ export async function auditAllDishes(args: {
       summary: {
         total_dishes: totalDishes,
         dishes_with_issues: withIssues,
+        red_line_violations: redLineViolations,
         avg_margin_pct: avgMargin,
         min_margin_threshold: minMargin,
       },

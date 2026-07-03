@@ -3,6 +3,7 @@ import {
   validateLegoChain,
   checkCircularRef,
 } from "../lib/validators.js";
+import { checkBrandCompliance } from "../lib/brand-rules.js";
 
 export const addBomLineSchema = {
   name: "add_bom_line",
@@ -73,6 +74,15 @@ export async function addBomLine(args: {
     );
     if (chainErr) return { error: chainErr };
 
+    // Brand red lines (kitchen-philosophy §2): block banned ingredients even if a
+    // legacy banned RAW already exists in nomenclature (e.g. an old rice-bran oil).
+    const brand = checkBrandCompliance(ingredient.product_code, ingredient.name);
+    if (brand.status === "banned") {
+      return {
+        error: `BRAND RED LINE: ${ingredient.product_code} — ${brand.reason} Refusing to add it to ${parent.product_code}'s BOM. Reformulate with an approved fat/ingredient.`,
+      };
+    }
+
     // Check circular references
     const circErr = await checkCircularRef(args.parent_id, args.ingredient_id);
     if (circErr) return { error: circErr };
@@ -133,6 +143,9 @@ export async function addBomLine(args: {
         yield_loss_pct: yieldLossPct,
       },
       hint: `Added ${args.quantity} ${ingredient.base_unit} of ${ingredient.product_code} to ${parent.product_code}.`,
+      ...(brand.status === "gated"
+        ? { warning: `GATED INGREDIENT: ${ingredient.product_code} — ${brand.reason}` }
+        : {}),
     };
   } catch (err: any) {
     return { error: err.message };

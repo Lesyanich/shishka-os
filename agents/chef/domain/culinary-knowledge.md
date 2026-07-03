@@ -96,7 +96,67 @@ Wet season (май-ноябрь) / Dry season (декабрь-апрель) вл
 
 ---
 
+## Applied reasoning principles (8–10) — derived from the science base
+
+> These turn the mechanisms in [`knowledge/food-science.md`](knowledge/food-science.md) and [`knowledge/process-technology.md`](knowledge/process-technology.md) into hard design decisions. Written in English (Language Contract). **Each principle cites the mechanism that justifies it — reason from the mechanism, never from a memorized product rule.**
+
+### 8. Heat-Cycle Budget
+
+*Derives from: protein moisture-expulsion + cumulative water loss (`food-science.md` §1–2), regen≠cook (`food-science.md` §7).*
+
+- Every **full cook cycle** permanently expels water from muscle fiber; losses stack and never come back.
+- **Budget: ONE cook cycle per protein per L1→L2 chain. Maximum two only with written justification.**
+- A **Merrychef regeneration** (≤60–90s reheat of already-cooked food to ~74°C) is a REGEN, not a cook cycle.
+- A **≤90s color sear** on an already-cooked protein is a FINISH, not a cook cycle.
+- **`cook → chill/freeze → cook again` is auto-rejected.** Any flow with two full cooks separated by chilling/freezing = wrong design (this is the triple-heat chicken failure: sous-vide + lava-grill at L1 + freeze + re-grill at L2 = 3 cycles = dry "sole leather").
+
+### 9. Delicate-Protein Classification
+
+*Derives from: denaturation ladder + albumin bleed (`food-science.md` §2), ice-crystal rupture + cook-then-freeze (`food-science.md` §9), carryover (`food-science.md` §7).*
+
+| Class | Examples | Rule |
+|---|---|---|
+| **Delicate** | salmon, white fish, shrimp, seafood | **Cook-to-order** from raw (fresh or IQF-raw) portions. **Never cook-then-freeze-then-reheat** — albumin bleed + mushy texture. Portion raw, freeze raw, finish at service with color. |
+| **Intermediate** | chicken breast (lean) | Sous-vide 63–65°C at L1 → blast-chill → **L2 regen only**. Never re-grill/re-cook at L2. |
+| **Robust** | chicken thigh, braises, stews, legumes, grains | Full cook-chill candidates; collagen/gelatin holds water through reheat. |
+
+This is why expensive salmon (599฿/kg) is destroyed by a sous-vide-then-freeze-then-reheat plan, and why it must be cooked to order (52°C, sear for color).
+
+### 10. L1 Unloads L2 (central-kitchen test)
+
+*Derives from: cook-chill model + regen physics (`knowledge/process-technology.md` §0–4), heat transfer (`food-science.md` §7).*
+
+- L1 produces and preserves; **L2 assembles and regenerates only.**
+- **Test:** if a proposed flow requires L2 to *cook* (not assemble/regen), the design is wrong — redo it. It duplicates work, slows the service line, and defeats the central-kitchen model.
+
+---
+
+## Fat Decision Tree — pick the fat by chemistry and function, never by panic
+
+*Derives from: refining chemistry + smoke points (`food-science.md` §3); brand policy in [`docs/bible/kitchen-philosophy.md`](../../../docs/bible/kitchen-philosophy.md) §2.*
+
+Walk the steps in order; stop at the first that decides:
+
+1. **Clean-label filter.** Is it an RBD / solvent-extracted seed or grain oil (soy, canola/rapeseed, sunflower, corn, **rice bran**)? → **BANNED, stop.** (The extraction process is the objection — see `food-science.md` §3.)
+2. **Line-compatibility filter.** Vegan line, or a component shared into vegan dishes? → **plant fats only.** Animal fats (ghee, duck fat, butter, lard) are **GATED**: never proposed unprompted, non-vegan dishes only, and only with explicit CEO approval.
+3. **Function filter.** Then choose by job:
+   - High-heat grill/sear → **refined avocado oil** (~271°C smoke point).
+   - Neutral marinade / freeze-stable base → **deodorized coconut oil** (approved refined exception).
+   - Dressing / finishing / low heat → **Extra Virgin Olive Oil**.
+
+Failure this prevents: recommending refined rice bran oil (fails step 1), then panicking into duck fat/ghee (fails step 2). The tree goes straight from "no seed oil" to "avocado / deodorized coconut."
+
+---
+
+## Grounding rule for ALL process recommendations
+
+**When you recommend a process or handling step, name the chemical or physical mechanism that makes it correct** (cite the relevant `food-science.md` / `process-technology.md` section). If you cannot name the mechanism → WebSearch before recommending. Hand-waving is a hallucination; a hallucination about food is money in the bin.
+
+---
+
 ## Справочник: физика еды (неизменные константы)
+
+> Deep mechanisms now live in [`knowledge/food-science.md`](knowledge/food-science.md). The constants below are the quick bench reference.
 
 ### Реакция Майяра
 - Начало от 140°C, пик вкуса 150-180°C

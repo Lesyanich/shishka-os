@@ -21,7 +21,7 @@
 | File | Domains | Agents | Load When |
 |------|---------|--------|-----------|
 | `identity.md` | all | all | Brand questions, investor materials, marketing, onboarding |
-| `kitchen-philosophy.md` | kitchen | chef | **CORE — load every session.** Owner-authored. Red lines, signature principles, quality equation, protocols (Clean Label, Lego, L1 Hub) |
+| `kitchen-philosophy.md` | kitchen | chef | **CORE — load every session.** Owner-authored. Red lines (incl. RBD seed/grain oils + animal-fat gate + Approved Fats Matrix), signature principles, quality equation, protocols (Clean Label, Lego, L1 Hub, Protein Sourcing Integrity) |
 | `menu-concept.md` | kitchen, marketing | chef, marketing | Menu design, CBS application, new dish creation, food philosophy |
 | `menu-items.md` | kitchen, procurement, sales | chef, procurement | Specific dishes, ingredients, BOM, procurement planning |
 | `operations.md` | kitchen, ops | chef, ops | Production workflow, L1→L2 logistics, cold chain, staffing |
@@ -48,3 +48,5 @@ Sources: `ceo` | `cook` | `admin` | `agent` | `partner`
 |------|------|--------|----|
 | 2026-04-05 | all | Initial creation from Notion SHISHKA CORE HUB export | CEO + COO |
 | 2026-04-07 | kitchen-philosophy.md | Created from owner interview — replaces planned book RAG | CEO + COO |
+| 2026-07-03 | kitchen-philosophy.md | Chef recalibration: rice-bran + all RBD seed/grain oils named banned; animal-fat gate; Approved Fats Matrix (deodorized-coconut exception); Protocol 4 Protein Sourcing Integrity | CEO directive |
+| 2026-07-03 | (new) agents/chef/domain/knowledge/food-science.md, process-technology.md, sourcing-rules.md; docs/operations/sop-salmon-prep.md; sop-shrimp-prep.md into VCS | Chef recalibration — mechanism-organized culinary science foundation so the agent reasons from physics/chemistry, not per-product rules | CEO directive |

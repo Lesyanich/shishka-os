@@ -8,6 +8,7 @@ import {
   findSimilarProducts,
   checkSupplierAvailability,
 } from "../lib/validators.js";
+import { checkBrandCompliance } from "../lib/brand-rules.js";
 
 export const createProductSchema = {
   name: "create_product",
@@ -103,6 +104,14 @@ export async function createProduct(args: {
     );
     if (nutritionErr) return { error: nutritionErr };
 
+    // Brand red lines (kitchen-philosophy §2): banned ingredients are a hard stop.
+    const brand = checkBrandCompliance(args.product_code, args.name);
+    if (brand.status === "banned") {
+      return {
+        error: `BRAND RED LINE: ${brand.reason} Refusing to create "${args.product_code}". Use an approved fat/ingredient instead (see the Fat Decision Tree / Approved Fats Matrix).`,
+      };
+    }
+
     // Exact code uniqueness
     const uniqueErr = await checkCodeUnique(args.product_code);
     if (uniqueErr) return { error: uniqueErr };
@@ -154,6 +163,13 @@ export async function createProduct(args: {
       const warnings: string[] = [];
       let similar: { id: string; product_code: string; name: string }[] = [];
       let supplierInfo: { found: boolean; suppliers: any[] } = { found: false, suppliers: [] };
+
+      // Gated ingredient (animal fat): soft confirmation, non-vegan + owner approval only.
+      if (brand.status === "gated") {
+        warnings.push(
+          `GATED INGREDIENT: ${brand.reason} Confirm this is a non-vegan dish and the owner has approved before creating.`,
+        );
+      }
 
       // Fuzzy duplicate check
       similar = await findSimilarProducts(args.name, args.product_code);
