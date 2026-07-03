@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, X, Loader2, FolderOpen, Pencil, Plus, Trash2, AlertTriangle, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Check, X, Loader2, FolderOpen, Pencil, Plus, Trash2, AlertTriangle, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import type { InboxRow } from '../../hooks/useReceiptInbox'
 import { supabase } from '../../lib/supabase'
 
@@ -39,6 +39,8 @@ interface Props {
   onApprove: (inboxId: string, payload: Record<string, unknown>) => Promise<{ ok: boolean; error?: string; expense_id?: string }>
   onSkip: (inboxId: string) => Promise<string | null>
   onReopen: (inboxId: string) => Promise<string | null>
+  /** Collapse the panel — used on mobile where the panel renders as a full-screen sheet. */
+  onClose?: () => void
 }
 
 /* ────────────────────────── Helpers ────────────────────────── */
@@ -136,7 +138,7 @@ function splitItemsToPayload(items: UnifiedItem[]) {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
+export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: Props) {
   const [isApproving, setIsApproving] = useState(false)
   const [isSkipping, setIsSkipping] = useState(false)
   const [isReopening, setIsReopening] = useState(false)
@@ -147,6 +149,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const p = row.parsed_payload as Record<string, any> | null
+  // Mobile-only: collapse the receipt image to a thin peek strip so the reviewer
+  // can push it out of the way and work on the parsed data (desktop always shows it).
+  const [imgCollapsed, setImgCollapsed] = useState(false)
 
   // ── Editable header state ──
   const [supplierName, setSupplierName] = useState<string>(p?.supplier_name || '')
@@ -523,7 +528,27 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
   )
 
   return (
-    <div className="flex flex-col lg:flex-row">
+    // On mobile the panel is a full-screen sheet (escapes the inbox table's
+    // horizontal scroll); on lg+ it renders inline inside the expanded row as before.
+    <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-slate-900 lg:static lg:z-auto lg:block lg:overflow-visible lg:bg-transparent">
+      {/* Mobile sheet header with close — hidden on desktop */}
+      {onClose && (
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/95 px-4 py-3 backdrop-blur lg:hidden">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-100">
+            {supplierName || 'Receipt'}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+            title="Close"
+            aria-label="Close review"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+      <div className="flex flex-col lg:flex-row">
       {/* ── LEFT: Zoomable image viewer (sticky) ── */}
       <div className="w-full lg:w-[340px] lg:shrink-0 lg:self-start lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-900/90 p-3">
         {/* Zoom controls */}
@@ -557,7 +582,16 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
               </button>
             )}
           </div>
-          <span className="text-[9px] text-slate-600">Scroll to zoom</span>
+          <span className="hidden text-[9px] text-slate-600 lg:inline">Scroll to zoom</span>
+          {/* Mobile-only: collapse/expand the image to reclaim vertical space */}
+          <button
+            type="button"
+            onClick={() => setImgCollapsed((v) => !v)}
+            className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-slate-200 lg:hidden"
+          >
+            {imgCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+            {imgCollapsed ? 'Show image' : 'Hide image'}
+          </button>
         </div>
 
         {/* Image container with arrows */}
@@ -569,7 +603,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            className={`h-[300px] lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
+            className={`${imgCollapsed ? 'h-16' : 'h-[42vh]'} lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
           >
             {row.photo_urls[selectedPhotoIdx]?.toLowerCase().endsWith('.pdf') ? (
               <iframe
@@ -642,9 +676,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       {dupeWarnings.length > 0 && (
         <div className="space-y-1">
           {dupeWarnings.map((w, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-rose-400" />
-              <span>{w}</span>
+            <div key={i} className="flex items-start gap-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-rose-400" />
+              <span className="min-w-0 break-words">{w}</span>
             </div>
           ))}
         </div>
@@ -652,12 +686,12 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
       {/* ── Header: receipt summary ── */}
       <div>
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {editingHeader ? (
               <input
                 value={supplierName}
                 onChange={(e) => setSupplierName(e.target.value)}
-                className={`${inputCls} max-w-xs text-sm font-semibold`}
+                className={`${inputCls} w-full text-sm font-semibold sm:max-w-xs`}
                 placeholder="Supplier"
               />
             ) : (
@@ -742,7 +776,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
                 <span className="text-slate-300">{fmt(p.vat_amount)}</span>
               </div>
             ) : null}
-            <div className="ml-auto">
+            <div className="w-full sm:ml-auto sm:w-auto">
               <span className="text-slate-500">TOTAL (items): </span>
               <span className={`text-base font-semibold ${totalMismatch ? 'text-amber-400' : 'text-slate-100'}`}>
                 {'\u0E3F'}{fmt(calculatedTotal)}
@@ -759,10 +793,12 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           )}
           {/* Mismatch warning */}
           {totalMismatch && (
-            <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
-              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              Items ({'\u0E3F'}{fmt(calculatedTotal)}){discountEmbedded ? ` [discount \u0E3F${fmt(discountAmount)} already in prices]` : ` \u2212 discount (\u0E3F${fmt(discountAmount)})`}{!vatIncluded && vatAmount ? ` + VAT (\u0E3F${fmt(vatAmount)})` : ''}{vatIncluded && vatAmount ? ` [VAT \u0E3F${fmt(vatAmount)} incl.]` : ''}{deliveryFee ? ` + delivery (\u0E3F${fmt(deliveryFee)})` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} \u2260 receipt ({'\u0E3F'}{fmt(receiptTotal)}).
-              Diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))}
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              <span className="min-w-0 break-words">
+                Items ({'\u0E3F'}{fmt(calculatedTotal)}){discountEmbedded ? ` [discount \u0E3F${fmt(discountAmount)} already in prices]` : ` \u2212 discount (\u0E3F${fmt(discountAmount)})`}{!vatIncluded && vatAmount ? ` + VAT (\u0E3F${fmt(vatAmount)})` : ''}{vatIncluded && vatAmount ? ` [VAT \u0E3F${fmt(vatAmount)} incl.]` : ''}{deliveryFee ? ` + delivery (\u0E3F${fmt(deliveryFee)})` : ''} = {'\u0E3F'}{fmt(expectedReceiptTotal)} \u2260 receipt ({'\u0E3F'}{fmt(receiptTotal)}).
+                {' '}Diff: {'\u0E3F'}{fmt(Math.abs(expectedReceiptTotal - receiptTotal))}
+              </span>
             </div>
           )}
         </div>
@@ -783,7 +819,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             {capexCount > 0 && <span className="text-sky-400">CapEx: {capexCount}</span>}
           </div>
         </div>
-        <div className="max-h-[36rem] overflow-y-auto overflow-x-auto rounded-lg border border-slate-800">
+        <div className="hidden max-h-[36rem] overflow-y-auto overflow-x-auto rounded-lg border border-slate-800 md:block">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-slate-900 text-[9px] uppercase tracking-wide text-slate-500">
               <tr>
@@ -913,6 +949,119 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
             </tbody>
           </table>
         </div>
+
+        {/* ── Mobile card list (replaces the wide table below md) ── */}
+        <div className="space-y-2 md:hidden">
+          {items.map((item, i) => {
+            const nom = item.nomenclature_id ? nomMap[item.nomenclature_id] : null
+            const editing = editingRows.has(i)
+            const checked = checkedItems.has(i)
+            const cardBg = checked
+              ? item.flow_type === 'CapEx' ? 'bg-sky-500/5' : item.flow_type === 'OpEx' ? 'bg-amber-500/5' : 'bg-emerald-500/5'
+              : 'bg-slate-900/40'
+            return (
+              <div key={i} className={`rounded-lg border border-slate-800 p-3 ${cardBg}`}>
+                {/* header: verify + # + flow + actions */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleCheck(i)}
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-600 bg-slate-800 accent-indigo-500"
+                    aria-label={`Verify item ${i + 1}`}
+                  />
+                  <span className="text-[11px] text-slate-500">#{i + 1}</span>
+                  {flowSelect(i, item.flow_type)}
+                  {!isReadOnly && (
+                    <div className="ml-auto flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleEdit(i)}
+                        className={`flex h-9 w-9 items-center justify-center rounded hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-400'}`}
+                        title={editing ? 'Done' : 'Edit'}
+                        aria-label={editing ? 'Done editing' : 'Edit item'}
+                      >
+                        {editing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(i)}
+                        className="flex h-9 w-9 items-center justify-center rounded text-slate-500 hover:bg-slate-700 hover:text-rose-400"
+                        title="Delete"
+                        aria-label="Delete item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* name */}
+                <div className="mt-2">
+                  {editing ? (
+                    <input value={item.name} onChange={(e) => updateItem(i, 'name', e.target.value)} className={`${inputCls} w-full text-sm`} />
+                  ) : (
+                    <>
+                      <div className="text-sm text-slate-100">{item.name}</div>
+                      {item.original_name && item.original_name !== item.name && (
+                        <div className="text-[11px] text-slate-500">{item.original_name}</div>
+                      )}
+                      {item.brand && (
+                        <span className="text-[11px] text-slate-600">{item.brand} {item.package_weight || ''}</span>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* qty × unit @ price = total */}
+                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500">Qty:</span>
+                    {editing ? (
+                      <input type="number" step="any" value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))} className={`${numInputCls} w-16`} />
+                    ) : (
+                      <span className="text-slate-200">{item.quantity}</span>
+                    )}
+                    {editing ? (
+                      <input value={item.unit} onChange={(e) => updateItem(i, 'unit', e.target.value)} className={`${inputCls} w-12`} />
+                    ) : (
+                      <span className="text-slate-400">{item.unit}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500">Price:</span>
+                    {editing ? (
+                      <input type="number" step="any" value={item.unit_price} onChange={(e) => updateItem(i, 'unit_price', Number(e.target.value))} className={`${numInputCls} w-20`} />
+                    ) : (
+                      <span className="text-slate-200">{fmt(item.unit_price)}</span>
+                    )}
+                  </div>
+                  <div className="col-span-2 flex items-center justify-between border-t border-slate-800 pt-1.5">
+                    <span className="text-slate-500">Total</span>
+                    <span className="text-sm font-semibold text-slate-100">{'฿'}{fmt(item.total_price)}</span>
+                  </div>
+                </div>
+
+                {/* barcode + nomenclature + confidence */}
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                  {editing ? (
+                    <input value={item.barcode || ''} onChange={(e) => updateItem(i, 'barcode', e.target.value)} className={`${inputCls} w-full font-mono text-[11px]`} placeholder="barcode" />
+                  ) : (
+                    <span className="break-all font-mono text-slate-500">{item.barcode || item.supplier_sku || '—'}</span>
+                  )}
+                  {nom ? (
+                    <span className="text-emerald-400">{nom.name}</span>
+                  ) : (
+                    <span className="text-amber-400">New</span>
+                  )}
+                  {confidenceBadge(item.confidence)}
+                  {nom?.category && <span className="text-slate-500">{nom.category}</span>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
         {!isReadOnly && (
           <div className="mt-1.5 flex items-center gap-2">
             <button type="button" onClick={() => addItem('COGS')} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-emerald-500 hover:bg-emerald-500/10">
@@ -930,10 +1079,10 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
 
       {/* ── GDrive paths ── */}
       {row.gdrive_paths && row.gdrive_paths.length > 0 && (
-        <div className="flex items-center gap-2 text-[10px] text-slate-500">
-          <FolderOpen className="h-3 w-3" />
+        <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
+          <FolderOpen className="h-3 w-3 shrink-0" />
           {row.gdrive_paths.map((gp, i) => (
-            <span key={i} className="rounded bg-slate-800 px-1.5 py-0.5 text-slate-400">{gp}</span>
+            <span key={i} className="max-w-full truncate rounded bg-slate-800 px-1.5 py-0.5 text-slate-400">{gp}</span>
           ))}
         </div>
       )}
@@ -1011,6 +1160,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen }: Props) {
           <span>{p.currency ?? 'THB'} | {p.flow_type} | cat {p.category_code ?? '\u2014'}</span>
         </div>
       </div>
+    </div>
     </div>
     </div>
   )
