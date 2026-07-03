@@ -58,6 +58,10 @@ const CookTasksPage = lazyWithReload(() => import('./pages/CookTasksPage').then(
 const KitchenLabels = lazyWithReload(() => import('./pages/KitchenLabels').then(m => ({ default: m.KitchenLabels })))
 const KitchenRecipesPage = lazyWithReload(() => import('./pages/KitchenRecipesPage').then(m => ({ default: m.KitchenRecipesPage })))
 const StaffSchedulePage = lazyWithReload(() => import('./pages/staff/StaffSchedulePage').then(m => ({ default: m.StaffSchedulePage })))
+const HandbookLayout = lazyWithReload(() => import('./pages/handbook/HandbookLayout').then(m => ({ default: m.HandbookLayout })))
+const HandbookHome = lazyWithReload(() => import('./pages/handbook/HandbookHome').then(m => ({ default: m.HandbookHome })))
+const HandbookPage = lazyWithReload(() => import('./pages/handbook/HandbookPage').then(m => ({ default: m.HandbookPage })))
+const KbEditor = lazyWithReload(() => import('./pages/handbook/KbEditor').then(m => ({ default: m.KbEditor })))
 
 function PageLoader() {
   return (
@@ -175,6 +179,15 @@ function App() {
                   <Route path="/kitchen/labels" element={<Suspense fallback={<PageLoader />}><KitchenLabels /></Suspense>} />
                   <Route path="/kitchen/recipes" element={<Suspense fallback={<PageLoader />}><KitchenRecipesPage /></Suspense>} />
                   <Route path="/staff/schedule" element={<Suspense fallback={<PageLoader />}><StaffSchedulePage /></Suspense>} />
+                  {/* Handbook (knowledge base) — read for all staff; create/edit owner-only */}
+                  <Route path="/handbook" element={<Suspense fallback={<PageLoader />}><HandbookLayout /></Suspense>}>
+                    <Route index element={<Suspense fallback={<PageLoader />}><HandbookHome /></Suspense>} />
+                    <Route path=":slug" element={<Suspense fallback={<PageLoader />}><HandbookPage /></Suspense>} />
+                    <Route element={<RoleGuard minRole="owner" />}>
+                      <Route path="new" element={<Suspense fallback={<PageLoader />}><KbEditor /></Suspense>} />
+                      <Route path=":slug/edit" element={<Suspense fallback={<PageLoader />}><KbEditor /></Suspense>} />
+                    </Route>
+                  </Route>
                 </Route>
               </Route>
             </Route>

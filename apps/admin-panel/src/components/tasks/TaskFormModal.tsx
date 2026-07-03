@@ -10,6 +10,8 @@ import type {
   TaskStation,
 } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
+import { useKbPages } from '../../hooks/useKbPages'
+import { pickTranslation } from '../../types/knowledgeBase'
 import { TaskLinkPicker, type TaskLinkValue } from './TaskLinkPicker'
 import {
   CATEGORY_OPTIONS,
@@ -62,8 +64,10 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
     linked_label_th: initial?.linked_label_th ?? null,
   })
   const [photoUrls, setPhotoUrls] = useState<string[]>(initial?.photo_urls ?? [])
+  const [kbPageId, setKbPageId] = useState<string | null>(initial?.kb_page_id ?? null)
   const [taskId] = useState<string>(() => initial?.id ?? freshId())
   const { upload, isUploading } = useTaskPhotoUpload()
+  const { visiblePages: kbPages } = useKbPages()
   const fileRef = useRef<HTMLInputElement>(null)
 
   if (!open) return null
@@ -107,6 +111,7 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
       linked_route: link.linked_route,
       linked_label: link.linked_label,
       linked_label_th: link.linked_label_th,
+      kb_page_id: kbPageId,
       comment: comment.trim() || null,
     }
     await onSubmit(input, canNotify && notify)
@@ -257,6 +262,23 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
 
           {/* Deep link */}
           <TaskLinkPicker value={link} station={station} onChange={setLink} />
+
+          {/* Handbook instructions page */}
+          <div>
+            <label className={LABEL}>Instructions page (Handbook)</label>
+            <select
+              className={INPUT}
+              value={kbPageId ?? ''}
+              onChange={(e) => setKbPageId(e.target.value || null)}
+            >
+              <option value="">None</option>
+              {kbPages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {pickTranslation(p, 'en').title}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Photo report */}
           <div>
