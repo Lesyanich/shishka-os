@@ -1,11 +1,23 @@
 {
   "version": 1,
   "skills": {
+    "agentic-browser-testing": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/agentic-browser-testing/SKILL.md",
+      "computedHash": "279f471e08cae048dacdd154a0cb8923dabd12ca88be9440b89625f2b253ded7"
+    },
     "database-testing": {
       "source": "petrkindlmann/qa-skills",
       "sourceType": "github",
       "skillPath": "skills/database-testing/SKILL.md",
       "computedHash": "9c7f61c9ccffc7f16c329890b4a8e0e56ba0eb6fec42bda669f77038bcc44db8"
+    },
+    "web-design-reviewer": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-reviewer/SKILL.md",
+      "computedHash": "2b324a0a6b44f16ddd2259f3cb2cb326b315ff5c42b5bf5c99132cd6f77835e5"
     },
     "exploratory-testing": {
       "source": "petrkindlmann/qa-skills",

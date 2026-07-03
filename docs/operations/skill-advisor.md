@@ -56,7 +56,8 @@ to narrow — keyword edits stay human-confirmed.
 - **`refactor-method-complexity-reduce`** _(github/awesome-copilot, official)_ — cut one over-complex method's cognitive complexity by extracting helper methods.
 
 ### QA / testing (playbooks)
-_Installed 2026-06-28 from `petrkindlmann/qa-skills` (6 of 50; markdown-only; see `skills-lock.json`). These are **playbooks for writing/planning tests** — distinct from `mcp playwright`, which DRIVES a real browser at runtime._
+_Installed from `petrkindlmann/qa-skills` (7 of 50; markdown-only; see `skills-lock.json`). Most are **playbooks for writing/planning tests** — distinct from `mcp playwright`, which DRIVES a real browser at runtime._
+- **`agentic-browser-testing`** — goal-driven E2E: a browser agent (Playwright MCP) reads a natural-language goal and explores the app via the accessibility tree to assert the outcome — no pre-written script. Best for "проверить, что flow X удобно/работает" incl. mobile-viewport usability runs. _e.g. "проверь удобство /receipts с телефона", "let an agent walk the checkout"._
 - **`playwright-automation`** — write production-grade Playwright E2E (Page Object Model, fixtures, parallel, CI). _e.g. "напиши e2e тест", "write a Playwright test"._
 - **`test-planning`** — single sprint/release test plan: scenarios, coverage map, estimation. **`test-strategy`** — multi-quarter QA strategy & test-pyramid. **`risk-based-testing`** — risk matrix (impact × probability), where to focus testing (run first).
 - **`database-testing`** — migration/rollback tests, schema constraints, data integrity, seed data.
@@ -72,6 +73,7 @@ _Installed 2026-06-28 from `petrkindlmann/qa-skills` (6 of 50; markdown-only; se
 ### Design / UI
 - **`frontend-design`** / **`ui-ux-pro-max`** — build distinctive, production-grade UI; styles, palettes, font pairings. Design is **code-first** (Figma is not used — CEO decision 2026-06-28).
 - **`emil-design-eng`** — UI polish, animation, microinteraction judgment.
+- **`web-design-reviewer`** _(github/awesome-copilot, official)_ — drives a real browser (Playwright MCP) across mobile 375 / tablet 768 / desktop 1280 / wide 1920 viewports and flags responsive breakage: horizontal overflow, touch targets <48px, clipping, contrast/focus, font readability — then fixes at source level. Use for "неудобно с телефона / вёрстка едет / audit the mobile layout". _(Considered but NOT installed 2026-07-03: mcpmarket "Responsive Design Tester" — no verifiable source repo, page 429; `web-design-reviewer` is the trusted-source equivalent.)_
 
 ### Browser / desktop automation
 - **mcp `claude-in-chrome`** — web automation & scraping (Lazada, Loyverse Back Office, Tops).
@@ -101,7 +103,10 @@ _Installed 2026-06-28 from `petrkindlmann/qa-skills` (6 of 50; markdown-only; se
 
 ### Meta / discovery
 - **`skill-creator`** — create / edit / optimize a skill.
-- **`find-skills`** — discover installable skills for a capability gap.
+- **`find-skills`** — discover installable skills for a capability gap. A direct tool-question
+  ("which skill/command should I use?") triggers a **full-registry read + `skills-lock.json`
+  source check** before answering; open-source research must **end with a registry update**
+  (install + this file + ADVISOR-MAP row). See `operational-rules.md` § RULE-SKILL-ADVISOR.
 - **`polyclaude:council`** — stress-test an idea from multiple cognitive perspectives.
 - **Routing agents:** `/coo`, `/strategy`, `/techlead`.
 
@@ -142,7 +147,7 @@ specific. The header and separator rows are skipped by the parser.
 | заверши сесси,end session,session diary,сохрани сессию | `/session-diary` | save session summary to memory |
 | здоровье систем,system health,статус os | `/health` | Shishka OS health snapshot |
 | создай скилл,создать скилл,новый скилл,create skill,edit skill | `skill-creator` | create/edit skills |
-| найди скилл,какой скилл,is there a skill,find a skill,какой инструмент,какие инструменты | `find-skills` | discover installable skills |
+| найди скилл,какой скилл,какую команду,какой команд,что использовать,чем протестир,какой инструмент,какие инструменты,какой тул,is there a skill,find a skill,which skill,which command,what tool | `find-skills` | discover installable skills |
 | по расписанию,каждый день,cron,scheduled agent,напомни мне | `/schedule` | recurring cloud agent / cron |
 | на интервал,каждые,keep running,run on a loop | `/loop` | run a prompt on a recurring interval |
 | несколько перспектив,red team,devil's advocate,стресс-тест иде,разнеси идею,poke holes | `polyclaude:council` | multi-perspective stress-test of an idea |
@@ -153,4 +158,6 @@ specific. The header and separator rows are skipped by the parser.
 | риск тестир,риск-матриц,что может сломаться,risk-based,risk matrix,where to focus testing,failure modes | `risk-based-testing` | risk matrix — prioritise what to test |
 | тест базы данн,тест миграц,database test,migration test,rollback test,data integrity,seed data | `database-testing` | DB migration/rollback & data-integrity tests |
 | исследовательск тестир,поиск багов,exploratory testing,bug hunting,sbtm,test charter | `exploratory-testing` | session-based exploratory bug hunting |
+| проверь удобство,протестировать удобство,юзабилити,с телефона,на телефоне,goal-driven test,agentic browser,natural-language e2e,let an agent explore,usability | `agentic-browser-testing` | goal-driven browser agent walks a flow (Playwright MCP) |
+| неудобно с телефона,вёрстка едет,верстка едет,мобильн вёрстк,мобильн верстк,адаптив,responsive,touch target,horizontal overflow,горизонтальн скролл,review the ui,audit the layout,mobile layout | `web-design-reviewer` | audit responsive/mobile layout in a real browser & fix at source |
 <!-- ADVISOR-MAP-END -->
