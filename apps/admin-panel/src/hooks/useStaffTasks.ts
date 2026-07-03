@@ -37,6 +37,9 @@ export interface StaffTask {
   linked_route: string | null
   linked_label: string | null
   linked_label_th: string | null
+  /** Optional deep-link to a Handbook (knowledge base) page — the how-to for this task. */
+  kb_page_id: string | null
+  kb_page?: { slug: string; translations: { lang: string; title: string }[] } | null
   /** Free-text execution comment/remark (distinct from description/Notes). */
   comment: string | null
   completed_at: string | null
@@ -70,13 +73,14 @@ export interface StaffTaskInsert {
   linked_route?: string | null
   linked_label?: string | null
   linked_label_th?: string | null
+  kb_page_id?: string | null
   comment?: string | null
 }
 
 export type StaffTaskUpdate = Partial<StaffTaskInsert>
 
 const SELECT_COLS =
-  'id, title, title_th, description, description_th, assigned_to, created_by, category, priority, status, station, due_date, due_time, reminder_offset_min, recurrence, recurrence_days, is_template, template_id, dm_message_id, group_message_id, photo_urls, linked_route, linked_label, linked_label_th, comment, completed_at, completed_via, created_at, updated_at, staff:staff(name, role)'
+  'id, title, title_th, description, description_th, assigned_to, created_by, category, priority, status, station, due_date, due_time, reminder_offset_min, recurrence, recurrence_days, is_template, template_id, dm_message_id, group_message_id, photo_urls, linked_route, linked_label, linked_label_th, kb_page_id, kb_page:kb_pages(slug, translations:kb_page_translations(lang, title)), comment, completed_at, completed_via, created_at, updated_at, staff:staff(name, role)'
 
 export interface UseStaffTasksResult {
   tasks: StaffTask[]        // concrete tasks (is_template = false)

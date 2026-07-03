@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   X, Pencil, Check, Link2, Repeat, Clock, MessageSquare, Camera, Loader2,
-  Trash2, Send,
+  Trash2, Send, BookOpen,
 } from 'lucide-react'
 import type { StaffTask } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
@@ -162,6 +162,20 @@ export function TaskDetailModal({
           >
             <Link2 className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{task.linked_label ?? 'Open tab'}</span>
+          </button>
+        )}
+
+        {/* Linked Handbook instructions page */}
+        {task.kb_page?.slug && (
+          <button
+            type="button"
+            onClick={() => navigate(`/handbook/${task.kb_page!.slug}`)}
+            className="mb-4 ml-0 inline-flex max-w-full items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-300 ring-1 ring-amber-500/20 transition hover:bg-amber-500/20 sm:ml-2"
+          >
+            <BookOpen className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+              {task.kb_page.translations?.find((t) => t.lang === 'en')?.title ?? 'Instructions'}
+            </span>
           </button>
         )}
 
