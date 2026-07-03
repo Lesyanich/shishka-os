@@ -531,26 +531,26 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
     // On mobile the panel is a full-screen sheet (escapes the inbox table's
     // horizontal scroll); on lg+ it renders inline inside the expanded row as before.
     <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-slate-900 lg:static lg:z-auto lg:block lg:overflow-visible lg:bg-transparent">
-      {/* Mobile sheet header with close — hidden on desktop */}
-      {onClose && (
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/95 px-4 py-3 backdrop-blur lg:hidden">
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-100">
-            {supplierName || 'Receipt'}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-            title="Close"
-            aria-label="Close review"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-      )}
       <div className="flex flex-col lg:flex-row">
-      {/* ── LEFT: Zoomable image viewer (sticky) ── */}
-      <div className="w-full lg:w-[340px] lg:shrink-0 lg:self-start lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-900/90 p-3">
+      {/* ── LEFT: Zoomable image viewer — sticky on mobile so it stays visible while rows scroll ── */}
+      <div className="sticky top-0 z-[5] w-full self-start border-b border-slate-800 bg-slate-900 p-3 lg:w-[340px] lg:shrink-0 lg:border-b-0 lg:border-r">
+        {/* Mobile title + close bar (over the pinned image) */}
+        {onClose && (
+          <div className="mb-2 flex items-center justify-between gap-2 lg:hidden">
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-100">
+              {supplierName || 'Receipt'}
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              title="Close"
+              aria-label="Close review"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        )}
         {/* Zoom controls */}
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-1">
@@ -603,7 +603,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            className={`${imgCollapsed ? 'h-16' : 'h-[42vh]'} lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
+            className={`${imgCollapsed ? 'h-14' : 'h-[32vh]'} lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
           >
             {row.photo_urls[selectedPhotoIdx]?.toLowerCase().endsWith('.pdf') ? (
               <iframe
@@ -950,18 +950,19 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
           </table>
         </div>
 
-        {/* ── Mobile card list (replaces the wide table below md) ── */}
-        <div className="space-y-2 md:hidden">
+        {/* ── Mobile card list (replaces the wide table below md) — compact ── */}
+        <div className="space-y-1.5 md:hidden">
           {items.map((item, i) => {
             const nom = item.nomenclature_id ? nomMap[item.nomenclature_id] : null
             const editing = editingRows.has(i)
             const checked = checkedItems.has(i)
             const cardBg = checked
-              ? item.flow_type === 'CapEx' ? 'bg-sky-500/5' : item.flow_type === 'OpEx' ? 'bg-amber-500/5' : 'bg-emerald-500/5'
+              ? item.flow_type === 'CapEx' ? 'bg-sky-500/5' : item.flow_type === 'OpEx' ? 'bg-amber-500/5' : 'bg-slate-900/40'
               : 'bg-slate-900/40'
+            const barcode = item.barcode || item.supplier_sku
             return (
-              <div key={i} className={`rounded-lg border border-slate-800 p-3 ${cardBg}`}>
-                {/* header: verify + # + flow + actions */}
+              <div key={i} className={`rounded-lg border border-slate-800 px-2.5 py-2 ${cardBg}`}>
+                {/* Row 1: verify · # · flow · actions */}
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -973,11 +974,11 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
                   <span className="text-[11px] text-slate-500">#{i + 1}</span>
                   {flowSelect(i, item.flow_type)}
                   {!isReadOnly && (
-                    <div className="ml-auto flex items-center gap-1">
+                    <div className="ml-auto flex items-center gap-0.5">
                       <button
                         type="button"
                         onClick={() => toggleEdit(i)}
-                        className={`flex h-9 w-9 items-center justify-center rounded hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-400'}`}
+                        className={`flex h-8 w-8 items-center justify-center rounded hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-400'}`}
                         title={editing ? 'Done' : 'Edit'}
                         aria-label={editing ? 'Done editing' : 'Edit item'}
                       >
@@ -986,7 +987,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
                       <button
                         type="button"
                         onClick={() => removeItem(i)}
-                        className="flex h-9 w-9 items-center justify-center rounded text-slate-500 hover:bg-slate-700 hover:text-rose-400"
+                        className="flex h-8 w-8 items-center justify-center rounded text-slate-500 hover:bg-slate-700 hover:text-rose-400"
                         title="Delete"
                         aria-label="Delete item"
                       >
@@ -996,59 +997,41 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
                   )}
                 </div>
 
-                {/* name */}
-                <div className="mt-2">
-                  {editing ? (
-                    <input value={item.name} onChange={(e) => updateItem(i, 'name', e.target.value)} className={`${inputCls} w-full text-sm`} />
-                  ) : (
-                    <>
-                      <div className="text-sm text-slate-100">{item.name}</div>
-                      {item.original_name && item.original_name !== item.name && (
-                        <div className="text-[11px] text-slate-500">{item.original_name}</div>
-                      )}
-                      {item.brand && (
-                        <span className="text-[11px] text-slate-600">{item.brand} {item.package_weight || ''}</span>
-                      )}
-                    </>
-                  )}
-                </div>
+                {/* Row 2: name */}
+                {editing ? (
+                  <input value={item.name} onChange={(e) => updateItem(i, 'name', e.target.value)} className={`${inputCls} mt-1.5 w-full text-sm`} />
+                ) : (
+                  <div className="mt-1 text-sm leading-snug text-slate-100">{item.name}</div>
+                )}
 
-                {/* qty × unit @ price = total */}
-                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                  <div className="flex items-center gap-1">
-                    <span className="text-slate-500">Qty:</span>
-                    {editing ? (
-                      <input type="number" step="any" value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))} className={`${numInputCls} w-16`} />
-                    ) : (
-                      <span className="text-slate-200">{item.quantity}</span>
-                    )}
-                    {editing ? (
-                      <input value={item.unit} onChange={(e) => updateItem(i, 'unit', e.target.value)} className={`${inputCls} w-12`} />
-                    ) : (
-                      <span className="text-slate-400">{item.unit}</span>
-                    )}
+                {/* Row 3: qty · unit-price ............ total */}
+                {editing ? (
+                  <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-xs">
+                    <label className="flex flex-col gap-0.5">
+                      <span className="text-[9px] uppercase text-slate-500">Qty</span>
+                      <input type="number" step="any" value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))} className={numInputCls} />
+                    </label>
+                    <label className="flex flex-col gap-0.5">
+                      <span className="text-[9px] uppercase text-slate-500">Unit</span>
+                      <input value={item.unit} onChange={(e) => updateItem(i, 'unit', e.target.value)} className={inputCls} />
+                    </label>
+                    <label className="flex flex-col gap-0.5">
+                      <span className="text-[9px] uppercase text-slate-500">Price</span>
+                      <input type="number" step="any" value={item.unit_price} onChange={(e) => updateItem(i, 'unit_price', Number(e.target.value))} className={numInputCls} />
+                    </label>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-slate-500">Price:</span>
-                    {editing ? (
-                      <input type="number" step="any" value={item.unit_price} onChange={(e) => updateItem(i, 'unit_price', Number(e.target.value))} className={`${numInputCls} w-20`} />
-                    ) : (
-                      <span className="text-slate-200">{fmt(item.unit_price)}</span>
-                    )}
-                  </div>
-                  <div className="col-span-2 flex items-center justify-between border-t border-slate-800 pt-1.5">
-                    <span className="text-slate-500">Total</span>
+                ) : (
+                  <div className="mt-1 flex items-baseline justify-between gap-2 text-xs">
+                    <span className="text-slate-400">
+                      {item.quantity} {item.unit}
+                      {item.unit_price ? <span className="text-slate-500"> · {fmt(item.unit_price)}/u</span> : null}
+                    </span>
                     <span className="text-sm font-semibold text-slate-100">{'฿'}{fmt(item.total_price)}</span>
                   </div>
-                </div>
+                )}
 
-                {/* barcode + nomenclature + confidence */}
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-                  {editing ? (
-                    <input value={item.barcode || ''} onChange={(e) => updateItem(i, 'barcode', e.target.value)} className={`${inputCls} w-full font-mono text-[11px]`} placeholder="barcode" />
-                  ) : (
-                    <span className="break-all font-mono text-slate-500">{item.barcode || item.supplier_sku || '—'}</span>
-                  )}
+                {/* Row 4: match · confidence · category · barcode (only what's present) */}
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
                   {nom ? (
                     <span className="text-emerald-400">{nom.name}</span>
                   ) : (
@@ -1056,6 +1039,11 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
                   )}
                   {confidenceBadge(item.confidence)}
                   {nom?.category && <span className="text-slate-500">{nom.category}</span>}
+                  {editing ? (
+                    <input value={item.barcode || ''} onChange={(e) => updateItem(i, 'barcode', e.target.value)} className={`${inputCls} mt-1 w-full font-mono text-[10px]`} placeholder="barcode" />
+                  ) : (
+                    barcode && <span className="break-all font-mono text-slate-600">{barcode}</span>
+                  )}
                 </div>
               </div>
             )
