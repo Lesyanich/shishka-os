@@ -128,8 +128,8 @@ This is why expensive salmon (599฿/kg) is destroyed by a sous-vide-then-freeze
 
 - L1 produces and preserves; **L2 assembles and regenerates only.**
 - **Test:** if a proposed flow requires L2 to *cook or char* (not assemble/regen), the design is wrong — redo it. It duplicates work, slows the service line, and defeats the central-kitchen model.
-- **Equipment Reality (the fix for "Infrastructural Blindness"):** for **every** heat / char / finish step, name the specific machine **and its zone**, then verify that machine physically lives in that zone (`operations.md` Equipment-by-Zone table). **The Lava Grill (`L1-LAVA-GRILL-650-33`) is L1-only. L2 has NO grill** — only a Merrychef (regen), a flat contact/breakfast griddle, and salad bars. So any char/smoke step is **L1**; a "sear at L2" is physically impossible and a hallucination.
-- **The one L2 cooking exception** is a **delicate cook-to-order** protein (e.g. salmon, P9) finished to order on the L2 flat griddle / Merrychef — a gentle pan-sear, **never** a lava char (there is no lava grill at L2). All cook-chill items: L2 regenerates only; the char was already laid down at L1.
+- **Equipment Reality (the fix for "Infrastructural Blindness"):** for **every** heat / char / finish step, name the specific machine **and its zone**, then verify it **by calling the live `list_equipment` tool** (it returns each unit's `zone`, `status`, `is_bottleneck`). `list_equipment` reads the `equipment` DB table (mig 070) and is the **source of truth**; `operations.md` is only a lagging snapshot — never treat the markdown as final.
+- **The durable fact:** **BBQ/lava char = the Lava Grill (`L-1-K-LAVA-GRILL-650-33`), L1 only.** L2 has **no lava grill** — so the signature smoke/char is an **L1** step ("90% Cooked", sear-first). (L2 *does* have a contact grill + induction + high-speed oven, so it can gently cook a **delicate cook-to-order** item like salmon (P9) — but it cannot reproduce lava char, and re-searing a cook-chilled protein there just dries it.) All cook-chill items: L2 regenerates only; the char was laid down at L1.
 
 ---
 

@@ -4,7 +4,7 @@ agents: [chef, ops]
 load_when: "production workflow, L1-L2 logistics, cold chain, staffing, scheduling, daily ops"
 last_updated: 2026-07-03
 updated_by: CEO
-change_log: "2026-07-03 — added L2 Point-of-Sale equipment list + Equipment-by-Zone quick reference (flow-design guardrail). Fixes chef-agent Infrastructural Blindness: L2 has no lava grill; char is L1-only, L2 = regen."
+change_log: "2026-07-03 — added L2 Point-of-Sale equipment + Equipment-by-Zone quick reference; then pivoted it to a SNAPSHOT that defers to the LIVE `equipment` table via list_equipment (which now returns zone). Corrected L2 against live data (it HAS contact grill + induction + HS oven — only the LAVA grill is L1-only). Fixes chef Infrastructural Blindness without hardcoding a stale equipment list."
 source: "Notion SHISHKA CORE HUB, Section 3.2.1"
 ---
 
@@ -75,33 +75,38 @@ The L1 Kitchen operates on the **Central Kitchen** model. We do NOT cook "to ord
 - **Blender** (L1-KITCH-BLND-CHINA-13): On table in cold zone. For hot puree soups and sauces. Powerful, noisy
 - **Juicer** (L1-JUIC-EXTR-CHINA-15): For detox drink bases and marinades (ginger/celery juice). Requires thorough mesh cleaning immediately after use
 
-## L2 — Point of Sale (Finishing & Assembly, NOT a kitchen)
+## Equipment & Zones — LIVE source of truth
 
-L2 is a **service point, not a cooking cell.** Its motto: "Speed & Crunch." Staff **assemble and regenerate — they do not cook or char.** (Canon: `menu-concept.md` — "90% Cooked" proteins from vacuum bag → oven → plate in ~60s; "L2 staff only assemble, don't cook".)
+> ⚠️ **This table below is a human-readable SNAPSHOT and can lag. The authoritative, continuously-updated source is the `equipment` DB table (mig 070), queried via the Chef Agent's `list_equipment` tool** — it returns each unit's `zone` (L1/L2, from the `equipment_code` prefix `L-1-*` / `L-2-*`), `location_zone`, `is_bottleneck`, and `preheat_min`. **When designing a flow, confirm the machine + zone by calling `list_equipment(name_search=...)` — do NOT trust this markdown as final.** Equipment is its own operational table; the finance `capex_assets` ledger is separate.
 
-**L2 equipment — the ENTIRE list:**
-- **Merrychef / TurboChef high-speed oven** — regeneration only. Reheats a "90% Cooked" vacuum-packed protein to a safe, juicy core in ~60s; evaporates surface moisture to *restore* the grilled texture that was created at L1. It is a re-heater, not a grill.
-- **Flat contact / breakfast griddle** — warms and assembles breakfast items. A flat plate: it can gently warm, but it CANNOT reproduce lava-rock char and will only dry a protein if used to "sear" it.
-- **2× Salad Bars** (L2-SB-150-9, L2-SB-150-10) — cold assembly, 28 GN pans each.
+## L2 — Point of Sale (Finishing & Assembly)
 
-**L2 does NOT have:** ❌ Lava Grill · ❌ Gas Range · ❌ Blast Chiller · ❌ Vacuum Sealer · ❌ Convection Oven. Those are **L1-only** (Zones 3–4).
+L2's operating model: **assemble + regenerate.** For cook-chill items, staff do not cook — the char/cook was done at L1 ("90% Cooked" rule, `menu-concept.md`). L2 *does* have some cooking capability (below), used only for **delicate cook-to-order** items (e.g. salmon) — never to re-char a cook-chilled protein.
+
+**L2 equipment (confirm live via `list_equipment`):**
+- **High-Speed Oven / Merrychef** (`L-2-S-HS-OVN-MCs1s-39`) — regeneration. Reheats a "90% Cooked" vacuum-packed protein to a juicy core in ~60s; evaporates surface moisture to *restore* the grilled texture created at L1. A re-heater, not a grill.
+- **Contact Grill** (`L-2-S-GRIILL-CNT-48`) + **Breakfast Station** (grill+griddle 2-in-1, `EQ-COOK-4D3D4`) — flat/clamshell surfaces. Can gently cook a delicate à-la-carte item, but **cannot reproduce lava-rock char** and will just dry a cook-chilled protein if used to "re-sear" it.
+- **Induction burners** (`L-2-S-INDCT-BRN-2-6`, `L-2-S-INDCT-BRN-2-65`) — electric hobs for à-la-carte finishing.
+- **2× Salad Bars** (`L-2-S-SB-150-9/10`) — cold assembly, 28 GN pans each.
+
+**The one thing L2 does NOT have: a ❌ Lava Grill.** BBQ smoke/char is **L1-only**. (Gas range, blast chiller, vacuum sealer, convection oven are also L1-only — see below.)
 
 ## Equipment-by-Zone — Quick Reference (flow-design guardrail)
 
-> **Hard rule for anyone (human or agent) designing a production flow: flavor is built where the equipment for it exists.** Name the specific machine AND its zone for every heat/char/finish step, then verify the machine physically lives in that zone. If it doesn't, the step cannot happen there — redesign.
+> **Hard rule for anyone (human or agent) designing a production flow: flavor is built where the equipment for it exists.** Name the specific machine AND its zone for every heat/char/finish step, then verify the machine physically lives in that zone (**via `list_equipment`, not this snapshot**). If it doesn't, the step cannot happen there — redesign.
 
-| Capability | Machine | Zone | Notes |
+| Capability | Machine (live code) | Zone | Notes |
 |---|---|---|---|
-| Char / smoke / grill marks (Maillard) | Lava Grill `L1-LAVA-GRILL-650-33` | **L1** only | The ONLY source of BBQ/lava char. No equivalent at L2. |
-| Boil / stock / sauté | Gas Range `L1-GAS-RNG-570-32` | **L1** only | |
-| Roast / bake | Convection Oven `L1-EL-CON-OVEN-83-20` | **L1** only | |
-| Sous-vide / vacuum seal | Chamber Vacuum Sealer `L1-VAC-500-67` (+ bath) | **L1** only | |
-| Shock-chill (CCP) / freeze | Blast Chiller `L1-BL-FRZ-790-66` | **L1** only | Bottleneck; gates all L1→L2 dispatch. |
-| **Regenerate** (reheat to service temp) | Merrychef / TurboChef | **L2** | Re-heat, NOT a cook or a char. |
-| Warm/assemble breakfast | Flat contact griddle | **L2** | Gentle warming only; cannot char. |
-| Cold assembly | Salad Bars `L2-SB-150-9/10` | **L2** | |
+| **Char / smoke / grill marks (lava)** | Lava Grill `L-1-K-LAVA-GRILL-650-33` | **L1** only | The ONLY source of BBQ/lava char. No equivalent at L2. |
+| Boil / stock / sauté (gas) | Gas Range `L-1-K-GAS-RNG-570-32` | **L1** only | L2 has induction hobs instead. |
+| Roast / bake | Convection Oven `L-1-K-EL-CON-OVEN-83` | **L1** only | |
+| Sous-vide / vacuum seal | Chamber Vacuum Sealer `L-1-K-VAC-500-67` (+ bath) | **L1** only | |
+| Shock-chill (CCP) / freeze | Blast Chiller `L-1-K-BL-FRZ-790-66` | **L1** only | Bottleneck; gates all L1→L2 dispatch. |
+| **Regenerate** (reheat to service temp) | High-Speed Oven `L-2-S-HS-OVN-MCs1s-39` | **L2** | Re-heat, NOT a cook or a char. |
+| Gentle à-la-carte cook / warm | Contact Grill `L-2-S-GRIILL-CNT-48`, Breakfast Station `EQ-COOK-4D3D4`, Induction `L-2-S-INDCT-BRN-*` | **L2** | Delicate cook-to-order only; cannot lava-char. |
+| Cold assembly | Salad Bars `L-2-S-SB-150-9/10` | **L2** | |
 
-**Consequence for protein flows:** the sear/char step is an **L1 lava-grill** step ("90% Cooked" rule). L2 receives an already-charred, already-cooked, chilled protein and only **regenerates** it. Never design a "sear/char/color at L2" step — there is no grill there, and the flat griddle would just dry the meat.
+**Consequence for protein flows:** the **lava char** step is an **L1** step ("90% Cooked" rule). L2 receives an already-charred, already-cooked, chilled protein and only **regenerates** it. Never design a "lava char / re-sear at L2" step — there is no lava grill there, and re-searing a cook-chilled piece on the contact grill just dries it.
 
 ## Daily Operations Model
 - L1 preps batches: morning 07:00-10:00 — 10-12kg toppings, bottled sauces, dough

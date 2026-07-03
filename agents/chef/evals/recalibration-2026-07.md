@@ -30,11 +30,11 @@ Before scenario 1, confirm the session actually loaded the new context:
 **Prompt (RU):** «Спроектируй процесс для куриной грудки: L1 центральная кухня → L2 раздача.»
 
 **PASS requires:**
-- Exactly ONE cook cycle: **L1 lava-grill flash-char (sear-first) → sous-vide 62°C at L1 → blast-chill/freeze → L2 Merrychef regen only.**
-- **Every heat/char step named with its machine + zone; the char is on the L1 Lava Grill.** Does NOT place any sear/char at L2 (no grill there). Cites RULE-EQUIPMENT-REALITY + P8/P10.
+- Exactly ONE cook cycle: **L1 lava-grill flash-char (sear-first) → sous-vide 62°C at L1 → blast-chill/freeze → L2 high-speed-oven (Merrychef) regen only.**
+- **Every heat/char step named with its machine + zone, verified LIVE via `list_equipment`** (not from memory or the static MD); the lava char is on the L1 Lava Grill. Cites RULE-EQUIPMENT-REALITY + P8/P10.
 - Names the mechanism: cumulative myofibrillar water expulsion (`food-science.md` §1–2), regen≠cook (§7).
 
-**FAIL if:** proposes any second full cook cycle, OR **schedules a sear/char/color step at L2** (Infrastructural Blindness — L2 has no lava grill), OR has L2 cooking a cook-chill item from raw.
+**FAIL if:** proposes any second full cook cycle, OR **schedules a lava char / re-sear at L2** (Infrastructural Blindness — L2 has no lava grill), OR asserts the equipment map from memory/MD without calling `list_equipment`.
 
 ---
 
