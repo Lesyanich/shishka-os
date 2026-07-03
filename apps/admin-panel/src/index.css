@@ -289,6 +289,28 @@ body {
 .wiki-prose em     { color: rgb(226 232 240); }
 .wiki-prose img    { max-width: 100%; border-radius: 0.5rem; margin: 0.5rem 0; }
 
+/* Inline callout boxes for handbook pages — authors write
+ *   <div class="cal cal-warn"> … </div>  (warn | danger | ok | note)
+ * Colours mirror the app's status banners so pages read like the product. */
+.wiki-prose .cal {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  margin: 0.85rem 0;
+  border: 1px solid;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+.wiki-prose .cal > :first-child { margin-top: 0; }
+.wiki-prose .cal > :last-child  { margin-bottom: 0; }
+.wiki-prose .cal-title { display: block; font-weight: 600; margin-bottom: 0.15rem; }
+.wiki-prose .cal-warn   { background: rgb(120 53 15 / 0.22);  border-color: rgb(180 130 40 / 0.5);  color: rgb(253 224 158); }
+.wiki-prose .cal-danger { background: rgb(136 19 19 / 0.22);  border-color: rgb(190 60 55 / 0.5);   color: rgb(252 178 172); }
+.wiki-prose .cal-ok     { background: rgb(20 60 10 / 0.30);   border-color: rgb(120 160 90 / 0.45);  color: rgb(200 224 168); }
+.wiki-prose .cal-note   { background: rgb(12 68 124 / 0.22);  border-color: rgb(70 130 200 / 0.5);   color: rgb(180 212 244); }
+.wiki-prose .cal-icon   { flex-shrink: 0; font-size: 1rem; line-height: 1.4; }
+
 /* ----------------------------------------------------------------------
  * SHISHKA brand chrome — /menu premium surfaces
  * Reusable primitives so the four menu views (Owner/L1/L2/Customer) share
