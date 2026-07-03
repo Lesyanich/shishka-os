@@ -29,7 +29,7 @@ interface Draft {
   location: string | null
 }
 
-const DEFAULT_DRAFT: Draft = { weekdays: [0, 2, 3, 4, 5, 6], start: '08:00', end: '17:00', brk: 60, location: null }
+const DEFAULT_DRAFT: Draft = { weekdays: [0, 2, 3, 4, 5, 6], start: '09:00', end: '18:00', brk: 60, location: null }
 
 export function ScheduleTemplatePanel() {
   const { locations } = useLocations()

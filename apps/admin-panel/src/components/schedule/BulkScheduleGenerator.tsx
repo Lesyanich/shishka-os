@@ -67,8 +67,8 @@ export function BulkScheduleGenerator() {
   const [template, setTemplate] = useState<Template>('every_day')
   const [customWorkDays, setCustomWorkDays] = useState(5)
   const [customOffDays, setCustomOffDays] = useState(2)
-  const [shiftStart, setShiftStart] = useState('08:00')
-  const [shiftEnd, setShiftEnd] = useState('16:00')
+  const [shiftStart, setShiftStart] = useState('09:00')
+  const [shiftEnd, setShiftEnd] = useState('18:00')
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<string | null>(null)
 
