@@ -515,7 +515,30 @@ is not the offer itself. The hook is best-effort; this rule holds even when it s
 **Compound engineering.** When a tool would have helped but no hint fired, add a row to the
 `ADVISOR-MAP` table (bilingual RU+EN keywords) — per `RULE-COMPOUND-ENGINEERING`.
 
+**Tool-question protocol (hard).** When the CEO directly asks which skill/command/tool to use
+for a task ("какой скилл/команду использовать", "какую команду или скилл", "which skill should
+I use", etc.), do this **in order before answering** — never keyword-grep the registry and
+guess:
+- Read `docs/operations/skill-advisor.md` **in full** — every domain section, not a grep.
+- Check the installed arsenal: skills listed in session context, slash-commands, MCP servers.
+- Check `skills-lock.json` sources for **partially-installed collections** — the source repo
+  may hold uninstalled skills that fit (e.g. `petrkindlmann/qa-skills` ships 50, only 6
+  installed; the answer to a gap may be an already-vetted-but-uninstalled skill).
+- If still no fit, run `find-skills` to search installable skills.
+- Only after all four steps may you say "no ready-made tool exists".
+
+**Research to registry (hard).** When the CEO asks to research open source (or you research it
+on your own initiative) for a capability gap, the deliverable is **not** a chat answer — it
+MUST end with a registry update:
+- Install the chosen skill(s) (update `skills-lock.json`).
+- Add the skill to the matching domain section of `skill-advisor.md`.
+- Add a bilingual (RU+EN) row to `ADVISOR-MAP`.
+- If nothing was worth installing, record the negative result (what was searched, when, why
+  rejected) so the search is not blindly repeated.
+- Research that ends with only a recommendation in chat is an **incomplete task**.
+
 > Origin: 2026-06-28. CEO: «я не могу запомнить все полезные фичи — хочу чтобы Клод сам подсказывал какими скиллами упростить работу».
+> Origin 2: 2026-07-03. CEO: «когда я задаю вопрос какой скилл/команду использовать — сначала посмотри все доступные варианты; если прошу поискать опен сорс — не просто ищи, а обновляй наш реестр».
 
 ---
 
