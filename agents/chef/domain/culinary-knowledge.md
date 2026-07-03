@@ -107,7 +107,7 @@ Wet season (май-ноябрь) / Dry season (декабрь-апрель) вл
 - Every **full cook cycle** permanently expels water from muscle fiber; losses stack and never come back.
 - **Budget: ONE cook cycle per protein per L1→L2 chain. Maximum two only with written justification.**
 - A **Merrychef regeneration** (≤60–90s reheat of already-cooked food to ~74°C) is a REGEN, not a cook cycle.
-- A **≤90s color sear** on an already-cooked protein is a FINISH, not a cook cycle.
+- The **lava-grill char** is a FINISH, not a cook cycle — but it must be laid down **at L1, where the grill is** (sear-first, "90% Cooked"). There is **no grill at L2**, so a char step can NEVER be scheduled at L2. (This is the equipment rule — see Principle 10 and `process-technology.md` §3.)
 - **`cook → chill/freeze → cook again` is auto-rejected.** Any flow with two full cooks separated by chilling/freezing = wrong design (this is the triple-heat chicken failure: sous-vide + lava-grill at L1 + freeze + re-grill at L2 = 3 cycles = dry "sole leather").
 
 ### 9. Delicate-Protein Classification
@@ -117,17 +117,19 @@ Wet season (май-ноябрь) / Dry season (декабрь-апрель) вл
 | Class | Examples | Rule |
 |---|---|---|
 | **Delicate** | salmon, white fish, shrimp, seafood | **Cook-to-order** from raw (fresh or IQF-raw) portions. **Never cook-then-freeze-then-reheat** — albumin bleed + mushy texture. Portion raw, freeze raw, finish at service with color. |
-| **Intermediate** | chicken breast (lean) | Sous-vide 63–65°C at L1 → blast-chill → **L2 regen only**. Never re-grill/re-cook at L2. |
+| **Intermediate** | chicken breast (lean) | **L1 lava-grill flash-char (~45s, sear-first)** → sous-vide **62°C** at L1 → blast-chill/freeze → **L2 Merrychef regen only**. Never re-grill or char at L2 — there is no grill there. (Canonical flow: `process-technology.md` §4.) |
 | **Robust** | chicken thigh, braises, stews, legumes, grains | Full cook-chill candidates; collagen/gelatin holds water through reheat. |
 
 This is why expensive salmon (599฿/kg) is destroyed by a sous-vide-then-freeze-then-reheat plan, and why it must be cooked to order (52°C, sear for color).
 
-### 10. L1 Unloads L2 (central-kitchen test)
+### 10. L1 Unloads L2 + Equipment Reality (flavor is built where the equipment is)
 
-*Derives from: cook-chill model + regen physics (`knowledge/process-technology.md` §0–4), heat transfer (`food-science.md` §7).*
+*Derives from: cook-chill model + regen physics (`knowledge/process-technology.md` §0–4), heat transfer (`food-science.md` §7), and the physical [`operations.md`](../../../docs/bible/operations.md) equipment map.*
 
 - L1 produces and preserves; **L2 assembles and regenerates only.**
-- **Test:** if a proposed flow requires L2 to *cook* (not assemble/regen), the design is wrong — redo it. It duplicates work, slows the service line, and defeats the central-kitchen model.
+- **Test:** if a proposed flow requires L2 to *cook or char* (not assemble/regen), the design is wrong — redo it. It duplicates work, slows the service line, and defeats the central-kitchen model.
+- **Equipment Reality (the fix for "Infrastructural Blindness"):** for **every** heat / char / finish step, name the specific machine **and its zone**, then verify that machine physically lives in that zone (`operations.md` Equipment-by-Zone table). **The Lava Grill (`L1-LAVA-GRILL-650-33`) is L1-only. L2 has NO grill** — only a Merrychef (regen), a flat contact/breakfast griddle, and salad bars. So any char/smoke step is **L1**; a "sear at L2" is physically impossible and a hallucination.
+- **The one L2 cooking exception** is a **delicate cook-to-order** protein (e.g. salmon, P9) finished to order on the L2 flat griddle / Merrychef — a gentle pan-sear, **never** a lava char (there is no lava grill at L2). All cook-chill items: L2 regenerates only; the char was already laid down at L1.
 
 ---
 
