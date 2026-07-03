@@ -1,15 +1,18 @@
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Star } from 'lucide-react'
 import type { KbOutletContext } from './HandbookLayout'
 import { pickTranslation } from '../../types/knowledgeBase'
 
-/** Handbook landing: a card per top-level space with its child pages. */
+/** Handbook landing: a personal "assigned to you" strip, then a card per space. */
 export function HandbookHome() {
-  const { tree, lang, isLoading, error } = useOutletContext<KbOutletContext>()
+  const { tree, visiblePages, assignedToMe, lang, isLoading, error } =
+    useOutletContext<KbOutletContext>()
   const navigate = useNavigate()
 
   if (isLoading) return <p className="p-6 text-sm text-cream/50">Loading…</p>
   if (error) return <p className="p-6 text-sm text-rose-300">{error}</p>
+
+  const myPages = visiblePages.filter((p) => assignedToMe.has(p.id))
 
   return (
     <div className="space-y-5">
@@ -19,6 +22,27 @@ export function HandbookHome() {
           Everything about our company, our processes, and how we work. Pick a topic to start reading.
         </p>
       </header>
+
+      {myPages.length > 0 && (
+        <section className="shk-panel p-4">
+          <div className="mb-2 flex items-center gap-1.5">
+            <Star className="h-4 w-4 text-honey-300" />
+            <span className="shk-eyebrow text-honey-300">Assigned to you</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {myPages.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => navigate(`/handbook/${p.slug}`)}
+                className="rounded-lg bg-[var(--color-royal-green)]/25 px-3 py-1.5 text-sm text-cream ring-1 ring-inset ring-[var(--color-forest-soft)]/30 transition hover:bg-[var(--color-royal-green)]/40"
+              >
+                {pickTranslation(p, lang).title}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {tree.length === 0 ? (
         <div className="shk-panel p-6 text-sm text-cream/50">No pages yet.</div>

@@ -4,10 +4,12 @@
 // Burmese for the owner to review. English is the canonical stored language;
 // th/my are drafts the owner hand-corrects before saving.
 //
-// SECURITY: owner-only. verify_jwt=true gates that *a* valid JWT is present,
-// but the anon key is itself a valid JWT — so we ALSO resolve the caller via
-// getUser(token) and require staff.app_role = 'owner' (see gotcha:
-// service-role fn needs in-handler guard).
+// SECURITY: owner-only, enforced IN-HANDLER. Deployed with verify_jwt=FALSE
+// (same as telegram-ai) so the browser CORS preflight + POST reach this code —
+// verify_jwt=true made the gateway reject the cross-origin call before it ran.
+// The real gate: resolve the caller via getUser(token) and require
+// staff.app_role = 'owner' (verify_jwt alone is not enough — the anon key is a
+// valid JWT; see gotcha: service-role fn needs in-handler guard).
 //
 // Self-contained on purpose (no ../_shared imports) so the repo file and the
 // deployed function stay identical and it deploys cleanly via MCP.

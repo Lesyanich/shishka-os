@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAppRole, type AppRole } from '../contexts/AppRoleContext'
 import { ROLE_RANK } from '../lib/roles'
-import type { KbLang, KbPage, KbTreeNode } from '../types/knowledgeBase'
+import { assignedStaffIds, type KbLang, type KbPage, type KbTreeNode } from '../types/knowledgeBase'
 
 const PAGE_SELECT =
-  'id, parent_id, slug, icon, sort_order, min_role, is_published, redirect_to_page_id, cover_image_url, created_by, updated_by, created_at, updated_at, translations:kb_page_translations(id, page_id, lang, title, body_md, updated_at)'
+  'id, parent_id, slug, icon, sort_order, min_role, is_published, redirect_to_page_id, cover_image_url, created_by, updated_by, created_at, updated_at, translations:kb_page_translations(id, page_id, lang, title, body_md, updated_at), assignments:kb_page_assignments(staff_id)'
 
 export interface KbPageInput {
   slug: string
@@ -51,6 +51,8 @@ export interface UseKbPagesResult {
   tree: KbTreeNode[]
   bySlug: Map<string, KbPage>
   allSlugs: string[]
+  /** Page ids personally assigned to the current staff member. */
+  assignedToMe: Set<string>
   isLoading: boolean
   error: string | null
   isOwner: boolean
@@ -63,6 +65,8 @@ export interface UseKbPagesResult {
     lang: KbLang,
     content: { title: string; body_md: string },
   ) => Promise<MutationResult>
+  /** Replace the set of staff a page is personally assigned to (owner only). */
+  setPageAssignments: (pageId: string, staffIds: string[]) => Promise<MutationResult>
 }
 
 /**
@@ -74,7 +78,7 @@ export interface UseKbPagesResult {
  * sensitive here). Mutations are owner-only; RLS rejects non-owner writes.
  */
 export function useKbPages(): UseKbPagesResult {
-  const { role, staffName } = useAppRole()
+  const { role, staffName, staffId } = useAppRole()
   const [pages, setPages] = useState<KbPage[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -100,16 +104,45 @@ export function useKbPages(): UseKbPagesResult {
   }, [refetch])
 
   const isOwner = role === 'owner'
+  const isManager = role === 'task_manager' || isOwner
 
-  const visiblePages = useMemo(
-    () =>
-      pages.filter((p) => {
-        if (isOwner) return true
-        if (!p.is_published) return false
-        return ROLE_RANK[role] >= ROLE_RANK[p.min_role]
-      }),
-    [pages, role, isOwner],
-  )
+  // Pages personally assigned to the current staff member.
+  const assignedToMe = useMemo(() => {
+    const s = new Set<string>()
+    if (!staffId) return s
+    for (const p of pages) {
+      if (assignedStaffIds(p).includes(staffId)) s.add(p.id)
+    }
+    return s
+  }, [pages, staffId])
+
+  const visiblePages = useMemo(() => {
+    // Owner sees everything (incl. drafts).
+    if (isOwner) return pages
+
+    const byId = new Map(pages.map((p) => [p.id, p]))
+
+    // Directly-visible pages: published, and either shared (role-gated) or
+    // personally assigned to me. Managers see all published pages.
+    const directlyVisible = pages.filter((p) => {
+      if (!p.is_published) return false
+      if (isManager) return true
+      const assignees = assignedStaffIds(p)
+      if (assignees.length === 0) return ROLE_RANK[role] >= ROLE_RANK[p.min_role]
+      return staffId != null && assignees.includes(staffId)
+    })
+
+    // Keep the tree path intact: pull in each visible page's (published) ancestors.
+    const visibleIds = new Set(directlyVisible.map((p) => p.id))
+    for (const p of directlyVisible) {
+      let cur = p.parent_id ? byId.get(p.parent_id) : undefined
+      while (cur && !visibleIds.has(cur.id)) {
+        if (cur.is_published) visibleIds.add(cur.id)
+        cur = cur.parent_id ? byId.get(cur.parent_id) : undefined
+      }
+    }
+    return pages.filter((p) => visibleIds.has(p.id))
+  }, [pages, role, isOwner, isManager, staffId])
 
   const tree = useMemo(() => buildTree(visiblePages), [visiblePages])
   const bySlug = useMemo(() => {
@@ -176,12 +209,33 @@ export function useKbPages(): UseKbPagesResult {
     [refetch],
   )
 
+  const setPageAssignments = useCallback(
+    async (pageId: string, staffIds: string[]): Promise<MutationResult> => {
+      // Replace the page's assignment set: clear, then insert the chosen staff.
+      const { error: delErr } = await supabase
+        .from('kb_page_assignments')
+        .delete()
+        .eq('page_id', pageId)
+      if (delErr) return { ok: false, error: delErr.message }
+      if (staffIds.length > 0) {
+        const { error: insErr } = await supabase.from('kb_page_assignments').insert(
+          staffIds.map((sid) => ({ page_id: pageId, staff_id: sid, assigned_by: staffName })),
+        )
+        if (insErr) return { ok: false, error: insErr.message }
+      }
+      await refetch()
+      return { ok: true, id: pageId }
+    },
+    [refetch, staffName],
+  )
+
   return {
     pages,
     visiblePages,
     tree,
     bySlug,
     allSlugs,
+    assignedToMe,
     isLoading,
     error,
     isOwner,
@@ -190,5 +244,6 @@ export function useKbPages(): UseKbPagesResult {
     updatePage,
     deletePage,
     upsertTranslation,
+    setPageAssignments,
   }
 }

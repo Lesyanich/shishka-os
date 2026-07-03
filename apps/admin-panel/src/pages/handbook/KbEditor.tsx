@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { AlertCircle, ImagePlus, Loader2, Sparkles, Trash2 } from 'lucide-react'
+import { AlertCircle, ImagePlus, Loader2, Sparkles, Trash2, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { slugifyHeading } from '../../lib/vault'
 import { useKbImageUpload } from '../../hooks/useKbImageUpload'
+import { useStaff } from '../../hooks/useStaff'
 import type { AppRole } from '../../contexts/AppRoleContext'
 import type { KbOutletContext } from './HandbookLayout'
 import { KbMarkdown } from './KbMarkdown'
 import {
+  assignedStaffIds,
   KB_LANGS,
   KB_LANG_LABEL,
   type KbLang,
@@ -55,8 +57,10 @@ export function KbEditor() {
     updatePage,
     deletePage,
     upsertTranslation,
+    setPageAssignments,
   } = useOutletContext<KbOutletContext>()
   const { upload, isUploading } = useKbImageUpload()
+  const { staff } = useStaff()
 
   const existing = slug ? bySlug.get(slug) ?? null : null
   const isEdit = !!existing
@@ -72,6 +76,7 @@ export function KbEditor() {
   const [redirectTo, setRedirectTo] = useState<string | null>(null)
   const [content, setContent] = useState<LangContent>(EMPTY_CONTENT)
   const [activeTab, setActiveTab] = useState<KbLang>('en')
+  const [assignedStaff, setAssignedStaff] = useState<string[]>([])
 
   const [saving, setSaving] = useState(false)
   const [translating, setTranslating] = useState<KbLang | null>(null)
@@ -83,8 +88,10 @@ export function KbEditor() {
   useEffect(() => {
     if (!existing) {
       setContent(EMPTY_CONTENT)
+      setAssignedStaff([])
       return
     }
+    setAssignedStaff(assignedStaffIds(existing))
     setSlugVal(existing.slug)
     setSlugTouched(true)
     setParentId(existing.parent_id)
@@ -216,6 +223,9 @@ export function KbEditor() {
       if (lang !== 'en' && !title.trim() && !body_md.trim()) continue
       if (pageId) await upsertTranslation(pageId, lang, { title, body_md })
     }
+
+    // Save the personal assignment set (who this page is for).
+    if (pageId) await setPageAssignments(pageId, assignedStaff)
 
     setSaving(false)
     navigate(`/handbook/${finalSlug}`)
@@ -349,6 +359,51 @@ export function KbEditor() {
           />
           Published (visible to staff)
         </label>
+      </div>
+
+      {/* ── Personal assignment: who this page is for ── */}
+      <div className="mb-5">
+        <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs text-cream/60">
+          <Users className="h-3.5 w-3.5" />
+          Assign to specific people
+          <span className="text-cream/35">— leave empty = everyone allowed by the role above</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {staff.filter((s) => s.is_active).length === 0 ? (
+            <span className="text-xs text-cream/35">No staff.</span>
+          ) : (
+            staff
+              .filter((s) => s.is_active)
+              .map((s) => {
+                const on = assignedStaff.includes(s.id)
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() =>
+                      setAssignedStaff((prev) =>
+                        on ? prev.filter((x) => x !== s.id) : [...prev, s.id],
+                      )
+                    }
+                    className={[
+                      'rounded-full px-2.5 py-1 text-xs font-medium transition',
+                      on
+                        ? 'bg-[var(--color-forest-soft)]/25 text-cream ring-1 ring-inset ring-[var(--color-forest-soft)]/40'
+                        : 'bg-[var(--s-2)] text-cream/55 hover:text-cream',
+                    ].join(' ')}
+                  >
+                    {s.name}
+                  </button>
+                )
+              })
+          )}
+        </div>
+        {assignedStaff.length > 0 && (
+          <p className="mt-1.5 text-[11px] text-honey-300/80">
+            Personal page — only the {assignedStaff.length} selected{' '}
+            {assignedStaff.length === 1 ? 'person' : 'people'} (plus managers/owner) will see it.
+          </p>
+        )}
       </div>
 
       {/* ── Language tabs ── */}

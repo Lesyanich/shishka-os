@@ -21,6 +21,10 @@ export interface KbTranslation {
   updated_at: string
 }
 
+export interface KbAssignment {
+  staff_id: string
+}
+
 export interface KbPage {
   id: string
   parent_id: string | null
@@ -36,6 +40,13 @@ export interface KbPage {
   created_at: string
   updated_at: string
   translations: KbTranslation[]
+  /** Staff this page is personally assigned to. Empty/absent = shared (role-visible). */
+  assignments?: KbAssignment[]
+}
+
+/** Staff ids a page is assigned to (empty = shared / role-visible). */
+export function assignedStaffIds(page: KbPage): string[] {
+  return (page.assignments ?? []).map((a) => a.staff_id)
 }
 
 export interface KbTreeNode extends KbPage {
