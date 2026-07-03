@@ -386,8 +386,13 @@ When CEO shares a test plan, results, or conclusions:
 |---|---|---|
 | "What did we decide about X?" | Supabase `agent_memory` | `recall_memories(agent_id='chef', topic='X')` |
 | "What's our kitchen philosophy?" | Project docs | Read `docs/bible/kitchen-philosophy.md` |
-| "What equipment do we have?" | Project docs | Read `docs/bible/equipment.md` |
+| "What equipment do we have / where / is it free?" | **LIVE `equipment` table** (SoT) | **`list_equipment(name_search=...)`** — returns `zone`, `status`, `is_bottleneck`. NOT the static `docs/bible/equipment.md` (a lagging snapshot). |
+| "What did the equipment cost / depreciation?" | Finance `capex_assets` (joined to equipment by `equipment_id`) | ask `/finance` (`manage_capex_assets`) |
 | "What kitchen tasks are open?" | Mission Control | `list_tasks(domain="kitchen")` |
+
+### Facts vs discovery — never confuse the two
+- **Live facts** (equipment/zone, cost, КБЖУ, inventory, supplier specs) → **query the MCP tool** (`list_equipment`, `calculate_cost`, `search_makro_catalog`…). These have a single live source in the DB. Never read a fact off a markdown/vault snapshot or off `graphify` — they lag.
+- **Discovery** ("which doc covers X / what connects to Y / where does this concept live") → `graphify` (GRAPH-BEFORE-GREP) is fine as a **map**, then open the file / query the live tool. graphify is a weekly snapshot and is **never authoritative for a fact** — its own rule: don't quote from the graph, open the source.
 
 ### Mandatory Write Protocol
 

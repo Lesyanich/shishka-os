@@ -52,20 +52,20 @@ The L1 Kitchen operates on the **Central Kitchen** model. We do NOT cook "to ord
 **Extraction Hood ("The Lungs of the Kitchen")**: L1-KTC-HOOD-150-31. Without it, grill operation is impossible.
 
 **Frying & Boiling Line** (on reinforced stand L1-SS-STND-160-68, 38cm + wheels):
-- **Gas Range 4-Burner** (L1-GAS-RNG-570-32): "The Workhorse" — soups, stocks, quinoa
-- **Lava Grill** (L1-LAVA-GRILL-650-33): Volcanic rocks, fat drips → smoke → BBQ flavor. Proteins (chicken, tofu, halloumi) without excess oil
+- **Gas Range 4-Burner** (`L-1-K-GAS-RNG-570-32`): "The Workhorse" — soups, stocks, quinoa
+- **Lava Grill** (`L-1-K-LAVA-GRILL-650-33`): Volcanic rocks, fat drips → smoke → BBQ flavor. Proteins (chicken, tofu, halloumi) without excess oil
 
-**Baking Station**: L1-EL-CON-OVEN-83-20 — Convection Oven (3 levels). Zone L1-Hot-W3. On stand L1-SS-STND-120-71 with tray runners. For roasting root vegetables and baking croissants.
+**Baking Station**: `L-1-K-EL-CON-OVEN-83` — Convection Oven (3 levels). Zone L1-Hot-W3. On stand L1-SS-STND-120-71 with tray runners. For roasting root vegetables and baking croissants. (Note: the live `equipment` table lists a separate Proofer under `L-1-K-EL-CON-OVEN-83-20` — don't conflate them; confirm via `list_equipment`.)
 
 ### Zone 4: Cook-Chill Hub (Heart of Technology)
 *The most important stage. Turns food into safe, long-storage semi-finished products.*
 
-**Blast Chiller ("The Time Machine")**: L1-BL-FRZ-790-66 — CRITICAL UNIT
+**Blast Chiller ("The Time Machine")**: `L-1-K-BL-FRZ-790-66` — CRITICAL UNIT
 - Algorithm: Chef removes hot tray (+90C) → IMMEDIATELY into Blast Chiller → +3C in <90 minutes
 - Why: Bacteria can't multiply, moisture stays locked in meat fibers. Foundation of food safety
 - **BOTTLENECK**: If Blast Chiller is full, no new hot cooking batch can start. Logistics L1→L2 only possible after cycle: Cook → Shock → Vacuum → Label
 
-**Vacuum Sealer**: L1-VAC-500-67 — Chamber Vacuum Sealer. On table in Hot Zone (L1-Hot-W2).
+**Vacuum Sealer**: `L-1-K-VAC-500-67` — Chamber Vacuum Sealer. On table in Hot Zone (L1-Hot-W2).
 - Algorithm: Chilled product portioned → bag → machine removes 99.9% of air
 - Result: Shelf life 7-10 days. No oxidation, no taste degradation
 

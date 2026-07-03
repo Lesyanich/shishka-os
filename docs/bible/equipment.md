@@ -9,6 +9,8 @@ source: "Notion SHISHKA CORE HUB, Section 3.2"
 
 # Equipment Registry
 
+> ⚠️ **NOT the source of truth — this is a lagging human snapshot.** The single source of truth for equipment is the **live `equipment` DB table** (operational: `zone`, `location_notes`, `is_bottleneck`, `preheat_min`, `status`), queried via the chef's **`list_equipment`** tool. Each machine also has a financial twin in **`capex_assets`**, joined 1:1 by `capex_assets.equipment_id → equipment.id` (76/81 linked). **Before relying on any code/spec below, confirm against `list_equipment`.** Note: the live DB uses the `L-<floor>-<zone>-…` code scheme (e.g. `L-1-K-LAVA-GRILL-650-33`); the codes in this file are on the older `L1-…` scheme and are being reconciled (see the equipment single-source MC task).
+
 > **CRITICAL**: Unit 66 (Blast Chiller) is the process bottleneck. Hot food cannot wait to be cooled.
 > If the Blast Chiller is full, a new hot cooking batch CANNOT be started.
 > Logistics L1→L2 is possible only after the full cycle: Cook → Shock → Vacuum → Label
