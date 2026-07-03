@@ -5,6 +5,7 @@ import {
   calculateTreeNutrition,
 } from "../lib/bom-walker.js";
 import { validateLegoChain } from "../lib/validators.js";
+import { checkBrandCompliance } from "../lib/brand-rules.js";
 
 export const validateBomSchema = {
   name: "validate_bom",
@@ -105,6 +106,27 @@ export async function validateBom(args: { product_id: string }) {
             severity: "error",
             code: "ZERO_QUANTITY",
             message: `Quantity is ${child.quantity}`,
+            path: childPath,
+          });
+        }
+
+        // Brand red line: banned ingredient anywhere in the tree (catches legacy data)
+        const brand = checkBrandCompliance(
+          child.item.product_code,
+          child.item.name
+        );
+        if (brand.status === "banned") {
+          issues.push({
+            severity: "error",
+            code: "RED_LINE_VIOLATION",
+            message: `${child.item.product_code}: ${brand.reason}`,
+            path: childPath,
+          });
+        } else if (brand.status === "gated") {
+          issues.push({
+            severity: "warning",
+            code: "GATED_INGREDIENT",
+            message: `${child.item.product_code}: ${brand.reason}`,
             path: childPath,
           });
         }

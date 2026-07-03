@@ -34,9 +34,12 @@ Every dish is judged against this persona. If it does not serve the Conscious Op
 
 **Ingredients** — banned, no exceptions:
 - Refined sugar
-- Trans fats / refined seed oils (soy, canola/rapeseed, sunflower, corn) — **even when cheaper, even in dressings**
+- Trans fats / refined seed & grain oils — soy, canola/rapeseed, sunflower, corn, **and rice bran oil**; i.e. **any RBD (refined-bleached-deodorized) / solvent-extracted seed or grain oil** — **even when cheaper, even in marinades, even in dressings**. (The extraction process is the objection, not just the plant — see the refining chemistry in `agents/chef/domain/knowledge/food-science.md` §3.)
 - Artificial colorants and preservatives
 - MSG / monosodium glutamate
+
+**Gated (not banned, but never proposed unprompted):**
+- **Animal fats** — ghee, duck fat, butter, lard. Allowed **only** in explicitly non-vegan dishes, and **only** with per-case owner approval. The Chef Agent never reaches for an animal fat on its own, and never anywhere in or feeding the vegan line. When a neutral or high-heat fat is needed, the plant answer comes first (see the Approved Fats Matrix in Protocol 1).
 
 **Techniques** — forbidden:
 - Deep frying
@@ -166,8 +169,19 @@ This is the single highest-leverage skill. Everything else serves this.
 
 It is easy on Phuket to fall for ready-made sauces from Makro. **This will kill the brand.**
 
-- **No "hidden nasties":** only cold-pressed oils — Extra Virgin Olive, Avocado, Coconut. Never soy or rapeseed in dressings.
+- **No "hidden nasties":** cold-pressed oils by default — Extra Virgin Olive, Avocado, Coconut. Never soy or rapeseed in dressings.
 - **Bases produced in-house at L1:** aquafaba mayo, local-greens pesto, tahini-based dressings. **This is our barrier to entry against competitors.**
+
+**Approved Fats Matrix** — pick the fat by function (smoke points cross-checked; chemistry in `agents/chef/domain/knowledge/food-science.md` §3):
+
+| Fat | Role | Heat | Notes |
+|-----|------|------|-------|
+| Extra Virgin Olive Oil | Dressings, finishing | Low / no heat | Cold-pressed |
+| Avocado oil | Grill, sear, high-heat | High (~271°C smoke point) | The approved high-heat oil |
+| Virgin / cold-pressed coconut | Flavored medium-heat | ~177°C | Whole-fruit |
+| **Deodorized (refined) coconut** | **Neutral marinade fat, freeze-stable base** | Medium (204–232°C) | **OFFICIAL EXCEPTION to "cold-pressed only":** physical steam refining, **no chemical solvent** — unlike banned RBD seed oils. Approved for neutral marinades that must not crack in the freezer. |
+
+The decision procedure for choosing among these lives in `agents/chef/domain/culinary-knowledge.md` (Fat Decision Tree).
 
 ### Protocol 2 — Lego Modularity
 
@@ -189,6 +203,14 @@ Per infrastructure (Zone 4: Cook-Chill):
 - **Blast chilling:** every prep from the hot zone passes through the blast chiller. Result: **5-7 day shelf life with no preservatives**, texture preserved.
 - **Zero-waste fermentation:** vegetable trim (broccoli stems, cabbage cores, carrot skin) goes into fermentation tanks → probiotic shots and soup bases. Nothing leaves L1 as waste.
 
+### Protocol 4 — Protein Sourcing Integrity
+
+Proteins are our biggest food-cost line and our biggest quality risk. Three owner rules the Chef Agent applies before proposing any protein source or process (mechanics and math in `agents/chef/domain/sourcing-rules.md` and `knowledge/food-science.md`):
+
+- **A cheaper SKU that fails one brand spec is not an alternative — it is a different product.** Tail-off, size grade, IQF-not-block, fresh-not-refrozen: one failed spec disqualifies it.
+- **Never judge frozen protein by pack price.** Ice glaze is water we pay meat prices for; the cheap segment loads 20–30%+. Always cost per *edible* kilogram, glaze- and yield-adjusted.
+- **Delicate fish is never cooked-then-frozen.** Salmon and white fish are portioned raw, frozen raw, and cooked to order — cooking then freezing then reheating causes albumin bleed and mushy texture, destroying an expensive product.
+
 ---
 
 ## How Chef Agent Uses This Document
@@ -207,3 +229,4 @@ Per infrastructure (Zone 4: Cook-Chill):
 | Date | Change | By |
 |------|--------|----|
 | 2026-04-07 | Initial creation from owner interview (10 questions + 3 protocols) | CEO + COO |
+| 2026-07-03 | Chef recalibration: rice bran oil + all RBD seed/grain oils named in red lines; animal-fat gate added; Approved Fats Matrix with deodorized-coconut exception; Protocol 4 (Protein Sourcing Integrity). Grounds the red lines in food-science chemistry. | CEO directive |
