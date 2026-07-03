@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, Plus, Search } from 'lucide-react'
+import { BookOpen, List, Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAppRole } from '../../contexts/AppRoleContext'
 import { useKbPages, type UseKbPagesResult } from '../../hooks/useKbPages'
@@ -93,12 +93,12 @@ export function HandbookLayout() {
           {kb.isOwner && (
             <button
               type="button"
-              onClick={() => navigate('/handbook/new')}
-              title="New page"
+              onClick={() => navigate('/handbook/registry')}
+              title="Registry — manage pages & access"
               className="ml-auto flex items-center gap-1 rounded-md border border-[var(--line)] px-2 py-1 text-[11px] text-cream/70 transition hover:border-[var(--color-forest-soft)]/40 hover:text-cream"
             >
-              <Plus className="h-3.5 w-3.5" />
-              New
+              <List className="h-3.5 w-3.5" />
+              Registry
             </button>
           )}
         </div>

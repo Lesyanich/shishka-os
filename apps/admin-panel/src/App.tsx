@@ -62,6 +62,7 @@ const HandbookLayout = lazyWithReload(() => import('./pages/handbook/HandbookLay
 const HandbookHome = lazyWithReload(() => import('./pages/handbook/HandbookHome').then(m => ({ default: m.HandbookHome })))
 const HandbookPage = lazyWithReload(() => import('./pages/handbook/HandbookPage').then(m => ({ default: m.HandbookPage })))
 const KbEditor = lazyWithReload(() => import('./pages/handbook/KbEditor').then(m => ({ default: m.KbEditor })))
+const KbRegistry = lazyWithReload(() => import('./pages/handbook/KbRegistry').then(m => ({ default: m.KbRegistry })))
 
 function PageLoader() {
   return (
@@ -184,6 +185,7 @@ function App() {
                     <Route index element={<Suspense fallback={<PageLoader />}><HandbookHome /></Suspense>} />
                     <Route path=":slug" element={<Suspense fallback={<PageLoader />}><HandbookPage /></Suspense>} />
                     <Route element={<RoleGuard minRole="owner" />}>
+                      <Route path="registry" element={<Suspense fallback={<PageLoader />}><KbRegistry /></Suspense>} />
                       <Route path="new" element={<Suspense fallback={<PageLoader />}><KbEditor /></Suspense>} />
                       <Route path=":slug/edit" element={<Suspense fallback={<PageLoader />}><KbEditor /></Suspense>} />
                     </Route>

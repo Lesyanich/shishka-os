@@ -20,6 +20,9 @@ const PAGES = [
   { ...base, id: '2', parent_id: '1', slug: 'about', sort_order: 10, translations: [tr('2', 'About')], assignments: [] },
   { ...base, id: '3', parent_id: null, slug: 'mine', sort_order: 20, translations: [tr('3', 'Mine')], assignments: [{ staff_id: 'me' }] },
   { ...base, id: '4', parent_id: null, slug: 'theirs', sort_order: 30, translations: [tr('4', 'Theirs')], assignments: [{ staff_id: 'other' }] },
+  // Children with NO own assignment — access cascades from the assigned section.
+  { ...base, id: '5', parent_id: '3', slug: 'mine-child', sort_order: 10, translations: [tr('5', 'Mine child')], assignments: [] },
+  { ...base, id: '6', parent_id: '4', slug: 'theirs-child', sort_order: 10, translations: [tr('6', 'Theirs child')], assignments: [] },
 ]
 
 vi.mock('../lib/supabase', () => ({
@@ -57,6 +60,8 @@ describe('useKbPages', () => {
     expect(slugs).toContain('about') // shared child
     expect(slugs).toContain('mine') // assigned to me
     expect(slugs).not.toContain('theirs') // assigned to someone else
+    expect(slugs).toContain('mine-child') // cascades: section assigned to me
+    expect(slugs).not.toContain('theirs-child') // cascades: section assigned to other
 
     expect(result.current.assignedToMe.has('3')).toBe(true)
     expect(result.current.assignedToMe.has('4')).toBe(false)

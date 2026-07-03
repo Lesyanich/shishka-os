@@ -122,14 +122,30 @@ export function useKbPages(): UseKbPagesResult {
 
     const byId = new Map(pages.map((p) => [p.id, p]))
 
-    // Directly-visible pages: published, and either shared (role-gated) or
-    // personally assigned to me. Managers see all published pages.
+    // Access cascades down the tree: the nearest ancestor-or-self that carries
+    // assignments governs. Assign a whole section (top-level page) to grant its
+    // entire subtree; a deeper page can override with its own assignments.
+    const governingAssignees = (p: KbPage): string[] | null => {
+      let cur: KbPage | undefined = p
+      const seen = new Set<string>()
+      while (cur && !seen.has(cur.id)) {
+        seen.add(cur.id)
+        const a = assignedStaffIds(cur)
+        if (a.length > 0) return a
+        cur = cur.parent_id ? byId.get(cur.parent_id) : undefined
+      }
+      return null
+    }
+
+    // Directly-visible pages: published, and either shared (no governing
+    // assignment → role-gated) or governed by a section/page assigned to me.
+    // Managers see all published pages.
     const directlyVisible = pages.filter((p) => {
       if (!p.is_published) return false
       if (isManager) return true
-      const assignees = assignedStaffIds(p)
-      if (assignees.length === 0) return ROLE_RANK[role] >= ROLE_RANK[p.min_role]
-      return staffId != null && assignees.includes(staffId)
+      const gov = governingAssignees(p)
+      if (gov === null) return ROLE_RANK[role] >= ROLE_RANK[p.min_role]
+      return staffId != null && gov.includes(staffId)
     })
 
     // Keep the tree path intact: pull in each visible page's (published) ancestors.
