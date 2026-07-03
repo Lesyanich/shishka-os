@@ -1,35 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ChefHat, Package, Loader2 } from 'lucide-react'
 import { useMenuData } from '../hooks/useMenuData'
 import { useMenuListEnrichment } from '../hooks/useMenuListEnrichment'
 import { useFeedbackCounts } from '../hooks/useRecipeFeedback'
-import {
-  RecipeStationPanel,
-  type RecipeStation,
-} from './menu/components/RecipeStationPanel'
+import { type RecipeStation } from './menu/components/RecipeStationPanel'
+import { StationRecipesView } from './menu/components/StationRecipesView'
 import { RecipeFeedbackPanel } from '../components/kitchen/RecipeFeedbackPanel'
-import type { TypeFilterValue } from '../components/menu/owner/TypeFilter'
 
 const STATION_TABS: { id: RecipeStation; label: string; icon: typeof ChefHat }[] = [
   { id: 'l1-cook', label: 'L1 Kitchen', icon: ChefHat },
   { id: 'l2-assembler', label: 'L2 Assembly', icon: Package },
 ]
 
-// Sensible per-station defaults (match the owner's /menu views):
-//   L1 prep station → PF (заготовки), show All availability
-//   L2 assembly station → SALE (final dishes), Active-only
-function defaultType(station: RecipeStation): TypeFilterValue {
-  return station === 'l1-cook' ? 'PF' : 'SALE'
-}
-function defaultAvailable(station: RecipeStation): boolean | null {
-  return station === 'l1-cook' ? null : true
-}
-
 /**
  * Cook-facing recipe stations (`/kitchen/recipes`, role: cook). Renders the same
- * {@link RecipeStationPanel} as the owner's `/menu` L1/L2 views, but in
- * `staffMode` — no cost/margin, read-only, with a per-dish feedback button.
+ * {@link StationRecipesView} as the owner's `/menu` L1/L2 views, but in
+ * `mode="cook"` — no cost/margin, read-only, with a per-dish feedback button.
+ * Station + all filters are URL-driven, delegated entirely to StationRecipesView.
  */
 export function KitchenRecipesPage() {
   const {
@@ -46,25 +34,18 @@ export function KitchenRecipesPage() {
 
   // Deep-link params (?dish={product_code}&station=l1-cook|l2-assembler) — a task
   // in the tracker can link straight to a dish's recipe on the right station tab.
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const dishParam = searchParams.get('dish')
-  const initialStation: RecipeStation =
+
+  // Station tab (L1 / L2) — URL-driven; StationRecipesView reads/writes the
+  // same station-appropriate ?type/?available defaults from the URL.
+  const station: RecipeStation =
     searchParams.get('station') === 'l2-assembler' ? 'l2-assembler' : 'l1-cook'
-
-  // Station tab (L1 / L2)
-  const [station, setStation] = useState<RecipeStation>(initialStation)
-
-  // Filters
-  const [typeFilter, setTypeFilter] = useState<TypeFilterValue>(defaultType(initialStation))
-  const [availableFilter, setAvailableFilter] = useState<boolean | null>(
-    defaultAvailable(initialStation),
-  )
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
 
   // When deep-linked to a specific dish, surface it: show All availability and
   // narrow to the dish's type + section so its card (with steps) is at the top.
+  // Translated into URL params ONCE via the appliedDishRef guard; StationRecipesView
+  // then reads these params and renders the surfaced dish.
   const appliedDishRef = useRef(false)
   useEffect(() => {
     if (appliedDishRef.current) return
@@ -72,26 +53,37 @@ export function KitchenRecipesPage() {
     appliedDishRef.current = true
     const item = items.find((i) => i.product_code === dishParam)
     if (!item) return
-    setTypeFilter(item.kind as TypeFilterValue)
-    setAvailableFilter(null)
-    setSelectedCategory(item.section_id ?? item.category_id ?? null)
-    setSelectedSubcategory(null)
-  }, [dishParam, items])
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        const st = prev.get('station') === 'l2-assembler' ? 'l2-assembler' : 'l1-cook'
+        next.set('type', item.kind)
+        const cat = item.section_id ?? item.category_id
+        if (cat) next.set('cat', cat); else next.delete('cat')
+        next.delete('subcat')
+        if (st === 'l1-cook') next.delete('available')
+        else next.set('available', 'all')
+        return next
+      },
+      { replace: true },
+    )
+  }, [dishParam, items, setSearchParams])
 
-  // Reset filters to station-appropriate defaults on tab switch.
+  // Station tab strip writer — URL-driven. No filter resets here:
+  // StationRecipesView recomputes station-appropriate defaults from URL
+  // params automatically (absent ?type / ?available fall back to the
+  // station default).
   function handleStationChange(next: RecipeStation) {
-    setStation(next)
-    setTypeFilter(defaultType(next))
-    setAvailableFilter(defaultAvailable(next))
-    setSelectedCategory(null)
-    setSelectedSubcategory(null)
-    setSearchQuery('')
+    setSearchParams(
+      (prev) => {
+        const nextParams = new URLSearchParams(prev)
+        if (next === 'l1-cook') nextParams.delete('station')
+        else nextParams.set('station', next)
+        return nextParams
+      },
+      { replace: false },
+    )
   }
-
-  const handleCategorySelect = useCallback((id: string | null) => {
-    setSelectedCategory(id)
-    setSelectedSubcategory(null)
-  }, [])
 
   // Feedback panel state
   const [commentDishId, setCommentDishId] = useState<string | null>(null)
@@ -142,26 +134,16 @@ export function KitchenRecipesPage() {
         ))}
       </div>
 
-      {/* Shared station panel (cook mode) */}
-      <RecipeStationPanel
+      {/* Shared station experience (cook mode) — all filter state URL-driven internally. */}
+      <StationRecipesView
         station={station}
+        mode="cook"
         items={items}
         categoriesById={categoriesById}
         subcategories={subcategories}
         childrenByParent={childrenByParent}
         enrichment={enrichment}
-        typeFilter={typeFilter}
-        onTypeFilter={setTypeFilter}
-        availableFilter={availableFilter}
-        onAvailableFilter={setAvailableFilter}
-        selectedCategory={selectedCategory}
-        onSelectCategory={handleCategorySelect}
-        selectedSubcategory={selectedSubcategory}
-        onSelectSubcategory={setSelectedSubcategory}
-        searchQuery={searchQuery}
-        onSearchQuery={setSearchQuery}
         onReorder={reorderItems}
-        staffMode
         feedbackCountById={feedbackCounts}
         onComment={setCommentDishId}
       />

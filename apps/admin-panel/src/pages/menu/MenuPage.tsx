@@ -20,7 +20,7 @@ import { useChannelMargins } from '../../hooks/useChannelMargins'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
-import { RecipeStationPanel } from './components/RecipeStationPanel'
+import { StationRecipesView } from './components/StationRecipesView'
 import { NewDishModal } from './components/NewDishModal'
 import { ChefChatPanel } from '../../components/chef/ChefChatPanel'
 import { TypeFilter, matchesType, type TypeFilterValue } from '../../components/menu/owner/TypeFilter'
@@ -88,10 +88,6 @@ export function MenuPage() {
   const { filters, setFilters } = useMenuFilters()
   // Back-compat for L1/L2/Customer single-cat strip — derive single string|null
   const selectedCategory = filters.categoryIds[0] ?? null
-  // L2 drill-down: second-level subcategory within the selected section (e.g.
-  // "Coffee" under the "Drinks" umbrella). Held in its own `subcat` param so the
-  // section strip and the subcategory strip stay independent.
-  const selectedSubcategory = searchParams.get('subcat')
   const setSelectedCategory = useCallback(
     (id: string | null) => {
       // Single setSearchParams call — two calls in one handler only apply the
@@ -152,10 +148,6 @@ export function MenuPage() {
     (t: TypeFilterValue) => updateParam({ type: t === defaultType ? null : t }),
     [updateParam, defaultType],
   )
-  const setSelectedSubcategory = useCallback(
-    (id: string | null) => updateParam({ subcat: id }),
-    [updateParam],
-  )
 
   // L1/L2 station name search (?q=) — shareable/refresh-safe like the other filters.
   // Uses history replace (not push) so every keystroke doesn't spam the back button.
@@ -172,27 +164,6 @@ export function MenuPage() {
       )
     },
     [setSearchParams],
-  )
-
-  // Availability filter for L1 Cook view (URL-driven: ?available=yes|no)
-  const availableParam = searchParams.get('available')
-  const availableFilter: boolean | null =
-    availableParam === 'yes' ? true : availableParam === 'no' ? false : null
-  const setAvailableFilter = useCallback(
-    (v: boolean | null) =>
-      updateParam({ available: v === true ? 'yes' : v === false ? 'no' : null }),
-    [updateParam],
-  )
-
-  // L2 Assembler availability filter (kitchen station): defaults to Active-only.
-  // Shares the `available` param but treats an absent value as "Active" rather
-  // than "All", so deactivated dishes are hidden unless explicitly requested.
-  const l2AvailableFilter: boolean | null =
-    availableParam === 'all' ? null : availableParam === 'no' ? false : availableParam === 'yes' ? true : true
-  const setL2AvailableFilter = useCallback(
-    (v: boolean | null) =>
-      updateParam({ available: v === true ? 'yes' : v === false ? 'no' : 'all' }),
-    [updateParam],
   )
 
   const openDrawer = useCallback(
@@ -490,47 +461,16 @@ export function MenuPage() {
           onUpdate={updateItem}
           onOpenDrawer={openDrawer}
         />
-      ) : view === 'l1-cook' ? (
-        <RecipeStationPanel
-          station="l1-cook"
+      ) : view === 'l1-cook' || view === 'l2-assembler' ? (
+        <StationRecipesView
+          station={view}
+          mode="owner"
           items={items}
           categoriesById={categoriesById}
           subcategories={subcategories}
           childrenByParent={childrenByParent}
           enrichment={enrichment}
-          typeFilter={typeFilter}
-          onTypeFilter={setTypeFilter}
           typeCounts={typeCounts}
-          availableFilter={availableFilter}
-          onAvailableFilter={setAvailableFilter}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-          selectedSubcategory={selectedSubcategory}
-          onSelectSubcategory={setSelectedSubcategory}
-          searchQuery={searchQuery}
-          onSearchQuery={setSearchQuery}
-          onOpenDish={openDrawer}
-          onReorder={reorderItems}
-        />
-      ) : view === 'l2-assembler' ? (
-        <RecipeStationPanel
-          station="l2-assembler"
-          items={items}
-          categoriesById={categoriesById}
-          subcategories={subcategories}
-          childrenByParent={childrenByParent}
-          enrichment={enrichment}
-          typeFilter={typeFilter}
-          onTypeFilter={setTypeFilter}
-          typeCounts={typeCounts}
-          availableFilter={l2AvailableFilter}
-          onAvailableFilter={setL2AvailableFilter}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-          selectedSubcategory={selectedSubcategory}
-          onSelectSubcategory={setSelectedSubcategory}
-          searchQuery={searchQuery}
-          onSearchQuery={setSearchQuery}
           onOpenDish={openDrawer}
           onReorder={reorderItems}
         />

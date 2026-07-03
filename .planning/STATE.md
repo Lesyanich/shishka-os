@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 Phase: 1 of 4 (Data Foundation + Owner Table)
 Plan: 0 of ? in current phase
 Status: Ready to plan
-Last activity: 2026-07-03 — Completed quick task 260702-xao: Wire name-search into cook /kitchen/recipes view
+Last activity: 2026-07-03 — Completed quick task 260703-0mc: Extract shared StationRecipesView (dedup L1/L2 across /menu and /kitchen/recipes)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -62,6 +62,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260702-xao | Wire name-search into cook /kitchen/recipes view | 2026-07-03 | f8e94ef | [260702-xao-wire-search-into-kitchen-recipes](./quick/260702-xao-wire-search-into-kitchen-recipes/) |
+| 260703-0mc | Extract shared StationRecipesView (owner /menu ↔ cook /kitchen/recipes) — kills station-wiring drift | 2026-07-03 | b201077 | [260703-0mc-extract-shared-stationrecipesview-compon](./quick/260703-0mc-extract-shared-stationrecipesview-compon/) |
 
 ## Session Continuity
 
