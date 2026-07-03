@@ -582,16 +582,42 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
               </button>
             )}
           </div>
-          <span className="hidden text-[9px] text-slate-600 lg:inline">Scroll to zoom</span>
-          {/* Mobile-only: collapse/expand the image to reclaim vertical space */}
-          <button
-            type="button"
-            onClick={() => setImgCollapsed((v) => !v)}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-slate-200 lg:hidden"
-          >
-            {imgCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-            {imgCollapsed ? 'Show image' : 'Hide image'}
-          </button>
+          <div className="flex items-center gap-1">
+            <span className="hidden text-[9px] text-slate-600 lg:inline">Scroll to zoom</span>
+            {/* Mobile-only: compact page switcher (out of the image's center) */}
+            {row.photo_urls.length > 1 && (
+              <div className="flex items-center gap-0.5 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPhotoIdx((i) => Math.max(0, i - 1))}
+                  disabled={selectedPhotoIdx === 0}
+                  className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-[10px] tabular-nums text-slate-400">{selectedPhotoIdx + 1}/{row.photo_urls.length}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPhotoIdx((i) => Math.min(row.photo_urls.length - 1, i + 1))}
+                  disabled={selectedPhotoIdx === row.photo_urls.length - 1}
+                  className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            {/* Mobile-only: collapse/expand the image to reclaim vertical space */}
+            <button
+              type="button"
+              onClick={() => setImgCollapsed((v) => !v)}
+              className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-slate-200 lg:hidden"
+            >
+              {imgCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+              {imgCollapsed ? 'Show' : 'Hide'}
+            </button>
+          </div>
         </div>
 
         {/* Image container with arrows */}
@@ -603,7 +629,7 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            className={`${imgCollapsed ? 'h-14' : 'h-[32vh]'} lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
+            className={`${imgCollapsed ? 'h-14' : 'h-[26vh]'} lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
           >
             {row.photo_urls[selectedPhotoIdx]?.toLowerCase().endsWith('.pdf') ? (
               <iframe
@@ -625,8 +651,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
               />
             )}
           </div>
+          {/* Desktop overlay arrows (mobile uses the compact switcher in the top bar) */}
           {row.photo_urls.length > 1 && (
-            <>
+            <div className="hidden lg:block">
               <button
                 type="button"
                 onClick={() => setSelectedPhotoIdx((i) => Math.max(0, i - 1))}
@@ -643,13 +670,13 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
-            </>
+            </div>
           )}
         </div>
 
-        {/* Page thumbnails */}
+        {/* Page thumbnails — desktop only (mobile uses the compact switcher) */}
         {row.photo_urls.length > 1 && (
-          <div className="mt-2 flex items-center justify-center gap-1.5">
+          <div className="mt-2 hidden items-center justify-center gap-1.5 lg:flex">
             {row.photo_urls.map((url, i) => (
               <button
                 key={i}
@@ -974,20 +1001,20 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
                   <span className="text-[11px] text-slate-500">#{i + 1}</span>
                   {flowSelect(i, item.flow_type)}
                   {!isReadOnly && (
-                    <div className="ml-auto flex items-center gap-0.5">
+                    <div className="ml-auto flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => toggleEdit(i)}
-                        className={`flex h-8 w-8 items-center justify-center rounded hover:bg-slate-700 ${editing ? 'text-indigo-400' : 'text-slate-400'}`}
-                        title={editing ? 'Done' : 'Edit'}
+                        className={`flex h-8 items-center gap-1 rounded-md border px-2 text-[11px] font-medium ${editing ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300' : 'border-slate-600 text-slate-300 hover:bg-slate-700'}`}
                         aria-label={editing ? 'Done editing' : 'Edit item'}
                       >
-                        {editing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                        {editing ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                        {editing ? 'Done' : 'Edit'}
                       </button>
                       <button
                         type="button"
                         onClick={() => removeItem(i)}
-                        className="flex h-8 w-8 items-center justify-center rounded text-slate-500 hover:bg-slate-700 hover:text-rose-400"
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-700 hover:text-rose-400"
                         title="Delete"
                         aria-label="Delete item"
                       >
@@ -1006,19 +1033,29 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
 
                 {/* Row 3: qty · unit-price ............ total */}
                 {editing ? (
-                  <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-xs">
-                    <label className="flex flex-col gap-0.5">
-                      <span className="text-[9px] uppercase text-slate-500">Qty</span>
-                      <input type="number" step="any" value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))} className={numInputCls} />
-                    </label>
-                    <label className="flex flex-col gap-0.5">
-                      <span className="text-[9px] uppercase text-slate-500">Unit</span>
-                      <input value={item.unit} onChange={(e) => updateItem(i, 'unit', e.target.value)} className={inputCls} />
-                    </label>
-                    <label className="flex flex-col gap-0.5">
-                      <span className="text-[9px] uppercase text-slate-500">Price</span>
-                      <input type="number" step="any" value={item.unit_price} onChange={(e) => updateItem(i, 'unit_price', Number(e.target.value))} className={numInputCls} />
-                    </label>
+                  <div className="mt-1.5">
+                    <div className="grid grid-cols-2 gap-1.5 text-xs">
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[9px] uppercase text-slate-500">Qty</span>
+                        <input type="number" step="any" value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))} className={numInputCls} />
+                      </label>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[9px] uppercase text-slate-500">Unit</span>
+                        <input value={item.unit} onChange={(e) => updateItem(i, 'unit', e.target.value)} className={inputCls} />
+                      </label>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[9px] uppercase text-slate-500">Price / unit</span>
+                        <input type="number" step="any" value={item.unit_price} onChange={(e) => updateItem(i, 'unit_price', Number(e.target.value))} className={numInputCls} />
+                      </label>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[9px] uppercase text-slate-500">Weight / pack</span>
+                        <input value={item.package_weight || ''} onChange={(e) => updateItem(i, 'package_weight', e.target.value)} className={inputCls} placeholder="e.g. 1 kg" />
+                      </label>
+                    </div>
+                    <div className="mt-1.5 flex items-baseline justify-between border-t border-slate-800 pt-1.5 text-xs">
+                      <span className="text-slate-500">Total (qty × price)</span>
+                      <span className="text-sm font-semibold text-slate-100">{'฿'}{fmt(item.total_price)}</span>
+                    </div>
                   </div>
                 ) : (
                   <div className="mt-1 flex items-baseline justify-between gap-2 text-xs">
