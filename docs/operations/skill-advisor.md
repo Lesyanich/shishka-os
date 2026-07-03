@@ -101,7 +101,10 @@ _Installed 2026-06-28 from `petrkindlmann/qa-skills` (6 of 50; markdown-only; se
 
 ### Meta / discovery
 - **`skill-creator`** — create / edit / optimize a skill.
-- **`find-skills`** — discover installable skills for a capability gap.
+- **`find-skills`** — discover installable skills for a capability gap. A direct tool-question
+  ("which skill/command should I use?") triggers a **full-registry read + `skills-lock.json`
+  source check** before answering; open-source research must **end with a registry update**
+  (install + this file + ADVISOR-MAP row). See `operational-rules.md` § RULE-SKILL-ADVISOR.
 - **`polyclaude:council`** — stress-test an idea from multiple cognitive perspectives.
 - **Routing agents:** `/coo`, `/strategy`, `/techlead`.
 
@@ -142,7 +145,7 @@ specific. The header and separator rows are skipped by the parser.
 | заверши сесси,end session,session diary,сохрани сессию | `/session-diary` | save session summary to memory |
 | здоровье систем,system health,статус os | `/health` | Shishka OS health snapshot |
 | создай скилл,создать скилл,новый скилл,create skill,edit skill | `skill-creator` | create/edit skills |
-| найди скилл,какой скилл,is there a skill,find a skill,какой инструмент,какие инструменты | `find-skills` | discover installable skills |
+| найди скилл,какой скилл,какую команду,какой команд,что использовать,чем протестир,какой инструмент,какие инструменты,какой тул,is there a skill,find a skill,which skill,which command,what tool | `find-skills` | discover installable skills |
 | по расписанию,каждый день,cron,scheduled agent,напомни мне | `/schedule` | recurring cloud agent / cron |
 | на интервал,каждые,keep running,run on a loop | `/loop` | run a prompt on a recurring interval |
 | несколько перспектив,red team,devil's advocate,стресс-тест иде,разнеси идею,poke holes | `polyclaude:council` | multi-perspective stress-test of an idea |
