@@ -38,4 +38,20 @@ describe('KbMarkdown', () => {
     expect(link).toHaveAttribute('href', 'https://example.com')
     expect(link).toHaveAttribute('target', '_blank')
   })
+
+  it('renders inline HTML callouts with class and style attributes', () => {
+    render(
+      <KbMarkdown body={'<div class="cal cal-warn" style="margin-top:4px"><span class="cal-title">Heads up</span> total mismatch</div>'} />,
+    )
+    expect(screen.getByText('Heads up')).toHaveClass('cal-title')
+    expect(screen.getByText(/total mismatch/)).toBeInTheDocument()
+  })
+
+  it('strips dangerous inline HTML (script tags) via sanitize', () => {
+    const { container } = render(
+      <KbMarkdown body={'ok text<script>window.__pwned = true</script>'} />,
+    )
+    expect(container.querySelector('script')).toBeNull()
+    expect(screen.getByText(/ok text/)).toBeInTheDocument()
+  })
 })

@@ -1,8 +1,29 @@
 import { useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { ExternalLink } from 'lucide-react'
 import { slugifyHeading } from '../../lib/vault'
+
+/**
+ * Sanitize schema for handbook pages. Extends the safe default (which already
+ * strips <script>, event handlers, iframes, etc.) to allow the styling authors
+ * need for rich pages — `class`/`style` on any element plus a few structural
+ * tags — so a page can embed brand callouts and small mockups inline. Pages are
+ * owner-authored (write is owner-only via RLS); sanitize is defence-in-depth.
+ */
+const KB_SANITIZE_SCHEMA = {
+  ...defaultSchema,
+  tagNames: [
+    ...(defaultSchema.tagNames ?? []),
+    'div', 'span', 'section', 'figure', 'figcaption', 'small',
+  ],
+  attributes: {
+    ...defaultSchema.attributes,
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'className', 'style'],
+  },
+}
 
 /**
  * Renders handbook markdown with brand-consistent prose (reuses `.wiki-prose`)
@@ -39,6 +60,7 @@ export function KbMarkdown({ body, knownSlugs = [], onNavigate }: Props) {
     <div className="wiki-prose">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, KB_SANITIZE_SCHEMA]]}
         components={{
           h2: ({ children }) => {
             const text = typeof children === 'string' ? children : String(children)
