@@ -1,4 +1,7 @@
--- 347_kb_seed_translations_th_my.sql
+-- 347a_kb_seed_translations_th_my.sql
+-- [renamed from 347_kb_seed_translations_th_my.sql, renumber 2026-07-04: number 347
+--  collided with 347_shift_hours_0900_1800.sql (earlier-applied, keeps its name);
+--  migration_log row renamed by 353_renumber_migration_log_347a.sql]
 -- Thai + Burmese translations for the seed Handbook pages (mig 345).
 --
 -- WHY: translations are done ONCE, offline (no real-time paid LLM calls) and
@@ -245,7 +248,7 @@ ON CONFLICT (page_id, lang) DO UPDATE
   SET title = EXCLUDED.title, body_md = EXCLUDED.body_md, updated_at = now();
 
 INSERT INTO public.migration_log (filename, applied_by, notes)
-VALUES ('347_kb_seed_translations_th_my.sql', 'claude-code',
+VALUES ('347a_kb_seed_translations_th_my.sql', 'claude-code',
   'Offline Thai + Burmese translations for the 15 seed Handbook pages (no runtime LLM). Replaces the removed kb-translate edge function. Idempotent (upsert).')
 ON CONFLICT (filename) DO NOTHING;
 

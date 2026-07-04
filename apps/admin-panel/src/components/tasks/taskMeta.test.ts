@@ -1,23 +1,47 @@
-import { describe, it, expect } from 'vitest'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, it, expect, vi } from 'vitest'
 import {
-  CATEGORY_ICON,
-  CATEGORY_LABEL,
+  CATEGORY_META,
   CATEGORY_OPTIONS,
+  TASK_CATEGORIES,
   categoryIcon,
+  categoryMeta,
   describeRecurrence,
   formatLocalDate,
   isOverdue,
   shortTime,
 } from './taskMeta'
-import type { StaffTask, TaskCategory } from '../../hooks/useStaffTasks'
+import type { StaffTask } from '../../hooks/useStaffTasks'
 
-// Every category the DB check constraint allows. Must stay in sync with
-// staff_tasks_category_check — a value here that the frontend maps miss renders
-// `<undefined/>` and crashes the whole board (React #130).
-const DB_CATEGORIES: TaskCategory[] = [
-  'opening', 'closing', 'prep', 'cleaning', 'admin', 'general',
-  'stock_check', 'waste', 'equipment', 'food_safety',
-]
+/**
+ * The DB's allowed categories, parsed from the migration that most recently
+ * (re)defined staff_tasks_category_check. This is what actually guards the
+ * React #130 drift class: the constraint and CATEGORY_META can only diverge
+ * with a failing test. (The column is CHECK-constrained text, not a Postgres
+ * enum, so `supabase gen types` would type it as plain `string` — parsing the
+ * migration is the lightweight SSoT check instead.)
+ */
+function dbCategoriesFromMigrations(): string[] {
+  // import.meta.url is an http: URL under the jsdom environment, so resolve
+  // from cwd instead (vitest runs from apps/admin-panel; tolerate repo root).
+  const dir = ['../../services/supabase/migrations', 'services/supabase/migrations']
+    .map((p) => resolve(process.cwd(), p))
+    .find(existsSync)
+  if (!dir) throw new Error('services/supabase/migrations not found from cwd')
+  const defining = readdirSync(dir)
+    .filter((f) => f.endsWith('.sql'))
+    .map((f) => ({ file: f, num: parseInt(f, 10), sql: readFileSync(`${dir}/${f}`, 'utf8') }))
+    .filter(({ sql }) => /ADD CONSTRAINT staff_tasks_category_check/.test(sql))
+    .sort((a, b) => a.num - b.num || a.file.localeCompare(b.file))
+  const latest = defining.at(-1)
+  if (!latest) throw new Error('No migration defines staff_tasks_category_check')
+  const check = latest.sql.match(
+    /ADD CONSTRAINT staff_tasks_category_check\s+CHECK \(category IN \(([\s\S]*?)\)\)/,
+  )
+  if (!check) throw new Error(`Could not parse category list from ${latest.file}`)
+  return [...check[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
+}
 
 function makeTask(over: Partial<StaffTask> = {}): StaffTask {
   return {
@@ -33,27 +57,40 @@ function makeTask(over: Partial<StaffTask> = {}): StaffTask {
 
 describe('taskMeta', () => {
   it('maps category labels', () => {
-    expect(CATEGORY_LABEL.opening).toBe('Opening')
+    expect(CATEGORY_META.opening.label).toBe('Opening')
   })
 
-  it('covers every DB category with an icon, label, and option (guards React #130)', () => {
+  it('CATEGORY_META matches the DB check constraint exactly (guards React #130)', () => {
+    expect(new Set(TASK_CATEGORIES)).toEqual(new Set(dbCategoriesFromMigrations()))
+  })
+
+  it('every category has a renderable icon, label, and option (guards React #130)', () => {
     // A lucide icon is a valid React element type: a function or a forwardRef
     // object. The invariant that prevents #130 is simply "never undefined/null".
-    for (const c of DB_CATEGORIES) {
-      expect(CATEGORY_ICON[c], `icon for "${c}"`).not.toBeUndefined()
-      expect(CATEGORY_ICON[c], `icon for "${c}"`).not.toBeNull()
-      expect(CATEGORY_LABEL[c], `label for "${c}"`).toBeTruthy()
+    for (const c of TASK_CATEGORIES) {
+      expect(CATEGORY_META[c].icon, `icon for "${c}"`).not.toBeUndefined()
+      expect(CATEGORY_META[c].icon, `icon for "${c}"`).not.toBeNull()
+      expect(CATEGORY_META[c].label, `label for "${c}"`).toBeTruthy()
       expect(CATEGORY_OPTIONS.some((o) => o.value === c), `option for "${c}"`).toBe(true)
     }
   })
 
-  it('categoryIcon returns a renderable type for known and unknown categories', () => {
-    expect(categoryIcon('equipment')).not.toBeUndefined()
-    expect(categoryIcon('food_safety')).not.toBeUndefined()
-    // A category the DB adds before the frontend catches up must not be
-    // undefined (which would render `<undefined/>` and crash the board).
-    expect(categoryIcon('some_future_category')).not.toBeUndefined()
-    expect(categoryIcon('some_future_category')).not.toBeNull()
+  it('categoryMeta/categoryIcon degrade safely for unknown categories', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      expect(categoryIcon('equipment')).not.toBeUndefined()
+      expect(categoryIcon('food_safety')).not.toBeUndefined()
+      // A category the DB adds before the frontend catches up must not be
+      // undefined (which would render `<undefined/>` and crash the board).
+      expect(categoryIcon('some_future_category')).not.toBeUndefined()
+      expect(categoryIcon('some_future_category')).not.toBeNull()
+      // The fallback keeps the raw value visible and warns in DEV so drift
+      // surfaces in logs instead of silently.
+      expect(categoryMeta('some_future_category').label).toBe('some_future_category')
+      expect(warn).toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   it('shortTime trims seconds', () => {

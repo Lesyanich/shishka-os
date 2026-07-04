@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-export type TaskCategory =
-  | 'opening' | 'closing' | 'prep' | 'cleaning' | 'admin' | 'general'
-  | 'stock_check' | 'waste' | 'equipment' | 'food_safety'
+// TaskCategory's source of truth is CATEGORY_META (one entry per category);
+// re-exported here so row-shaped types and their consumers keep one import path.
+import type { TaskCategory } from '../components/tasks/taskMeta'
+export type { TaskCategory }
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low'
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'skipped' | 'cancelled'
 export type TaskRecurrence = 'none' | 'daily' | 'weekly'

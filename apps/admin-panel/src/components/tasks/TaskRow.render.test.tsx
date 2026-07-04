@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { TaskRow } from './TaskRow'
+import { TASK_CATEGORIES } from './taskMeta'
 import type { StaffTask, TaskCategory } from '../../hooks/useStaffTasks'
 
 function makeTask(over: Partial<StaffTask> = {}): StaffTask {
@@ -22,12 +23,10 @@ function makeTask(over: Partial<StaffTask> = {}): StaffTask {
 // category maps didn't cover, so CATEGORY_ICON[category] was undefined and
 // `<undefined/>` threw React #130, wiping out /kitchen/my-tasks and /staff-tasks.
 describe('TaskRow renders every DB category without crashing', () => {
-  const categories: TaskCategory[] = [
-    'opening', 'closing', 'prep', 'cleaning', 'admin', 'general',
-    'stock_check', 'waste', 'equipment', 'food_safety',
-  ]
-
-  for (const category of categories) {
+  // TASK_CATEGORIES is derived from CATEGORY_META, and taskMeta.test.ts pins
+  // that set to the DB check constraint — so iterating it here covers exactly
+  // the categories the DB can hand us.
+  for (const category of TASK_CATEGORIES) {
     it(`renders a "${category}" task`, () => {
       const { getByText } = render(
         <MemoryRouter>
@@ -37,4 +36,20 @@ describe('TaskRow renders every DB category without crashing', () => {
       expect(getByText('Check fridge temperature')).toBeTruthy()
     })
   }
+
+  it('renders a category the frontend does not know yet (DB-ahead drift)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { getByText } = render(
+        <MemoryRouter>
+          <TaskRow task={makeTask({ category: 'some_future_category' as TaskCategory })} />
+        </MemoryRouter>,
+      )
+      expect(getByText('Check fridge temperature')).toBeTruthy()
+      // The raw value stays visible on the chip so the drift is noticeable.
+      expect(getByText('some_future_category')).toBeTruthy()
+    } finally {
+      warn.mockRestore()
+    }
+  })
 })

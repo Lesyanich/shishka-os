@@ -9,11 +9,78 @@ import {
 } from 'lucide-react'
 import type {
   StaffTask,
-  TaskCategory,
   TaskPriority,
   TaskStation,
   TaskStatus,
 } from '../../hooks/useStaffTasks'
+
+export interface CategoryMeta {
+  label: string
+  label_th: string
+  /** Work-type chip icon — also the card accent's visual anchor. */
+  icon: LucideIcon
+  /** Chip badge classes (bg + text). */
+  style: string
+  /** Left-border accent class — the card's at-a-glance work-type stripe. */
+  accent: string
+  /** Clustering order so same-type work sits together inside a time-of-day section. */
+  sort: number
+}
+
+/**
+ * Single source of truth for task categories. Adding a category = adding ONE
+ * entry here (plus the DB migration widening staff_tasks_category_check —
+ * taskMeta.test.ts asserts both stay in sync by parsing the migrations).
+ * Key order = display order of the form dropdown & filter chips.
+ */
+export const CATEGORY_META = {
+  opening: {
+    label: 'Opening', label_th: 'เปิดร้าน', icon: DoorOpen,
+    style: 'bg-sky-500/15 text-sky-300', accent: 'border-l-sky-500/60', sort: 0,
+  },
+  closing: {
+    label: 'Closing', label_th: 'ปิดร้าน', icon: DoorClosed,
+    style: 'bg-violet-500/15 text-violet-300', accent: 'border-l-violet-500/60', sort: 8,
+  },
+  prep: {
+    label: 'Prep', label_th: 'เตรียมของ', icon: ChefHat,
+    style: 'bg-amber-500/15 text-amber-300', accent: 'border-l-amber-500/60', sort: 1,
+  },
+  cleaning: {
+    label: 'Cleaning', label_th: 'ทำความสะอาด', icon: Sparkles,
+    style: 'bg-teal-500/15 text-teal-300', accent: 'border-l-teal-500/60', sort: 4,
+  },
+  stock_check: {
+    label: 'Stock check', label_th: 'เช็คสต๊อก', icon: PackageCheck,
+    style: 'bg-lime-500/15 text-lime-300', accent: 'border-l-lime-500/60', sort: 2,
+  },
+  food_safety: {
+    label: 'Food safety', label_th: 'ความปลอดภัยอาหาร', icon: ShieldCheck,
+    style: 'bg-red-500/15 text-red-300', accent: 'border-l-red-500/60', sort: 3,
+  },
+  equipment: {
+    label: 'Equipment', label_th: 'อุปกรณ์', icon: Wrench,
+    style: 'bg-orange-500/15 text-orange-300', accent: 'border-l-orange-500/60', sort: 5,
+  },
+  waste: {
+    label: 'Write-off', label_th: 'ตัดทิ้ง', icon: Trash2,
+    style: 'bg-rose-500/15 text-rose-300', accent: 'border-l-rose-500/60', sort: 6,
+  },
+  admin: {
+    label: 'Admin', label_th: 'งานเอกสาร', icon: ClipboardList,
+    style: 'bg-slate-500/15 text-slate-300', accent: 'border-l-slate-500/60', sort: 7,
+  },
+  general: {
+    label: 'General', label_th: 'ทั่วไป', icon: Tag,
+    style: 'bg-slate-700/40 text-slate-300', accent: 'border-l-slate-700', sort: 9,
+  },
+} as const satisfies Record<string, CategoryMeta>
+
+/** Derived from CATEGORY_META — the hand-written union it replaces is what drifted in React #130. */
+export type TaskCategory = keyof typeof CATEGORY_META
+
+/** Every category the frontend knows, in display order. */
+export const TASK_CATEGORIES = Object.keys(CATEGORY_META) as TaskCategory[]
 
 export interface CategoryOption {
   value: TaskCategory
@@ -21,86 +88,33 @@ export interface CategoryOption {
   label_th: string
 }
 
-export const CATEGORY_OPTIONS: CategoryOption[] = [
-  { value: 'opening', label: 'Opening', label_th: 'เปิดร้าน' },
-  { value: 'closing', label: 'Closing', label_th: 'ปิดร้าน' },
-  { value: 'prep', label: 'Prep', label_th: 'เตรียมของ' },
-  { value: 'cleaning', label: 'Cleaning', label_th: 'ทำความสะอาด' },
-  { value: 'stock_check', label: 'Stock check', label_th: 'เช็คสต๊อก' },
-  { value: 'food_safety', label: 'Food safety', label_th: 'ความปลอดภัยอาหาร' },
-  { value: 'equipment', label: 'Equipment', label_th: 'อุปกรณ์' },
-  { value: 'waste', label: 'Write-off', label_th: 'ตัดทิ้ง' },
-  { value: 'admin', label: 'Admin', label_th: 'งานเอกสาร' },
-  { value: 'general', label: 'General', label_th: 'ทั่วไป' },
-]
-
-export const CATEGORY_LABEL: Record<TaskCategory, string> = Object.fromEntries(
-  CATEGORY_OPTIONS.map((c) => [c.value, c.label]),
-) as Record<TaskCategory, string>
-
-export const CATEGORY_STYLE: Record<TaskCategory, string> = {
-  opening: 'bg-sky-500/15 text-sky-300',
-  closing: 'bg-violet-500/15 text-violet-300',
-  prep: 'bg-amber-500/15 text-amber-300',
-  cleaning: 'bg-teal-500/15 text-teal-300',
-  stock_check: 'bg-lime-500/15 text-lime-300',
-  food_safety: 'bg-red-500/15 text-red-300',
-  equipment: 'bg-orange-500/15 text-orange-300',
-  waste: 'bg-rose-500/15 text-rose-300',
-  admin: 'bg-slate-500/15 text-slate-300',
-  general: 'bg-slate-700/40 text-slate-300',
-}
-
-/** Per-category icon — used for the card's work-type chip & accent. */
-export const CATEGORY_ICON: Record<TaskCategory, LucideIcon> = {
-  opening: DoorOpen,
-  closing: DoorClosed,
-  prep: ChefHat,
-  cleaning: Sparkles,
-  stock_check: PackageCheck,
-  food_safety: ShieldCheck,
-  equipment: Wrench,
-  waste: Trash2,
-  admin: ClipboardList,
-  general: Tag,
-}
+export const CATEGORY_OPTIONS: CategoryOption[] = TASK_CATEGORIES.map((value) => ({
+  value,
+  label: CATEGORY_META[value].label,
+  label_th: CATEGORY_META[value].label_th,
+}))
 
 /**
- * Icon for a category, with a safe fallback. A category is a component (not a
+ * Meta for a category, with a safe fallback. The icon is a component (not a
  * string), so an unknown value (the DB check constraint can add a category the
- * frontend map hasn't caught up to yet) would render `<undefined/>` and crash
- * the whole board with React #130. Fall back to the neutral Tag icon instead.
+ * frontend hasn't caught up to yet) would render `<undefined/>` and crash the
+ * whole board with React #130. Degrade to neutral styling with the raw value
+ * as the label so the drift is visible instead of fatal.
  */
+export function categoryMeta(category: string): CategoryMeta {
+  const meta = CATEGORY_META[category as TaskCategory]
+  if (meta) return meta
+  if (import.meta.env.DEV) {
+    console.warn(
+      `[taskMeta] Unknown task category "${category}" — the DB check constraint is ahead of CATEGORY_META. Add one entry there and commit the migration.`,
+    )
+  }
+  return { ...CATEGORY_META.general, label: category, label_th: '' }
+}
+
+/** Icon for a category — same safe fallback as categoryMeta. */
 export function categoryIcon(category: string): LucideIcon {
-  return CATEGORY_ICON[category as TaskCategory] ?? Tag
-}
-
-/** Left-border accent class per category — the card's at-a-glance work-type stripe. */
-export const CATEGORY_ACCENT: Record<TaskCategory, string> = {
-  opening: 'border-l-sky-500/60',
-  closing: 'border-l-violet-500/60',
-  prep: 'border-l-amber-500/60',
-  cleaning: 'border-l-teal-500/60',
-  stock_check: 'border-l-lime-500/60',
-  food_safety: 'border-l-red-500/60',
-  equipment: 'border-l-orange-500/60',
-  waste: 'border-l-rose-500/60',
-  admin: 'border-l-slate-500/60',
-  general: 'border-l-slate-700',
-}
-
-/** Clustering order so same-type work sits together inside a time-of-day section. */
-export const CATEGORY_SORT: Record<TaskCategory, number> = {
-  opening: 0,
-  prep: 1,
-  stock_check: 2,
-  food_safety: 3,
-  cleaning: 4,
-  equipment: 5,
-  waste: 6,
-  admin: 7,
-  closing: 8,
-  general: 9,
+  return categoryMeta(category).icon
 }
 
 export interface PriorityOption {
