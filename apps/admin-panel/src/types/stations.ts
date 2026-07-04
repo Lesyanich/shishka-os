@@ -129,6 +129,45 @@ export const COUNT_CLASS_META: Record<CountClass, { label: string; badgeCls: str
   C: { label: 'C · monthly', badgeCls: 'bg-[var(--s-2)] text-cream/50' },
 }
 
+export type CountStatus = 'out' | 'low' | 'in' | 'over' | 'untracked'
+
+/** Where a counted (or on-hand) value sits vs Min/Par. Pure — tested. */
+export function countStatus(
+  value: number | null,
+  min: number | null,
+  par: number | null,
+): CountStatus {
+  if (min == null && par == null) return 'untracked'
+  if (value == null || value <= 0) return 'out'
+  if (min != null && value <= min) return 'low'
+  if (par != null && value > par) return 'over'
+  return 'in'
+}
+
+/** Zone-bar geometry: fill % (0–100, capped) of the entered value against a
+ * Par-scaled track, plus the status colouring. Track spans 0→Par (fallback to
+ * Min×2 when Par is unset). */
+export function zoneBarFill(
+  value: number | null,
+  min: number | null,
+  par: number | null,
+): { pct: number; minPct: number; status: CountStatus } {
+  const status = countStatus(value, min, par)
+  const scale = par ?? (min != null ? min * 2 : null)
+  if (scale == null || scale <= 0) return { pct: 0, minPct: 0, status }
+  const pct = Math.max(0, Math.min(100, ((value ?? 0) / scale) * 100))
+  const minPct = min != null ? Math.max(0, Math.min(100, (min / scale) * 100)) : 0
+  return { pct, minPct, status }
+}
+
+export const COUNT_STATUS_META: Record<CountStatus, { label: string; text: string; fill: string }> = {
+  out: { label: 'Out', text: 'text-brick-bright', fill: 'var(--color-brick, #b62a23)' },
+  low: { label: 'Low', text: 'text-amber-watch', fill: 'var(--color-amber-watch, #d9a441)' },
+  in: { label: 'In', text: 'text-forest-soft', fill: 'var(--color-forest-soft, #4a7a3a)' },
+  over: { label: 'Over', text: 'text-forest-soft', fill: 'var(--color-forest-soft, #4a7a3a)' },
+  untracked: { label: '—', text: 'text-cream/40', fill: 'var(--s-3)' },
+}
+
 export const SESSION_STATUS_META: Record<StocktakeSessionStatus, { label: string; badgeCls: string }> = {
   draft: { label: 'Draft', badgeCls: 'bg-[var(--s-2)] text-cream/60' },
   submitted: { label: 'Submitted', badgeCls: 'bg-amber-watch/15 text-amber-watch' },

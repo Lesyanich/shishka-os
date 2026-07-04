@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   compareChecklistRows,
+  countStatus,
   normalizeChecklistRow,
+  zoneBarFill,
   type RawChecklistRow,
   type StationChecklistRow,
 } from './stations'
@@ -81,5 +83,45 @@ describe('compareChecklistRows', () => {
     const a = row({ name: 'Mango' })
     const b = row({ name: 'Avocado' })
     expect([a, b].sort(compareChecklistRows)[0].name).toBe('Avocado')
+  })
+})
+
+describe('countStatus', () => {
+  it('untracked when no min and no par', () => {
+    expect(countStatus(5, null, null)).toBe('untracked')
+  })
+  it('out at zero or below', () => {
+    expect(countStatus(0, 3, 10)).toBe('out')
+    expect(countStatus(null, 3, 10)).toBe('out')
+  })
+  it('low at or below min', () => {
+    expect(countStatus(3, 3, 10)).toBe('low')
+    expect(countStatus(2.9, 3, 10)).toBe('low')
+  })
+  it('in between min and par', () => {
+    expect(countStatus(5, 3, 10)).toBe('in')
+    expect(countStatus(10, 3, 10)).toBe('in')
+  })
+  it('over above par (surplus is catchable)', () => {
+    expect(countStatus(12, 3, 10)).toBe('over')
+  })
+  it('with only min set, above min is in', () => {
+    expect(countStatus(5, 3, null)).toBe('in')
+  })
+})
+
+describe('zoneBarFill', () => {
+  it('fills relative to par and caps at 100%', () => {
+    expect(zoneBarFill(5, 3, 10).pct).toBe(50)
+    expect(zoneBarFill(20, 3, 10).pct).toBe(100) // surplus caps the bar
+  })
+  it('marks the min tick position', () => {
+    expect(zoneBarFill(5, 3, 10).minPct).toBe(30)
+  })
+  it('falls back to min×2 scale when par is unset', () => {
+    expect(zoneBarFill(3, 3, null).pct).toBe(50)
+  })
+  it('no geometry when untracked', () => {
+    expect(zoneBarFill(5, null, null)).toEqual({ pct: 0, minPct: 0, status: 'untracked' })
   })
 })

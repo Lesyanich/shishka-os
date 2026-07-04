@@ -1,0 +1,16 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - img [ref=e7]
+    - heading "Shishka OS" [level=1] [ref=e12]
+    - paragraph [ref=e13]: Вход для сотрудника
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]: Имя
+      - textbox "Имя" [ref=e17]:
+        - /placeholder: напр. Alex
+    - generic [ref=e18]:
+      - generic [ref=e19]: PIN
+      - textbox "PIN" [ref=e20]:
+        - /placeholder: ••••••
+    - button "Войти" [ref=e21]
+  - button "Вход для владельца (email)" [ref=e22]
