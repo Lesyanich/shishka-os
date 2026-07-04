@@ -7,9 +7,9 @@ import type { StaffTask } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
 import {
   CATEGORY_ACCENT,
-  CATEGORY_ICON,
   CATEGORY_LABEL,
   CATEGORY_STYLE,
+  categoryIcon,
   PRIORITY_DOT,
   STATION_LABEL,
   STATION_STYLE,
@@ -43,7 +43,7 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
   const navigate = useNavigate()
   const { upload, isUploading } = useTaskPhotoUpload()
   const fileRef = useRef<HTMLInputElement>(null)
-  const CatIcon = CATEGORY_ICON[task.category]
+  const CatIcon = categoryIcon(task.category)
   // todo/done read off the checkbox + strikethrough; only the exceptional
   // states still warrant an explicit badge.
   const showStatusBadge =
