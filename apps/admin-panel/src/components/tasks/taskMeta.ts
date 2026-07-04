@@ -5,7 +5,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   DoorOpen, DoorClosed, ChefHat, Sparkles, ClipboardList, Tag,
-  PackageCheck, Trash2, Sunrise, Sun, Sunset, Clock,
+  PackageCheck, Trash2, Wrench, ShieldCheck, Sunrise, Sun, Sunset, Clock,
 } from 'lucide-react'
 import type {
   StaffTask,
@@ -27,6 +27,8 @@ export const CATEGORY_OPTIONS: CategoryOption[] = [
   { value: 'prep', label: 'Prep', label_th: 'เตรียมของ' },
   { value: 'cleaning', label: 'Cleaning', label_th: 'ทำความสะอาด' },
   { value: 'stock_check', label: 'Stock check', label_th: 'เช็คสต๊อก' },
+  { value: 'food_safety', label: 'Food safety', label_th: 'ความปลอดภัยอาหาร' },
+  { value: 'equipment', label: 'Equipment', label_th: 'อุปกรณ์' },
   { value: 'waste', label: 'Write-off', label_th: 'ตัดทิ้ง' },
   { value: 'admin', label: 'Admin', label_th: 'งานเอกสาร' },
   { value: 'general', label: 'General', label_th: 'ทั่วไป' },
@@ -42,6 +44,8 @@ export const CATEGORY_STYLE: Record<TaskCategory, string> = {
   prep: 'bg-amber-500/15 text-amber-300',
   cleaning: 'bg-teal-500/15 text-teal-300',
   stock_check: 'bg-lime-500/15 text-lime-300',
+  food_safety: 'bg-red-500/15 text-red-300',
+  equipment: 'bg-orange-500/15 text-orange-300',
   waste: 'bg-rose-500/15 text-rose-300',
   admin: 'bg-slate-500/15 text-slate-300',
   general: 'bg-slate-700/40 text-slate-300',
@@ -54,9 +58,21 @@ export const CATEGORY_ICON: Record<TaskCategory, LucideIcon> = {
   prep: ChefHat,
   cleaning: Sparkles,
   stock_check: PackageCheck,
+  food_safety: ShieldCheck,
+  equipment: Wrench,
   waste: Trash2,
   admin: ClipboardList,
   general: Tag,
+}
+
+/**
+ * Icon for a category, with a safe fallback. A category is a component (not a
+ * string), so an unknown value (the DB check constraint can add a category the
+ * frontend map hasn't caught up to yet) would render `<undefined/>` and crash
+ * the whole board with React #130. Fall back to the neutral Tag icon instead.
+ */
+export function categoryIcon(category: string): LucideIcon {
+  return CATEGORY_ICON[category as TaskCategory] ?? Tag
 }
 
 /** Left-border accent class per category — the card's at-a-glance work-type stripe. */
@@ -66,6 +82,8 @@ export const CATEGORY_ACCENT: Record<TaskCategory, string> = {
   prep: 'border-l-amber-500/60',
   cleaning: 'border-l-teal-500/60',
   stock_check: 'border-l-lime-500/60',
+  food_safety: 'border-l-red-500/60',
+  equipment: 'border-l-orange-500/60',
   waste: 'border-l-rose-500/60',
   admin: 'border-l-slate-500/60',
   general: 'border-l-slate-700',
@@ -76,11 +94,13 @@ export const CATEGORY_SORT: Record<TaskCategory, number> = {
   opening: 0,
   prep: 1,
   stock_check: 2,
-  cleaning: 3,
-  waste: 4,
-  admin: 5,
-  closing: 6,
-  general: 7,
+  food_safety: 3,
+  cleaning: 4,
+  equipment: 5,
+  waste: 6,
+  admin: 7,
+  closing: 8,
+  general: 9,
 }
 
 export interface PriorityOption {

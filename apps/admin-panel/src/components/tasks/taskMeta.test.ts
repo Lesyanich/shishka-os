@@ -1,12 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import {
+  CATEGORY_ICON,
   CATEGORY_LABEL,
+  CATEGORY_OPTIONS,
+  categoryIcon,
   describeRecurrence,
   formatLocalDate,
   isOverdue,
   shortTime,
 } from './taskMeta'
-import type { StaffTask } from '../../hooks/useStaffTasks'
+import type { StaffTask, TaskCategory } from '../../hooks/useStaffTasks'
+
+// Every category the DB check constraint allows. Must stay in sync with
+// staff_tasks_category_check — a value here that the frontend maps miss renders
+// `<undefined/>` and crashes the whole board (React #130).
+const DB_CATEGORIES: TaskCategory[] = [
+  'opening', 'closing', 'prep', 'cleaning', 'admin', 'general',
+  'stock_check', 'waste', 'equipment', 'food_safety',
+]
 
 function makeTask(over: Partial<StaffTask> = {}): StaffTask {
   return {
@@ -23,6 +34,26 @@ function makeTask(over: Partial<StaffTask> = {}): StaffTask {
 describe('taskMeta', () => {
   it('maps category labels', () => {
     expect(CATEGORY_LABEL.opening).toBe('Opening')
+  })
+
+  it('covers every DB category with an icon, label, and option (guards React #130)', () => {
+    // A lucide icon is a valid React element type: a function or a forwardRef
+    // object. The invariant that prevents #130 is simply "never undefined/null".
+    for (const c of DB_CATEGORIES) {
+      expect(CATEGORY_ICON[c], `icon for "${c}"`).not.toBeUndefined()
+      expect(CATEGORY_ICON[c], `icon for "${c}"`).not.toBeNull()
+      expect(CATEGORY_LABEL[c], `label for "${c}"`).toBeTruthy()
+      expect(CATEGORY_OPTIONS.some((o) => o.value === c), `option for "${c}"`).toBe(true)
+    }
+  })
+
+  it('categoryIcon returns a renderable type for known and unknown categories', () => {
+    expect(categoryIcon('equipment')).not.toBeUndefined()
+    expect(categoryIcon('food_safety')).not.toBeUndefined()
+    // A category the DB adds before the frontend catches up must not be
+    // undefined (which would render `<undefined/>` and crash the board).
+    expect(categoryIcon('some_future_category')).not.toBeUndefined()
+    expect(categoryIcon('some_future_category')).not.toBeNull()
   })
 
   it('shortTime trims seconds', () => {

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 
 export type TaskCategory =
   | 'opening' | 'closing' | 'prep' | 'cleaning' | 'admin' | 'general'
-  | 'stock_check' | 'waste'
+  | 'stock_check' | 'waste' | 'equipment' | 'food_safety'
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low'
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'skipped' | 'cancelled'
 export type TaskRecurrence = 'none' | 'daily' | 'weekly'
