@@ -91,6 +91,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Production & Planning',
     items: [
+      { path: '/schedule', icon: CalendarDays, label: 'Schedule', minRole: 'task_manager' },
       { path: '/planner', icon: CalendarDays, label: 'Planner', minRole: 'task_manager' },
       { path: '/planner/batch', icon: Rewind, label: 'Batch Plan', minRole: 'task_manager' },
       { path: '/production', icon: Factory, label: 'Production', minRole: 'task_manager' },
@@ -120,7 +121,6 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'HR & Payroll',
     items: [
       { path: '/hr/attendance', icon: CalendarCheck, label: 'Attendance', minRole: 'owner' },
-      { path: '/hr/schedule', icon: CalendarDays, label: 'Schedule', minRole: 'owner' },
       { path: '/hr/payroll', icon: Banknote, label: 'Payroll', minRole: 'owner' },
       { path: '/hr/staff', icon: Users, label: 'Staff', minRole: 'owner' },
     ],
