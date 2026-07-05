@@ -32,6 +32,7 @@ import {
   Banknote,
   Users,
   ListTodo,
+  Menu,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAppRole, type AppRole } from '../contexts/AppRoleContext'
@@ -147,10 +148,13 @@ function SidebarSection({
   section,
   isOpen,
   onToggle,
+  onNavigate,
 }: {
   section: NavSection
   isOpen: boolean
   onToggle: () => void
+  /** Called after a link is tapped — closes the mobile drawer. */
+  onNavigate: () => void
 }) {
   return (
     <div>
@@ -158,10 +162,10 @@ function SidebarSection({
         onClick={onToggle}
         className="flex w-full items-center justify-between px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream/40 transition hover:text-cream/70"
       >
-        <span className="hidden lg:block">{section.title}</span>
+        <span className="hidden lg:block [.mobile-open_&]:block">{section.title}</span>
         <ChevronDown
           className={[
-            'hidden h-3 w-3 transition-transform lg:block',
+            'hidden h-3 w-3 transition-transform lg:block [.mobile-open_&]:block',
             isOpen ? '' : '-rotate-90',
           ].join(' ')}
         />
@@ -173,6 +177,7 @@ function SidebarSection({
               key={path}
               to={path}
               end={path === '/'}
+              onClick={onNavigate}
               className={({ isActive }) =>
                 [
                   'flex items-center gap-3 rounded-lg px-2 py-2 text-xs font-medium transition',
@@ -190,7 +195,7 @@ function SidebarSection({
                       isActive ? 'text-honey-300' : '',
                     ].join(' ')}
                   />
-                  <span className="hidden lg:block">{label}</span>
+                  <span className="hidden lg:block [.mobile-open_&]:block">{label}</span>
                 </>
               )}
             </NavLink>
@@ -213,6 +218,11 @@ export function AppShell() {
       items: s.items.filter((i) => hasAccess(role, i.minRole)),
     }))
     .filter((s) => s.items.length > 0)
+
+  // Mobile-only off-canvas drawer. On lg+ the sidebar is always-on (static);
+  // below lg it slides in over a backdrop so the phone view keeps full width.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const closeMobileNav = () => setMobileNavOpen(false)
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     () => {
@@ -237,12 +247,28 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-[var(--s-0)]">
-      {/* ─── Sidebar ─── */}
-      <aside className="flex w-14 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--s-1)] lg:w-52">
+      {/* Mobile drawer backdrop */}
+      {mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={closeMobileNav}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+        />
+      )}
+
+      {/* ─── Sidebar — off-canvas drawer on mobile, static rail on lg+ ─── */}
+      <aside
+        className={[
+          'fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 -translate-x-full flex-col border-r border-[var(--line)] bg-[var(--s-1)] transition-transform duration-200',
+          'lg:static lg:z-auto lg:w-52 lg:translate-x-0',
+          mobileNavOpen ? 'mobile-open translate-x-0' : '',
+        ].join(' ')}
+      >
         {/* Brand */}
         <div className="flex items-center gap-2.5 border-b border-[var(--line)] px-3 py-4">
           <span className="shk-seal h-8 w-8 text-[13px]" aria-hidden>S</span>
-          <div className="hidden lg:block">
+          <div className="hidden lg:block [.mobile-open_&]:block">
             <p className="font-display text-sm font-bold tracking-tight text-cream">Shishka OS</p>
             <p className="text-[10px] uppercase tracking-[0.14em] text-cream/40">Unified ERP / KDS</p>
           </div>
@@ -251,12 +277,12 @@ export function AppShell() {
         {/* Staff identity */}
         {!roleLoading && staffName && (
           <div className="flex items-center gap-2 border-b border-[var(--line)] px-3 py-2.5">
-            <span className="hidden truncate text-xs font-medium text-cream/85 lg:block">
+            <span className="hidden truncate text-xs font-medium text-cream/85 lg:block [.mobile-open_&]:block">
               {staffName}
             </span>
             <span
               className={[
-                'hidden rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase lg:inline-block',
+                'hidden rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase lg:inline-block [.mobile-open_&]:inline-block',
                 ROLE_STYLE[role],
               ].join(' ')}
             >
@@ -273,6 +299,7 @@ export function AppShell() {
               section={section}
               isOpen={openSections[section.title] ?? true}
               onToggle={() => toggleSection(section.title)}
+              onNavigate={closeMobileNav}
             />
           ))}
 
@@ -281,6 +308,7 @@ export function AppShell() {
             <div className="mt-auto">
               <NavLink
                 to="/settings"
+                onClick={closeMobileNav}
                 className={({ isActive }) =>
                   [
                     'flex items-center gap-3 rounded-lg px-2 py-2 text-xs font-medium transition',
@@ -293,7 +321,7 @@ export function AppShell() {
                 {({ isActive }) => (
                   <>
                     <Settings className={['h-4 w-4 shrink-0', isActive ? 'text-honey-300' : ''].join(' ')} />
-                    <span className="hidden lg:block">Settings</span>
+                    <span className="hidden lg:block [.mobile-open_&]:block">Settings</span>
                   </>
                 )}
               </NavLink>
@@ -312,6 +340,14 @@ export function AppShell() {
         {/* Top bar */}
         <header className="flex shrink-0 items-center justify-between border-b border-[var(--line)] bg-[var(--s-0)]/75 px-6 py-3 backdrop-blur">
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open menu"
+              className="-ml-1 rounded p-1.5 text-cream/70 transition hover:bg-surface-3 hover:text-cream lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             <span className="inline-flex h-1.5 w-1.5 rounded-full bg-forest-soft" />
             <span className="text-xs text-cream/50">Supabase connected</span>
           </div>

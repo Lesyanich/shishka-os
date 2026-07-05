@@ -9,7 +9,6 @@ import {
   categoryMeta,
   PRIORITY_DOT,
   STATION_LABEL,
-  STATION_STYLE,
   STATUS_LABEL,
   STATUS_STYLE,
   describeRecurrence,
@@ -27,21 +26,38 @@ interface TaskRowProps {
   showDate?: boolean
 }
 
+/** Compact "22 Jun" / "22 Jun 08:00" / "08:00" label for the card's when-chip. */
+function whenLabel(task: StaffTask, showDate?: boolean): string {
+  if (task.is_template) return ''
+  const time = shortTime(task.due_time)
+  if (showDate && task.due_date) {
+    const d = new Date(`${task.due_date}T00:00:00`)
+    const md = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    return time ? `${md} ${time}` : md
+  }
+  return time
+}
+
 /**
- * One task card. Tuned for phone readability: a coloured left stripe + icon
- * names the work type at a glance, the title wraps (never truncates), and the
- * card carries only the fast in-place action (camera). Editing, deleting and
- * Telegram pushes happen in the detail view opened by tapping the card.
+ * One task card — a compact checklist row tuned for a cook's phone.
+ *
+ * The whole card is ~64px: line 1 is the priority dot + a single English title
+ * (wraps to two lines max); line 2 is one muted meta line (when · work-type ·
+ * station · who). A coloured left stripe + icon name the work type at a glance.
+ * English-only and short by design — full details, the Thai title, editing,
+ * deleting and Telegram pushes live in the detail view opened by tapping the
+ * card. The only in-place action is the camera (photo proof).
  */
 export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }: TaskRowProps) {
   const done = task.status === 'done'
   const overdue = isOverdue(task)
-  const assignee = task.staff?.name ?? 'Unassigned'
+  const assignee = task.staff?.name ?? null
   const navigate = useNavigate()
   const { upload, isUploading } = useTaskPhotoUpload()
   const fileRef = useRef<HTMLInputElement>(null)
   const catMeta = categoryMeta(task.category)
   const CatIcon = catMeta.icon
+  const when = whenLabel(task, showDate)
   // todo/done read off the checkbox + strikethrough; only the exceptional
   // states still warrant an explicit badge.
   const showStatusBadge =
@@ -62,15 +78,15 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
 
   return (
     <div
-      className={`flex items-start gap-3 rounded-xl border border-l-4 border-slate-800 bg-slate-900/60 px-3 py-3 ${catMeta.accent}`}
+      className={`flex items-center gap-2.5 rounded-lg border border-l-4 border-slate-800 bg-slate-900/60 px-3 py-2 ${catMeta.accent}`}
     >
-      {/* Done toggle — big tap target */}
+      {/* Done toggle — tap target */}
       {onToggleDone && !task.is_template && (
         <button
           type="button"
           onClick={() => onToggleDone(task)}
           title={done ? 'Mark as to-do' : 'Mark as done'}
-          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition ${
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition ${
             done
               ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-300'
               : 'border-slate-700 text-transparent hover:border-emerald-500/40 hover:text-emerald-400/50'
@@ -86,65 +102,70 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
           className={onOpen ? 'cursor-pointer' : undefined}
           onClick={onOpen ? () => onOpen(task) : undefined}
         >
-          {/* Title row — wraps to two lines, never truncates */}
+          {/* Line 1 — priority dot · title (wraps to 2 lines max) */}
           <div className="flex items-start gap-2">
-            <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[task.priority]}`} />
             <span
-              className={`line-clamp-2 text-[15px] font-medium leading-snug ${
+              className={`mt-1 h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[task.priority]}`}
+              title={`Priority: ${task.priority}`}
+            />
+            <span
+              className={`line-clamp-2 text-[15px] font-medium leading-tight ${
                 done ? 'text-slate-500 line-through' : 'text-slate-100'
               }`}
             >
               {task.title}
             </span>
-            {task.is_template && (
-              <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300">
-                <Repeat className="h-3 w-3" />
-                {describeRecurrence(task)}
-              </span>
-            )}
           </div>
 
-          {task.title_th && (
-            <p className="mt-0.5 line-clamp-1 pl-4 text-xs text-slate-400">{task.title_th}</p>
-          )}
-
-          {/* Meta row — work type leads, then station / who / when */}
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium ${catMeta.style}`}
-            >
-              <CatIcon className="h-3 w-3" />
-              {catMeta.label}
-            </span>
-            {task.station !== 'general' && (
-              <span className={`rounded-full px-1.5 py-0.5 font-semibold ${STATION_STYLE[task.station]}`}>
-                {STATION_LABEL[task.station]}
+          {/* Line 2 — one muted meta line: when · work-type · station · who */}
+          <div className="mt-1 flex items-center gap-1.5 overflow-hidden pl-4 text-[11px] text-slate-400">
+            {task.is_template ? (
+              <span className="inline-flex shrink-0 items-center gap-1 font-medium text-indigo-300">
+                <Repeat className="h-3 w-3" />
+                {describeRecurrence(task)}
+                <span className="text-slate-600">·</span>
               </span>
+            ) : (
+              when && (
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1 font-medium tabular-nums ${
+                    overdue ? 'text-rose-300' : 'text-slate-300'
+                  }`}
+                >
+                  {overdue ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                  {when}
+                  <span className="text-slate-600">·</span>
+                </span>
+              )
             )}
-            <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-slate-300">{assignee}</span>
-            {!task.is_template && (task.due_time || (showDate && task.due_date)) && (
-              <span
-                className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${
-                  overdue ? 'bg-rose-500/15 text-rose-300' : 'bg-slate-800 text-slate-400'
-                }`}
-              >
-                {overdue ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                {showDate && task.due_date ? `${task.due_date} ` : ''}
-                {shortTime(task.due_time)}
-              </span>
+            <CatIcon className="h-3 w-3 shrink-0" />
+            <span className="shrink-0">{catMeta.label}</span>
+            {task.station !== 'general' && (
+              <>
+                <span className="text-slate-600">·</span>
+                <span
+                  className={`shrink-0 font-semibold ${
+                    task.station === 'L1' ? 'text-orange-300' : 'text-cyan-300'
+                  }`}
+                  title={STATION_LABEL[task.station]}
+                >
+                  {task.station}
+                </span>
+              </>
+            )}
+            {assignee && (
+              <>
+                <span className="text-slate-600">·</span>
+                <span className="truncate text-slate-300">{assignee}</span>
+              </>
             )}
             {showStatusBadge && (
-              <span className={`rounded-full px-1.5 py-0.5 ${STATUS_STYLE[task.status]}`}>
+              <span className={`ml-1 shrink-0 rounded-full px-1.5 py-0.5 ${STATUS_STYLE[task.status]}`}>
                 {STATUS_LABEL[task.status]}
               </span>
             )}
             {task.comment && (
-              <span
-                className="inline-flex items-center rounded-full bg-slate-700/40 px-1 py-0.5 text-slate-300"
-                title={task.comment}
-              >
-                <MessageSquare className="h-3 w-3" />
-              </span>
+              <MessageSquare className="ml-0.5 h-3 w-3 shrink-0 text-slate-500" aria-label="Has note" />
             )}
           </div>
         </div>
@@ -165,7 +186,7 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
         {task.photo_urls.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {task.photo_urls.map((url) => (
-              <a key={url} href={url} target="_blank" rel="noreferrer" className="block h-12 w-12 overflow-hidden rounded-md border border-slate-700">
+              <a key={url} href={url} target="_blank" rel="noreferrer" className="block h-11 w-11 overflow-hidden rounded-md border border-slate-700">
                 <img src={url} alt="report" className="h-full w-full object-cover" />
               </a>
             ))}
