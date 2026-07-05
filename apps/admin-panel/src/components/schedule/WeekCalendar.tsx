@@ -12,7 +12,7 @@ function useIsMobile(breakpoint = 640) {
   return isMobile
 }
 import { useStaff } from '../../hooks/useStaff'
-import { useShifts, type Shift, type ShiftInsert } from '../../hooks/useShifts'
+import type { Shift, ShiftInsert, UseShiftsResult } from '../../hooks/useShifts'
 import { useShiftTasks } from '../../hooks/useShiftTasks'
 import { useEquipment } from '../../hooks/useEquipment'
 import { supabase } from '../../lib/supabase'
@@ -49,11 +49,26 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 interface WeekCalendarProps {
+  // Shift data + mutations are owned by the parent so the grid and the parent's
+  // Weekly Hours Summary share a single useShifts() instance and stay in sync.
+  shifts: Shift[]
+  shiftsLoading: boolean
+  createShift: UseShiftsResult['createShift']
+  updateShift: UseShiftsResult['updateShift']
+  deleteShift: UseShiftsResult['deleteShift']
   locationFilter?: string | null
   onWeekChange?: (weekStart: Date) => void
 }
 
-export function WeekCalendar({ locationFilter = null, onWeekChange }: WeekCalendarProps = {}) {
+export function WeekCalendar({
+  shifts: allShifts,
+  shiftsLoading,
+  createShift,
+  updateShift,
+  deleteShift,
+  locationFilter = null,
+  onWeekChange,
+}: WeekCalendarProps) {
   const isMobile = useIsMobile()
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
   const [mobileDay, setMobileDay] = useState(() => formatDate(new Date()))
@@ -63,7 +78,6 @@ export function WeekCalendar({ locationFilter = null, onWeekChange }: WeekCalend
   } | null>(null)
 
   const { staff, isLoading: staffLoading } = useStaff()
-  const { shifts: allShifts, isLoading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts()
   const { createShiftTask, deleteShiftTask } = useShiftTasks()
   const { equipment } = useEquipment()
 

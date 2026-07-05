@@ -48,7 +48,7 @@ export function SchedulePage() {
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
 
   const { staff } = useStaff()
-  const { shifts } = useShifts()
+  const { shifts, isLoading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts()
   const { locations } = useLocations()
 
   const activeStaff = useMemo(() => staff.filter((s) => s.is_active), [staff])
@@ -166,6 +166,11 @@ export function SchedulePage() {
 
       {/* Week calendar */}
       <WeekCalendar
+        shifts={shifts}
+        shiftsLoading={shiftsLoading}
+        createShift={createShift}
+        updateShift={updateShift}
+        deleteShift={deleteShift}
         locationFilter={locationFilter}
         onWeekChange={setWeekStart}
       />
