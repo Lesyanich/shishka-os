@@ -13,6 +13,7 @@ Usage:
 
 import hashlib
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -38,11 +39,18 @@ MAKRO_SUPPLIER_ID = "c548db19-8a70-4f34-96af-d66162793cbf"
 
 
 def get_db_url() -> str:
+    """Retrieve DATABASE_URL from env var (cloud/CI) or macOS Keychain (local)."""
+    env_url = os.environ.get("DATABASE_URL", "").strip()
+    if env_url:
+        return env_url
     result = subprocess.run(
         ["security", "find-generic-password", "-s", "shishka-database-url", "-w"],
         capture_output=True, text=True,
     )
-    return result.stdout.strip()
+    url = result.stdout.strip()
+    if not url:
+        raise RuntimeError("DATABASE_URL not found in env or Keychain (shishka-database-url)")
+    return url
 
 
 def fetch_raw_auto_items(cur) -> list[dict]:

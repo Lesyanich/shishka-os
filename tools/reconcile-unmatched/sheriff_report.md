@@ -1,14 +1,16 @@
 # Data Health Sheriff Report
-**Date:** 2026-06-21  
+**Date:** 2026-07-05  
 **Run type:** Scheduled weekly audit  
-**Status:** ⛔ BLOCKED — No database credentials available
+**Status:** ⛔ BLOCKED — No database credentials available (2nd consecutive week)
 
 ---
 
 ## AUDIT BLOCKED: Missing Credentials
 
 The weekly data health audit **could not run** because no database credentials
-are available in the cloud execution environment (Linux, `IS_SANDBOX=yes`).
+are available in the cloud execution environment (Linux, no macOS Keychain).
+
+**This is the second consecutive week the audit has been blocked.** Previous blocked run: 2026-06-21.
 
 ### What was tried
 
@@ -17,24 +19,27 @@ are available in the cloud execution environment (Linux, `IS_SANDBOX=yes`).
 | `DATABASE_URL` env var | Not set |
 | macOS Keychain `shishka-database-url` | Unavailable (Linux, no `security` CLI) |
 | `SUPABASE_SERVICE_ROLE_KEY` env var | Not set |
-| `.env` / `services/lightrag/db-url.local` files | Gitignored — not present in clone |
+| `.env` file in repo root | Gitignored — not present in clone |
+| `apps/admin-panel/.env.local` | Gitignored — not present in clone |
 
-### What needs to be done
+### Fix Required
 
-**To fix this for future scheduled runs**, add the following to the scheduled
-routine's environment variables in the Claude Code web settings:
+Add **one** of the following to the scheduled routine's environment variables
+in the Claude Code web settings (https://code.claude.com):
 
+**Option A — Direct Postgres URL (preferred for psycopg2 tools):**
 ```
-DATABASE_URL=postgresql://postgres.[project-id]:[password]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
 ```
-or
+
+**Option B — Supabase REST API key (if psycopg2 replaced with supabase-py):**
 ```
 SUPABASE_SERVICE_ROLE_KEY=<service role key from Supabase dashboard>
 SUPABASE_URL=https://qcqgtcsjoacuktcewpvo.supabase.co
 ```
 
-See: https://code.claude.com/docs/en/claude-code-on-the-web (environment configuration)  
-Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
+Supabase project ref: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)  
+Dashboard: https://supabase.com/dashboard/project/qcqgtcsjoacuktcewpvo/settings/database
 
 ---
 
@@ -43,8 +48,8 @@ Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 1: data_health_rules | ⛔ BLOCKED | Requires DB connection |
-| Phase 2: Duplicate detection | ⛔ BLOCKED | Requires DB connection |
-| Phase 3: Makro barcode audit | ⛔ BLOCKED | Requires DB connection |
+| Phase 2: Duplicate detection (enhanced) | ⛔ BLOCKED | Requires DB connection |
+| Phase 3: Makro barcode audit | ⛔ BLOCKED | Requires DB connection (`audit_makro_barcodes.py` also uses macOS Keychain) |
 | Phase 4: Price drift + conversion sanity | ⛔ BLOCKED | Requires DB connection |
 | Phase 5: Report generation | ⚠ PARTIAL | This file only |
 
@@ -54,45 +59,56 @@ Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
 
 Based on learned patterns from previous manual cleanup sessions:
 
-### Active data_health_rules (from schema)
+### Active data_health_rules
 All active rules in `public.data_health_rules` where `is_active = TRUE`,
-ordered by severity. Auto-fix rules (e.g. `zero_cost_with_purchases`) would
-have recalculated WAC for zero-cost items with purchase history, excluding
-items with `notes` containing `'free'` / `'in-house'` / `'recipe'`.
+ordered by severity. Auto-fix rule `zero_cost_with_purchases` would recalculate
+WAC for zero-cost items with purchase history, excluding items with `notes`
+containing `'free'` / `'in-house'` / `'recipe'`.
 
 ### Duplicate detection (learned patterns)
-- **OCR name variants**: Multiple RAW/RAW-AUTO items with same supplier +
-  similar price (±20%) + overlapping purchase dates → likely same physical
-  product (e.g. the lamb case: AU Frozen Lamb Shoulder / Leg / Minced Lamb,
-  barcode 831436).
-- **Unit confusion g vs kg**: Items with `cost_per_unit < 5` AND
-  `base_unit = 'g'` — likely misclassified (Gouda cheese pattern).
+- **OCR name variants**: Multiple RAW/RAW-AUTO items, same supplier + similar
+  price (±20%) + overlapping purchase dates → same physical product
+  (lamb shoulder / leg / minced from barcode 831436).
+- **Unit confusion g vs kg**: `cost_per_unit < 5` AND `base_unit = 'g'` →
+  likely misclassified (Gouda cheese pattern: WAC=0.82/g vs correct 822/kg).
 - **Conversion factor drift >1000%**: `last_seen_price` vs `cost_per_unit`
-  ratio > 10x (Olive Oil 5L pattern: WAC=440/L but last_price=2200 for bottle).
+  ratio > 10× (Olive Oil 5L: WAC=440/L but last_price=2200 for bottle).
 
-### Known safe zero-cost items (do NOT flag)
-- Tahini: supplied free from friend's factory (check `notes LIKE '%free%'`)
-- Chili paste: PF made in-house from recipe (check `notes LIKE '%in-house%'`)
+### Known safe zero-cost items (excluded from zero-cost checks)
+- Tahini: supplied free from partner factory (`notes LIKE '%free%'`)
+- Chili paste: PF made in-house from recipe (`notes LIKE '%in-house%'` or `'%recipe%'`)
 
 ### Makro barcode audit
-Would have run `tools/reconcile-unmatched/audit_makro_barcodes.py` against
 ~222 barcodes in `supplier_catalog` + `purchase_logs` for Makro supplier
-(`c548db19-8a70-4f34-96af-d66162793cbf`), checking for NAME_MISMATCH /
-NAME_DIFF / NOT_FOUND against live Makro Typesense API.
+(`c548db19-8a70-4f34-96af-d66162793cbf`). Also needs fixing: `get_db_url()` in
+`audit_makro_barcodes.py` uses macOS Keychain — needs an env-var fallback for
+cloud runs.
 
 ---
 
 ## Health Score
 **N/A** — could not compute (no DB access)
 
-Last known report: none (first run, blocked before any data fetched)
-
 ---
 
 ## Action Required
 
-1. **Add `DATABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY` to the scheduled routine environment** — see fix above
-2. Re-run this audit after credentials are configured
-3. The audit will then run all 5 phases and produce a full report with health score
+1. **Add `DATABASE_URL` to the scheduled routine environment** (see fix above)
+2. **Update `get_db_url()` in audit scripts** to fall back to `DATABASE_URL` env var when Keychain unavailable (Linux/cloud):
+   ```python
+   def get_db_url() -> str:
+       env_url = os.environ.get("DATABASE_URL")
+       if env_url:
+           return env_url
+       result = subprocess.run(
+           ["security", "find-generic-password", "-s", "shishka-database-url", "-w"],
+           capture_output=True, text=True,
+       )
+       url = result.stdout.strip()
+       if not url:
+           raise RuntimeError("DATABASE_URL not found in env or Keychain")
+       return url
+   ```
+3. Re-run this audit after credentials are configured
 
-_Report generated: 2026-06-21 | Session: claude-opus-session-a261e2ff_
+_Report generated: 2026-07-05 | Session: claude-opus-session-dec13efc | 2nd consecutive blocked run_
