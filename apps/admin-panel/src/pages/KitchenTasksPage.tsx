@@ -20,7 +20,7 @@ import { TaskDetailModal } from '../components/tasks/TaskDetailModal'
 import { TelegramLinkPanel } from '../components/tasks/TelegramLinkPanel'
 import {
   CATEGORY_OPTIONS,
-  CATEGORY_SORT,
+  categoryMeta,
   STATUS_OPTIONS,
   TIME_BANDS,
   type TimeBand,
@@ -343,7 +343,7 @@ export function KitchenTasksPage() {
       ...band,
       tasks: (map.get(band.key) ?? []).slice().sort(
         (a, b) =>
-          CATEGORY_SORT[a.category] - CATEGORY_SORT[b.category] ||
+          categoryMeta(a.category).sort - categoryMeta(b.category).sort ||
           (a.due_time ?? '').localeCompare(b.due_time ?? '') ||
           a.title.localeCompare(b.title),
       ),

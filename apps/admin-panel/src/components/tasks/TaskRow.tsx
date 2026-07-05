@@ -6,10 +6,7 @@ import {
 import type { StaffTask } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
 import {
-  CATEGORY_ACCENT,
-  CATEGORY_ICON,
-  CATEGORY_LABEL,
-  CATEGORY_STYLE,
+  categoryMeta,
   PRIORITY_DOT,
   STATION_LABEL,
   STATION_STYLE,
@@ -43,7 +40,8 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
   const navigate = useNavigate()
   const { upload, isUploading } = useTaskPhotoUpload()
   const fileRef = useRef<HTMLInputElement>(null)
-  const CatIcon = CATEGORY_ICON[task.category]
+  const catMeta = categoryMeta(task.category)
+  const CatIcon = catMeta.icon
   // todo/done read off the checkbox + strikethrough; only the exceptional
   // states still warrant an explicit badge.
   const showStatusBadge =
@@ -64,7 +62,7 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
 
   return (
     <div
-      className={`flex items-start gap-3 rounded-xl border border-l-4 border-slate-800 bg-slate-900/60 px-3 py-3 ${CATEGORY_ACCENT[task.category]}`}
+      className={`flex items-start gap-3 rounded-xl border border-l-4 border-slate-800 bg-slate-900/60 px-3 py-3 ${catMeta.accent}`}
     >
       {/* Done toggle — big tap target */}
       {onToggleDone && !task.is_template && (
@@ -113,10 +111,10 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
           {/* Meta row — work type leads, then station / who / when */}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium ${CATEGORY_STYLE[task.category]}`}
+              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium ${catMeta.style}`}
             >
               <CatIcon className="h-3 w-3" />
-              {CATEGORY_LABEL[task.category]}
+              {catMeta.label}
             </span>
             {task.station !== 'general' && (
               <span className={`rounded-full px-1.5 py-0.5 font-semibold ${STATION_STYLE[task.station]}`}>
