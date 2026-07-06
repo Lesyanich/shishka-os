@@ -96,7 +96,8 @@ export function WeekCalendar({
   }, [weekStart])
 
   const today = formatDate(new Date())
-  const activeStaff = staff.filter((s) => s.is_active)
+  // Owners (app_role='owner') are not rostered — keep them off the schedule grid.
+  const activeStaff = staff.filter((s) => s.is_active && s.app_role !== 'owner')
 
   // Build a lookup: staffId -> date -> shifts
   const shiftMap = useMemo(() => {

@@ -51,7 +51,11 @@ export function SchedulePage() {
   const { shifts, isLoading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts()
   const { locations } = useLocations()
 
-  const activeStaff = useMemo(() => staff.filter((s) => s.is_active), [staff])
+  // Owners (Bas, Lesia) are not on the roster — exclude them from the schedule grid.
+  const activeStaff = useMemo(
+    () => staff.filter((s) => s.is_active && s.app_role !== 'owner'),
+    [staff],
+  )
 
   // Calculate weekly stats per staff for the current week
   const weeklyStats = useMemo((): WeeklyStats[] => {

@@ -7,6 +7,7 @@ export interface Staff {
   name: string
   name_th: string | null
   role: 'cook' | 'sous_chef' | 'admin' | 'dishwasher' | 'prep'
+  app_role: string | null
   phone: string | null
   pin_code: string | null
   is_active: boolean
@@ -52,7 +53,7 @@ export function useStaff(): UseStaffResult {
 
     const { data, error: fetchError } = await supabase
       .from('staff')
-      .select('id, name, name_th, role, phone, pin_code, is_active, created_at')
+      .select('id, name, name_th, role, app_role, phone, pin_code, is_active, created_at')
       .order('name', { ascending: true })
 
     if (fetchError) {
