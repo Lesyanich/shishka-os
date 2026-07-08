@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 import type { StockStatus } from '../types/stockSheet'
 
 export type StockRequestStatus = 'open' | 'converted' | 'archived'
@@ -38,8 +39,8 @@ export function useStockRequests(): UseStockRequestsResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchRequests = useCallback(async () => {
-    setIsLoading(true)
+  const fetchRequests = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const { data, error: qErr } = await supabase
@@ -81,18 +82,10 @@ export function useStockRequests(): UseStockRequestsResult {
 
   useEffect(() => {
     fetchRequests()
-
-    const channel = supabase
-      .channel('stock-requests-live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'stock_requests' },
-        () => { fetchRequests() },
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
   }, [fetchRequests])
+
+  useCoalescedRealtimeRefetch('stock-requests-live', [{ table: 'stock_requests' }],
+    () => { fetchRequests({ silent: true }) })
 
   const fetchLines = useCallback(async (requestId: string): Promise<StockRequestLine[]> => {
     const [lineRes, nomRes] = await Promise.all([
@@ -134,10 +127,11 @@ export function useStockRequests(): UseStockRequestsResult {
         .update({ status })
         .eq('id', id)
       if (upErr) return false
-      fetchRequests()
+      // Optimistic status change — no full refetch (line_count preserved).
+      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)))
       return true
     },
-    [fetchRequests],
+    [],
   )
 
   return { requests, isLoading, error, refetch: fetchRequests, fetchLines, updateStatus }

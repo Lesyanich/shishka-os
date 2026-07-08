@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Monitor, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from '../hooks/useCoalescedRealtimeRefetch'
 
 interface LiveTask {
   id: string
@@ -18,8 +19,8 @@ export function KitchenLive() {
   const [tasks, setTasks] = useState<LiveTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const fetchTasks = useCallback(async () => {
-    setIsLoading(true)
+  const fetchTasks = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     const today = new Date().toISOString().split('T')[0]
 
     const { data } = await supabase
@@ -47,12 +48,10 @@ export function KitchenLive() {
 
   useEffect(() => {
     fetchTasks()
-    const channel = supabase
-      .channel('kitchen-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => fetchTasks())
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
   }, [fetchTasks])
+
+  useCoalescedRealtimeRefetch('kitchen-live', [{ table: 'production_tasks' }],
+    () => { fetchTasks({ silent: true }) })
 
   function getElapsed(actualStart: string | null): string {
     if (!actualStart) return ''
@@ -88,7 +87,7 @@ export function KitchenLive() {
         <div className="mx-auto flex max-w-4xl items-center gap-3">
           <Monitor className="h-5 w-5 text-sky-400" />
           <h1 className="flex-1 text-lg font-bold">Kitchen Live</h1>
-          <button type="button" onClick={fetchTasks} disabled={isLoading} className="rounded-xl bg-slate-800 p-2.5">
+          <button type="button" onClick={() => fetchTasks()} disabled={isLoading} className="rounded-xl bg-slate-800 p-2.5">
             <RefreshCw className={`h-4 w-4 text-slate-400 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>

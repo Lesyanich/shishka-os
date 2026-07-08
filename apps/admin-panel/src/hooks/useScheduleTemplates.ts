@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 import {
   generateMonthShifts,
   dateStr,
@@ -43,8 +44,8 @@ export function useScheduleTemplates() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     const { data, error: fetchError } = await supabase
       .from('staff_schedule_templates')
       .select('id, staff_id, working_weekdays, start_time, end_time, break_minutes, location_id, is_active')
@@ -61,18 +62,10 @@ export function useScheduleTemplates() {
 
   useEffect(() => {
     fetchData()
-    const channel = supabase
-      .channel('schedule-templates-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'staff_schedule_templates' },
-        () => fetchData(),
-      )
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchData])
+
+  useCoalescedRealtimeRefetch('schedule-templates-realtime', [{ table: 'staff_schedule_templates' }],
+    () => { fetchData({ silent: true }) })
 
   /** Upsert the (single active) template for a staff member. */
   const saveTemplate = useCallback(async (input: TemplateUpsert): Promise<boolean> => {
