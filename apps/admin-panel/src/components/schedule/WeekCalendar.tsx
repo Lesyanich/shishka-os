@@ -16,6 +16,7 @@ import type { Shift, ShiftInsert, UseShiftsResult } from '../../hooks/useShifts'
 import { useShiftTasks } from '../../hooks/useShiftTasks'
 import { useEquipment } from '../../hooks/useEquipment'
 import { supabase } from '../../lib/supabase'
+import { toISODate } from '../../lib/staffSchedule'
 import { ShiftEditor, } from './ShiftEditor'
 import type { ShiftTaskDraft } from './ShiftTaskEditor'
 
@@ -30,9 +31,9 @@ function getMonday(d: Date): Date {
   return date
 }
 
-function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0]
-}
+// shift_date is a plain DATE — always derive it from local time, never
+// toISOString(): UTC conversion shifts local-midnight dates back a day in ICT.
+const formatDate = toISODate
 
 function formatShort(d: Date): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })

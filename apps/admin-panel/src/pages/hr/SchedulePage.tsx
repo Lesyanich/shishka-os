@@ -3,6 +3,7 @@ import { CalendarPlus, Clock, AlertTriangle, CalendarCog } from 'lucide-react'
 import { useStaff } from '../../hooks/useStaff'
 import { useShifts, type Shift } from '../../hooks/useShifts'
 import { useLocations } from '../../hooks/useLocations'
+import { toISODate } from '../../lib/staffSchedule'
 import { WeekCalendar } from '../../components/schedule/WeekCalendar'
 import { BulkScheduleGenerator } from '../../components/schedule/BulkScheduleGenerator'
 import { ScheduleTemplatePanel } from '../../components/schedule/ScheduleTemplatePanel'
@@ -19,9 +20,9 @@ function getMonday(d: Date): Date {
   return date
 }
 
-function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0]
-}
+// shift_date is a plain DATE — always derive it from local time, never
+// toISOString(): UTC conversion shifts local-midnight dates back a day in ICT.
+const formatDate = toISODate
 
 function calcShiftHours(s: Shift): number {
   const [sh, sm] = s.start_time.split(':').map(Number)
