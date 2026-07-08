@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from '../hooks/useCoalescedRealtimeRefetch'
 import { useRecipeSteps, type RecipeStep } from '../hooks/useRecipeSteps'
 import { RecipeStepCard } from '../components/kds/RecipeStepCard'
 import { KitchenNav } from '../components/KitchenNav'
@@ -105,8 +106,8 @@ export function MyTasks() {
   }, [cookId, navigate])
 
   // ─── Fetch tasks ────────────────────────────────────────────
-  const fetchTasks = useCallback(async () => {
-    setIsLoading(true)
+  const fetchTasks = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const query = supabase
@@ -150,12 +151,10 @@ export function MyTasks() {
 
   useEffect(() => {
     fetchTasks()
-    const channel = supabase
-      .channel('my-tasks')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => fetchTasks())
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
   }, [fetchTasks])
+
+  useCoalescedRealtimeRefetch('my-tasks', [{ table: 'production_tasks' }],
+    () => { fetchTasks({ silent: true }) })
 
   // ─── Actions ────────────────────────────────────────────────
   const handleStart = useCallback(async (taskId: string) => {

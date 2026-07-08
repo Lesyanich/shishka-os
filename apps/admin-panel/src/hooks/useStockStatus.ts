@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 import {
   compareStockRows,
   type StockStatusRow,
@@ -86,8 +87,8 @@ export function useStockStatus(): UseStockStatusResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchRows = useCallback(async () => {
-    setIsLoading(true)
+  const fetchRows = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
     const { data, error: fetchError } = await supabase
       .from('v_stock_status')
@@ -106,19 +107,13 @@ export function useStockStatus(): UseStockStatusResult {
 
   useEffect(() => {
     fetchRows()
-    const channel = supabase
-      .channel('stock-status-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sku_balances' }, () => {
-        fetchRows()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_batches' }, () => {
-        fetchRows()
-      })
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchRows])
+
+  useCoalescedRealtimeRefetch(
+    'stock-status-live',
+    [{ table: 'sku_balances' }, { table: 'inventory_batches' }],
+    () => { fetchRows({ silent: true }) },
+  )
 
   const updatePar = useCallback(
     async (id: string, patch: StockParPatch): Promise<StockMutationResult> => {
@@ -130,10 +125,10 @@ export function useStockStatus(): UseStockStatusResult {
         .update(patch)
         .eq('id', id)
       if (updateError) {
-        await fetchRows()
+        await fetchRows({ silent: true })
         return { ok: false, error: updateError.message }
       }
-      await fetchRows()
+      await fetchRows({ silent: true })
       return { ok: true }
     },
     [fetchRows],

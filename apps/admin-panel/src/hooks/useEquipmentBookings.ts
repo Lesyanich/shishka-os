@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 import type { EquipmentBooking } from '../types/scheduling'
 
 interface BookingWithEquipment extends EquipmentBooking {
@@ -19,8 +20,8 @@ export function useEquipmentBookings(date: string): UseEquipmentBookingsResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchBookings = useCallback(async () => {
-    setIsLoading(true)
+  const fetchBookings = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const dayStart = `${date}T00:00:00`
@@ -47,12 +48,10 @@ export function useEquipmentBookings(date: string): UseEquipmentBookingsResult {
 
   useEffect(() => {
     fetchBookings()
-    const channel = supabase
-      .channel(`bookings-${date}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipment_bookings' }, () => { fetchBookings() })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [date, fetchBookings])
+  }, [fetchBookings])
+
+  useCoalescedRealtimeRefetch(`bookings-${date}`, [{ table: 'equipment_bookings' }],
+    () => { fetchBookings({ silent: true }) })
 
   // Group by equipment
   const byEquipment: Record<string, BookingWithEquipment[]> = {}

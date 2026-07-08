@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bell, Loader2, Plus, RefreshCw, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useCoalescedRealtimeRefetch } from '../../hooks/useCoalescedRealtimeRefetch'
 import { OrderDetailsModal, type Order } from './OrderDetailsModal'
 
 /* ─── Status column config ──────────────────────────────────── */
@@ -42,8 +43,8 @@ export function LiveOrderBoard() {
 
   /* ─── Fetch orders ──────────────────────────────────────── */
 
-  const fetchOrders = useCallback(async () => {
-    setIsLoading(true)
+  const fetchOrders = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     const { data, error } = await supabase
       .from('orders')
       .select('id, source, status, customer_name, customer_phone, total_amount, notes, created_at')
@@ -64,24 +65,12 @@ export function LiveOrderBoard() {
   useEffect(() => {
     mountedRef.current = true
     fetchOrders()
-
-    const channel = supabase
-      .channel('orders-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        () => {
-          // Refetch on any change for simplicity
-          if (mountedRef.current) fetchOrders()
-        },
-      )
-      .subscribe()
-
-    return () => {
-      mountedRef.current = false
-      supabase.removeChannel(channel)
-    }
+    return () => { mountedRef.current = false }
   }, [fetchOrders])
+
+  // Realtime: coalesced SILENT refetch (was a blind non-silent refetch).
+  useCoalescedRealtimeRefetch('orders-realtime', [{ table: 'orders' }],
+    () => { if (mountedRef.current) fetchOrders({ silent: true }) })
 
   /* ─── Load SALE items for manual order form ─────────────── */
 
@@ -140,8 +129,8 @@ export function LiveOrderBoard() {
       setSelectedOrder(null)
     }
 
-    // Realtime will refetch, but do it eagerly
-    fetchOrders()
+    // Realtime will refetch, but do it eagerly (silent — no spinner).
+    fetchOrders({ silent: true })
   }
 
   /* ─── Create manual order ───────────────────────────────── */
@@ -218,7 +207,7 @@ export function LiveOrderBoard() {
       setCustomerName('')
       setCustomerPhone('')
       setNotes('')
-      fetchOrders()
+      fetchOrders({ silent: true })
     } catch (err) {
       console.error('[LiveOrderBoard] create order error', err)
     } finally {
@@ -251,7 +240,7 @@ export function LiveOrderBoard() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={fetchOrders}
+            onClick={() => fetchOrders()}
             className="inline-flex h-7 items-center rounded-md border border-slate-700 px-2.5 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-slate-200"
           >
             <RefreshCw className="mr-1 h-3 w-3" />
