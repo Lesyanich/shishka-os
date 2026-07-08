@@ -15,6 +15,12 @@
 
 ## In-flight (backend foundation)
 
+- **2026-07-08 — Repo-root & CLAUDE.md hygiene (branch `feature/cleanup/ai-config-hygiene`, MC 07044b76, epic 2a8b06a4).**
+  - CLAUDE.md: removed all GSD-injected blocks (~10 KB: stale Menu Control project spec + research dump, empty Conventions/Architecture/Profile stubs, duplicated skills table, GSD Workflow Enforcement that conflicted with the MC/task-lifecycle canon). Core router (~44 lines) unchanged.
+  - Removed `GEMINI.md` (CEO: Gemini not used; file assumed a no-disk-access chat model) and `shishka-mission-control.plugin` (built ZIP tracked at root, zero references); added `/*.plugin` to `.gitignore`.
+  - Verified NOT junk, left alone: `graphify-out/` (manifest whitelisted, used by settings.json hook + graphify skill).
+  - Follow-ups (logged in MC task, not done): TECH_STACK.md consolidation into docs/, STATUS.md regen with Supabase creds, PROJECT_MAP.md tree refresh, `.planning/` archival.
+
 - **2026-07-03 — Chef agent recalibration: culinary-science foundation + brand red-line enforcement (branch `feature/agents/chef-recalibration`).**
   - CEO audit: /chef gave ungrounded "cabinet economist" advice (cheap IQF shrimp on pack price ignoring glaze+tail-off; triple-heat chicken; cook-then-freeze salmon; rice-bran oil then panic to duck fat/ghee). Root cause: brand rules existed but the /chef bootstrap never loaded them, `recall_memories` was optional, and the agent had no real food-science base to reason from.
   - **Foundation (reason from mechanism, not per-product rules):** new `agents/chef/domain/knowledge/food-science.md` (protein/fat/freezing/heat chemistry) + `process-technology.md` (cook-chill/sous-vide/regen) + `sourcing-rules.md` (true-cost-per-edible-kg, spec-match, ESTIMATE labeling). `culinary-knowledge.md` gains Principles 8–10 (heat-cycle budget, delicate-protein, L1-unloads-L2) + Fat Decision Tree, each citing the science.
