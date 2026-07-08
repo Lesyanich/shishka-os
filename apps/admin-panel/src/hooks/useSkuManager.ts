@@ -74,8 +74,8 @@ export function useSkuManager(): UseSkuManagerResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const [skuResult, nomResult, balResult, scResult] = await Promise.all([
@@ -174,7 +174,10 @@ export function useSkuManager(): UseSkuManagerResult {
         return { ok: false, error: insertErr.message }
       }
 
-      await fetchData()
+      // sku_code is trigger-assigned and the row carries joined stock/supplier
+      // counts, so we can't build the optimistic row locally. No realtime here,
+      // so a single SILENT refetch reconciles without flashing the spinner.
+      await fetchData({ silent: true })
       return { ok: true }
     },
     [fetchData],
@@ -206,10 +209,26 @@ export function useSkuManager(): UseSkuManagerResult {
         return { ok: false, error: updateErr.message }
       }
 
-      await fetchData()
+      // Optimistic merge of the edited columns — no full refetch. If the
+      // nomenclature link changed, re-derive its name/type from the in-memory
+      // options so the joined display stays correct.
+      setSkus((prev) =>
+        prev.map((s) => {
+          if (s.id !== id) return s
+          const merged = { ...s, ...(updates as Partial<SkuRow>) }
+          if (updates.nomenclature_id) {
+            const nom = nomenclatureOptions.find((n) => n.id === updates.nomenclature_id)
+            if (nom) {
+              merged.nomenclature_name = nom.name
+              merged.nomenclature_type = nom.type
+            }
+          }
+          return merged
+        }),
+      )
       return { ok: true }
     },
-    [fetchData],
+    [nomenclatureOptions],
   )
 
   const deactivateSku = useCallback(
@@ -223,10 +242,11 @@ export function useSkuManager(): UseSkuManagerResult {
         return { ok: false, error: updateErr.message }
       }
 
-      await fetchData()
+      // Optimistic flag flip — no full refetch.
+      setSkus((prev) => prev.map((s) => (s.id === id ? { ...s, is_active: false } : s)))
       return { ok: true }
     },
-    [fetchData],
+    [],
   )
 
   // Compute stats

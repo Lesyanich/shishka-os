@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -93,8 +94,8 @@ export function useProductionOrders(filters?: FilterOptions): UseProductionOrder
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchOrders = useCallback(async () => {
-    setIsLoading(true)
+  const fetchOrders = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     let query = supabase
@@ -171,19 +172,9 @@ export function useProductionOrders(filters?: FilterOptions): UseProductionOrder
   }, [fetchOrders])
 
   // ─── Realtime subscription ──────────────────────────────────────
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('production_orders_changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'production_orders' },
-        () => { fetchOrders() }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [fetchOrders])
+  // Coalesced SILENT refetch (was a blind non-silent refetch → spinner flash).
+  useCoalescedRealtimeRefetch('production_orders_changes', [{ table: 'production_orders' }],
+    () => { fetchOrders({ silent: true }) })
 
   // ─── Mutations ──────────────────────────────────────────────────
 

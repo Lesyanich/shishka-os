@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 
 export interface DashboardShift {
   id: string
@@ -56,8 +57,8 @@ export function useKitchenDashboard(date?: string): UseKitchenDashboardResult {
 
   const targetDate = date ?? new Date().toISOString().split('T')[0]
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const [shiftsRes, tasksRes, slotsRes] = await Promise.all([
@@ -120,33 +121,17 @@ export function useKitchenDashboard(date?: string): UseKitchenDashboardResult {
     setIsLoading(false)
   }, [targetDate])
 
-  // Realtime: re-fetch on any change to shifts, shift_tasks, or equipment_slots
   useEffect(() => {
     fetchData()
-
-    const channel = supabase
-      .channel('kitchen-dashboard')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'shifts' },
-        () => { fetchData() },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'shift_tasks' },
-        () => { fetchData() },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'equipment_slots' },
-        () => { fetchData() },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchData])
+
+  // Realtime: any change to shifts / shift_tasks / equipment_slots triggers a
+  // single coalesced SILENT refetch (no spinner, one fetch per transaction).
+  useCoalescedRealtimeRefetch(
+    'kitchen-dashboard',
+    [{ table: 'shifts' }, { table: 'shift_tasks' }, { table: 'equipment_slots' }],
+    () => { fetchData({ silent: true }) },
+  )
 
   return {
     shifts,
