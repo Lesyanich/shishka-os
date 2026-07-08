@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 
 export interface CookTask {
   id: string
@@ -32,8 +33,8 @@ export function useCookTasks(): UseCookTasksResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchTasks = useCallback(async () => {
-    setIsLoading(true)
+  const fetchTasks = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const { data, error: fetchError } = await supabase
@@ -60,29 +61,14 @@ export function useCookTasks(): UseCookTasksResult {
     setIsLoading(false)
   }, [])
 
-  // Realtime subscription
   useEffect(() => {
     fetchTasks()
-
-    const channel = supabase
-      .channel('cook-tasks')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'production_tasks',
-        },
-        () => {
-          fetchTasks()
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchTasks])
+
+  // Realtime: coalesced SILENT refetch (no spinner; a completed task drops out
+  // of the pending/in_progress filter on the next reconcile).
+  useCoalescedRealtimeRefetch('cook-tasks', [{ table: 'production_tasks' }],
+    () => { fetchTasks({ silent: true }) })
 
   const startTask = useCallback(
     async (taskId: string): Promise<{ ok: boolean; error?: string }> => {

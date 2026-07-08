@@ -185,8 +185,8 @@ export function useMenuData(): UseMenuDataResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const [nomenResult, tagResult, subcatResult, bomResult, costSplitResult] = await Promise.all([
@@ -474,10 +474,20 @@ export function useMenuData(): UseMenuDataResult {
         if (updateErr) return { ok: false, error: updateErr.message }
       }
 
-      await fetchData()
+      // Optimistic merge of exactly what was persisted — no full refetch. The
+      // edited fields (name, flags, portion, price) never affect the derived
+      // cost/BOM/category maps, so patching the row in place is sufficient.
+      setItems((prev) =>
+        prev.map((i) => {
+          if (i.id !== id) return i
+          const merged = { ...i, ...(updates as Partial<MenuItem>) }
+          if (patch.price !== undefined) merged.price = patch.price
+          return merged
+        }),
+      )
       return { ok: true }
     },
-    [fetchData],
+    [],
   )
 
   const reorderItems = useCallback(
@@ -490,7 +500,9 @@ export function useMenuData(): UseMenuDataResult {
       const failed = results.find((r) => r.error)
       if (failed?.error) return { ok: false, error: failed.error.message }
 
-      await fetchData()
+      // Reorder persists display_order for many rows at once; a SILENT refetch
+      // re-sorts without a spinner (the drag UI already shows the new order).
+      await fetchData({ silent: true })
       return { ok: true }
     },
     [fetchData],

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 
 export interface Shift {
   id: string
@@ -109,30 +110,15 @@ export function useShifts(dateFilter?: string): UseShiftsResult {
     [dateFilter],
   )
 
-  // Initial load + Supabase Realtime subscription (keeps other instances / clients in sync).
-  // Refetch silently so a remote change doesn't flash the whole grid back to a loading spinner.
   useEffect(() => {
     fetchData()
+  }, [fetchData])
 
-    const channel = supabase
-      .channel(`shifts-realtime-${instanceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shifts',
-        },
-        () => {
-          fetchData({ silent: true })
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [fetchData, instanceId])
+  // Realtime: coalesced SILENT refetch keeps other instances / clients in sync
+  // without flashing the grid back to a spinner (a burst fires one refetch).
+  // Per-instance channel — multiple useShifts() can be mounted at once.
+  useCoalescedRealtimeRefetch(`shifts-realtime-${instanceId}`, [{ table: 'shifts' }],
+    () => { fetchData({ silent: true }) })
 
   const createShift = useCallback(
     async (input: ShiftInsert): Promise<Shift | null> => {
