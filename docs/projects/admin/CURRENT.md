@@ -19,7 +19,7 @@
   - CLAUDE.md: removed all GSD-injected blocks (~10 KB: stale Menu Control project spec + research dump, empty Conventions/Architecture/Profile stubs, duplicated skills table, GSD Workflow Enforcement that conflicted with the MC/task-lifecycle canon). Core router (~44 lines) unchanged.
   - Removed `GEMINI.md` (CEO: Gemini not used; file assumed a no-disk-access chat model) and `shishka-mission-control.plugin` (built ZIP tracked at root, zero references); added `/*.plugin` to `.gitignore`.
   - Verified NOT junk, left alone: `graphify-out/` (manifest whitelisted, used by settings.json hook + graphify skill).
-  - Follow-ups (logged in MC task, not done): TECH_STACK.md consolidation into docs/, STATUS.md regen with Supabase creds, PROJECT_MAP.md tree refresh, `.planning/` archival.
+  - Follow-ups DONE same day: TECH_STACK.md → `docs/tech-stack.md` (verified vs admin package.json; SYRVE→Loyverse fixed); STATUS.md regenerated with live MC data via `generate_status` MCP; PROJECT_MAP.md tree/agents/POS refreshed; `.planning/` (stale GSD menu-control milestone) archived to `docs/plans/archive/gsd-planning-menu-control/`.
 
 - **2026-07-03 — Chef agent recalibration: culinary-science foundation + brand red-line enforcement (branch `feature/agents/chef-recalibration`).**
   - CEO audit: /chef gave ungrounded "cabinet economist" advice (cheap IQF shrimp on pack price ignoring glaze+tail-off; triple-heat chicken; cook-then-freeze salmon; rice-bran oil then panic to duck fat/ghee). Root cause: brand rules existed but the /chef bootstrap never loaded them, `recall_memories` was optional, and the agent had no real food-science base to reason from.
