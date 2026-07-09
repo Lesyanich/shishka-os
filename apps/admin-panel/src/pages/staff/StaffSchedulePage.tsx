@@ -12,6 +12,8 @@ import {
 } from 'lucide-react'
 import { useAppRole } from '../../contexts/AppRoleContext'
 import { useShiftClock, useWeekSchedule } from '../../hooks/useShiftClock'
+import { useAttendanceRange } from '../../hooks/useAttendanceRange'
+import { attendanceMeta, attendanceMetaGeneric, isNonWorkingStatus } from '../../lib/attendanceStatus'
 import { formatTime, getWeekDays, shiftFor } from '../../lib/staffSchedule'
 
 export function StaffSchedulePage() {
@@ -30,6 +32,7 @@ export function StaffSchedulePage() {
   const { isClockedIn, lastEvent, todayEvents, isLoading: clockLoading, isSaving, error: clockError, clock } =
     useShiftClock(staffId)
   const { roster, shifts, isLoading: weekLoading, error: weekError } = useWeekSchedule(weekStart, weekEnd)
+  const { attendanceByKey } = useAttendanceRange(weekStart, weekEnd)
 
   const weekLabel = `${weekDays[0].dayNum} – ${weekDays[6].dayNum}`
 
@@ -201,9 +204,24 @@ export function StaffSchedulePage() {
                       </td>
                       {weekDays.map((d) => {
                         const shift = shiftFor(shifts, member.id, d.iso)
+                        const attStatus = attendanceByKey.get(`${member.id}|${d.iso}`)
+                        // Own row shows the specific status; colleagues show a
+                        // generic "Off" so a leave reason isn't broadcast.
+                        const override = isNonWorkingStatus(attStatus)
+                          ? isMe
+                            ? attendanceMeta(attStatus)
+                            : attendanceMetaGeneric(attStatus)
+                          : null
                         return (
                           <td key={d.iso} className="px-2 py-2 text-center">
-                            {shift ? (
+                            {override ? (
+                              <span
+                                className={`inline-block rounded-md px-2 py-1 text-xs ${override.badge}`}
+                                title={isMe ? override.label : undefined}
+                              >
+                                {override.short}
+                              </span>
+                            ) : shift ? (
                               <span
                                 className={[
                                   'inline-block rounded-md px-2 py-1 text-xs',
