@@ -128,6 +128,15 @@ Code in git worktrees is **invisible to main**. Before ending a session that use
 
 > Origin: 2026-04-04. Full Receipt Review UI (`InboxReviewPanel`, ~1000 LOC) was lost because it lived only in a worktree that was deleted. (Legacy: `P0 Rule #12`.)
 
+## RULE-DEPLOY-MAP
+
+The live customer site `shishka.health` is served by the Vercel project **`shishka-web`**, which builds the **`Lesyanich/shishka-health`** repo (`main`) — **not this repo**. The `shishka-os` Vercel project builds `apps/admin-panel` only. Full topology: `docs/operations/deploy-map.md`.
+
+1. Agents **never** run `vercel deploy` / `vercel --prod` (CLI upload) or re-point domains — live-site changes ship only via git push to `shishka-health` `main`. Prod rollback = **Promote** a previous git deployment (CEO, or agent on explicit CEO instruction naming the project).
+2. Before ANY deploy/rollback/site-incident work: read `docs/operations/deploy-map.md` and follow its runbook **symptom-first** (domain → project → deployment source → only then git).
+
+> Origin: 2026-07-11. A parallel session shipped `shishka-os/apps/web` onto the live-site project via CLI `vercel deploy`, replacing shishka.health entirely; recovery = dashboard Promote of the last git deploy (`10a01aa`). Post-mortem in the deploy map.
+
 ## RULE-MIGRATION-TRACKING
 
 Every migration file **must** end with a self-register `INSERT` into `migration_log`.
