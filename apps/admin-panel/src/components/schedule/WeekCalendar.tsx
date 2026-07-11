@@ -16,6 +16,9 @@ import type { Shift, ShiftInsert, UseShiftsResult } from '../../hooks/useShifts'
 import { useShiftTasks } from '../../hooks/useShiftTasks'
 import { useEquipment } from '../../hooks/useEquipment'
 import { supabase } from '../../lib/supabase'
+import { toISODate } from '../../lib/staffSchedule'
+import { attendanceMeta, isNonWorkingStatus } from '../../lib/attendanceStatus'
+import { useAttendanceRange } from '../../hooks/useAttendanceRange'
 import { ShiftEditor, } from './ShiftEditor'
 import type { ShiftTaskDraft } from './ShiftTaskEditor'
 
@@ -30,9 +33,9 @@ function getMonday(d: Date): Date {
   return date
 }
 
-function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0]
-}
+// shift_date is a plain DATE — always derive it from local time, never
+// toISOString(): UTC conversion shifts local-midnight dates back a day in ICT.
+const formatDate = toISODate
 
 function formatShort(d: Date): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -94,6 +97,10 @@ export function WeekCalendar({
       return formatDate(d)
     })
   }, [weekStart])
+
+  // Attendance overlay: a day-off / leave / absence marked in /hr/attendance
+  // overrides a scheduled shift on this grid.
+  const { attendanceByKey } = useAttendanceRange(weekDates[0], weekDates[6])
 
   const today = formatDate(new Date())
   // Owners (app_role='owner') are not rostered — keep them off the schedule grid.
@@ -281,6 +288,8 @@ export function WeekCalendar({
           ) : (
             activeStaff.map((s) => {
               const cellShifts = shiftMap.get(`${s.id}|${mobileDay}`) ?? []
+              const attStatus = attendanceByKey.get(`${s.id}|${mobileDay}`)
+              const override = isNonWorkingStatus(attStatus) ? attendanceMeta(attStatus) : null
               return (
                 <div
                   key={s.id}
@@ -292,17 +301,26 @@ export function WeekCalendar({
                     <p className="text-[11px] text-slate-500 capitalize">{s.role}</p>
                   </div>
                   {cellShifts.length > 0 ? (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col items-end gap-1">
                       {cellShifts.map((sh) => (
                         <span
                           key={sh.id}
-                          className={`rounded px-2 py-0.5 text-xs border ${ROLE_COLORS[s.role] ?? ROLE_COLORS.cook}`}
+                          className={`rounded px-2 py-0.5 text-xs border ${ROLE_COLORS[s.role] ?? ROLE_COLORS.cook} ${override ? 'line-through opacity-40' : ''}`}
                         >
                           {sh.start_time.slice(0, 5)}–{sh.end_time.slice(0, 5)}
                           {sh.location && <span className="ml-1 opacity-70">{sh.location.name}</span>}
                         </span>
                       ))}
+                      {override && (
+                        <span className={`rounded px-2 py-0.5 text-xs ${override.badge}`} title={override.label}>
+                          {override.short}
+                        </span>
+                      )}
                     </div>
+                  ) : override ? (
+                    <span className={`rounded px-2 py-0.5 text-xs ${override.badge}`} title={override.label}>
+                      {override.short}
+                    </span>
                   ) : (
                     <span className="text-xs text-slate-600">No shift</span>
                   )}
@@ -345,6 +363,8 @@ export function WeekCalendar({
                     {weekDates.map((date) => {
                       const cellShifts = shiftMap.get(`${s.id}|${date}`) ?? []
                       const isToday = date === today
+                      const attStatus = attendanceByKey.get(`${s.id}|${date}`)
+                      const override = isNonWorkingStatus(attStatus) ? attendanceMeta(attStatus) : null
                       return (
                         <td
                           key={date}
@@ -354,17 +374,28 @@ export function WeekCalendar({
                           }}
                         >
                           {cellShifts.length > 0 ? (
-                            cellShifts.map((sh) => (
-                              <div
-                                key={sh.id}
-                                className={`rounded px-1.5 py-1 text-[11px] border ${ROLE_COLORS[s.role] ?? ROLE_COLORS.cook}`}
-                              >
-                                <div>{sh.start_time.slice(0, 5)}–{sh.end_time.slice(0, 5)}</div>
-                                {sh.location && (
-                                  <div className="text-[9px] opacity-70 truncate">{sh.location.name}</div>
-                                )}
-                              </div>
-                            ))
+                            <>
+                              {cellShifts.map((sh) => (
+                                <div
+                                  key={sh.id}
+                                  className={`rounded px-1.5 py-1 text-[11px] border ${ROLE_COLORS[s.role] ?? ROLE_COLORS.cook} ${override ? 'line-through opacity-40' : ''}`}
+                                >
+                                  <div>{sh.start_time.slice(0, 5)}–{sh.end_time.slice(0, 5)}</div>
+                                  {sh.location && (
+                                    <div className="text-[9px] opacity-70 truncate">{sh.location.name}</div>
+                                  )}
+                                </div>
+                              ))}
+                              {override && (
+                                <div className={`mt-1 rounded px-1 py-0.5 text-center text-[10px] ${override.badge}`} title={override.label}>
+                                  {override.short}
+                                </div>
+                              )}
+                            </>
+                          ) : override ? (
+                            <div className={`rounded px-1 py-1.5 text-center text-[10px] ${override.badge}`} title={override.label}>
+                              {override.short}
+                            </div>
                           ) : (
                             <div className="h-8 rounded border border-dashed border-slate-800 opacity-30" />
                           )}
