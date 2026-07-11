@@ -100,3 +100,6 @@ services/supabase/supabase/
 # Graphify working directory — keep only the manifest baseline for incremental --update
 /graphify-out/*
 !/graphify-out/manifest.json
+
+# Built plugin archives — distribution artifacts, not source
+/*.plugin
