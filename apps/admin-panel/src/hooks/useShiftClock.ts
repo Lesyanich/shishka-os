@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { deriveClockStatus, toISODate, type ClockEvent } from '../lib/staffSchedule'
+import { deriveClockStatus, localDayBounds, type ClockEvent } from '../lib/staffSchedule'
 
 export type { ClockEvent } from '../lib/staffSchedule'
 
@@ -35,11 +35,13 @@ export function useShiftClock(staffId: string | null): UseShiftClockResult {
     setIsLoading(true)
     setError(null)
 
+    const { startIso, endIso } = localDayBounds(new Date())
     const { data, error: fetchError } = await supabase
       .from('shift_clock_events')
       .select('id, staff_id, shift_id, event_type, event_at, source, note, created_at')
       .eq('staff_id', staffId)
-      .gte('event_at', `${toISODate(new Date())}T00:00:00`)
+      .gte('event_at', startIso)
+      .lt('event_at', endIso)
       .order('event_at', { ascending: true })
 
     if (fetchError) {

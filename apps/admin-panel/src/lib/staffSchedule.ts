@@ -45,6 +45,21 @@ export function toISODate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/**
+ * UTC-instant bounds `[startIso, endIso)` for the local calendar day that
+ * contains `refDate`. Use these to query a timestamptz column (e.g.
+ * shift_clock_events.event_at) for "today": a bare `YYYY-MM-DDT00:00:00`
+ * string is read in the DB session timezone (UTC), which shifts the window
+ * ~7h off the shop's local day and drops early-morning punches.
+ */
+export function localDayBounds(refDate: Date): { startIso: string; endIso: string } {
+  const start = new Date(refDate)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  return { startIso: start.toISOString(), endIso: end.toISOString() }
+}
+
 /** The Monday-anchored 7-day window that contains `refDate` (local time). */
 export function getWeekDays(refDate: Date): WeekDay[] {
   const monday = new Date(refDate)
