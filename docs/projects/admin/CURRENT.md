@@ -15,6 +15,8 @@
 
 ## In-flight (backend foundation)
 
+- **2026-07-11 — STATUS.md post-commit churn fixed (branch `feature/cleanup/status-hook-offline-skip`, MC 2948402c, epic 2a8b06a4).** `scripts/generate-status.sh` no longer regenerates STATUS.md in offline `--git-only` mode — without Supabase env it now exits 0 and leaves the file untouched (was clobbering the committed live-MC snapshot + churning the tree every commit). Online path unchanged. Follow-up to 07044b76.
+
 - **2026-07-08 — Repo-root & CLAUDE.md hygiene (branch `feature/cleanup/ai-config-hygiene`, MC 07044b76, epic 2a8b06a4).**
   - CLAUDE.md: removed all GSD-injected blocks (~10 KB: stale Menu Control project spec + research dump, empty Conventions/Architecture/Profile stubs, duplicated skills table, GSD Workflow Enforcement that conflicted with the MC/task-lifecycle canon). Core router (~44 lines) unchanged.
   - Removed `GEMINI.md` (CEO: Gemini not used; file assumed a no-disk-access chat model) and `shishka-mission-control.plugin` (built ZIP tracked at root, zero references); added `/*.plugin` to `.gitignore`.
