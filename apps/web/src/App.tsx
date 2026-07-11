@@ -3,6 +3,7 @@ import { CartProvider } from './state/cart.tsx'
 import MenuPage from './pages/MenuPage.tsx'
 import CheckoutPage from './pages/CheckoutPage.tsx'
 import OrderConfirmationPage from './pages/OrderConfirmationPage.tsx'
+import PlayPage from './pages/PlayPage.tsx'
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
       <CartProvider>
         <Routes>
           <Route path="/" element={<MenuPage />} />
+          <Route path="/play" element={<PlayPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/order/:code" element={<OrderConfirmationPage />} />
         </Routes>

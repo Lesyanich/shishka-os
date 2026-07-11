@@ -64,7 +64,11 @@ export function usePublicMenu(): UsePublicMenuResult {
         if (!byCat.has(code)) byCat.set(code, { code, name, dishes: [] })
         byCat.get(code)!.dishes.push(dish)
       }
-      setCategories([...byCat.values()])
+      // Salads lead the menu; other categories keep their natural order.
+      const ordered = [...byCat.values()].sort(
+        (a, b) => (a.code === 'KP-FIN-SLD' ? 0 : 1) - (b.code === 'KP-FIN-SLD' ? 0 : 1),
+      )
+      setCategories(ordered)
       setIsLoading(false)
     })()
     return () => {

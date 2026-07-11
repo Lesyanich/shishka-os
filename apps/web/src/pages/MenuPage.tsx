@@ -57,6 +57,12 @@ export default function MenuPage() {
       <header className="px-5 py-6">
         <h1 className="font-display text-3xl text-cream">Shishka</h1>
         <p className="text-cream/50 text-sm">Healthy Kitchen</p>
+        <Link
+          to="/play"
+          className="mt-3 inline-flex items-center gap-2 rounded-full bg-royal-red px-4 py-2 text-sm font-medium text-cream shadow-lg transition active:scale-95"
+        >
+          🔪 Slice &amp; win 15% off
+        </Link>
       </header>
 
       {isLoading && <MenuSkeleton />}
@@ -105,50 +111,66 @@ export default function MenuPage() {
             >
               <h2 className="font-display text-xl text-cream/90 mb-3">{cat.name}</h2>
               <ul className="space-y-3">
-                {cat.dishes.map((dish) => (
-                  <li key={dish.id} className="flex items-start gap-3 rounded-lg bg-surface-2 p-3">
-                    {/* Tap card body → open detail sheet */}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDish(dish)}
-                      className="flex flex-1 items-start gap-3 text-left"
-                    >
-                      {dish.image_url ? (
+                {cat.dishes.map((dish) => {
+                  // No photo yet → show as "Coming soon" (not orderable). Self-heals once an image_url lands.
+                  const comingSoon = !dish.image_url
+                  if (comingSoon) {
+                    return (
+                      <li
+                        key={dish.id}
+                        className="flex items-center gap-3 rounded-lg bg-surface-2 p-3 opacity-60"
+                      >
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-surface-3">
+                          <span className="text-xl opacity-25">🥗</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-cream/80">{dish.name}</p>
+                          <span className="mt-1 inline-block rounded-full border border-amber-watch/40 px-2 py-0.5 text-xs text-amber-watch">
+                            Coming soon
+                          </span>
+                        </div>
+                      </li>
+                    )
+                  }
+                  return (
+                    <li key={dish.id} className="flex items-start gap-3 rounded-lg bg-surface-2 p-3">
+                      {/* Tap card body → open detail sheet */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDish(dish)}
+                        className="flex flex-1 items-start gap-3 text-left"
+                      >
                         <img
-                          src={dish.image_url}
+                          src={dish.image_url!}
                           alt=""
                           className="h-16 w-16 shrink-0 rounded-lg object-cover"
                         />
-                      ) : (
-                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-surface-3">
-                          <span className="text-xl opacity-25">🍽</span>
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-cream">{dish.name}</p>
-                        {dish.description && (
-                          <p className="mt-0.5 text-cream/50 text-sm line-clamp-2">
-                            {dish.description}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-cream">{dish.name}</p>
+                          {dish.description && (
+                            <p className="mt-0.5 text-cream/50 text-sm line-clamp-2">
+                              {dish.description}
+                            </p>
+                          )}
+                          <p className="mt-1 font-mono text-sm text-amber-watch">
+                            {baht(dish.price)}
                           </p>
-                        )}
-                        <p className="mt-1 font-mono text-sm text-amber-watch">
-                          {baht(dish.price)}
-                        </p>
-                      </div>
-                    </button>
+                        </div>
+                      </button>
 
-                    {/* Quick-add */}
-                    <button
-                      type="button"
-                      onClick={() => cart.add(dish)}
-                      aria-label={`Add ${dish.name}`}
-                      disabled={dish.price == null}
-                      className="self-center shrink-0 rounded-full bg-forest-soft p-2 text-surface-1 transition active:scale-90 disabled:opacity-40"
-                    >
-                      <Plus size={18} />
-                    </button>
-                  </li>
-                ))}
+                      {/* Quick-add */}
+                      <button
+                        type="button"
+                        onClick={() => cart.add(dish)}
+                        aria-label={`Add ${dish.name}`}
+                        disabled={dish.price == null}
+                        className="self-center shrink-0 rounded-full bg-forest-soft p-2 text-surface-1 transition active:scale-90 disabled:opacity-40"
+                      >
+                        <Plus size={18} />
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             </section>
           ))}
