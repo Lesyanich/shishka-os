@@ -1,163 +1,163 @@
 {
-  "generated_at": "2026-06-14T02:48:21.674969+00:00",
+  "generated_at": "2026-07-12T14:49:53.460284+00:00",
   "summary": {
-    "nodes": 3329,
-    "edges": 4776,
-    "communities": 421,
-    "cross_community_edges": 669
+    "nodes": 5557,
+    "edges": 9101,
+    "communities": 372,
+    "cross_community_edges": 1104
   },
   "confidence": {
-    "extracted": 4197,
-    "inferred": 228,
-    "ambiguous": 0
+    "extracted": 8813,
+    "inferred": 283,
+    "ambiguous": 5
   },
   "god_nodes": [
     {
-      "id": "supabase_getsupabase",
-      "label": "getSupabase()",
-      "degree": 50,
-      "source_file": "services/mcp-finance/src/lib/supabase.ts",
-      "community": 5
+      "id": "hooks_usecoalescedrealtimerefetch_usecoalescedrealtimerefetch",
+      "label": "useCoalescedRealtimeRefetch()",
+      "degree": 45,
+      "source_file": "apps/admin-panel/src/hooks/useCoalescedRealtimeRefetch.ts",
+      "community": 85
     },
     {
-      "id": "lib_supabase_supabase",
-      "label": "supabase",
-      "degree": 42,
-      "source_file": "apps/web/src/lib/supabase.ts",
-      "community": 56
-    },
-    {
-      "id": "chef_agent",
-      "label": "Chef Agent",
-      "degree": 38,
-      "source_file": "agents/chef/AGENT.md",
-      "community": 9
-    },
-    {
-      "id": "operational_rules",
-      "label": "Operational Rules (constitution)",
-      "degree": 36,
+      "id": "operational_rules_doc",
+      "label": "Operational Rules (Foundation, Agents, Routing, Sessions)",
+      "degree": 35,
       "source_file": "docs/constitution/operational-rules.md",
-      "community": 21
-    },
-    {
-      "id": "mcp_mission_control",
-      "label": "MCP Server: shishka-mission-control",
-      "degree": 30,
-      "source_file": "agents/chef/AGENT.md",
-      "community": 14
-    },
-    {
-      "id": "finance_agent",
-      "label": "Finance Agent",
-      "degree": 29,
-      "source_file": "agents/finance/AGENT.md",
-      "community": 18
-    },
-    {
-      "id": "ollama_agent_log",
-      "label": "log()",
-      "degree": 26,
-      "source_file": "agents/finance/ollama-agent.js",
-      "community": 58
+      "community": 38
     },
     {
       "id": "hooks_usemenudata_menuitem",
       "label": "MenuItem",
-      "degree": 20,
+      "degree": 29,
       "source_file": "apps/admin-panel/src/hooks/useMenuData.ts",
-      "community": 8
+      "community": 12
+    },
+    {
+      "id": "shared_telegram_sendmessage",
+      "label": "sendMessage()",
+      "degree": 28,
+      "source_file": "services/supabase/functions/_shared/telegram.ts",
+      "community": 43
+    },
+    {
+      "id": "validators_base_baseschemavalidator",
+      "label": "BaseSchemaValidator",
+      "degree": 26,
+      "source_file": ".claude/skills/xlsx/scripts/office/validators/base.py",
+      "community": 2
+    },
+    {
+      "id": "contexts_approlecontext_useapprole",
+      "label": "useAppRole()",
+      "degree": 26,
+      "source_file": "apps/admin-panel/src/contexts/AppRoleContext.tsx",
+      "community": 92
     },
     {
       "id": "loyverse_sync_index_json",
       "label": "json()",
-      "degree": 19,
+      "degree": 23,
       "source_file": "services/supabase/functions/loyverse-sync/index.ts",
-      "community": 7
+      "community": 14
     },
     {
-      "id": "lawyer_agent",
-      "label": "Lawyer Agent (AGENT.md)",
+      "id": "telegram_webhook_index_handlecallback",
+      "label": "handleCallback()",
+      "degree": 20,
+      "source_file": "services/supabase/functions/telegram-webhook/index.ts",
+      "community": 9
+    },
+    {
+      "id": "hooks_usebusinesstasks_businesstask",
+      "label": "BusinessTask",
+      "degree": 19,
+      "source_file": "apps/admin-panel/src/hooks/useBusinessTasks.ts",
+      "community": 76
+    },
+    {
+      "id": "shared_telegram_escapehtml",
+      "label": "escapeHtml()",
       "degree": 18,
-      "source_file": ".claude/skills/lawyer/SKILL.md",
-      "community": 12
+      "source_file": "services/supabase/functions/_shared/telegram.ts",
+      "community": 9
     }
   ],
   "top_communities": [
     {
       "id": 0,
       "label": "Community 0",
-      "size": 53
+      "size": 78
     },
     {
       "id": 1,
       "label": "Community 1",
-      "size": 52
+      "size": 69
     },
     {
       "id": 2,
       "label": "Community 2",
-      "size": 49
+      "size": 68
     },
     {
       "id": 3,
       "label": "Community 3",
-      "size": 46
+      "size": 68
     },
     {
       "id": 4,
       "label": "Community 4",
-      "size": 44
+      "size": 64
     },
     {
       "id": 5,
       "label": "Community 5",
-      "size": 43
+      "size": 63
     },
     {
       "id": 6,
       "label": "Community 6",
-      "size": 42
+      "size": 61
     },
     {
       "id": 7,
       "label": "Community 7",
-      "size": 41
+      "size": 61
     },
     {
       "id": 8,
       "label": "Community 8",
-      "size": 38
+      "size": 61
     },
     {
       "id": 9,
       "label": "Community 9",
-      "size": 37
+      "size": 61
     },
     {
       "id": 10,
       "label": "Community 10",
-      "size": 36
+      "size": 56
     },
     {
       "id": 11,
       "label": "Community 11",
-      "size": 35
+      "size": 54
     },
     {
       "id": 12,
       "label": "Community 12",
-      "size": 34
+      "size": 52
     },
     {
       "id": 13,
       "label": "Community 13",
-      "size": 34
+      "size": 52
     },
     {
       "id": 14,
       "label": "Community 14",
-      "size": 32
+      "size": 48
     }
   ]
 }
