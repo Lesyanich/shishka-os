@@ -5,7 +5,7 @@
 # available in the repo, and flags anything not yet catalogued:
 #   - skills    (.claude/skills/*/)
 #   - commands  (.claude/commands/*.md)
-#   - MCP       (.claude/.mcp.json + ~/.claude.json — best-effort)
+#   - MCP       (.mcp.json + ~/.claude.json — best-effort)
 #
 # Two tiers:
 #   MISSING    — name not mentioned anywhere in the registry → add it
@@ -69,7 +69,7 @@ for f in .claude/commands/*.md; do
   [ -f "$f" ] || continue
   classify "$(basename "$f" .md)" "command"; n_cmds=$((n_cmds + 1))
 done
-MCP_KEYS=$( { jq -r '(.mcpServers // {}) | keys[]' .claude/.mcp.json 2>/dev/null
+MCP_KEYS=$( { jq -r '(.mcpServers // {}) | keys[]' .mcp.json 2>/dev/null
              jq -r '(.mcpServers // {}) | keys[]' "$HOME/.claude.json" 2>/dev/null; } | sort -u )
 for k in $MCP_KEYS; do
   [ -n "$k" ] || continue
@@ -78,7 +78,7 @@ done
 
 echo "=== Skill Advisor — anti-drift audit ==="
 echo "Registry : $REG"
-echo "Inventory: ${n_skills} skills · ${n_cmds} commands · ${n_mcp} MCP servers (MCP best-effort: .claude/.mcp.json + ~/.claude.json)"
+echo "Inventory: ${n_skills} skills · ${n_cmds} commands · ${n_mcp} MCP servers (MCP best-effort: .mcp.json + ~/.claude.json)"
 echo ""
 if [ -n "$MISSING" ]; then
   echo "⚠  MISSING from registry — add a row to ADVISOR-MAP:"
