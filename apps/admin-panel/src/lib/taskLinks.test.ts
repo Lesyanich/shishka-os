@@ -33,4 +33,17 @@ describe('taskLinks', () => {
       expect(f.label_th.length).toBeGreaterThan(0)
     }
   })
+
+  it('offers per-station count deep links (S3)', () => {
+    const countLinks = FIXED_LINKS.filter((f) => f.route.startsWith('/count/'))
+    expect(countLinks.length).toBeGreaterThanOrEqual(5)
+    // Each points at a concrete station code the StationCountPage can resolve
+    // (/count/:code, cook-reachable) and carries a Thai label.
+    for (const f of countLinks) {
+      expect(f.route).toMatch(/^\/count\/[a-z-]+$/)
+      expect(f.label_th.length).toBeGreaterThan(0)
+      expect(f.id.startsWith('count-')).toBe(true)
+    }
+    expect(FIXED_LINKS.map((f) => f.route)).toContain('/count/salad-bar')
+  })
 })

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { CalendarClock, ClipboardList, Loader2, Package, Play } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CalendarClock, ClipboardCheck, ClipboardList, Loader2, Package, Play } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useStationChecklist } from '../../hooks/useStationChecklist'
 import { useStocktakeSession } from '../../hooks/useStocktakeSession'
@@ -17,13 +18,14 @@ import { CountZoneBar } from './CountZoneBar'
 export function StationChecklistPanel({ station }: { station: Station }) {
   const { rows, isLoading, error, refetch, dueCount, foodCount, packagingCount } =
     useStationChecklist(station.id)
-  const { staffName } = useAppRole()
+  const { staffName, role } = useAppRole()
+  const navigate = useNavigate()
+  const canReview = role === 'owner' || role === 'task_manager'
 
   const [kind, setKind] = useState<ChecklistItemKind>('food')
   const [dueOnly, setDueOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [baseline, setBaseline] = useState(false)
-  const [banner, setBanner] = useState<string | null>(null)
 
   const session = useStocktakeSession(station.code, station.id, kind, staffName ?? 'admin')
 
@@ -50,15 +52,6 @@ export function StationChecklistPanel({ station }: { station: Station }) {
     },
     [station.location_id, refetch],
   )
-
-  const handleApply = useCallback(async () => {
-    const res = await session.apply()
-    if (res.ok) {
-      const v = Math.round(res.variance ?? 0)
-      setBanner(`Count applied — variance ${v > 0 ? '+' : ''}${v.toLocaleString()} ฿`)
-      await refetch()
-    }
-  }, [session, refetch])
 
   const counting = session.session != null
   const fmtAge = (iso: string | null): string => {
@@ -110,14 +103,18 @@ export function StationChecklistPanel({ station }: { station: Station }) {
             <span className="text-[11px] text-cream/45">
               {Object.keys(session.counts).length} counted
             </span>
-            <button
-              type="button"
-              onClick={handleApply}
-              disabled={session.busy || Object.keys(session.counts).length === 0}
-              className="ml-auto rounded-md bg-[var(--color-royal-green)] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[var(--color-royal-soft)] disabled:opacity-40"
-            >
-              Apply count
-            </button>
+            {canReview ? (
+              <button
+                type="button"
+                onClick={() => navigate(`/count/session/${session.session!.id}`)}
+                disabled={session.busy || Object.keys(session.counts).length === 0}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-[var(--color-royal-green)] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[var(--color-royal-soft)] disabled:opacity-40"
+              >
+                <ClipboardCheck className="h-3.5 w-3.5" /> Review &amp; apply
+              </button>
+            ) : (
+              <span className="ml-auto text-[11px] text-cream/45">A manager will review &amp; apply</span>
+            )}
             <button
               type="button"
               onClick={session.cancel}
@@ -152,12 +149,6 @@ export function StationChecklistPanel({ station }: { station: Station }) {
           </>
         )}
       </div>
-
-      {banner && (
-        <div className="rounded-md border border-forest-soft/30 bg-forest-soft/10 px-3 py-2 text-xs text-forest-soft">
-          {banner}
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {(
