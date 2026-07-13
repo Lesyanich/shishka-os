@@ -22,19 +22,19 @@ if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
   fi
 fi
 
-# Decide mode: full (with MC data) vs git-only fallback.
-# Missing env is NOT fatal — post-commit still refreshes STATUS.md git state
-# and stamps an offline banner. This keeps HC-1 working on dev machines
-# without .env (audit finding B2).
-MODE_FLAG=""
+# Without Supabase env we SKIP regeneration entirely and leave STATUS.md
+# untouched. The old git-only fallback rewrote the file with a stale offline
+# banner on every commit — that churned the working tree and clobbered the
+# last online (live-MC) STATUS.md. HC-1 stays satisfied by the committed
+# online snapshot; refresh it with the generate_status MCP tool when needed.
 if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-  MODE_FLAG="--git-only"
-  echo "[generate-status] Running in offline mode (no Supabase env)"
+  echo "[generate-status] SKIP: no Supabase env — leaving STATUS.md untouched (use generate_status MCP to refresh)"
+  exit 0
 fi
 
 # Run the generate-status script via tsx (fast ts runner)
 if command -v npx >/dev/null 2>&1; then
-  cd "$MC_DIR" && npx tsx "$REPO_ROOT/scripts/run-generate-status.ts" "$REPO_ROOT" $MODE_FLAG 2>/dev/null &
+  cd "$MC_DIR" && npx tsx "$REPO_ROOT/scripts/run-generate-status.ts" "$REPO_ROOT" 2>/dev/null &
   echo "[generate-status] Started async STATUS.md generation"
 else
   echo "[generate-status] SKIP: npx not available"
