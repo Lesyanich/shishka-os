@@ -24,7 +24,6 @@ git fetch origin --prune --quiet 2>/dev/null || { echo "fetch failed — showing
 now=$(git log -1 --format=%ct "$BASE" 2>/dev/null || date +%s)
 
 merged=0; stale=0; recent=0
-stale_list=""
 for b in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -v 'origin/HEAD' | grep -vx 'origin/main'); do
   if git merge-base --is-ancestor "$b" "$BASE" 2>/dev/null; then
     merged=$((merged+1))
@@ -35,7 +34,6 @@ for b in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | gr
       recent=$((recent+1))
     else
       stale=$((stale+1))
-      stale_list="${stale_list}\n  ${days}d  ${b#origin/}"
     fi
   fi
 done
@@ -47,9 +45,10 @@ echo "🔴 unmerged, stale >${STALE_DAYS}d : $stale   (abandoned candidates)"
 echo "🟡 unmerged, recent      : $recent   (probably live — leave alone)"
 echo
 if [ "$merged" -gt 0 ]; then
-  echo "→ Delete the merged ones:"
+  echo "→ Delete the merged ones (run on YOUR machine — session tokens"
+  echo "  usually lack branch-delete rights; macOS xargs has no -r flag):"
   echo "  git branch -r --merged $BASE | grep -v HEAD | grep -vx '  origin/main' \\"
-  echo "    | sed 's#origin/##' | xargs -r -n1 git push origin --delete"
+  echo "    | sed 's#origin/##' | xargs -n1 git push origin --delete"
 fi
 echo
 echo "PRs are not counted here (needs the GitHub API). The systemic fix is"

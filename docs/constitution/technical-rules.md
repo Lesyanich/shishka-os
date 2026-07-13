@@ -339,16 +339,25 @@ Never let a widget crash on null.
 | Layer | Mechanism | Strength |
 |---|---|---|
 | 1. Rule | this section + the CEO guide | agents read it |
-| 2. Local hook | `.claude/hooks/git-guard-pretool.sh` (PreToolUse/Bash): **hard-blocks** commit/push to `main`; **warns** on off-convention branch names | blocks any Claude session in the terminal |
+| 2. Local hook | `.claude/hooks/git-guard-pretool.sh` (PreToolUse/Bash): **hard-blocks** local `main` mutations (commit/merge/cherry-pick/revert) and any push targeting `main`; **warns** on off-convention branch names (only until the branch has an upstream — after the first push a rename would break the PR) | blocks any Claude session in the terminal |
 | 3. GitHub settings | branch protection on `main` (block direct push), squash-only merge, required CI checks, auto-delete head branches | server-side; applies to everyone, cannot be bypassed by a prompt |
 
 Layer 3 is set once in the GitHub UI (the proxy blocks settings writes from
 agents) — see the checklist in the CEO guide. Layers 1–3 are complementary; all
 three should be on.
 
-**Escape hatch.** Sanctioned automation that must write to `main` (e.g. the
-data-health sheriff) sets `SHISHKA_ALLOW_MAIN=1` to bypass the layer-2 block.
-Never use it interactively.
+**Layer-3 caveat — the sheriff.** The data-health sheriff is a scheduled Claude
+session that commits its report straight to `main` (e.g. `6015194`). Before
+enabling require-PR on `main`, either add the committing actor to the ruleset
+**bypass list** or migrate the sheriff to PR flow — otherwise its next run fails
+at the server with no escape hatch.
+
+**Escape hatch (layer 2 only).** Sanctioned automation that must write to
+`main` (e.g. the sheriff) **prefixes the command**: `SHISHKA_ALLOW_MAIN=1 git
+commit …`. The guard greps the prefix out of the command text (an env var
+exported inside the Bash call never reaches the hook process) and also honours
+it in its own env for cron-configured runners. Never use it interactively —
+deny messages deliberately do not spell it out.
 
 **Visibility.** `sh scripts/git-hygiene-report.sh` buckets remote branches
 (merged-not-deleted / stale / live) on demand, so clutter is seen, not silently
