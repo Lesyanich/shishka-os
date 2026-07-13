@@ -3,7 +3,7 @@ import { getSupabase } from "../lib/supabase.js";
 export const listEquipmentSchema = {
   name: "list_equipment",
   description:
-    "List kitchen equipment with category and status. Use to check what equipment exists for recipe planning and production scheduling. Supports multilingual search — query in English, Russian, Arabic, or Thai.",
+    "List kitchen equipment with category, status, and STATION ZONE (L1 Kitchen vs L2 Service). This is the LIVE source of truth for what equipment exists and WHERE — use it (not any static doc) for RULE-EQUIPMENT-REALITY when designing a production flow: confirm the machine exists and read its `zone` before placing a heat/char/finish step there. Returns `zone` (L1|L2), `location_zone`, `location_notes`, `is_bottleneck`, `preheat_min`. Supports multilingual search — query in English, Russian, Arabic, or Thai.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -36,7 +36,7 @@ export async function listEquipment(args: {
     // Try enriched schema with aliases (post-migration 142)
     const enriched = await sb
       .from("equipment")
-      .select("id, equipment_code, name, aliases, category, status, capacity, capacity_unit, is_available, processing_time_min, setup_time_min, max_parallel, notes, last_service_date, daily_availability_min")
+      .select("id, equipment_code, name, aliases, category, status, capacity, capacity_unit, is_available, processing_time_min, setup_time_min, max_parallel, notes, last_service_date, daily_availability_min, location_zone, location_notes, is_bottleneck, preheat_min")
       .order("name");
 
     let data: any[] | null = null;
@@ -100,10 +100,21 @@ export async function listEquipment(args: {
       schema_version: isEnriched ? "enriched (migration 070)" : "basic (pre-070)",
       categories: isEnriched ? byCategory : undefined,
       results: filtered.map((eq: any) => {
+        // Zone is the authoritative station location. Prefer the explicit
+        // location_zone column; otherwise derive L1/L2 from the equipment_code
+        // prefix (L-1-* = L1 Kitchen, L-2-* = L2 Service). This is what the
+        // Chef Agent's RULE-EQUIPMENT-REALITY check reads — the LIVE source of
+        // truth, not the (lagging) operations.md snapshot.
+        const codePrefixZone = /^L-1\b|^L-1-/.test(eq.equipment_code || "")
+          ? "L1"
+          : /^L-2\b|^L-2-/.test(eq.equipment_code || "")
+            ? "L2"
+            : null;
         const result: Record<string, any> = {
           id: eq.id,
           equipment_code: eq.equipment_code,
           name: eq.name,
+          zone: codePrefixZone, // L1 | L2 | null (unknown — verify via location_notes)
           capacity_unit: eq.capacity_unit,
           last_service_date: eq.last_service_date,
         };
@@ -111,7 +122,11 @@ export async function listEquipment(args: {
           result.category = eq.category;
           result.status = eq.status;
           result.is_available = eq.is_available;
+          result.location_zone = eq.location_zone; // sub-zone within L1/L2 (e.g. "Hot")
+          result.location_notes = eq.location_notes;
+          result.is_bottleneck = eq.is_bottleneck;
           result.capacity = eq.capacity;
+          result.preheat_min = eq.preheat_min;
           result.processing_time_min = eq.processing_time_min;
           result.setup_time_min = eq.setup_time_min;
           result.max_parallel = eq.max_parallel;

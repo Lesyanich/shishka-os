@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 import type {
   PurchaseOrder,
   POLine,
@@ -28,8 +29,8 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
   const [statusFilter, setStatusFilter] = useState<POStatus | 'all'>('all')
   const [isCreating, setIsCreating] = useState(false)
 
-  const fetchOrders = useCallback(async () => {
-    setIsLoading(true)
+  const fetchOrders = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     let query = supabase
@@ -95,18 +96,10 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
 
   useEffect(() => {
     fetchOrders()
-
-    const channel = supabase
-      .channel('po-live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'purchase_orders' },
-        () => { fetchOrders() },
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
   }, [fetchOrders])
+
+  useCoalescedRealtimeRefetch('po-live', [{ table: 'purchase_orders' }],
+    () => { fetchOrders({ silent: true }) })
 
   const createPO = useCallback(
     async (payload: CreatePOPayload): Promise<CreatePOResult> => {
@@ -132,10 +125,17 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
         .eq('id', poId)
 
       if (updateError) return false
-      fetchOrders()
+      // Optimistic status change — no full refetch. If a status filter is
+      // active and the row no longer matches it, drop it from the view;
+      // otherwise patch the status in place (supplier_name / line_count kept).
+      setOrders((prev) =>
+        statusFilter !== 'all' && status !== statusFilter
+          ? prev.filter((o) => o.id !== poId)
+          : prev.map((o) => (o.id === poId ? { ...o, status } : o)),
+      )
       return true
     },
-    [fetchOrders],
+    [statusFilter],
   )
 
   const fetchLines = useCallback(async (poId: string): Promise<POLine[]> => {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 
 export interface EquipmentSlot {
   id: string
@@ -49,8 +50,8 @@ export function useEquipmentSlots(dateFilter?: string): UseEquipmentSlotsResult 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     let query = supabase
@@ -80,29 +81,14 @@ export function useEquipmentSlots(dateFilter?: string): UseEquipmentSlotsResult 
     setIsLoading(false)
   }, [dateFilter])
 
-  // Supabase Realtime subscription
   useEffect(() => {
     fetchData()
-
-    const channel = supabase
-      .channel('equipment-slots-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'equipment_slots',
-        },
-        () => {
-          fetchData()
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchData])
+
+  // Realtime: coalesced SILENT refetch (was a blind non-silent refetch that
+  // flashed the spinner on every change).
+  useCoalescedRealtimeRefetch('equipment-slots-realtime', [{ table: 'equipment_slots' }],
+    () => { fetchData({ silent: true }) })
 
   const createSlot = useCallback(async (input: EquipmentSlotInsert): Promise<EquipmentSlot | null> => {
     const { data, error: insertError } = await supabase

@@ -3,6 +3,7 @@ import { CalendarPlus, Clock, AlertTriangle, CalendarCog } from 'lucide-react'
 import { useStaff } from '../../hooks/useStaff'
 import { useShifts, type Shift } from '../../hooks/useShifts'
 import { useLocations } from '../../hooks/useLocations'
+import { toISODate } from '../../lib/staffSchedule'
 import { WeekCalendar } from '../../components/schedule/WeekCalendar'
 import { BulkScheduleGenerator } from '../../components/schedule/BulkScheduleGenerator'
 import { ScheduleTemplatePanel } from '../../components/schedule/ScheduleTemplatePanel'
@@ -19,9 +20,9 @@ function getMonday(d: Date): Date {
   return date
 }
 
-function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0]
-}
+// shift_date is a plain DATE — always derive it from local time, never
+// toISOString(): UTC conversion shifts local-midnight dates back a day in ICT.
+const formatDate = toISODate
 
 function calcShiftHours(s: Shift): number {
   const [sh, sm] = s.start_time.split(':').map(Number)
@@ -48,10 +49,14 @@ export function SchedulePage() {
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
 
   const { staff } = useStaff()
-  const { shifts } = useShifts()
+  const { shifts, isLoading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts()
   const { locations } = useLocations()
 
-  const activeStaff = useMemo(() => staff.filter((s) => s.is_active), [staff])
+  // Owners (Bas, Lesia) are not on the roster — exclude them from the schedule grid.
+  const activeStaff = useMemo(
+    () => staff.filter((s) => s.is_active && s.app_role !== 'owner'),
+    [staff],
+  )
 
   // Calculate weekly stats per staff for the current week
   const weeklyStats = useMemo((): WeeklyStats[] => {
@@ -166,6 +171,11 @@ export function SchedulePage() {
 
       {/* Week calendar */}
       <WeekCalendar
+        shifts={shifts}
+        shiftsLoading={shiftsLoading}
+        createShift={createShift}
+        updateShift={updateShift}
+        deleteShift={deleteShift}
         locationFilter={locationFilter}
         onWeekChange={setWeekStart}
       />

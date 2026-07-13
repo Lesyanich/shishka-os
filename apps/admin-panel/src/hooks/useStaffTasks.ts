@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 
-export type TaskCategory =
-  | 'opening' | 'closing' | 'prep' | 'cleaning' | 'admin' | 'general'
-  | 'stock_check' | 'waste'
+// TaskCategory's source of truth is CATEGORY_META (one entry per category);
+// re-exported here so row-shaped types and their consumers keep one import path.
+import type { TaskCategory } from '../components/tasks/taskMeta'
+export type { TaskCategory }
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low'
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'skipped' | 'cancelled'
 export type TaskRecurrence = 'none' | 'daily' | 'weekly'
@@ -95,13 +97,32 @@ export interface UseStaffTasksResult {
   materializeToday: () => Promise<number>
 }
 
+// Keep optimistic inserts/edits in the same order as the fetch query:
+// due_date asc (nulls last) → due_time asc (nulls first) → created_at asc.
+function sortStaffTasks(list: StaffTask[]): StaffTask[] {
+  return [...list].sort((a, b) => {
+    if (a.due_date !== b.due_date) {
+      if (a.due_date === null) return 1
+      if (b.due_date === null) return -1
+      return a.due_date < b.due_date ? -1 : 1
+    }
+    if (a.due_time !== b.due_time) {
+      if (a.due_time === null) return -1
+      if (b.due_time === null) return 1
+      return a.due_time < b.due_time ? -1 : 1
+    }
+    if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1
+    return 0
+  })
+}
+
 export function useStaffTasks(): UseStaffTasksResult {
   const [rows, setRows] = useState<StaffTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const { data, error: fetchError } = await supabase
@@ -127,25 +148,14 @@ export function useStaffTasks(): UseStaffTasksResult {
     setIsLoading(false)
   }, [])
 
-  // Realtime — Telegram button presses (Phase 2) and other clients reflect live.
   useEffect(() => {
     fetchData()
-
-    const channel = supabase
-      .channel('staff-tasks-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'staff_tasks' },
-        () => {
-          fetchData()
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchData])
+
+  // Realtime — Telegram button presses (Phase 2) and other clients reflect live.
+  // Coalesced SILENT refetch: no spinner, and one multi-row tx fires once.
+  useCoalescedRealtimeRefetch('staff-tasks-realtime', [{ table: 'staff_tasks' }],
+    () => { fetchData({ silent: true }) })
 
   const tasks = useMemo(() => rows.filter((r) => !r.is_template), [rows])
   const templates = useMemo(() => rows.filter((r) => r.is_template), [rows])
@@ -163,9 +173,11 @@ export function useStaffTasks(): UseStaffTasksResult {
       return null
     }
 
-    await fetchData()
-    return data as unknown as StaffTask
-  }, [fetchData])
+    // Optimistic insert of the fully-joined row — no full refetch.
+    const created = data as unknown as StaffTask
+    setRows((prev) => sortStaffTasks([...prev, created]))
+    return created
+  }, [])
 
   const updateTask = useCallback(async (id: string, input: StaffTaskUpdate): Promise<StaffTask | null> => {
     const { data, error: updateError } = await supabase
@@ -181,9 +193,11 @@ export function useStaffTasks(): UseStaffTasksResult {
       return null
     }
 
-    await fetchData()
-    return data as unknown as StaffTask
-  }, [fetchData])
+    // Optimistic merge of the returned row — no full refetch.
+    const updated = data as unknown as StaffTask
+    setRows((prev) => sortStaffTasks(prev.map((r) => (r.id === id ? updated : r))))
+    return updated
+  }, [])
 
   const setStatus = useCallback(async (id: string, status: TaskStatus): Promise<StaffTask | null> => {
     const patch: Record<string, unknown> = { status }
@@ -208,9 +222,11 @@ export function useStaffTasks(): UseStaffTasksResult {
       return null
     }
 
-    await fetchData()
-    return data as unknown as StaffTask
-  }, [fetchData])
+    // Optimistic merge of the returned row — no full refetch.
+    const updated = data as unknown as StaffTask
+    setRows((prev) => sortStaffTasks(prev.map((r) => (r.id === id ? updated : r))))
+    return updated
+  }, [])
 
   const deleteTask = useCallback(async (id: string): Promise<boolean> => {
     const { error: deleteError } = await supabase
@@ -224,9 +240,10 @@ export function useStaffTasks(): UseStaffTasksResult {
       return false
     }
 
-    await fetchData()
+    // Optimistic removal — no full refetch.
+    setRows((prev) => prev.filter((r) => r.id !== id))
     return true
-  }, [fetchData])
+  }, [])
 
   const materializeToday = useCallback(async (): Promise<number> => {
     const { data, error: rpcError } = await supabase.rpc('fn_materialize_recurring_tasks')
@@ -235,7 +252,9 @@ export function useStaffTasks(): UseStaffTasksResult {
       setError(rpcError.message)
       return 0
     }
-    await fetchData()
+    // Materialize can create many rows at once — a SILENT refetch reconciles
+    // without a spinner.
+    await fetchData({ silent: true })
     return (data as number) ?? 0
   }, [fetchData])
 

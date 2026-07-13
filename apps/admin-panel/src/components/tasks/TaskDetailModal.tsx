@@ -7,8 +7,7 @@ import {
 import type { StaffTask } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
 import {
-  CATEGORY_LABEL,
-  CATEGORY_STYLE,
+  categoryMeta,
   PRIORITY_DOT,
   STATION_LABEL,
   STATION_STYLE,
@@ -118,8 +117,8 @@ export function TaskDetailModal({
               {STATION_LABEL[task.station]}
             </span>
           )}
-          <span className={`rounded-full px-2 py-0.5 ${CATEGORY_STYLE[task.category]}`}>
-            {CATEGORY_LABEL[task.category]}
+          <span className={`rounded-full px-2 py-0.5 ${categoryMeta(task.category).style}`}>
+            {categoryMeta(task.category).label}
           </span>
           <span className="rounded-full bg-slate-800 px-2 py-0.5 text-slate-300">
             {task.staff?.name ?? 'Unassigned'}

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { LayoutDashboard, RefreshCw, ChefHat, Clock, AlertTriangle, CheckCircle2, MessageCircle, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from '../hooks/useCoalescedRealtimeRefetch'
 import { KitchenNav } from '../components/KitchenNav'
 
 interface TaskSummary {
@@ -42,8 +43,8 @@ export function Dashboard() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     try {
@@ -137,13 +138,11 @@ export function Dashboard() {
 
   useEffect(() => {
     fetchData()
-    // Realtime subscription for production_tasks changes
-    const channel = supabase
-      .channel('dashboard-tasks')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => fetchData())
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
   }, [fetchData])
+
+  // Realtime: coalesced SILENT refetch (was a blind non-silent refetch).
+  useCoalescedRealtimeRefetch('dashboard-tasks', [{ table: 'production_tasks' }],
+    () => { fetchData({ silent: true }) })
 
   const progressPct = summary.total > 0 ? Math.round((summary.completed / summary.total) * 100) : 0
 
@@ -160,7 +159,7 @@ export function Dashboard() {
           </div>
           <button
             type="button"
-            onClick={fetchData}
+            onClick={() => fetchData()}
             disabled={isLoading}
             className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 active:bg-slate-700 disabled:opacity-50"
           >

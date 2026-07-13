@@ -11,12 +11,18 @@ Multi-agent architecture: AI agents handle finance, recipes, procurement; humans
 
 ```
 shishka-os/
-├── docs/           Brains: rules, domain knowledge, modules, phase history
-├── agents/         Brains: agent prompts, guidelines, domain files
-├── apps/           Hands: frontend applications (React + Vite)
-├── services/       Hands: backend (Supabase), MCP servers, GAS
+├── docs/           Brains: constitution (rules), modules, business domains, plans, projects
+├── agents/         Brains: agent prompts (chef, finance, coo, lawyer, procurement, strategy, tech-lead, designer)
+├── apps/           Hands: admin-panel (React+Vite → Vercel), kds, web
+├── services/       Hands: supabase (migrations, edge fns), MCP servers (chef, finance, mission-control, graphify), print-bridge
 ├── tools/          Hands: standalone utilities (parsers, sync scripts)
+├── scripts/        Repo automation (status generation, hook helpers)
+├── packages/       Shared packages
+├── supabase/       Supabase CLI config
+├── knowledge/      AI-learning notes, phase knowledge
+├── design/         Design assets (labels)
 ├── vault/          Knowledge base (Obsidian vault)
+├── .claude/        Claude Code config: skills, commands, hooks, settings
 └── .secrets/       Credentials (gitignored)
 ```
 
@@ -26,17 +32,17 @@ shishka-os/
 |---------|-------------|
 | **Lego BOM** | Menu modules: RAW (raw ingredient) -> PF (semi-finished) -> MOD (topping) -> SALE (dish) |
 | **SSoT** | Supabase PostgreSQL is the single source of truth |
-| **SYRVE** | External POS system of record (inventory, BOM, sales) |
+| **Loyverse** | POS (sales, receipts, items); DB pushes to it via `loyverse-sync` edge fn + push queue |
 | **MCP** | Model Context Protocol — how AI agents interact with the system |
-| **Mission Control** | Cross-domain business task management (8 domains: kitchen, procurement, finance, marketing, ops, sales, strategy, tech) |
+| **Mission Control** | Cross-domain business task management (kitchen, procurement, finance, marketing, ops, sales, strategy, tech, legal) |
 
 ## Active Projects
 
 | Project | Path | Status |
 |---------|------|--------|
-| Admin Panel | `apps/admin-panel/` | Active (Phase 17) |
-| Web (public) | `apps/web/` | Planned |
-| Mobile App | `apps/app/` | Planned |
+| Admin Panel | `apps/admin-panel/` | Active — deployed on Vercel |
+| KDS | `apps/kds/` | Active |
+| Public site | separate repo **shishka-health** | Live at shishka.health (brand design system lives there) |
 
 ## AI Agents
 
@@ -44,8 +50,10 @@ shishka-os/
 |-------|--------|-------------|
 | Chef | `agents/chef/` | `services/mcp-chef/` |
 | Finance | `agents/finance/` | `services/mcp-finance/` |
-| Invoice Parser | `agents/invoice-parser/` | (uses Finance MCP) |
-| Dispatcher | `docs/business/DISPATCH_RULES.md` | (planned: `services/mcp-dispatcher/`) |
+| COO / Strategy | `agents/coo/`, `agents/strategy/` | `services/mcp-mission-control/` |
+| Lawyer | `agents/lawyer/` | (docs + GDrive custodian) |
+| Procurement | `agents/procurement/` | (uses Chef MCP catalogs) |
+| Tech-lead | `agents/tech-lead/` | (repo + Supabase MCP) |
 
 ## Business Domains (Mission Control)
 
@@ -62,5 +70,5 @@ shishka-os/
 ## Next Steps
 
 - Read `STATUS.md` for current state and active tasks
-- Read `TECH_STACK.md` for infrastructure details
+- Read `docs/tech-stack.md` for infrastructure details
 - Read `docs/constitution/operational-rules.md` for immutable rules

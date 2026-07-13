@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 
 export const TELEGRAM_BOT_USERNAME = 'Shishka_Kitchen_bot'
 
@@ -33,8 +34,8 @@ export function useStaffTelegram(): UseStaffTelegramResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
     const { data, error: fetchError } = await supabase
       .from('staff_telegram')
@@ -57,14 +58,10 @@ export function useStaffTelegram(): UseStaffTelegramResult {
 
   useEffect(() => {
     fetchData()
-    const channel = supabase
-      .channel('staff-telegram-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_telegram' }, () => fetchData())
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchData])
+
+  useCoalescedRealtimeRefetch('staff-telegram-realtime', [{ table: 'staff_telegram' }],
+    () => { fetchData({ silent: true }) })
 
   const generateCode = useCallback(async (staffId: string): Promise<GeneratedCode | null> => {
     const code = randomCode()

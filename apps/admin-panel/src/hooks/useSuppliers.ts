@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 
 /** Weekday codes stored in suppliers.delivery_days (text[]). */
 export type WeekdayCode = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
@@ -146,8 +147,8 @@ export function useSuppliers(): UseSuppliersResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchSuppliers = useCallback(async () => {
-    setIsLoading(true)
+  const fetchSuppliers = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
     const { data, error: fetchError } = await supabase
       .from('suppliers')
@@ -165,16 +166,10 @@ export function useSuppliers(): UseSuppliersResult {
 
   useEffect(() => {
     fetchSuppliers()
-    const channel = supabase
-      .channel('suppliers-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'suppliers' }, () => {
-        fetchSuppliers()
-      })
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchSuppliers])
+
+  useCoalescedRealtimeRefetch('suppliers-live', [{ table: 'suppliers' }],
+    () => { fetchSuppliers({ silent: true }) })
 
   const createSupplier = useCallback(async (name: string) => {
     const trimmed = name.trim()
@@ -185,7 +180,9 @@ export function useSuppliers(): UseSuppliersResult {
       .select('id')
       .single()
     if (insertError) return { ok: false, error: insertError.message }
-    await fetchSuppliers()
+    // Insert returns only the id; the joined/normalized row comes from a SILENT
+    // refetch (no spinner). Realtime would also catch it — this makes it instant.
+    await fetchSuppliers({ silent: true })
     return { ok: true, id: data?.id as string | undefined }
   }, [fetchSuppliers])
 
@@ -208,9 +205,10 @@ export function useSuppliers(): UseSuppliersResult {
       .update({ is_deleted: true })
       .eq('id', id)
     if (delError) return { ok: false, error: delError.message }
-    await fetchSuppliers()
+    // Optimistic removal — soft-deleted rows drop out of the is_deleted=false view.
+    setSuppliers((prev) => prev.filter((s) => s.id !== id))
     return { ok: true }
-  }, [fetchSuppliers])
+  }, [])
 
   const fetchSupplierProducts = useCallback(async (supplierId: string) => {
     const { data, error: prodError } = await supabase

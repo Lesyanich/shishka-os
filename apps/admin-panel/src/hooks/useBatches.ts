@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 
 export type BatchStatus = 'sealed' | 'opened' | 'depleted' | 'wasted'
 
@@ -45,8 +46,8 @@ export function useBatches(): UseBatchesResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchBatches = useCallback(async () => {
-    setIsLoading(true)
+  const fetchBatches = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     // Three queries: inventory_batches + nomenclature + locations, joined in JS
@@ -95,18 +96,10 @@ export function useBatches(): UseBatchesResult {
 
   useEffect(() => {
     fetchBatches()
-
-    const channel = supabase
-      .channel('batches-live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'inventory_batches' },
-        () => { fetchBatches() },
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
   }, [fetchBatches])
+
+  useCoalescedRealtimeRefetch('batches-live', [{ table: 'inventory_batches' }],
+    () => { fetchBatches({ silent: true }) })
 
   const createBatchesFromTask = useCallback(
     async (
@@ -126,12 +119,11 @@ export function useBatches(): UseBatchesResult {
       }
 
       const result = data as BatchCreationResult
-      if (result.ok) {
-        await fetchBatches()
-      }
+      // New batches arrive via the realtime subscription (silent, coalesced) —
+      // no explicit refetch needed.
       return result
     },
-    [fetchBatches],
+    [],
   )
 
   const openBatch = useCallback(
@@ -147,11 +139,24 @@ export function useBatches(): UseBatchesResult {
 
       const result = data as { ok: boolean; expires_at?: string; error?: string }
       if (result.ok) {
-        await fetchBatches()
+        // Optimistic: mark the batch opened in place (still within the
+        // sealed/opened filter); realtime reconciles the rest.
+        setBatches((prev) =>
+          prev.map((b) =>
+            b.id === batchId
+              ? {
+                  ...b,
+                  status: 'opened' as const,
+                  opened_at: new Date().toISOString(),
+                  expires_at: result.expires_at ?? b.expires_at,
+                }
+              : b,
+          ),
+        )
       }
       return result
     },
-    [fetchBatches],
+    [],
   )
 
   return { batches, isLoading, error, refetch: fetchBatches, createBatchesFromTask, openBatch }

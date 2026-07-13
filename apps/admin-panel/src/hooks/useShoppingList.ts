@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 import type {
   ShoppingItem,
   ShoppingStatus,
@@ -60,8 +61,8 @@ export function useShoppingList(): UseShoppingListResult {
   const [statusFilter, setStatusFilter] = useState<ShoppingStatus | 'all'>('all')
   const [isSeeding, setIsSeeding] = useState(false)
 
-  const fetchItems = useCallback(async () => {
-    setIsLoading(true)
+  const fetchItems = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const { data, error: fetchError } = await supabase
@@ -84,18 +85,10 @@ export function useShoppingList(): UseShoppingListResult {
 
   useEffect(() => {
     fetchItems()
-
-    const channel = supabase
-      .channel('shopping-list-live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'shopping_list_items' },
-        () => { fetchItems() },
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
   }, [fetchItems])
+
+  useCoalescedRealtimeRefetch('shopping-list-live', [{ table: 'shopping_list_items' }],
+    () => { fetchItems({ silent: true }) })
 
   const addItem = useCallback(
     async (item: NewShoppingItem): Promise<MutationResult> => {
@@ -113,7 +106,7 @@ export function useShoppingList(): UseShoppingListResult {
         })
 
       if (insertError) return { ok: false, error: insertError.message }
-      await fetchItems()
+      await fetchItems({ silent: true })
       return { ok: true }
     },
     [fetchItems],
@@ -137,7 +130,7 @@ export function useShoppingList(): UseShoppingListResult {
         .eq('id', id)
 
       if (updateError) {
-        await fetchItems() // revert optimistic change
+        await fetchItems({ silent: true }) // revert optimistic change
         return { ok: false, error: updateError.message }
       }
       return { ok: true }
@@ -154,7 +147,7 @@ export function useShoppingList(): UseShoppingListResult {
         .eq('id', id)
 
       if (deleteError) {
-        await fetchItems()
+        await fetchItems({ silent: true })
         return { ok: false, error: deleteError.message }
       }
       return { ok: true }
@@ -171,7 +164,7 @@ export function useShoppingList(): UseShoppingListResult {
       setIsSeeding(false)
 
       if (rpcError) return { ok: false, error: rpcError.message }
-      await fetchItems()
+      await fetchItems({ silent: true })
       return data as SeedResult
     },
     [fetchItems],
@@ -185,7 +178,7 @@ export function useShoppingList(): UseShoppingListResult {
       })
       setIsSeeding(false)
       if (rpcError) return { ok: false, error: rpcError.message }
-      await fetchItems()
+      await fetchItems({ silent: true })
       return data as SeedResult
     },
     [fetchItems],
@@ -254,10 +247,13 @@ export function useShoppingList(): UseShoppingListResult {
         .update({ status: 'ordered' })
         .in('id', ids)
       if (updateError) return { ok: false, error: updateError.message }
-      await fetchItems()
+      // Optimistic bulk status flip — no full refetch.
+      setItems((prev) =>
+        prev.map((it) => (ids.includes(it.id) ? { ...it, status: 'ordered' as ShoppingItem['status'] } : it)),
+      )
       return { ok: true }
     },
-    [fetchItems],
+    [],
   )
 
   return {

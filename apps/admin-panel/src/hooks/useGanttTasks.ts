@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 import type { EquipmentBooking } from '../types/scheduling'
 
 export interface GanttTask {
@@ -86,8 +87,8 @@ export function useGanttTasks(): UseGanttTasksResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchTasks = useCallback(async () => {
-    setIsLoading(true)
+  const fetchTasks = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const [tasksResult, bookingsResult] = await Promise.all([
@@ -123,45 +124,16 @@ export function useGanttTasks(): UseGanttTasksResult {
     setIsLoading(false)
   }, [])
 
-  // Supabase Realtime subscription
   useEffect(() => {
     fetchTasks()
-
-    const tasksChannel = supabase
-      .channel('gantt-tasks')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'production_tasks',
-        },
-        () => {
-          fetchTasks()
-        },
-      )
-      .subscribe()
-
-    const bookingsChannel = supabase
-      .channel('gantt-bookings')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'equipment_bookings',
-        },
-        () => {
-          fetchTasks()
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(tasksChannel)
-      supabase.removeChannel(bookingsChannel)
-    }
   }, [fetchTasks])
+
+  // Realtime: both tables on one channel, coalesced SILENT refetch.
+  useCoalescedRealtimeRefetch(
+    'gantt-live',
+    [{ table: 'production_tasks' }, { table: 'equipment_bookings' }],
+    () => { fetchTasks({ silent: true }) },
+  )
 
   const conflicts = detectConflicts(tasks)
 

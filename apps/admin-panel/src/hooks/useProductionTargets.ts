@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 import type { ProductionTarget, Channel, TargetStatus } from '../types/scheduling'
 
 export interface UseProductionTargetsResult {
@@ -25,8 +26,8 @@ export function useProductionTargets(date: string): UseProductionTargetsResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchTargets = useCallback(async () => {
-    setIsLoading(true)
+  const fetchTargets = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
 
     const { data, error: fetchError } = await supabase
@@ -51,19 +52,13 @@ export function useProductionTargets(date: string): UseProductionTargetsResult {
 
   useEffect(() => {
     fetchTargets()
+  }, [fetchTargets])
 
-    const channel = supabase
-      .channel(`targets-${date}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'production_targets',
-        filter: `date=eq.${date}`,
-      }, () => { fetchTargets() })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [date, fetchTargets])
+  useCoalescedRealtimeRefetch(
+    `targets-${date}`,
+    [{ table: 'production_targets', filter: `date=eq.${date}` }],
+    () => { fetchTargets({ silent: true }) },
+  )
 
   const addTarget = useCallback(async (target: {
     date: string

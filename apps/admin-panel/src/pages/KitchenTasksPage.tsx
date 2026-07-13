@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useOptimistic, useRef, useState, startTransition } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Plus, RefreshCw, CalendarDays, ListTodo, Repeat, Users, Send, ChevronDown, SlidersHorizontal,
+  Plus, RefreshCw, CalendarDays, ListTodo, Repeat, Send, ChevronDown, SlidersHorizontal,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAppRole } from '../contexts/AppRoleContext'
 import { useStaff } from '../hooks/useStaff'
-import { useShifts } from '../hooks/useShifts'
 import {
   useStaffTasks,
   type StaffTask,
@@ -19,14 +18,13 @@ import { TaskFormModal } from '../components/tasks/TaskFormModal'
 import { TaskDetailModal } from '../components/tasks/TaskDetailModal'
 import { TelegramLinkPanel } from '../components/tasks/TelegramLinkPanel'
 import {
-  CATEGORY_OPTIONS,
-  CATEGORY_SORT,
+  categoryMeta,
+  TASK_CATEGORIES,
   STATUS_OPTIONS,
   TIME_BANDS,
   type TimeBand,
   describeRecurrence,
   formatLocalDate,
-  shortTime,
   timeBandOf,
 } from '../components/tasks/taskMeta'
 import { useTabParam } from '../hooks/useTabParam'
@@ -35,11 +33,13 @@ type Tab = 'today' | 'all' | 'recurring' | 'team'
 type StationFilter = 'all' | 'L1' | 'L2'
 type KindFilter = 'all' | 'recurring' | 'oneoff'
 type CategoryFilter = 'all' | TaskCategory
+type DayScope = 'all' | 'overdue' | 'today' | 'week'
 
-const STATION_CHIPS: { value: StationFilter; label: string }[] = [
+const DAY_SCOPES: { value: DayScope; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'L1', label: 'L1 Kitchen' },
-  { value: 'L2', label: 'L2 Assembly' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: '7 days' },
 ]
 
 const KIND_CHIPS: { value: KindFilter; label: string }[] = [
@@ -53,10 +53,138 @@ interface ChipOption {
   label: string
 }
 
-const CATEGORY_CHIPS: ChipOption[] = [
-  { value: 'all', label: 'All' },
-  ...CATEGORY_OPTIONS.map((c) => ({ value: c.value, label: c.label })),
-]
+/**
+ * Always-visible work-type strip: [All] + one coloured chip per category that
+ * has tasks in the current list (data-driven, like the /menu chips). Tap = filter.
+ * The selected category stays visible even at zero so the filter can be cleared.
+ */
+function CategoryChipStrip({
+  counts,
+  value,
+  onSelect,
+}: {
+  counts: Partial<Record<TaskCategory, number>>
+  value: CategoryFilter
+  onSelect: (v: CategoryFilter) => void
+}) {
+  const cats = TASK_CATEGORIES
+    .filter((c) => (counts[c] ?? 0) > 0 || c === value)
+    .sort((a, b) => categoryMeta(a).sort - categoryMeta(b).sort)
+  const total = Object.values(counts).reduce((s, n) => s + (n ?? 0), 0)
+  return (
+    <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+      <button
+        type="button"
+        onClick={() => onSelect('all')}
+        className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-medium transition ${
+          value === 'all'
+            ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+        }`}
+      >
+        All
+        <span className="text-[10px] opacity-70">{total}</span>
+      </button>
+      {cats.map((c) => {
+        const meta = categoryMeta(c)
+        const Icon = meta.icon
+        const active = value === c
+        return (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onSelect(active ? 'all' : c)}
+            className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-medium transition ${
+              active
+                ? `${meta.style} ring-1 ring-current/30`
+                : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {meta.label}
+            <span className="text-[10px] opacity-70">{counts[c] ?? 0}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Always-visible station switch (All / L1 / L2) — the cook's primary axis, so it
+ * lives in reach rather than behind the Filters button. Full-width segments =
+ * big thumb targets; the active segment takes the station's own colour.
+ */
+function StationSegmented({
+  value,
+  onSelect,
+}: {
+  value: StationFilter
+  onSelect: (v: StationFilter) => void
+}) {
+  const opts: { value: StationFilter; label: string; active: string }[] = [
+    { value: 'all', label: 'All', active: 'bg-emerald-500/15 text-emerald-300' },
+    { value: 'L1', label: 'L1 Kitchen', active: 'bg-orange-500/15 text-orange-300' },
+    { value: 'L2', label: 'L2 Assembly', active: 'bg-cyan-500/15 text-cyan-300' },
+  ]
+  return (
+    <div className="flex gap-1 rounded-lg bg-slate-900/60 p-1 ring-1 ring-slate-800">
+      {opts.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onSelect(o.value)}
+          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+            value === o.value ? o.active : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Day-scope switch for the All tab (All / Overdue / Today / next 7 days). */
+function DayScopeSegmented({
+  value,
+  onSelect,
+}: {
+  value: DayScope
+  onSelect: (v: DayScope) => void
+}) {
+  return (
+    <div className="flex gap-1 rounded-lg bg-slate-900/60 p-1 ring-1 ring-slate-800">
+      {DAY_SCOPES.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onSelect(o.value)}
+          className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${
+            value === o.value
+              ? o.value === 'overdue'
+                ? 'bg-rose-500/15 text-rose-300'
+                : 'bg-emerald-500/15 text-emerald-300'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Human day-group heading: "Today" / "Tomorrow" / "Wed 9 Jul" from a YYYY-MM-DD. */
+function dayLabel(dateStr: string, todayStr: string, tomorrowStr: string): string {
+  if (dateStr === todayStr) return 'Today'
+  if (dateStr === tomorrowStr) return 'Tomorrow'
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
 
 /** One labelled row of filter chips — label stays put, chips scroll sideways. */
 function FilterChipRow({
@@ -98,13 +226,14 @@ function FilterChipRow({
 /**
  * Unified kitchen task board — the single tracker behind both `/kitchen/my-tasks`
  * (cook landing) and `/staff-tasks` (manager). Everyone sees the whole team's
- * tasks and can create / assign / complete; managers additionally get the shifts
- * strip, Telegram pushes, and the Telegram-link tab.
+ * tasks and can create / assign / complete; managers additionally get Telegram
+ * pushes and the Telegram-link tab.
  *
  * Today is sectioned by time of day (Morning / Day / Evening / Anytime); inside
  * each section cards are clustered by work type, which also shows as a coloured
- * stripe + icon. Filters (work type / station / person / kind) collapse behind a
- * single button to keep the phone view clean. "general" tasks show under L1 & L2.
+ * stripe + icon. The station switch and the work-type chip strip stay always
+ * visible; the rarer filters (person / kind) collapse behind the Filters button.
+ * "general" tasks show under L1 & L2.
  */
 export function KitchenTasksPage() {
   const today = formatLocalDate(new Date())
@@ -112,7 +241,6 @@ export function KitchenTasksPage() {
   const isManager = role !== 'cook'
 
   const { staff } = useStaff()
-  const { shifts } = useShifts(today)
   const {
     tasks,
     templates,
@@ -144,8 +272,11 @@ export function KitchenTasksPage() {
   const [personFilter, setPersonFilter] = useState<string>('all') // 'all' | 'unassigned' | staffId
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
+  const [dayScope, setDayScope] = useState<DayScope>('all') // All-tab day filter
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [collapsedBands, setCollapsedBands] = useState<Set<TimeBand>>(new Set())
+  // Overdue day-group starts collapsed so old backlog doesn't flood the All tab.
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set(['overdue']))
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<StaffTask | null>(null)
   const [viewingId, setViewingId] = useState<string | null>(null)
@@ -302,6 +433,27 @@ export function KitchenTasksPage() {
       return next
     })
 
+  const toggleDay = (key: string) =>
+    setCollapsedDays((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+
+  // Overdue is collapsed by default (de-flood in the 'all' view); filtering
+  // explicitly to Overdue should reveal it rather than show a collapsed header.
+  const selectDayScope = (v: DayScope) => {
+    setDayScope(v)
+    if (v === 'overdue') {
+      setCollapsedDays((prev) => {
+        const next = new Set(prev)
+        next.delete('overdue')
+        return next
+      })
+    }
+  }
+
   // Filter predicates. "general" tasks show under L1 and L2.
   const matchesStation = (t: StaffTask) =>
     stationFilter === 'all' || t.station === stationFilter || t.station === 'general'
@@ -316,19 +468,36 @@ export function KitchenTasksPage() {
     kindFilter === 'all' ? true : kindFilter === 'recurring' ? !!t.template_id : !t.template_id
   const matchesCategory = (t: StaffTask) => categoryFilter === 'all' || t.category === categoryFilter
 
+  // Day-scope bounds for the All tab (ISO date strings compare lexicographically).
+  const tomorrow = useMemo(() => formatLocalDate(new Date(Date.now() + 864e5)), [])
+  const weekEnd = useMemo(() => formatLocalDate(new Date(Date.now() + 6 * 864e5)), [])
+  const matchesDayScope = (t: StaffTask) => {
+    if (dayScope === 'all') return true
+    if (!t.due_date) return false
+    if (dayScope === 'overdue') return t.due_date < today
+    if (dayScope === 'today') return t.due_date === today
+    return t.due_date >= today && t.due_date <= weekEnd // 'week'
+  }
+
   // ── Today: concrete tasks due today, grouped into time-of-day bands ──
-  const todayTasks = useMemo(
+  // Two-step: the pre-category base feeds the chip counts (a chip's count must
+  // not depend on the category filter itself), then matchesCategory narrows it.
+  const todayBase = useMemo(
     () =>
       optimisticTasks.filter(
         (t) =>
           t.due_date === today &&
           matchesStation(t) &&
           matchesPerson(t) &&
-          matchesKind(t) &&
-          matchesCategory(t),
+          matchesKind(t),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [optimisticTasks, today, stationFilter, personFilter, kindFilter, categoryFilter],
+    [optimisticTasks, today, stationFilter, personFilter, kindFilter],
+  )
+  const todayTasks = useMemo(
+    () => todayBase.filter(matchesCategory),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [todayBase, categoryFilter],
   )
   // Group by time band, drop empty bands, cluster by work type inside each.
   const bands = useMemo(() => {
@@ -343,23 +512,64 @@ export function KitchenTasksPage() {
       ...band,
       tasks: (map.get(band.key) ?? []).slice().sort(
         (a, b) =>
-          CATEGORY_SORT[a.category] - CATEGORY_SORT[b.category] ||
+          categoryMeta(a.category).sort - categoryMeta(b.category).sort ||
           (a.due_time ?? '').localeCompare(b.due_time ?? '') ||
           a.title.localeCompare(b.title),
       ),
     })).filter((band) => band.tasks.length > 0)
   }, [todayTasks])
 
-  // ── All: filtered concrete tasks ──
-  const filteredAll = useMemo(() => {
+  // ── All: filtered concrete tasks (same two-step split as Today) ──
+  const allBase = useMemo(() => {
     return optimisticTasks.filter((t) => {
-      if (!matchesStation(t) || !matchesPerson(t) || !matchesKind(t) || !matchesCategory(t)) return false
+      if (!matchesStation(t) || !matchesPerson(t) || !matchesKind(t) || !matchesDayScope(t)) return false
       if (statusFilter === 'all') return true
       if (statusFilter === 'open') return t.status === 'todo' || t.status === 'in_progress'
       return t.status === statusFilter
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [optimisticTasks, statusFilter, stationFilter, personFilter, kindFilter, categoryFilter])
+  }, [optimisticTasks, statusFilter, stationFilter, personFilter, kindFilter, dayScope, today, weekEnd])
+  const filteredAll = useMemo(
+    () => allBase.filter(matchesCategory),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allBase, categoryFilter],
+  )
+
+  // Break the All list out of one flat sheet into day groups: Overdue first,
+  // then each concrete date ascending (Today / Tomorrow / weekday), No-date last.
+  const dayGroups = useMemo(() => {
+    const buckets = new Map<string, StaffTask[]>()
+    for (const t of filteredAll) {
+      const key = !t.due_date ? 'none' : t.due_date < today ? 'overdue' : t.due_date
+      const arr = buckets.get(key)
+      if (arr) arr.push(t)
+      else buckets.set(key, [t])
+    }
+    const rank = (k: string) => (k === 'overdue' ? '0000-00-00' : k === 'none' ? '9999-99-99' : k)
+    return [...buckets.keys()]
+      .sort((a, b) => rank(a).localeCompare(rank(b)))
+      .map((key) => ({
+        key,
+        label: key === 'overdue' ? 'Overdue' : key === 'none' ? 'No date' : dayLabel(key, today, tomorrow),
+        overdue: key === 'overdue',
+        spansDates: key === 'overdue' || key === 'none',
+        tasks: buckets.get(key)!.slice().sort(
+          (a, b) =>
+            (a.due_date ?? '').localeCompare(b.due_date ?? '') ||
+            (a.due_time ?? '').localeCompare(b.due_time ?? '') ||
+            categoryMeta(a.category).sort - categoryMeta(b.category).sort ||
+            a.title.localeCompare(b.title),
+        ),
+      }))
+  }, [filteredAll, today, tomorrow])
+
+  // Per-category counts for the chip strip, from the current tab's base list.
+  const categoryCounts = useMemo(() => {
+    const src = tab === 'today' ? todayBase : allBase
+    const counts: Partial<Record<TaskCategory, number>> = {}
+    for (const t of src) counts[t.category] = (counts[t.category] ?? 0) + 1
+    return counts
+  }, [tab, todayBase, allBase])
 
   // ── Recurring: templates, filtered by station + person (kind is implicit) ──
   const filteredTemplates = useMemo(
@@ -380,10 +590,10 @@ export function KitchenTasksPage() {
   const showFilters = tab === 'today' || tab === 'all' || tab === 'recurring'
   const showCategoryRow = tab === 'today' || tab === 'all'
   const showKindRow = tab === 'today' || tab === 'all'
+  // Station + category are always visible (segmented switch + chip strip), so
+  // the Filters badge only counts the collapsed axes: person / kind.
   const activeFilterCount =
-    (stationFilter !== 'all' ? 1 : 0) +
     (personFilter !== 'all' ? 1 : 0) +
-    (showCategoryRow && categoryFilter !== 'all' ? 1 : 0) +
     (showKindRow && kindFilter !== 'all' ? 1 : 0)
 
   return (
@@ -456,22 +666,20 @@ export function KitchenTasksPage() {
           )}
         </div>
 
+        {showFilters && (
+          <StationSegmented value={stationFilter} onSelect={setStationFilter} />
+        )}
+
+        {showCategoryRow && (
+          <CategoryChipStrip
+            counts={categoryCounts}
+            value={categoryFilter}
+            onSelect={setCategoryFilter}
+          />
+        )}
+
         {showFilters && filtersOpen && (
           <div className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-2.5">
-            {showCategoryRow && (
-              <FilterChipRow
-                label="Work"
-                options={CATEGORY_CHIPS}
-                value={categoryFilter}
-                onSelect={(v) => setCategoryFilter(v as CategoryFilter)}
-              />
-            )}
-            <FilterChipRow
-              label="Station"
-              options={STATION_CHIPS}
-              value={stationFilter}
-              onSelect={(v) => setStationFilter(v as StationFilter)}
-            />
             <FilterChipRow
               label="People"
               options={personOptions}
@@ -493,38 +701,12 @@ export function KitchenTasksPage() {
       {/* ── TODAY ── */}
       {tab === 'today' && (
         <div className="space-y-4">
-          {isManager && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs text-slate-400">
-                <Users className="h-3.5 w-3.5" />
-                <span className="font-medium">Working today</span>
-                <span className="text-slate-600">·</span>
-                <span>{today}</span>
-                <span className="text-slate-600">·</span>
-                <span>{doneToday}/{todayTasks.length} tasks done</span>
-              </div>
-              {shifts.length === 0 ? (
-                <p className="text-xs text-slate-600">No shifts scheduled today.</p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {shifts.map((sh) => (
-                    <span key={sh.id} className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
-                      {sh.staff?.name ?? '—'} · {shortTime(sh.start_time)}–{shortTime(sh.end_time)}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!isManager && (
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <ListTodo className="h-4 w-4 text-emerald-400" />
-              <span className="font-medium text-slate-200">Today's tasks · งานวันนี้</span>
-              <span className="text-slate-600">·</span>
-              <span>{doneToday}/{todayTasks.length} done</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <ListTodo className="h-4 w-4 text-emerald-400" />
+            <span className="font-medium text-slate-200">Today's tasks</span>
+            <span className="text-slate-600">·</span>
+            <span>{doneToday}/{todayTasks.length} done</span>
+          </div>
 
           {isLoading ? (
             <p className="text-xs text-slate-500">Loading…</p>
@@ -579,6 +761,7 @@ export function KitchenTasksPage() {
       {tab === 'all' && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
+            <DayScopeSegmented value={dayScope} onSelect={selectDayScope} />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
@@ -592,22 +775,54 @@ export function KitchenTasksPage() {
             </select>
           </div>
 
-          {filteredAll.length === 0 ? (
+          {dayGroups.length === 0 ? (
             <p className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-xs text-slate-600">
               No tasks match these filters.
             </p>
           ) : (
-            <div className="space-y-1.5">
-              {filteredAll.map((t) => (
-                <TaskRow
-                  key={t.id}
-                  task={t}
-                  showDate
-                  onOpen={openView}
-                  onToggleDone={toggleDone}
-                  onPhotosChange={handlePhotosChange}
-                />
-              ))}
+            <div className="space-y-4">
+              {dayGroups.map((group) => {
+                const total = group.tasks.length
+                const doneN = group.tasks.filter((t) => t.status === 'done').length
+                const collapsed = collapsedDays.has(group.key)
+                return (
+                  <div key={group.key}>
+                    <button
+                      type="button"
+                      onClick={() => toggleDay(group.key)}
+                      className="mb-1.5 flex w-full items-center gap-2 px-1 text-left"
+                    >
+                      <span
+                        className={`text-sm font-semibold ${
+                          group.overdue ? 'text-rose-300' : 'text-slate-200'
+                        }`}
+                      >
+                        {group.label}
+                      </span>
+                      <span className="ml-auto rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-300">
+                        {doneN}/{total}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-slate-500 transition-transform ${collapsed ? '-rotate-90' : ''}`}
+                      />
+                    </button>
+                    {!collapsed && (
+                      <div className="space-y-1.5">
+                        {group.tasks.map((t) => (
+                          <TaskRow
+                            key={t.id}
+                            task={t}
+                            showDate={group.spansDates}
+                            onOpen={openView}
+                            onToggleDone={toggleDone}
+                            onPhotosChange={handlePhotosChange}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

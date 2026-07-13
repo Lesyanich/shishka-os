@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { CalendarPlus, Loader2 } from 'lucide-react'
 import { useStaff } from '../../hooks/useStaff'
 import { useShifts } from '../../hooks/useShifts'
+import { toISODate } from '../../lib/staffSchedule'
 
 type Template = '5_2' | '2_2' | '6_1' | 'every_day' | 'custom'
 
@@ -37,7 +38,9 @@ function generateDates(
   while (s <= e) {
     const isWork = cycleDays > 0 ? (dayIndex % cycleDays) < workDays : true
     if (isWork) {
-      dates.push(s.toISOString().split('T')[0])
+      // Local date, not toISOString(): UTC conversion drops local-midnight
+      // dates back a day in ICT and desyncs the work/off cycle.
+      dates.push(toISODate(s))
     }
     s.setDate(s.getDate() + 1)
     dayIndex++
@@ -55,20 +58,20 @@ export function BulkScheduleGenerator() {
     const day = d.getDay()
     const diff = day === 0 ? 1 : 8 - day // next Monday
     d.setDate(d.getDate() + diff)
-    return d.toISOString().split('T')[0]
+    return toISODate(d)
   })
   const [endDate, setEndDate] = useState(() => {
     const d = new Date()
     const day = d.getDay()
     const diff = day === 0 ? 7 : 14 - day // next Sunday
     d.setDate(d.getDate() + diff)
-    return d.toISOString().split('T')[0]
+    return toISODate(d)
   })
   const [template, setTemplate] = useState<Template>('every_day')
   const [customWorkDays, setCustomWorkDays] = useState(5)
   const [customOffDays, setCustomOffDays] = useState(2)
-  const [shiftStart, setShiftStart] = useState('08:00')
-  const [shiftEnd, setShiftEnd] = useState('16:00')
+  const [shiftStart, setShiftStart] = useState('09:00')
+  const [shiftEnd, setShiftEnd] = useState('18:00')
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<string | null>(null)
 

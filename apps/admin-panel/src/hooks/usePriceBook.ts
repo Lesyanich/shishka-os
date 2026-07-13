@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCoalescedRealtimeRefetch } from './useCoalescedRealtimeRefetch'
 import type {
   PriceSummaryRow,
   PriceQuoteRow,
@@ -72,8 +73,8 @@ export function usePriceBook(): UsePriceBookResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchSummary = useCallback(async () => {
-    setIsLoading(true)
+  const fetchSummary = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true)
     setError(null)
     const [{ data, error: fetchError }, { data: sup }] = await Promise.all([
       supabase.from('v_price_comparison_summary').select(SUMMARY_COLS).order('item_name', { ascending: true }),
@@ -90,16 +91,10 @@ export function usePriceBook(): UsePriceBookResult {
 
   useEffect(() => {
     fetchSummary()
-    const channel = supabase
-      .channel('pricebook-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'supplier_catalog' }, () => {
-        fetchSummary()
-      })
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchSummary])
+
+  useCoalescedRealtimeRefetch('pricebook-live', [{ table: 'supplier_catalog' }],
+    () => { fetchSummary({ silent: true }) })
 
   const fetchComparison = useCallback(async (nomenclatureId: string) => {
     const { data, error: cmpError } = await supabase
@@ -122,7 +117,8 @@ export function usePriceBook(): UsePriceBookResult {
     if (rpcError) return { ok: false, error: rpcError.message }
     const res = data as RpcResult
     if (res && res.ok === false) return res
-    await fetchSummary()
+    // View-derived rollup — recompute via a SILENT refetch (no spinner).
+    await fetchSummary({ silent: true })
     return { ok: true }
   }, [fetchSummary])
 
@@ -133,7 +129,8 @@ export function usePriceBook(): UsePriceBookResult {
     if (rpcError) return { ok: false, error: rpcError.message }
     const res = data as RpcResult
     if (res && res.ok === false) return res
-    await fetchSummary()
+    // View-derived rollup — recompute via a SILENT refetch (no spinner).
+    await fetchSummary({ silent: true })
     return { ok: true }
   }, [fetchSummary])
 

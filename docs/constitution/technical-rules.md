@@ -128,6 +128,15 @@ Code in git worktrees is **invisible to main**. Before ending a session that use
 
 > Origin: 2026-04-04. Full Receipt Review UI (`InboxReviewPanel`, ~1000 LOC) was lost because it lived only in a worktree that was deleted. (Legacy: `P0 Rule #12`.)
 
+## RULE-DEPLOY-MAP
+
+The live customer site `shishka.health` is served by the Vercel project **`shishka-web`**, which builds the **`Lesyanich/shishka-health`** repo (`main`) — **not this repo**. The `shishka-os` Vercel project builds `apps/admin-panel` only. Full topology: `docs/operations/deploy-map.md`.
+
+1. Agents **never** run `vercel deploy` / `vercel --prod` (CLI upload) or re-point domains — live-site changes ship only via git push to `shishka-health` `main`. Prod rollback = **Promote** a previous git deployment (CEO, or agent on explicit CEO instruction naming the project).
+2. Before ANY deploy/rollback/site-incident work: read `docs/operations/deploy-map.md` and follow its runbook **symptom-first** (domain → project → deployment source → only then git).
+
+> Origin: 2026-07-11. A parallel session shipped `shishka-os/apps/web` onto the live-site project via CLI `vercel deploy`, replacing shishka.health entirely; recovery = dashboard Promote of the last git deploy (`10a01aa`). Post-mortem in the deploy map.
+
 ## RULE-MIGRATION-TRACKING
 
 Every migration file **must** end with a self-register `INSERT` into `migration_log`.
@@ -309,6 +318,25 @@ Before starting any new major phase or feature, create a new git branch (e.g. `f
 
 ## BOM Hub Filtering (→ RULE-BOM-PREFIX-FILTER)
 See § RULE-BOM-PREFIX-FILTER above — filter strictly by product_code prefix.
+
+## RULE-REALTIME-LIST-HOOK
+
+Any admin-panel hook that backs a live list/table (fetch + Supabase realtime + mutations) **must not** cause a reload/flicker. Flicker = **any fetch that calls `setIsLoading(true)` while the list is already populated.** There are two triggers, and both are banned:
+
+1. **A mutation that does `await fetchData()`** — the write already succeeded; a full refetch clears the table to a spinner and resets the just-edited row for a frame.
+2. **A blind `event:'*'` realtime callback that re-runs the (non-silent) fetch** — it catches the echo of your own write and fires a *second* full refetch. A multi-row transaction fires one per row.
+
+**The canonical pattern (model: `hooks/useReceiptInbox.ts`):**
+
+- **`fetchData({ silent }: { silent?: boolean } = {})`** — `if (!silent) setIsLoading(true)`. The spinner is for the **first mount only** (and explicit filter changes). Background reconciles are silent.
+- **Mutations update local state OPTIMISTICALLY** — targeted `setState` (merge / insert / remove the one changed row), **never** `await fetchData()`. If the write returns the row (`.select().single()`) or you know exactly what changed, patch it in place. Re-sort to match the fetch's `ORDER BY`. Honour any active client-side filter (drop the row if it no longer matches).
+- **Realtime drives a SILENT, COALESCED refetch** via the shared **`hooks/useCoalescedRealtimeRefetch.ts`** helper — debounces a burst (multi-row tx / echo) into one `() => fetchData({ silent: true })`. This is the reconcile path for other clients' writes and server-computed columns.
+
+**JS-joined fetches** (a row enriched from several tables — `supplier_name`, `line_count`, nomenclature name, a `v_*` view, `location_name`): do **not** hand-enrich the raw realtime payload (it lacks those fields — fragile). Put targeted patches in the **mutations** (where the changed fields are known) and let the silent-coalesced refetch reconcile the joins. A trigger-assigned code / brand-new joined row that can't be built locally → a single `await fetchData({ silent: true })` (no realtime double-fire when the hook has no subscription).
+
+**FORBIDDEN:** `() => { fetchX() }` (blind, non-silent) inside a `.on('postgres_changes', …)` callback; `await fetchData()` in a mutation success path; a hand-rolled `supabase.channel(...).on(...).subscribe()` block in a list hook when the coalesced helper fits.
+
+> Origin: 2026-07-08 (MC 90e31026). CEO: «такие проблемы возникают не только в этом разделе, я уже не первый раз делаю подобный фикс». ~24 of 27 realtime consumers carried the anti-pattern. Fixed the 12 worst; helper + this rule prevent recurrence.
 
 ---
 

@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "shishka-mission-control": {
+      "command": "bash",
+      "args": ["${HOME}/code/shishka/scripts/launch-mc-mcp.sh"]
+    },
+    "shishka-chef": {
+      "command": "bash",
+      "args": ["${HOME}/code/shishka/scripts/launch-chef-mcp.sh"]
+    },
+    "shishka-finance": {
+      "command": "bash",
+      "args": ["${HOME}/code/shishka/scripts/launch-finance-mcp.sh"]
+    },
+    "shishka-graphify": {
+      "command": "bash",
+      "args": ["${HOME}/code/shishka/scripts/launch-graphify-mcp.sh"]
+    }
+  }
+}

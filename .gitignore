@@ -65,6 +65,12 @@ credentials.json
 gcp-oauth.keys.json
 token.json
 .mcp.json
+# ...but DO track the repo-ROOT .mcp.json: it is secret-free by contract — it only
+# references scripts/launch-*.sh, which pull secrets from the macOS Keychain at
+# runtime. This is the one MCP config file Claude Code actually reads, and it must
+# sync across machines via git. NEVER put inline secrets/tokens in it. Nested
+# .mcp.json (e.g. per-agent/per-dev) stay ignored by the rule above.
+!/.mcp.json
 
 # Media & Docs (heavy files excluded from code repo)
 *.jpg
@@ -100,3 +106,6 @@ services/supabase/supabase/
 # Graphify working directory — keep only the manifest baseline for incremental --update
 /graphify-out/*
 !/graphify-out/manifest.json
+
+# Built plugin archives — distribution artifacts, not source
+/*.plugin

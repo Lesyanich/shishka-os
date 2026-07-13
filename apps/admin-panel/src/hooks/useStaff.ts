@@ -7,6 +7,7 @@ export interface Staff {
   name: string
   name_th: string | null
   role: 'cook' | 'sous_chef' | 'admin' | 'dishwasher' | 'prep'
+  app_role: string | null
   phone: string | null
   pin_code: string | null
   is_active: boolean
@@ -41,6 +42,9 @@ export interface UseStaffResult {
   deleteStaff: (id: string) => Promise<boolean>
 }
 
+const sortByName = (list: Staff[]): Staff[] =>
+  [...list].sort((a, b) => a.name.localeCompare(b.name))
+
 export function useStaff(): UseStaffResult {
   const [staff, setStaff] = useState<Staff[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -52,7 +56,7 @@ export function useStaff(): UseStaffResult {
 
     const { data, error: fetchError } = await supabase
       .from('staff')
-      .select('id, name, name_th, role, phone, pin_code, is_active, created_at')
+      .select('id, name, name_th, role, app_role, phone, pin_code, is_active, created_at')
       .order('name', { ascending: true })
 
     if (fetchError) {
@@ -97,9 +101,11 @@ export function useStaff(): UseStaffResult {
       return null
     }
 
-    await fetchData()
-    return data as Staff
-  }, [fetchData])
+    // Optimistic insert — no full refetch (avoids the spinner/flicker).
+    const created = data as Staff
+    setStaff((prev) => sortByName([...prev, created]))
+    return created
+  }, [])
 
   const updateStaff = useCallback(async (id: string, input: StaffUpdate): Promise<Staff | null> => {
     const { data, error: updateError } = await supabase
@@ -115,9 +121,11 @@ export function useStaff(): UseStaffResult {
       return null
     }
 
-    await fetchData()
-    return data as Staff
-  }, [fetchData])
+    // Optimistic merge of the returned row — no full refetch.
+    const updated = data as Staff
+    setStaff((prev) => sortByName(prev.map((s) => (s.id === id ? updated : s))))
+    return updated
+  }, [])
 
   const deleteStaff = useCallback(async (id: string): Promise<boolean> => {
     const { error: deleteError } = await supabase
@@ -131,9 +139,10 @@ export function useStaff(): UseStaffResult {
       return false
     }
 
-    await fetchData()
+    // Optimistic removal — no full refetch.
+    setStaff((prev) => prev.filter((s) => s.id !== id))
     return true
-  }, [fetchData])
+  }, [])
 
   return {
     staff,
