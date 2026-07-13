@@ -1,5 +1,5 @@
--- 339_thai_tea_modifiers_and_price.sql
--- Finalize the 5 Thai milk teas (created via chef MCP after migration 338):
+-- 359_thai_tea_modifiers_and_price.sql
+-- Finalize the 5 Thai milk teas (created via chef MCP after migration 358):
 --   1. Seed an ESTIMATED Makro price for the new Thai tea powder so cost rolls up.
 --      Trigger fn_sc_seed_raw_cost → cost_per_unit = last_seen_price / conversion_factor,
 --      cost_source = 'catalog_estimate'.  100 THB / 0.4 kg-per-bag = 250 THB/kg.
@@ -37,7 +37,7 @@ WHERE n.product_code IN (
   );
 
 INSERT INTO migration_log (filename, notes)
-VALUES ('339_thai_tea_modifiers_and_price.sql',
+VALUES ('359_thai_tea_modifiers_and_price.sql',
         'Estimated Thai tea powder price (250 THB/kg); Milk modifier group on 5 Thai teas');
 
 COMMIT;
