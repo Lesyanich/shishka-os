@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useOptimistic, useState } from 'react'
 import { AlertTriangle, Loader2, PackageX, ShoppingCart } from 'lucide-react'
 import { useStockStatus } from '../../hooks/useStockStatus'
+import { useStations } from '../../hooks/useStations'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
 import { InlineEditCell } from '../menu/owner/InlineEditCell'
 import {
@@ -10,6 +11,8 @@ import {
   type StockStatusRow,
 } from '../../types/stockStatus'
 import type { PrefillLine } from './StockRequestsPanel'
+import { StationChecklistPanel } from './StationChecklistPanel'
+import { StocktakeSessionsPanel } from './StocktakeSessionsPanel'
 
 type Filter = 'all' | 'lowout' | 'expiring'
 
@@ -54,6 +57,11 @@ function fmtDate(iso: string | null): string {
 export function StockPanel({ onAddToPO }: Props) {
   const { rows, isLoading, error, updatePar, lowCount, expiringCount, untrackedCount } =
     useStockStatus()
+
+  // Station scope: null = global reorder view; a station = its BOM-derived checklist.
+  const { stations } = useStations()
+  const [stationId, setStationId] = useState<string | null>(null)
+  const activeStation = stations.find((s) => s.id === stationId) ?? null
 
   const inline = useInlineUpdate((id: string, patch: StockParPatch) => updatePar(id, patch))
   const [optimistic, setOptimistic] = useOptimistic(
@@ -112,6 +120,53 @@ export function StockPanel({ onAddToPO }: Props) {
 
   return (
     <section className="space-y-4">
+      {/* Station scope chips — grouped by floor (L2 service / L1 prep / storage zones) */}
+      <div className="space-y-1.5">
+        <button
+          type="button"
+          onClick={() => setStationId(null)}
+          className={[
+            'rounded-md px-2.5 py-1 text-[11px] font-medium transition',
+            stationId === null
+              ? 'bg-[var(--s-3)] text-cream'
+              : 'bg-[var(--s-2)] text-cream/45 hover:text-cream/80',
+          ].join(' ')}
+        >
+          All items
+        </button>
+        {(['L2', 'L1', 'general'] as const).map((floor) => {
+          const group = stations.filter((s) => s.floor === floor)
+          if (group.length === 0) return null
+          const groupLabel = floor === 'L2' ? 'L2 · Service' : floor === 'L1' ? 'L1 · Prep' : 'Zones'
+          return (
+            <div key={floor} className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 w-16 shrink-0 text-[9px] font-semibold uppercase tracking-wide text-cream/30">
+                {groupLabel}
+              </span>
+              {group.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setStationId(s.id)}
+                  className={[
+                    'rounded-md px-2.5 py-1 text-[11px] font-medium transition',
+                    stationId === s.id
+                      ? 'bg-[var(--s-3)] text-cream'
+                      : 'bg-[var(--s-2)] text-cream/45 hover:text-cream/80',
+                  ].join(' ')}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+
+      {activeStation ? (
+        <StationChecklistPanel station={activeStation} />
+      ) : (
+        <>
       <div className="grid grid-cols-3 gap-3">
         <StatCard icon={PackageX} label="Low / Out" value={lowCount} color="text-brick-bright" />
         <StatCard
@@ -319,6 +374,10 @@ export function StockPanel({ onAddToPO }: Props) {
           </table>
         </div>
       )}
+        </>
+      )}
+
+      <StocktakeSessionsPanel stations={stations} />
     </section>
   )
 }

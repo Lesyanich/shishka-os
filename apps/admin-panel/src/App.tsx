@@ -24,6 +24,8 @@ const CookStation = lazyWithReload(() => import('./pages/CookStation').then(m =>
 const WasteTracker = lazyWithReload(() => import('./pages/WasteTracker').then(m => ({ default: m.WasteTracker })))
 const Procurement = lazyWithReload(() => import('./pages/Procurement').then(m => ({ default: m.Procurement })))
 const ShoppingList = lazyWithReload(() => import('./pages/ShoppingList').then(m => ({ default: m.ShoppingList })))
+const StocktakeReviewPage = lazyWithReload(() => import('./pages/StocktakeReviewPage').then(m => ({ default: m.StocktakeReviewPage })))
+const StationCountPage = lazyWithReload(() => import('./pages/StationCountPage').then(m => ({ default: m.StationCountPage })))
 const SkuManagerPage = lazyWithReload(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
 const MasterPlanner = lazyWithReload(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
 const FinanceLayout = lazyWithReload(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
@@ -168,6 +170,8 @@ function App() {
                   <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
                   <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
                   <Route path="/shopping-list" element={<Suspense fallback={<PageLoader />}><ShoppingList /></Suspense>} />
+                  {/* Stocktake review → apply → route to Shopping/Production (S3) */}
+                  <Route path="/count/session/:id" element={<Suspense fallback={<PageLoader />}><StocktakeReviewPage /></Suspense>} />
                   {/* Heavy KDS production tooling — managers only, off the cook floor */}
                   <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
                   <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
@@ -176,6 +180,8 @@ function App() {
                 {/* ── Staff floor (cook) — all authenticated roles ── */}
                 <Route element={<RoleGuard minRole="cook" />}>
                   <Route path="/kitchen/my-tasks" element={<Suspense fallback={<PageLoader />}><CookTasksPage /></Suspense>} />
+                  {/* Per-station count screen — deep-linked from stock_check tasks (S3) */}
+                  <Route path="/count/:code" element={<Suspense fallback={<PageLoader />}><StationCountPage /></Suspense>} />
                   <Route path="/kitchen/labels" element={<Suspense fallback={<PageLoader />}><KitchenLabels /></Suspense>} />
                   <Route path="/kitchen/recipes" element={<Suspense fallback={<PageLoader />}><KitchenRecipesPage /></Suspense>} />
                   <Route path="/staff/schedule" element={<Suspense fallback={<PageLoader />}><StaffSchedulePage /></Suspense>} />
