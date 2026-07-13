@@ -82,6 +82,16 @@
             "timeout": 8000
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .claude/hooks/git-guard-pretool.sh",
+            "timeout": 8000
+          }
+        ]
       }
     ]
   },

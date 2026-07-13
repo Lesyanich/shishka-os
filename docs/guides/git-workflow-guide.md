@@ -264,6 +264,42 @@ Do these five and your history stays clean without you ever typing a git command
 
 ---
 
-*Related rules: `technical-rules.md` § Git Workflow, § RULE-COMMIT-GATE,
+## 10. How this is now enforced (so you don't police it by hand)
+
+This guide is backed by **three layers** so the rules self-enforce (`RULE-GIT-HYGIENE`):
+
+| Layer | What it is | Who it stops |
+|---|---|---|
+| **1. Rule** | This guide + `technical-rules.md` § RULE-GIT-HYGIENE | Claude reads it |
+| **2. Local hook** | `.claude/hooks/git-guard-pretool.sh` — **hard-blocks** any commit/push to `main`, **warns** on off-convention branch names | any Claude session in the terminal |
+| **3. GitHub settings** | branch protection, squash-only, required CI, auto-delete branches | **everyone** — can't be bypassed by a prompt |
+
+Layer 2 already ships in this repo. Layer 3 is the strongest and only **you** can
+switch it on (the agent proxy blocks settings writes). It's a 2-minute one-time job:
+
+### ✅ GitHub settings checklist (do once)
+
+Open **github.com/Lesyanich/shishka-os → Settings**, then:
+
+1. **General → "Pull Requests"**
+   - ✅ **Allow squash merging** — and set it as the default; uncheck "Allow merge
+     commits" so history stays one-line-per-PR.
+   - ✅ **Automatically delete head branches** — kills the merged-but-undeleted clutter forever.
+2. **Branches → Add branch ruleset (or protect `main`)** — target `main`:
+   - ✅ **Require a pull request before merging** (blocks direct pushes to `main`).
+   - ✅ **Require status checks to pass** — pick the CI check (Vercel / build). This is
+     what would have caught the PR #493 break before merge.
+   - ✅ (optional) **Require branches to be up to date before merging.**
+
+Once these are on, direct-to-`main` and branch clutter become **structurally
+impossible**, not just discouraged — for you, me, and any parallel session.
+
+> Escape hatch for automation: sanctioned jobs that must write to `main` (e.g. the
+> data-health sheriff) run with `SHISHKA_ALLOW_MAIN=1`. Never use it by hand.
+> On-demand clutter snapshot: `sh scripts/git-hygiene-report.sh`.
+
+---
+
+*Related rules: `technical-rules.md` § RULE-GIT-HYGIENE, § RULE-COMMIT-GATE,
 § RULE-DEPLOY-MAP · `operational-rules.md` § Git State Protocol · core principle
 VERIFY-BEFORE-DONE.*
