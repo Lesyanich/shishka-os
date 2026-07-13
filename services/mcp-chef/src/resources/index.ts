@@ -33,8 +33,8 @@ export const staticResources = [
 - MOD  — Modifiers / toppings (add-ons for dishes, made from RAW)
 - SALE — Finished dishes (sold to customers, made from PF and MOD)
 
-## Lego Chain Rules (IMMUTABLE)
-SALE can contain: PF, MOD
+## Lego Chain Rules
+SALE can contain: RAW, PF, MOD
 PF can contain:   RAW, PF
 MOD can contain:  RAW
 RAW can contain:  nothing (leaf node)

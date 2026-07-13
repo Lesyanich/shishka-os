@@ -8,7 +8,7 @@ import { checkBrandCompliance } from "../lib/brand-rules.js";
 export const addBomLineSchema = {
   name: "add_bom_line",
   description:
-    "Add an ingredient to a product's BOM (recipe). Validates Lego chain rules (SALE→PF/MOD, PF→RAW/PF, MOD→RAW) and checks for circular references. Quantity is in the ingredient's base_unit.",
+    "Add an ingredient to a product's BOM (recipe). Validates Lego chain rules (SALE→RAW/PF/MOD, PF→RAW/PF, MOD→RAW) and checks for circular references. Quantity is in the ingredient's base_unit.",
   inputSchema: {
     type: "object" as const,
     properties: {
