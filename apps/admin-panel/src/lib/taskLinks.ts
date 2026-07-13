@@ -35,6 +35,7 @@ export const FIXED_LINKS: FixedLinkOption[] = [
   { id: 'count-manakish', route: '/count/manakish', label: 'Count · Manakish', label_th: 'นับสต็อก · มานาคีช' },
   { id: 'count-chocolate', route: '/count/chocolate', label: 'Count · Chocolate', label_th: 'นับสต็อก · ช็อกโกแลต' },
   { id: 'count-bread', route: '/count/bread', label: 'Count · Bread', label_th: 'นับสต็อก · ขนมปัง' },
+  { id: 'thaw', route: '/thaw', label: 'Thaw / Put away', label_th: 'ละลาย / เก็บแช่แข็ง' },
 ]
 
 /** Map a task's station to the cook recipe page's station tab. */

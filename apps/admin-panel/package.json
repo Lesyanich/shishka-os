@@ -23,6 +23,7 @@
     "@sentry/react": "^10.43.0",
     "@supabase/supabase-js": "^2.98.0",
     "@tailwindcss/vite": "^4.2.1",
+    "@zxing/browser": "^0.2.1",
     "ai": "^6.0.161",
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.577.0",

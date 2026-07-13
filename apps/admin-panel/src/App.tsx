@@ -26,6 +26,7 @@ const Procurement = lazyWithReload(() => import('./pages/Procurement').then(m =>
 const ShoppingList = lazyWithReload(() => import('./pages/ShoppingList').then(m => ({ default: m.ShoppingList })))
 const StocktakeReviewPage = lazyWithReload(() => import('./pages/StocktakeReviewPage').then(m => ({ default: m.StocktakeReviewPage })))
 const StationCountPage = lazyWithReload(() => import('./pages/StationCountPage').then(m => ({ default: m.StationCountPage })))
+const ThawStation = lazyWithReload(() => import('./pages/ThawStation').then(m => ({ default: m.ThawStation })))
 const SkuManagerPage = lazyWithReload(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
 const MasterPlanner = lazyWithReload(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
 const FinanceLayout = lazyWithReload(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
@@ -182,6 +183,8 @@ function App() {
                   <Route path="/kitchen/my-tasks" element={<Suspense fallback={<PageLoader />}><CookTasksPage /></Suspense>} />
                   {/* Per-station count screen — deep-linked from stock_check tasks (S3) */}
                   <Route path="/count/:code" element={<Suspense fallback={<PageLoader />}><StationCountPage /></Suspense>} />
+                  {/* Cold-chain scan station — put-away + thaw (S4) */}
+                  <Route path="/thaw" element={<Suspense fallback={<PageLoader />}><ThawStation /></Suspense>} />
                   <Route path="/kitchen/labels" element={<Suspense fallback={<PageLoader />}><KitchenLabels /></Suspense>} />
                   <Route path="/kitchen/recipes" element={<Suspense fallback={<PageLoader />}><KitchenRecipesPage /></Suspense>} />
                   <Route path="/staff/schedule" element={<Suspense fallback={<PageLoader />}><StaffSchedulePage /></Suspense>} />
