@@ -58,6 +58,28 @@ BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 LAST_COMMIT=$(git log --oneline -1 2>/dev/null || echo "no commits")
 DIRTY_COUNT=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 
+# --- Git freshness (best-effort; NEVER blocks the hook, NEVER touches files) ---
+# `git fetch` is READ-ONLY: it updates remote-tracking refs only, never your
+# working tree. Backgrounded so a slow/offline remote can't delay session start;
+# the behind-counts below read refs from the previous fetch and self-heal next
+# session. Warns when you're behind so you remember to `git pull` before working.
+GIT_FRESHNESS=""
+( git fetch --quiet >/dev/null 2>&1 & ) 2>/dev/null || true
+if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+  UPSTREAM=$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null || echo "")
+  BEHIND=$(git rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
+  if [ "${BEHIND:-0}" -gt 0 ] 2>/dev/null; then
+    GIT_FRESHNESS="⚠️  BEHIND $UPSTREAM by $BEHIND commit(s) — run 'git pull' before working"
+  fi
+fi
+if [ "$BRANCH" != "main" ]; then
+  BEHIND_MAIN=$(git rev-list --count "HEAD..origin/main" 2>/dev/null || echo 0)
+  if [ "${BEHIND_MAIN:-0}" -gt 0 ] 2>/dev/null; then
+    GIT_FRESHNESS="${GIT_FRESHNESS:+$GIT_FRESHNESS
+}ℹ️  origin/main is $BEHIND_MAIN commit(s) ahead — pull/merge main for the latest merged work"
+  fi
+fi
+
 # --- Fetch live MC in_progress tasks (best-effort; never block) ---
 MC_TASKS=""
 MC_ERROR=""
@@ -105,7 +127,8 @@ My session ID: $MY_SESSION_ID
 Branch: $BRANCH
 Last commit: $LAST_COMMIT
 Dirty tree: $DIRTY_COUNT files
-Source: $SOURCE
+Source: $SOURCE${GIT_FRESHNESS:+
+$GIT_FRESHNESS}
 
 Live MC tasks (status=in_progress):
 ${MC_TASKS:-  (no tasks fetched) $MC_ERROR}
