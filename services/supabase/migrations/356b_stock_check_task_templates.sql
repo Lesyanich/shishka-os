@@ -1,4 +1,4 @@
--- 356_stock_check_task_templates.sql
+-- 356b_stock_check_task_templates.sql
 -- Station stock v1 (S3). Recurring stock-count staff tasks, one per front-of-
 -- house station, so "count the Bar" shows up on the floor on its own cadence
 -- instead of relying on someone remembering. MC 563af492 (initiative 8b709aa0).
@@ -41,7 +41,7 @@ WHERE EXISTS (SELECT 1 FROM public.stations s WHERE s.code = v.code AND s.is_act
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '356_stock_check_task_templates.sql',
+  '356b_stock_check_task_templates.sql',
   'claude-code',
   NULL,
   'Station stock v1 S3: 5 recurring stock_check staff_tasks templates (Bar/Salad Bar daily; Manakish/Chocolate/Bread weekly-Mon), linked_route /count/<code>. Materialized by fn_materialize_recurring_tasks (mig 276a cron). Idempotent on (is_template, stock_check, linked_route). MC 563af492.'

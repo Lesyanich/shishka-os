@@ -1,4 +1,4 @@
--- 353_station_count_mode_finished.sql
+-- 353a_station_count_mode_finished.sql
 -- Station stock v1: reheat/finished stations count the FINISHED unit, not ingredients.
 -- CEO caught Manakish L2 showing raw ingredients — but L2 only RECEIVES the frozen
 -- assembled manakish (a PF, produced by the cook-chill BOM re-level) and reheats it.
@@ -89,6 +89,6 @@ CREATE OR REPLACE VIEW public.v_station_checklist AS
      OR n.type = 'modifier'::text AND NOT (EXISTS ( SELECT 1 FROM bom_structures bb WHERE bb.parent_id = n.id));
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('353_station_count_mode_finished.sql','claude-code',NULL,
+VALUES ('353a_station_count_mode_finished.sql','claude-code',NULL,
   'Station stock v1: stations.count_mode (components|finished); Manakish L2 = finished (BOM walk stops at depth 1 → counts frozen PFs post cook-chill re-level, not raw ingredients).')
 ON CONFLICT DO NOTHING;

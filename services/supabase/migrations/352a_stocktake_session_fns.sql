@@ -1,4 +1,4 @@
--- 352_stocktake_session_fns.sql
+-- 352a_stocktake_session_fns.sql
 -- Station stock v1 (S2). The stocktake session lifecycle functions that make
 -- the document editable: open -> record counted lines -> submit -> apply.
 --
@@ -282,7 +282,7 @@ GRANT EXECUTE ON FUNCTION public.fn_apply_stocktake_session(uuid, text) TO authe
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '352_stocktake_session_fns.sql',
+  '352a_stocktake_session_fns.sql',
   'claude-code',
   NULL,
   'Station stock v1 S2: stocktake session lifecycle fns (open/record/delete-line/submit/cancel/apply). Self-contained — does NOT touch fn_apply_stocktake (epic c605e2ca surface). Apply writes confirmed entries with location_id + posts location-scoped stocktake_adj movements (baseline skips variance), stamps session totals/summary. doc_number ST-YYYYMMDD-NN (ICT).'

@@ -1,4 +1,4 @@
--- 354_bread_station_finished.sql
+-- 353b_bread_station_finished.sql
 -- Bread is a reheat/finished station too (CEO 2026-07-03): it holds finished PF
 -- bases and reheats/grills them to order. Unlike manakish, the bread SALE dishes
 -- were ALREADY modelled as `1x PF-base + packaging` (no BOM re-level needed) —
@@ -12,6 +12,6 @@
 UPDATE public.stations SET count_mode = 'finished' WHERE code = 'bread';
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('354_bread_station_finished.sql','claude-code',NULL,
+VALUES ('353b_bread_station_finished.sql','claude-code',NULL,
   'Station stock v1: bread station = finished count_mode (counts the 3 held PF bases, not their raw ingredients). Bread SALE dishes already PF-base+packaging, so no BOM re-level — flag only.')
 ON CONFLICT DO NOTHING;

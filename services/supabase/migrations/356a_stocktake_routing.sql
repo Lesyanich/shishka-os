@@ -1,4 +1,4 @@
--- 355_stocktake_routing.sql
+-- 356a_stocktake_routing.sql
 -- Station stock v1 (S3). Closes the count -> action loop: a REVIEWED (applied)
 -- stocktake session's low lines become concrete work —
 --   RAW-low -> Shopping List (buy it)
@@ -220,7 +220,7 @@ GRANT EXECUTE ON FUNCTION public.fn_route_stocktake_session(uuid, uuid[], uuid[]
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '355_stocktake_routing.sql',
+  '356a_stocktake_routing.sql',
   'claude-code',
   NULL,
   'Station stock v1 S3: v_stocktake_session_lines (review table + routing candidates from a session''s own counted lines; RAW/PF by prefix; low+suggested per mig 320) + fn_route_stocktake_session(session, shopping_ids[], production_ids[]) owner/task_manager-gated, applied-only, idempotent shopping (source stocktake), PF->production_tasks at producing station; skips unroutables. Provenance: shopping_list_items.stocktake_session_id, production_tasks.stocktake_session_id + station_id. MC 563af492.'

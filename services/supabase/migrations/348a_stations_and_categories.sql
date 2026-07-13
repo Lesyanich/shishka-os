@@ -1,4 +1,4 @@
--- 348_stations_and_categories.sql
+-- 348a_stations_and_categories.sql
 -- Station-based stock management v1 (S1). Plan: CEO-approved 2026-07-03.
 -- MC initiative 8b709aa0 (connected stock). Companion migrations: 349-354.
 --
@@ -199,7 +199,7 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '348_stations_and_categories.sql',
+  '348a_stations_and_categories.sql',
   'claude-code',
   NULL,
   'Station stock v1 S1: stations (1:1 private locations anchor, floor L1/L2/general) + station_categories (consumes|produces M2M to product_categories) + station_extra_items escape hatch. Seeds 11 locations, 11 stations, CEO category mappings (Bundles excluded).'
