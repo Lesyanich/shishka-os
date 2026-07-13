@@ -1,4 +1,4 @@
--- 322_fix_chocolate_section_and_drinks_order.sql
+-- 361_fix_chocolate_section_and_drinks_order.sql
 -- Two menu-taxonomy fixes, both data-only (product_categories sort_order/parent).
 --
 -- A) Chocolate was misparented. KP-FIN-CHO ("🍫 Chocolate") carries a KP-FIN
@@ -37,7 +37,7 @@ UPDATE public.product_categories SET sort_order = 7, updated_at = now() WHERE co
 -- Ledger
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '322_fix_chocolate_section_and_drinks_order.sql',
+  '361_fix_chocolate_section_and_drinks_order.sql',
   'claude-code',
   NULL,
   'Fix: KP-FIN-CHO Chocolate re-homed under KP-FIN as its own menu section (was misparented under KP-DRK Drinks). Set drinks subcategory order: Smoothies, Juices, Lemonades, Coffee, Matcha, Shots, Soft Drinks. Data-only.'

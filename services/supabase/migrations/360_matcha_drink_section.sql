@@ -1,4 +1,4 @@
--- 321_matcha_drink_section.sql
+-- 360_matcha_drink_section.sql
 -- Carve matcha out into its own drinks subcategory.
 --
 -- Today the matcha drinks are scattered: 5 sit under ☕ Coffee (KP-DRK-COF) and
@@ -43,7 +43,7 @@ WHERE product_code IN (
 -- 3) Ledger
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '321_matcha_drink_section.sql',
+  '360_matcha_drink_section.sql',
   'claude-code',
   NULL,
   'New 🍵 Matcha drinks subcategory (KP-DRK-MAT, sort_order 2 after Coffee); re-pointed 6 matcha dishes (5 from Coffee + Matcha Green Smoothie). Data-only; site + admin pick it up automatically.'
