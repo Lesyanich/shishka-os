@@ -19,34 +19,42 @@ export function useStationChecklist(stationId: string | null) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchRows = useCallback(async () => {
-    if (!stationId) {
-      setRows([])
-      return
-    }
-    setIsLoading(true)
-    setError(null)
-    const { data, error: err } = await supabase
-      .from('v_station_checklist')
-      .select(SELECT_COLS)
-      .eq('station_id', stationId)
-    if (err) {
-      setError(err.message)
+  // background=true keeps the current rows on screen while re-fetching, so an
+  // inline Min/Par/count save refreshes the numbers without blanking the whole
+  // table to a spinner (the "page reloads on every edit" symptom).
+  const fetchRows = useCallback(
+    async (background = false) => {
+      if (!stationId) {
+        setRows([])
+        return
+      }
+      if (!background) setIsLoading(true)
+      setError(null)
+      const { data, error: err } = await supabase
+        .from('v_station_checklist')
+        .select(SELECT_COLS)
+        .eq('station_id', stationId)
+      if (err) {
+        setError(err.message)
+        setIsLoading(false)
+        return
+      }
+      // View isn't in generated DB types — cast through unknown (house pattern).
+      setRows(
+        ((data ?? []) as unknown as RawChecklistRow[])
+          .map(normalizeChecklistRow)
+          .sort(compareChecklistRows),
+      )
       setIsLoading(false)
-      return
-    }
-    // View isn't in generated DB types — cast through unknown (house pattern).
-    setRows(
-      ((data ?? []) as unknown as RawChecklistRow[])
-        .map(normalizeChecklistRow)
-        .sort(compareChecklistRows),
-    )
-    setIsLoading(false)
-  }, [stationId])
+    },
+    [stationId],
+  )
 
   useEffect(() => {
-    fetchRows()
+    void fetchRows()
   }, [fetchRows])
+
+  const refetch = useCallback(() => fetchRows(true), [fetchRows])
 
   const { dueCount, foodCount, packagingCount } = useMemo(() => {
     let due = 0
@@ -60,5 +68,5 @@ export function useStationChecklist(stationId: string | null) {
     return { dueCount: due, foodCount: food, packagingCount: pkg }
   }, [rows])
 
-  return { rows, isLoading, error, refetch: fetchRows, dueCount, foodCount, packagingCount }
+  return { rows, isLoading, error, refetch, dueCount, foodCount, packagingCount }
 }
