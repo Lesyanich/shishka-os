@@ -59,7 +59,12 @@ export const createProductSchema = {
       category_id: {
         type: "string",
         description:
-          "UUID of the product_categories row. REQUIRED for SALE items (dishes are invisible on menu without a category). Optional for RAW/PF/MOD.",
+          "UUID of the product_categories row. REQUIRED for SALE items (dishes are invisible on menu without a category). Optional for RAW/PF/MOD. Prefer category_code instead.",
+      },
+      category_code: {
+        type: "string",
+        description:
+          "Category code (e.g. 'KP-FIN-MAN'). Resolves to category_id automatically. Use this instead of category_id when UUID is unknown.",
       },
       confirmed: {
         type: "boolean",
@@ -82,6 +87,7 @@ export async function createProduct(args: {
   fat?: number;
   allergens?: string[];
   category_id?: string;
+  category_code?: string;
   confirmed?: boolean;
 }) {
   try {
@@ -132,8 +138,22 @@ export async function createProduct(args: {
       return { error: `Cannot map prefix "${prefix}" to a database type` };
     }
 
+    // Resolve category_code → category_id if provided
+    if (args.category_code && !args.category_id) {
+      const sb0 = getSupabase();
+      const { data: cat, error: catErr } = await sb0
+        .from("product_categories")
+        .select("id")
+        .eq("code", args.category_code)
+        .single();
+      if (catErr || !cat) {
+        return { error: `category_code "${args.category_code}" not found in product_categories` };
+      }
+      args.category_id = cat.id;
+    }
+
     if (prefix === "SALE" && !args.category_id) {
-      return { error: `SALE items require category_id — without it the dish is invisible on the menu page. Look up the correct UUID from product_categories (e.g. KP-FIN-MAN for manakish).` };
+      return { error: `SALE items require category_id or category_code — without it the dish is invisible on the menu page. Example: category_code='KP-FIN-MAN' for manakish.` };
     }
 
     if (prefix !== "SALE" && args.price) {

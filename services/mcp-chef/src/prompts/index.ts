@@ -59,7 +59,7 @@ PHASE 4 — VERIFY:
 12. calculate_nutrition to get KBZHU values
 
 Remember:
-- Lego rules: SALE → PF/MOD, PF → RAW/PF, MOD → RAW
+- Lego rules: SALE → RAW/PF/MOD, PF → RAW/PF, MOD → RAW
 - Shishka is a HEALTHY kitchen — prioritize nutritious ingredients
 - All quantities are in the ingredient's base_unit
 - Set yield_pct < 100 for ingredients with waste (e.g., 85 for 15% peeling loss)
