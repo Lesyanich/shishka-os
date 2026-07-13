@@ -313,8 +313,61 @@ Never let a widget crash on null.
 - Handover: `vault/Handover/HANDOVER.md`
 - Dev server: `apps/admin-panel/` (port 5173)
 
-## Git Workflow
-Before starting any new major phase or feature, create a new git branch (e.g. `feature/{project}/{description}`). Never commit directly to `main` during active development. See `operational-rules.md` § Session Handoff Protocol § Git State Protocol for branch checks.
+## RULE-GIT-HYGIENE
+
+> One rule for how work enters `main` cleanly. Enforced in three layers so the
+> CEO never has to police it by hand or by prompt. Plain-language primer for the
+> CEO: `docs/guides/git-workflow-guide.md`.
+
+**The six practices**
+
+1. **Branch, never `main`.** All work goes on a branch named
+   `feature/{project}/{description}` — project ∈ `admin | web | app | agents |
+   security | tooling | docs | cleanup` (also allowed: `fix|chore|docs|refactor|
+   perf|security/…`). Auto-generated `claude/*` names carry no meaning — rename
+   before the first push (`git branch -m feature/…`; safe while no PR exists).
+2. **Never commit or push to `main`.** `main` ships to production and is PR-only.
+3. **Verify before merge.** Build + prove it works (VERIFY-BEFORE-DONE) — not just
+   "tests pass". A merge-then-revert (e.g. PR #493) is the failure this prevents.
+4. **One PR = one intent, kept small.** A PR you can't skim in ~2 min hides risk
+   and is painful to revert.
+5. **Squash on merge.** One PR → one commit on `main`. Consistent, linear history.
+6. **Delete the branch after merge.** No merged-but-undeleted clutter.
+
+**Enforcement layers**
+
+| Layer | Mechanism | Strength |
+|---|---|---|
+| 1. Rule | this section + the CEO guide | agents read it |
+| 2. Local hook | `.claude/hooks/git-guard-pretool.sh` (PreToolUse/Bash): **hard-blocks** local `main` mutations (commit/merge/cherry-pick/revert) and any push targeting `main`; **warns** on off-convention branch names (only until the branch has an upstream — after the first push a rename would break the PR) | blocks any Claude session in the terminal |
+| 3. GitHub settings | branch protection on `main` (block direct push), squash-only merge, required CI checks, auto-delete head branches | server-side; applies to everyone, cannot be bypassed by a prompt |
+
+Layer 3 is set once in the GitHub UI (the proxy blocks settings writes from
+agents) — see the checklist in the CEO guide. Layers 1–3 are complementary; all
+three should be on.
+
+**Layer-3 caveat — the sheriff.** The data-health sheriff is a scheduled Claude
+session that commits its report straight to `main` (e.g. `6015194`). Before
+enabling require-PR on `main`, either add the committing actor to the ruleset
+**bypass list** or migrate the sheriff to PR flow — otherwise its next run fails
+at the server with no escape hatch.
+
+**Escape hatch (layer 2 only).** Sanctioned automation that must write to
+`main` (e.g. the sheriff) **prefixes the command**: `SHISHKA_ALLOW_MAIN=1 git
+commit …`. The guard greps the prefix out of the command text (an env var
+exported inside the Bash call never reaches the hook process) and also honours
+it in its own env for cron-configured runners. Never use it interactively —
+deny messages deliberately do not spell it out.
+
+**Visibility.** `sh scripts/git-hygiene-report.sh` buckets remote branches
+(merged-not-deleted / stale / live) on demand, so clutter is seen, not silently
+accumulated.
+
+> Origin: 2026-07-13. CEO branch/PR-hygiene review found 248 remote branches
+> (49 merged-but-undeleted, ~167 abandoned, 11 stale PRs open >1 month) and a
+> merge-then-revert incident (PR #493). Codified so it self-enforces.
+
+See `operational-rules.md` § Session Handoff Protocol § Git State Protocol for branch checks.
 
 ## BOM Hub Filtering (→ RULE-BOM-PREFIX-FILTER)
 See § RULE-BOM-PREFIX-FILTER above — filter strictly by product_code prefix.
