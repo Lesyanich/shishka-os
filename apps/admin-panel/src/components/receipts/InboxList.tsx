@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useState } from 'react'
-import { Brain, Check, ChevronRight, Loader2, Play, RefreshCcw, Search, Trash2, X, Zap } from 'lucide-react'
+import { Brain, Camera, Check, ChevronRight, Loader2, Play, RefreshCcw, Search, StickyNote, Trash2, X, Zap } from 'lucide-react'
 import type { InboxRow, OcrModel } from '../../hooks/useReceiptInbox'
 import { InboxReviewPanel } from './InboxReviewPanel'
+import { PendingPreview } from './PendingPreview'
 
 /* ────────────────────────── Status config ────────────────────────── */
 
@@ -377,11 +378,15 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
               {filteredRows.map((r) => {
                 const badge = STATUS_BADGE[r.status]
                 const isExpanded = expandedId === r.id
-                const canExpand = r.parsed_payload && ['parsed', 'processed', 'skipped', 'error'].includes(r.status)
+                const hasReviewPanel = !!r.parsed_payload && ['parsed', 'processed', 'skipped', 'error'].includes(r.status)
+                // Unparsed rows (pending/processing/error-before-parse) expand into a
+                // lightweight preview so their photos/notes are visible before OCR.
+                const hasPreview = !hasReviewPanel && (r.photo_urls.length > 0 || !!r.notes || !!r.error_message)
+                const canExpand = hasReviewPanel || hasPreview
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parsed_payload shape is dynamic
                 const pp = r.parsed_payload as Record<string, any> | null
 
-                const supplier = pp?.supplier_name || r.supplier_hint || '\u2014'
+                const supplier = pp?.supplier_name || r.supplier_hint || null
                 const amount = pp?.amount_original ?? r.amount_hint
 
                 return (
@@ -415,7 +420,25 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-slate-200 font-medium">{r.uploaded_by}</td>
-                      <td className="px-2 py-2.5 text-slate-400">{supplier}</td>
+                      <td className="px-2 py-2.5 text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <span className="max-w-[180px] truncate">
+                            {supplier || (r.notes ? <span className="italic text-slate-500">{r.notes}</span> : '—')}
+                          </span>
+                          <span
+                            className={`inline-flex shrink-0 items-center gap-0.5 text-[9px] ${r.photo_urls.length > 0 ? 'text-slate-500' : 'text-amber-500/80'}`}
+                            title={r.photo_urls.length > 0 ? `${r.photo_urls.length} photo(s)` : 'No photos — note-only entry'}
+                          >
+                            <Camera className="h-3 w-3" />
+                            {r.photo_urls.length}
+                          </span>
+                          {r.notes && supplier && (
+                            <span className="shrink-0 text-slate-500" title={r.notes}>
+                              <StickyNote className="h-3 w-3" />
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-2 py-2.5 text-right text-slate-300">
                         {amount != null
                           ? `\u0E3F${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -492,10 +515,17 @@ export function InboxList({ rows, isLoading, error, onRefetch, onParse, onApprov
                         </div>
                       </td>
                     </tr>
-                    {isExpanded && r.parsed_payload && (
+                    {isExpanded && hasReviewPanel && (
                       <tr>
                         <td colSpan={10} className="border-t border-indigo-500/20 bg-slate-900/80 px-0 py-0">
                           <InboxReviewPanel row={r} onApprove={onApprove} onSkip={onSkip} onReopen={onReopen} onClose={() => setExpandedId(null)} />
+                        </td>
+                      </tr>
+                    )}
+                    {isExpanded && !hasReviewPanel && hasPreview && (
+                      <tr>
+                        <td colSpan={10} className="border-t border-indigo-500/20 bg-slate-900/80 px-0 py-0">
+                          <PendingPreview row={r} />
                         </td>
                       </tr>
                     )}

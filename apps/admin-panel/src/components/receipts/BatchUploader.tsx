@@ -177,6 +177,15 @@ export function BatchUploader({ onBatchProcess, onInsert, onParse }: BatchUpload
   const handleNoteOnly = async () => {
     const text = noteText.trim()
     if (!text) return
+    // A stray Enter here creates a receipt row with no photo and no visible
+    // data — confirm when the note doesn't even parse into supplier/amount.
+    const hints = parseQuickExpense(text)
+    if (!hints.supplier_hint && !hints.amount_hint) {
+      const proceed = window.confirm(
+        `Create a receipt entry WITHOUT photos from this note?\n\n"${text}"\n\nNo supplier or amount detected — the row will look empty in the list.`,
+      )
+      if (!proceed) return
+    }
     setStep('uploading')
     setToast(null)
     const payload = buildInsert([])
