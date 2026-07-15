@@ -75,11 +75,13 @@ describe('signReceiptUrls', () => {
     expect(out[GDRIVE]).toBe(GDRIVE)
   })
 
-  it('falls back to the original value when signing yields nothing', async () => {
-    // The mocked client returns an empty data array — the fallback must keep the
-    // stored URL, which still resolves while the bucket is public.
+  // The bucket is private, so the stored value is a dead link. Handing it back
+  // as a "fallback" would render a broken image and hide the real failure — the
+  // ref must be absent instead, so callers show a placeholder.
+  it('omits a ref it could not sign, rather than falling back to the stored URL', async () => {
+    // The mocked client returns an empty data array = nothing got signed.
     const { signReceiptUrls } = await import('./receiptUrls')
     const out = await signReceiptUrls([PUBLIC])
-    expect(out[PUBLIC]).toBe(PUBLIC)
+    expect(out[PUBLIC]).toBeUndefined()
   })
 })

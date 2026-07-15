@@ -59,7 +59,9 @@ export function ReceiptGallery({
   // goes into the DOM.
   const url = pages[current] ?? ''
   const { resolve } = useSignedReceiptUrls(pages)
-  const src = url ? resolve(url) : ''
+  // null while the signature is in flight or if signing failed — the bucket is
+  // private, so the stored value is not a usable fallback.
+  const src = url ? resolve(url) : null
 
   // Reset zoom/rotation when page changes
   useEffect(() => {
@@ -144,7 +146,7 @@ export function ReceiptGallery({
             </>
           )}
           <a
-            href={src}
+            href={src ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
             className="rounded-lg p-2 text-cream/60 hover:bg-[var(--s-2)] hover:text-white"
@@ -192,6 +194,8 @@ export function ReceiptGallery({
               className="h-[80vh] w-[70vw] rounded-lg border border-[var(--line-strong)]"
               allow="autoplay"
             />
+          ) : !src ? (
+            <div className="animate-pulse p-12 text-sm text-cream/50">Loading receipt…</div>
           ) : isPdf ? (
             <iframe
               src={src}
@@ -254,12 +258,14 @@ export function ReceiptGallery({
                 <div className="flex h-full w-full items-center justify-center bg-[var(--s-2)] text-[10px] font-medium text-cream/60">
                   {isPdfUrl(pageUrl) ? 'PDF' : 'GDrive'}
                 </div>
-              ) : (
+              ) : resolve(pageUrl) ? (
                 <img
-                  src={resolve(pageUrl)}
+                  src={resolve(pageUrl)!}
                   alt={`Thumb ${i + 1}`}
                   className="h-full w-full object-cover"
                 />
+              ) : (
+                <span className="block h-full w-full animate-pulse bg-[var(--s-2)]" />
               )}
               <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[9px] text-cream/80">
                 {i + 1}
