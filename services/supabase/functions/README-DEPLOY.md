@@ -7,79 +7,61 @@
   supabase secrets set OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
   ```
 
-- `FUNCTION_INTERNAL_SECRET` must be set for the server-to-server functions
-  (`update-receipt-job`). Set the **same** value in the GAS ReceiptParser
-  Script Properties. See
-  [`docs/security/service-role-isolation-audit-2026-06-29.md`](../../../docs/security/service-role-isolation-audit-2026-06-29.md) (F1).
-  ```bash
-  supabase secrets set FUNCTION_INTERNAL_SECRET="$(openssl rand -hex 32)"
-  ```
-
 ## Inbound auth on service-role functions
 
-`loyverse-sync`, `parse-receipts`, `update-receipt-job` run with the service-role
-key and are deployed `--no-verify-jwt`. They enforce auth **in the handler**:
-- `loyverse-sync`, `parse-receipts` — require an authenticated Supabase user
-  (`auth.getUser()` on the caller's JWT). Do **not** flip `verify_jwt:true` — the
-  anon key is a valid JWT and would pass the gateway.
-- `update-receipt-job` — requires the `x-internal-secret` header (server-to-server).
+`loyverse-sync` runs with the service-role key and is deployed `--no-verify-jwt`.
+It enforces auth **in the handler** — it requires an authenticated Supabase user
+(`auth.getUser()` on the caller's JWT). Do **not** flip `verify_jwt:true` on a
+browser-called function: the anon key is itself a valid JWT and would sail past
+the gateway, and `verify_jwt:true` also rejects the CORS preflight, so the
+browser gets a 401 with no logs.
 
-## Deploy: parse-receipts
+`ocr-receipt` and `receipt-batch-process` are deployed with `verify_jwt:true` —
+they are called with a real user session from the admin panel.
 
-### Option A: Supabase Dashboard (Recommended)
+## Deploy
 
-1. Go to https://supabase.com/dashboard/project/qcqgtcsjoacuktcewpvo/functions
-2. Click **"Create a new function"**
-3. Name: `parse-receipts`
-4. Paste contents of `parse-receipts/index.ts`
-5. Click **"Deploy"**
-6. Verify JWT: **disabled** (`--no-verify-jwt`) — auth is enforced in-handler (requires an authenticated user's JWT)
-
-### Option B: Supabase CLI
+Run from `services/` — the CLI resolves `supabase/functions/` relative to the
+working directory, and the repo nests that under `services/`:
 
 ```bash
-# Install CLI if needed
-npm install -g supabase
-
-# Link to project
-supabase link --project-ref qcqgtcsjoacuktcewpvo
-
-# Deploy function
-supabase functions deploy parse-receipts --project-ref qcqgtcsjoacuktcewpvo
+cd services
+supabase functions deploy ocr-receipt --project-ref qcqgtcsjoacuktcewpvo
 ```
+
+⚠ **Check for drift before deploying.** A live function can be ahead of this
+repo (this has bitten us on `loyverse-sync`). Pull the deployed source with the
+Supabase MCP `get_edge_function` and diff it against the repo copy first —
+never blind-deploy a repo copy over a live function you have not compared.
+
+## Receipt images: how functions read them
+
+`_shared/gcv.ts` → `downloadImageAsBase64(ref)` takes a stored receipt
+reference in **any** shape — full public URL, signed URL, or bare in-bucket
+path — and downloads the bytes with the **service-role** client, which bypasses
+RLS and does not care whether the `receipts` bucket is public.
+
+It used to be a bare `fetch(url)` with no credentials, which worked only
+because the bucket was public. Do not regress it back: the bucket is on its way
+to `public=false` (T3, MC `69395970`), and a plain `fetch()` cannot resolve a
+bare path at all.
+
+The vision/LLM APIs are always handed **inline base64**, never a URL — so no
+external service ever needs to reach our storage. Keep it that way; a URL
+passed to an outside fetcher is what blocked this migration for months (see the
+retired GAS parser below).
 
 ## Test with curl
 
-> `parse-receipts` now requires an **authenticated user's** JWT — the anon key
-> alone returns `401`. Use a real session `access_token` (grab one from the
-> admin panel devtools), and pass `job_id` in the URL (zero-body-read design).
+`ocr-receipt` takes `inbox_id` as a **query parameter** (zero-body-read design):
 
 ```bash
-# anon key alone → 401 (hole closed)
-curl -s -o /dev/null -w '%{http_code}\n' -X POST \
-  'https://qcqgtcsjoacuktcewpvo.supabase.co/functions/v1/parse-receipts?job_id=test' \
-  -H 'Authorization: Bearer YOUR_ANON_KEY'
-
-# real user session token → routed (200 / 404 'job not found')
 curl -X POST \
-  'https://qcqgtcsjoacuktcewpvo.supabase.co/functions/v1/parse-receipts?job_id=YOUR_JOB_ID' \
-  -H 'Authorization: Bearer YOUR_USER_ACCESS_TOKEN'
+  'https://qcqgtcsjoacuktcewpvo.supabase.co/functions/v1/ocr-receipt?inbox_id=YOUR_INBOX_ID' \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
 ```
 
-## Expected Response
-
-```json
-{
-  "supplier_name": "Makro Food Service",
-  "invoice_number": "INV-2026-0342",
-  "total_amount": 4520.00,
-  "currency": "THB",
-  "transaction_date": "2026-03-10",
-  "food_items": [...],
-  "capex_items": [...],
-  "opex_items": [...]
-}
-```
+Expected: `{"ok":true,"pipeline":"gcv+llm","items_parsed":N,"ocr_chars":N,...}`.
 
 ---
 
@@ -91,3 +73,11 @@ curl -X POST \
 | 2026-04-12 | `ocr-receipt` | Redeploy | Refactored to use `_shared/` imports (commit 42e6187). `--no-verify-jwt` |
 | 2026-06-30 | `loyverse-sync`, `parse-receipts` | Deployed ✓ | In-handler JWT auth guard (F1). `--no-verify-jwt`. Verified: anon→401, logged-in user→pass. |
 | 2026-06-30 | `update-receipt-job` | Deployed ✓ | `x-internal-secret` guard (F1). `FUNCTION_INTERNAL_SECRET` set in Supabase + GAS Script Properties. Verified: no/wrong secret→401, correct→pass. |
+| 2026-07-15 | `parse-receipts`, `update-receipt-job` | **DELETED** ✓ | Dead since 2026-04-06 (own DEPRECATED.md: "Replaced by Finance Agent"); `receipt_jobs` had 0 rows since 2026-03-31; only caller `MagicDropzone` hung off the unrouted `FinanceManager`. Undeployed + source removed (T3 step 2, MC 69395970, PR #513). They were also the last consumer handing raw receipt URLs to an external anonymous fetcher (GAS) — the blocker to making the bucket private. |
+| 2026-07-15 | `ocr-receipt` (v54), `receipt-batch-process` (v18) | Redeploy ✓ | `_shared/gcv.ts`: `downloadImageAsBase64` now resolves a stored ref to an in-bucket path and downloads via service-role, instead of an uncredentialed `fetch(url)`. Backward compatible — the 318 existing full URLs resolve as before. Verified end-to-end on prod against a temp inbox row: `ok:true`, gcv+llm, 2571 ocr_chars, 9 items; temp row deleted after. Drift-checked against repo before deploying: byte-identical, no drift. (T3 step 3, MC 69395970) |
+
+### `FUNCTION_INTERNAL_SECRET` — now unused
+
+Its only consumer was `update-receipt-job`, deleted 2026-07-15. The secret can
+be dropped from Supabase Secrets whenever convenient; left in place for now
+because removing it is not free of risk if some forgotten caller exists.
