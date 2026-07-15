@@ -569,10 +569,10 @@ function ExpandedExpensePanel({
 
       if (uploadErr) throw uploadErr
 
-      const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
-      const publicUrl = urlData.publicUrl
-
-      await onUpdateExpense(row.id, { [slot]: publicUrl } as ExpenseUpdatePayload)
+      // Store the storage path, not getPublicUrl() — a public link persisted in
+      // the DB keeps resolving regardless of bucket policy. Viewers mint a
+      // short-lived signed URL from the path (lib/receiptUrls.ts). T3, MC 69395970.
+      await onUpdateExpense(row.id, { [slot]: path } as ExpenseUpdatePayload)
       onRefetch()
     } catch (err) {
       console.error('Upload failed:', err)

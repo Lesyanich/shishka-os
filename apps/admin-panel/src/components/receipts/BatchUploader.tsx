@@ -215,20 +215,22 @@ export function BatchUploader({ onBatchProcess, onInsert, onParse }: BatchUpload
     setStep('uploading')
     setProgress(`Uploading ${compressed.length} files...`)
     const results = await Promise.all(compressed.map((f, i) => uploadToStorage(f, i)))
-    const photoUrls = results.filter((r): r is { url: string } => 'url' in r).map((r) => r.url)
+    // Storage paths, not URLs — photo_urls now holds `inbox/x.jpg`. Readers
+    // resolve either shape, so old rows with full URLs are unaffected.
+    const photoPaths = results.filter((r): r is { path: string } => 'path' in r).map((r) => r.path)
     const uploadErrors = results.filter((r): r is { error: string } => 'error' in r)
 
-    if (photoUrls.length === 0) {
+    if (photoPaths.length === 0) {
       setStep('error')
       setToast({ type: 'err', msg: `Upload failed: ${uploadErrors[0]?.error ?? 'unknown'}` })
       return null
     }
 
     if (uploadErrors.length > 0) {
-      setProgress(`Uploaded ${photoUrls.length}/${compressed.length} (${uploadErrors.length} failed)`)
+      setProgress(`Uploaded ${photoPaths.length}/${compressed.length} (${uploadErrors.length} failed)`)
     }
 
-    return photoUrls
+    return photoPaths
   }
 
   /* ── Upload only (no parse) ── */

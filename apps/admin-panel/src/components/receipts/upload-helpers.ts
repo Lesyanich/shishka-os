@@ -43,10 +43,23 @@ export async function compressImage(file: File): Promise<File> {
   return new File([blob], `${baseName}.${ext}`, { type: mime })
 }
 
+/**
+ * Uploads a receipt and returns its **in-bucket path**, not a URL.
+ *
+ * This used to return getPublicUrl(), which bakes a permanently-public link
+ * into the DB — and those links keep resolving no matter what the bucket
+ * policy says. Paths are the stable identity; a viewer mints a short-lived
+ * signed URL from one at render time (lib/receiptUrls.ts). See T3, MC 69395970.
+ *
+ * Readers already accept both shapes, so old rows holding full URLs keep
+ * working: lib/receiptUrls.ts toReceiptPath (browser), _shared/gcv.ts
+ * toReceiptPath (edge functions), extractStoragePath (mcp-finance
+ * download-receipt + archive-receipt-gdrive).
+ */
 export async function uploadToStorage(
   file: File,
   index: number,
-): Promise<{ url: string } | { error: string }> {
+): Promise<{ path: string } | { error: string }> {
   const ext = file.name.split('.').pop() ?? 'webp'
   const filePath = `inbox/${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}.${ext}`
 
@@ -59,6 +72,5 @@ export async function uploadToStorage(
     return { error: error.message }
   }
 
-  const { data } = supabase.storage.from('receipts').getPublicUrl(filePath)
-  return { url: data.publicUrl }
+  return { path: filePath }
 }
