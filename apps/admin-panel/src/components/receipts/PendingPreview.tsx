@@ -1,5 +1,6 @@
 import { AlertTriangle, ImageOff, StickyNote } from 'lucide-react'
 import type { InboxRow } from '../../hooks/useReceiptInbox'
+import { isPdfReceipt, useSignedReceiptUrls } from '../../lib/receiptUrls'
 
 interface Props {
   row: InboxRow
@@ -12,6 +13,9 @@ interface Props {
  */
 export function PendingPreview({ row }: Props) {
   const photos = row.photo_urls || []
+  // `url` below stays the stored value (identity + type detection); only what
+  // lands in href/src is swapped for a short-lived signed URL.
+  const { resolve } = useSignedReceiptUrls(photos)
 
   return (
     <div className="space-y-3 px-4 py-4">
@@ -27,16 +31,16 @@ export function PendingPreview({ row }: Props) {
           {photos.map((url, i) => (
             <a
               key={i}
-              href={url}
+              href={resolve(url)}
               target="_blank"
               rel="noreferrer"
               className="block h-40 w-28 overflow-hidden rounded-lg border border-slate-700 bg-slate-950 hover:border-indigo-500"
               title={`Open photo ${i + 1} full size`}
             >
-              {url.toLowerCase().endsWith('.pdf') ? (
+              {isPdfReceipt(url) ? (
                 <span className="flex h-full w-full items-center justify-center text-[10px] text-slate-400">PDF</span>
               ) : (
-                <img src={url} alt={`Receipt photo ${i + 1}`} loading="lazy" className="h-full w-full object-cover" />
+                <img src={resolve(url)} alt={`Receipt photo ${i + 1}`} loading="lazy" className="h-full w-full object-cover" />
               )}
             </a>
           ))}
