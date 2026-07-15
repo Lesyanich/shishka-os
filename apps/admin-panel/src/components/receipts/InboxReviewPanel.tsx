@@ -636,25 +636,34 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
             onMouseLeave={handleMouseUp}
             className={`${imgCollapsed ? 'h-14' : 'h-[26vh]'} lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
           >
-            {isPdfReceipt(row.photo_urls[selectedPhotoIdx] ?? '') ? (
-              <iframe
-                src={resolvePhoto(row.photo_urls[selectedPhotoIdx] ?? '')}
-                title="Receipt PDF"
-                className="h-full w-full border-0"
-              />
-            ) : (
-              <img
-                src={resolvePhoto(row.photo_urls[selectedPhotoIdx] ?? '')}
-                alt="Receipt"
-                draggable={false}
-                className="h-full w-full select-none"
-                style={{
-                  objectFit: 'contain',
-                  transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                  transformOrigin: 'center center',
-                }}
-              />
-            )}
+            {(() => {
+              const stored = row.photo_urls[selectedPhotoIdx] ?? ''
+              // null while the signature is in flight or if signing failed — the
+              // bucket is private, so the stored value is not a usable fallback.
+              const src = stored ? resolvePhoto(stored) : null
+              if (!src) {
+                return (
+                  <div className="flex h-full w-full animate-pulse items-center justify-center text-xs text-slate-600">
+                    Loading receipt…
+                  </div>
+                )
+              }
+              return isPdfReceipt(stored) ? (
+                <iframe src={src} title="Receipt PDF" className="h-full w-full border-0" />
+              ) : (
+                <img
+                  src={src}
+                  alt="Receipt"
+                  draggable={false}
+                  className="h-full w-full select-none"
+                  style={{
+                    objectFit: 'contain',
+                    transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                    transformOrigin: 'center center',
+                  }}
+                />
+              )
+            })()}
           </div>
           {/* Desktop overlay arrows (mobile uses the compact switcher in the top bar) */}
           {row.photo_urls.length > 1 && (
@@ -691,7 +700,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
               >
                 {isPdfReceipt(url)
                   ? <span className="flex h-full w-full items-center justify-center text-[8px] text-slate-400">PDF</span>
-                  : <img src={resolvePhoto(url)} alt={`page ${i + 1}`} className="h-full w-full object-cover" />
+                  : resolvePhoto(url)
+                    ? <img src={resolvePhoto(url)!} alt={`page ${i + 1}`} className="h-full w-full object-cover" />
+                    : <span className="block h-full w-full animate-pulse bg-slate-900" />
                 }
               </button>
             ))}
