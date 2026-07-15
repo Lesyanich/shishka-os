@@ -3,7 +3,9 @@ import { supabase } from '../lib/supabase'
 
 export interface TaskPhotoUploadResult {
   ok: boolean
-  url?: string
+  /** In-bucket path — the value that gets persisted. Not a public URL; the
+   *  bucket is private and viewers sign the path at render time. MC 6d860866. */
+  path?: string
   error?: string
 }
 
@@ -12,13 +14,16 @@ const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_BYTES = 8 * 1024 * 1024 // 8 MB — phone-camera photos run larger than dish refs
 
 /**
- * Uploads a single task-report photo to the public `task-photos` bucket and
- * returns its public URL. Mirrors {@link useDishPhotoUpload}, but tasks keep a
- * *list* of photos (a report can have several), so each upload writes a unique
- * timestamped path and never overwrites — the caller appends the returned URL to
- * `staff_tasks.photo_urls`.
+ * Uploads a single task-report photo to the private `task-photos` bucket and
+ * returns its in-bucket PATH. Tasks keep a *list* of photos (a report can have
+ * several), so each upload writes a unique timestamped path and never
+ * overwrites — the caller appends the returned path to `staff_tasks.photo_urls`.
  *
- * Path: `task-photos/{taskId}/{timestamp}.{ext}`.
+ * Path: `{taskId}/{timestamp}.{ext}`.
+ *
+ * Deliberately not getPublicUrl(): the bucket is private, and a public link
+ * persisted in the DB would outlive any policy we set on it. Viewers mint a
+ * short-lived signed URL from the path (lib/taskPhotoUrls.ts). MC 6d860866.
  */
 export function useTaskPhotoUpload() {
   const [isUploading, setIsUploading] = useState(false)
@@ -51,9 +56,8 @@ export function useTaskPhotoUpload() {
         return { ok: false, error: uploadErr.message }
       }
 
-      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
       setIsUploading(false)
-      return { ok: true, url: data.publicUrl }
+      return { ok: true, path }
     },
     [],
   )

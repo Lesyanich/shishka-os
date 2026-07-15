@@ -20,6 +20,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { db } from "../_shared/supabase.ts"
+import { signStorageRef } from "../_shared/storage.ts"
 import {
   answerCallbackQuery,
   boardUrl,
@@ -53,6 +54,12 @@ const PHOTO_PROMPT = "📷 Send the photo for this task · ส่งรูปส
 
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? ""
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
+
+const TASK_PHOTOS_BUCKET = "task-photos"
+/** Telegram fetches a photo URL ONCE and then re-serves the image from its own
+ *  CDN, so the link only has to survive that single fetch. Keep it short — it is
+ *  the only moment a task photo is reachable from outside. */
+const TELEGRAM_PHOTO_TTL_SECONDS = 5 * 60
 
 /** Keep an async task alive after we return 200 (Supabase Edge runtime). */
 function fireAndForget(p: Promise<unknown>) {
@@ -817,7 +824,12 @@ async function ownerChats(): Promise<string[]> {
   return ((data ?? []) as Array<{ telegram_chat_id: string }>).map((r) => r.telegram_chat_id)
 }
 
-/** Download a Telegram photo and store it in the public task-photos bucket. */
+/**
+ * Download a Telegram photo and store it in the PRIVATE task-photos bucket.
+ * Returns the in-bucket PATH — never getPublicUrl(): a public link persisted in
+ * staff_tasks.photo_urls would outlive any policy we set on the bucket. Viewers
+ * sign the path at render time. MC 6d860866.
+ */
 async function storePhoto(fileId: string, taskId: string): Promise<string | null> {
   const path = await getFilePath(fileId)
   if (!path) return null
@@ -831,7 +843,7 @@ async function storePhoto(fileId: string, taskId: string): Promise<string | null
     console.error("[telegram-webhook] photo upload failed:", error)
     return null
   }
-  return db.storage.from("task-photos").getPublicUrl(key).data.publicUrl
+  return key
 }
 
 /** Inbound photo: attach to a task (if it replies to a task DM) else relay to owners. */
@@ -1231,9 +1243,18 @@ async function handleCallback(cq: Record<string, unknown>) {
     } else if (tdAction === "pics") {
       await answerCallbackQuery(id)
       const { data: d } = await db.from("staff_tasks").select("photo_urls").eq("id", tid).maybeSingle()
-      const urls = ((d?.photo_urls as string[] | null) ?? []).slice(0, 10)
-      if (urls.length === 0) await sendMessage(msgChatId, "No photos yet · ยังไม่มีรูป")
-      for (const u of urls) await sendPhoto(msgChatId, u)
+      const refs = ((d?.photo_urls as string[] | null) ?? []).slice(0, 10)
+      if (refs.length === 0) await sendMessage(msgChatId, "No photos yet · ยังไม่มีรูป")
+      // The bucket is private, so Telegram cannot fetch a stored ref directly —
+      // it pulls the URL anonymously, with none of our credentials. Mint a
+      // short-lived signed URL per photo instead: Telegram downloads it ONCE and
+      // then serves the photo from its own CDN, so a few minutes is ample and no
+      // long-lived link ever leaves this function.
+      for (const ref of refs) {
+        const signed = await signStorageRef(TASK_PHOTOS_BUCKET, ref, TELEGRAM_PHOTO_TTL_SECONDS)
+        if (signed) await sendPhoto(msgChatId, signed)
+        else console.error("[telegram-webhook] skipping unsignable photo ref:", ref)
+      }
     } else {
       await answerCallbackQuery(id, "Unknown action")
     }

@@ -10,6 +10,7 @@ import type {
   TaskStation,
 } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
+import { useSignedTaskPhotoUrls } from '../../lib/taskPhotoUrls'
 import { useKbPages } from '../../hooks/useKbPages'
 import { pickTranslation } from '../../types/knowledgeBase'
 import { TaskLinkPicker, type TaskLinkValue } from './TaskLinkPicker'
@@ -67,6 +68,7 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
   const [kbPageId, setKbPageId] = useState<string | null>(initial?.kb_page_id ?? null)
   const [taskId] = useState<string>(() => initial?.id ?? freshId())
   const { upload, isUploading } = useTaskPhotoUpload()
+  const { resolve: resolvePhoto } = useSignedTaskPhotoUrls(photoUrls)
   const { visiblePages: kbPages } = useKbPages()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -83,7 +85,7 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
     e.target.value = ''
     for (const file of files) {
       const res = await upload(file, taskId)
-      if (res.ok && res.url) setPhotoUrls((prev) => [...prev, res.url!])
+      if (res.ok && res.path) setPhotoUrls((prev) => [...prev, res.path!])
       else if (res.error) window.alert(res.error)
     }
   }
@@ -289,7 +291,11 @@ export function TaskFormModal({ open, initial, staff, onClose, onSubmit }: TaskF
             <div className="flex flex-wrap items-center gap-2">
               {photoUrls.map((url) => (
                 <div key={url} className="relative h-16 w-16 overflow-hidden rounded-lg border border-slate-700">
-                  <img src={url} alt="report" className="h-full w-full object-cover" />
+                  {/* null while in flight / on failure — private bucket, the
+                      stored ref is not a usable fallback. */}
+                  {resolvePhoto(url)
+                    ? <img src={resolvePhoto(url)!} alt="report" className="h-full w-full object-cover" />
+                    : <span className="block h-full w-full animate-pulse bg-slate-800" />}
                   <button
                     type="button"
                     onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
