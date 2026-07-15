@@ -14,7 +14,7 @@ for local intents: `healthy food rawai`, `gluten-free restaurant phuket`, `по�
 
 | Gap | Impact | Workaround used |
 |---|---|---|
-| Mission Control MCP / Supabase key absent | Epic unread; WPs not filed to MC | This doc is interim source of truth; sync to MC in a session with access |
+| Mission Control MCP / Supabase key absent | Epic unread; WPs not filed to MC | **Root cause fixed 2026-07-15**: `.mcp.json` now uses repo-relative paths and launch scripts prefer env vars over macOS Keychain. Remaining step: owner adds `SUPABASE_SERVICE_ROLE_KEY` to the remote environment (see `docs/keys-config.md` § Remote Sessions), then next session syncs WPs to MC |
 | Session network policy blocked `shishka.health` | No live prod raw-HTML audit | Audited `main` branch `index.html` + PR #33 diff via public github.com; prod check moved into WP-0 acceptance |
 | `shishka-health` repo not in session scope | Could not build/fix the failing deploy | PR read via public GitHub pages; the fix is WP-0 |
 
@@ -57,9 +57,12 @@ for local intents: `healthy food rawai`, `gluten-free restaurant phuket`, `по�
 
 ### PR #33 verdict, per artifact
 
+> **Update 2026-07-15:** CEO decided to close PR #33 without merge (see WP-0). Verdicts below are
+> preserved as the harvest list for WP-4: KEEP = carry into the WP-4 branch, REWORK = rebuild there.
+
 | Artifact | Verdict | Why |
 |---|---|---|
-| Vercel build error | **FIX FIRST** | Nothing ships until green |
+| Vercel build error | **MOOT** | PR closed without merge; WP-4 starts fresh from `main` |
 | `index.html` Restaurant JSON-LD (NAP, geo, hours, cuisines) | **KEEP** | Correct entity-disambiguation layer (lever 7); add `sameAs` once profiles are claimed (WP-3/WP-7) |
 | `index.html` FAQPage JSON-LD (10 Q&A, head-only) | **REWORK** | Schema describing content that doesn't exist on the page violates Google structured-data guidelines (spam risk) and gives text-reading LLM crawlers nothing. The Q&A are good — render them as visible HTML (WP-4) and keep schema in sync |
 | `scripts/aeo.mjs` Menu JSON-LD injection (79 dishes) | **REWORK** | Right data source, wrong output: emit **visible HTML menu pages** at build time from the same JSON (lever 4), with Menu schema alongside. Fix 79-vs-24 truthfulness first |
@@ -72,18 +75,21 @@ for local intents: `healthy food rawai`, `gluten-free restaurant phuket`, `по�
 
 ## 2. Work Packages
 
-### WP-0 `[OPUS]` Fix & land PR #33 (patched)
-- **Goal:** ship the correct parts of PR #33; unblock everything on-site.
+### WP-0 `[OPUS]` Close PR #33, harvest the keepers into WP-4
+> CEO decision 2026-07-15: PR #33 is closed without merge (broken build, head-only FAQPage,
+> 79-vs-24 dish mismatch). Its useful pieces are carried into the WP-4 branch instead.
+- **Goal:** retire PR #33 cleanly; preserve the 3 salvageable artifacts for WP-4.
 - **Impact/Effort:** H / L
 - **Acceptance (binary):**
-  - [ ] Vercel build green; PR merged
-  - [ ] `curl -A GPTBot https://shishka.health/` returns 200 with Restaurant JSON-LD in raw HTML
-  - [ ] GPTBot / ClaudeBot / PerplexityBot / OAI-SearchBot each get HTTP 200 (not 403) from prod — Vercel Firewall has no AI-bot challenge rule
-  - [ ] Dish count in Menu JSON-LD equals the real orderable SKU count confirmed by owner
-- **Brief:** clone `shishka-health`, reproduce the build error on `feature/web/aeo-optimization`,
-  fix, reconcile menu source to real SKUs (Input #1), demote head-only FAQPage schema (move to
-  WP-4 or drop until visible), merge. Inputs: repo access, real SKU list. Outputs: merged PR,
-  prod verification log.
+  - [ ] PR #33 closed with an explanatory comment linking to this plan
+  - [ ] Keepers staged for WP-4: `robots.txt` AI-crawler allows; Restaurant JSON-LD (after
+        fact-check of NAP, hours, claims); menu-JSON-as-single-data-source concept
+  - [ ] WP-4 branch starts fresh from `main` (no dependency on the PR #33 branch)
+  - [ ] Prod checks moved to WP-4 acceptance: GPTBot / ClaudeBot / PerplexityBot / OAI-SearchBot
+        each get HTTP 200 (not 403) from `shishka.health` — Vercel Firewall has no AI-bot challenge rule
+- **Brief:** post verdict comment on PR #33, close it. WP-4 executor copies the keepers with
+  fact-checked data (Input #1: real SKU list; Input #5: claims sign-off). Outputs: closed PR,
+  keeper checklist inside the WP-4 brief.
 
 ### WP-1 `[HUMAN]` Google Business Profile overhaul
 - **Goal:** make GBP the machine-readable source Ask Maps reads: categories, dietary attributes,
@@ -136,8 +142,9 @@ for local intents: `healthy food rawai`, `gluten-free restaurant phuket`, `по�
   - [ ] Design system tokens from `shishka-health` `design-system/MASTER.md` used
 - **Brief:** extend the build (vite-ssg / prerender plugin, or extend `aeo.mjs` to emit static
   HTML) rather than migrating to Next.js — MINIMAL-CORRECT-CHANGE. EN first; TH/RU with hreflang
-  as WP-4b (effort M). Inputs: merged WP-0, confirmed SKU list, keyword sign-off. Output: live
-  URLs + raw-HTML audit.
+  as WP-4b (effort M). Branch starts fresh from `main`; carry the WP-0 keepers (robots.txt,
+  fact-checked Restaurant JSON-LD, menu-JSON source). Inputs: WP-0 keeper list, confirmed SKU
+  list, keyword sign-off. Output: live URLs + raw-HTML audit.
 
 ### WP-5 `[OPUS]` Community-intent page: "Where to eat clean & healthy in Rawai — an honest local guide"
 - **Goal:** discussion-shaped page for community-flavored queries: real trade-offs, limitations,
@@ -199,7 +206,7 @@ for local intents: `healthy food rawai`, `gluten-free restaurant phuket`, `по�
 ## 3. Sequencing
 
 **Weeks 1–2 — needle-movers (no dependencies):**
-- WP-0 fix & land PR #33 (blocks WP-4, WP-7)
+- WP-0 close PR #33 + stage keepers (unblocks WP-4 to start fresh)
 - WP-1 GBP overhaul (biggest single lever, zero dependencies)
 - WP-2 review engine launch
 - WP-8 baseline: run the prompt panel BEFORE anything ships (clean baseline)
@@ -269,7 +276,7 @@ for local intents: `healthy food rawai`, `gluten-free restaurant phuket`, `по�
 
 ## 6. Inputs Needed From Human
 
-1. **Real orderable SKU list** (resolves 79-dishes-vs-24-SKU conflict) — blocks WP-0 merge.
+1. **Real orderable SKU list** (resolves 79-dishes-vs-24-SKU conflict) — blocks WP-4.
 2. **Canonical NAP string** (exact name, address romanization, phone) — blocks WP-3, WP-7.
 3. **GBP access confirmed** + Vercel dashboard access (logs, Firewall check) — blocks WP-1, WP-8, WP-0 verification.
 4. **Owner interview** (30 min): real trade-offs, honest alternatives in Rawai, actual guest FAQ — blocks WP-5, improves WP-4 FAQ.
