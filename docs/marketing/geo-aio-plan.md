@@ -270,9 +270,71 @@ for local intents: `healthy food rawai`, `gluten-free restaurant phuket`, `по�
 
 ### Appendix: prompt panel log
 
+#### Baseline — 2026-07-15 (run before any WP shipped)
+
+**Result: `absent` on 45/45 — all 15 prompts × all 3 platforms. Zero mentions, zero citations.**
+This is the clean baseline the plan called for; it can only be measured once. Every future run is
+scored against this row.
+
 | Date | Prompt # | Google AI Mode | Perplexity | ChatGPT | Notes |
 |---|---|---|---|---|---|
-| (baseline pending) | | | | | |
+| 2026-07-15 | 1 best healthy restaurant in Rawai Phuket | absent | absent | absent | All 3 answered from Google Places / TripAdvisor, never the site |
+| 2026-07-15 | 2 gluten free restaurant Phuket | absent | absent | absent | ChatGPT cited Reddit; Google cited Aleenta / Woo Phuket |
+| 2026-07-15 | 3 where to eat clean in Nai Harn | absent | absent | absent | |
+| 2026-07-15 | 4 vegan friendly cafe Rawai | absent | absent | absent | |
+| 2026-07-15 | 5 полезная еда Пхукет где поесть | absent | absent | absent | RU query — no RU surface exists yet |
+| 2026-07-15 | 6 healthy breakfast Rawai | absent | absent | absent | |
+| 2026-07-15 | 7 restaurant that doesn't use seed oils Phuket | absent | absent | absent | Positioning claim owned by nobody — see below |
+| 2026-07-15 | 8 grass-fed meat restaurant Phuket | absent | absent | absent | Positioning claim owned by nobody — see below |
+| 2026-07-15 | 9 keto friendly restaurant Phuket | absent | absent | absent | |
+| 2026-07-15 | 10 gluten free brunch near Nai Harn beach | absent | absent | absent | |
+| 2026-07-15 | 11 clean eating Phuket recommendations | absent | absent | absent | |
+| 2026-07-15 | 12 where do expats eat healthy in Rawai reddit | absent | absent | absent | |
+| 2026-07-15 | 13 здоровый завтрак Раваи Пхукет | absent | absent | absent | RU query |
+| 2026-07-15 | 14 healthy food delivery Rawai | absent | absent | absent | |
+| 2026-07-15 | 15 matcha cafe Rawai Nai Harn | absent | absent | absent | |
+
+**Score:** cited 0/45 · mentioned 0/45 · absent 45/45.
+
+#### Method (reproduce this exactly next run)
+
+- **Date/time:** 2026-07-15, ~13:20–13:50 ICT. **Location:** Phuket residential IP (local network) —
+  local-intent answers are geo-sensitive, so future runs must also originate from Phuket or the
+  comparison is invalid.
+- **Google AI Mode:** `https://www.google.com/search?q=<urlencoded>&udm=50` — `udm=50` is AI Mode; no
+  login required.
+- **Perplexity:** `https://www.perplexity.ai/search?q=<urlencoded>` — no login required.
+- **ChatGPT:** `https://chatgpt.com/?q=<urlencoded>&hints=search`. Two gotchas: the `?q=` auto-submit
+  only fires on a **fresh** page load (navigate to `https://chatgpt.com/` first, then the `?q=` URL —
+  otherwise the composer sits prefilled but unsent), and typing into the composer via automation does
+  **not** register in React state (no send button appears), so the URL route is the only reliable one.
+- **Scoring:** page `innerText` matched against `/shishka|шишка/i`, plus an `<a href>` scan for
+  `shishka.health` to separate `cited` (linked) from `mentioned` (named only).
+- **Session state:** all three platforms were queried **logged out**. This is deliberate — a logged-out
+  session has no personalization or chat memory, so it measures the brand's public visibility rather
+  than the operator's own history. A logged-in ChatGPT run may differ and is not comparable to this row.
+
+#### What the baseline actually shows (beyond "absent")
+
+1. **The engines answer from Google Places, TripAdvisor and Reddit — not from anybody's website.**
+   Perplexity's #1 answer was assembled from a Maps panel (name, rating, review count, price band,
+   open-hours); ChatGPT cited TripAdvisor and Reddit; Google AI Mode rendered a Places-backed card list.
+   This is direct field evidence for the plan's core bet: **WP-1 (GBP) and WP-2 (reviews) are the
+   needle-movers, and a perfect website alone would not have appeared in a single one of these 45 answers.**
+2. **Ratings are the currency, and the bar is high.** Competitors surfacing in answers carry 4.8–4.9
+   with 150–400+ reviews. WP-2's target of ≥8 reviews/month is the entry ticket, not a stretch goal.
+3. **Prompts 7 and 8 are an unclaimed niche.** "No seed oils" and "grass-fed" returned generic
+   healthy-restaurant lists on all three platforms — no competitor owns those queries in Phuket. That is
+   the cheapest differentiated win available **if and only if** the claims survive Input #5 sign-off.
+   Machine-readable claims get repeated by AI verbatim; an unverified claim becomes a durable liability.
+4. **Competitor set for WP-5** (harvested free from this run; WP-5 needs ≥3 honest alternatives):
+   Stay Green Café, Pure Vegan Heaven, All Vegan Cafe & Restaurant, Elysium Cafe & Bathhouse, WeCafe
+   Rawai, BOOST Cafe, Little Bowl, Go Vegan Cafe, Pure Prep Rawai, Vida Nova, SOUL Vegan, EatWise Vegan.
+
+#### Next run
+
+**2026-08-01** (1st of month, per § 5). Same 15 prompts verbatim, same method, same location.
+Target by **2026-10-15**: mentioned-or-cited on ≥5/15 prompts on ≥2 platforms.
 
 ## 6. Inputs Needed From Human
 
@@ -282,5 +344,7 @@ for local intents: `healthy food rawai`, `gluten-free restaurant phuket`, `по�
 4. **Owner interview** (30 min): real trade-offs, honest alternatives in Rawai, actual guest FAQ — blocks WP-5, improves WP-4 FAQ.
 5. **Truthfulness sign-off** on positioning claims baked into PR #33 schema ("never seed oils", "grass-fed") — they are now machine-readable assertions AI will repeat.
 6. **TripAdvisor / Wongnai / Apple Business Connect credentials** or delegation — blocks WP-3, WP-6.
-7. **Mission Control access** for a future session to file these WPs as MC tasks (the authoring session had none).
+7. ~~**Mission Control access** for a future session to file these WPs as MC tasks (the authoring session had none).~~
+   **RESOLVED 2026-07-15** — all 9 WPs filed as child tasks of MC epic `9ced1036-dab4-40ec-b511-914b89d79acb`
+   (no GEO `business_initiative` exists, so they are grouped via `parent_task_id`). PR #33 closed the same day (WP-0).
 8. **Keyword set sign-off** for WP-4 page slugs.
