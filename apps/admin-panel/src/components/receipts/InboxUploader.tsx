@@ -125,10 +125,12 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
     try {
       const compressed = await Promise.all(files.map((f) => compressImage(f.file)))
       const results = await Promise.all(compressed.map((f, i) => uploadToStorage(f, i)))
-      const photoUrls = results.filter((r): r is { url: string } => 'url' in r).map((r) => r.url)
+      // Storage paths, not URLs — photo_urls now holds `inbox/x.jpg`. Readers
+      // resolve either shape, so old rows with full URLs are unaffected.
+      const photoPaths = results.filter((r): r is { path: string } => 'path' in r).map((r) => r.path)
       const errors = results.filter((r): r is { error: string } => 'error' in r)
 
-      if (photoUrls.length === 0) {
+      if (photoPaths.length === 0) {
         setToast({ type: 'err', msg: `Upload failed: ${errors[0]?.error ?? 'unknown'}` })
         return
       }
@@ -136,7 +138,7 @@ export function InboxUploader({ onSubmit, onParse }: InboxUploaderProps) {
       const modelUsed = model === 'claude-sub' ? 'claude-subscription' : null
       const payload: InboxInsert = {
         uploaded_by: uploadedBy,
-        photo_urls: photoUrls,
+        photo_urls: photoPaths,
         receipt_date: receiptDate || null,
         supplier_hint: supplierHint || null,
         amount_hint: amountHint ? Number(amountHint) : null,

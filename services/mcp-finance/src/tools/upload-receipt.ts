@@ -28,7 +28,8 @@ const MIME_MAP: Record<string, string> = {
 interface UploadResult {
   file: string;
   ok: boolean;
-  url?: string;
+  /** In-bucket path — the value that gets persisted. Not a public URL: see
+   *  the note on getPublicUrl removal below (T3, MC 69395970). */
   storage_path?: string;
   error?: string;
   size_kb?: number;
@@ -95,13 +96,13 @@ async function uploadSingleFile(
     };
   }
 
-  // Get public URL
-  const { data } = sb.storage.from(BUCKET).getPublicUrl(storagePath);
-
+  // No getPublicUrl(): a public link persisted in expense_ledger keeps
+  // resolving regardless of bucket policy, which is exactly what T3 is undoing.
+  // The path is the stable identity — readers resolve it (download-receipt's
+  // extractStoragePath, the admin panel's lib/receiptUrls.ts). MC 69395970.
   return {
     file: fileName,
     ok: true,
-    url: data.publicUrl,
     storage_path: storagePath,
     size_kb: Math.round(buffer.length / 1024),
   };
@@ -144,7 +145,9 @@ export async function uploadReceipt(args: UploadReceiptArgs) {
   const successful = results.filter((r) => r.ok);
   const failed = results.filter((r) => !r.ok);
 
-  // Map URLs to the three expense_ledger fields based on doc_type or position
+  // Map storage PATHS to the three expense_ledger fields based on doc_type or
+  // position. The columns are named *_url for historical reasons and still hold
+  // full URLs on older rows; readers accept both shapes.
   const urlMapping: Record<string, string | null> = {
     receipt_supplier_url: null,
     receipt_bank_url: null,
@@ -153,19 +156,19 @@ export async function uploadReceipt(args: UploadReceiptArgs) {
 
   if (successful.length > 0) {
     if (docType === "supplier" || docType === "all") {
-      urlMapping.receipt_supplier_url = successful[0]?.url ?? null;
+      urlMapping.receipt_supplier_url = successful[0]?.storage_path ?? null;
     }
     if (docType === "bank" || (docType === "all" && successful.length > 1)) {
       urlMapping.receipt_bank_url =
         docType === "bank"
-          ? successful[0]?.url ?? null
-          : successful[1]?.url ?? null;
+          ? successful[0]?.storage_path ?? null
+          : successful[1]?.storage_path ?? null;
     }
     if (docType === "tax" || (docType === "all" && successful.length > 2)) {
       urlMapping.tax_invoice_url =
         docType === "tax"
-          ? successful[0]?.url ?? null
-          : successful[2]?.url ?? null;
+          ? successful[0]?.storage_path ?? null
+          : successful[2]?.storage_path ?? null;
     }
   }
 
