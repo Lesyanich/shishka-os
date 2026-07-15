@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import type { StaffTask } from '../../hooks/useStaffTasks'
 import { useTaskPhotoUpload } from '../../hooks/useTaskPhotoUpload'
+import { useSignedTaskPhotoUrls } from '../../lib/taskPhotoUrls'
 import {
   categoryMeta,
   PRIORITY_DOT,
@@ -54,6 +55,7 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
   const assignee = task.staff?.name ?? null
   const navigate = useNavigate()
   const { upload, isUploading } = useTaskPhotoUpload()
+  const { resolve: resolvePhoto } = useSignedTaskPhotoUrls(task.photo_urls)
   const fileRef = useRef<HTMLInputElement>(null)
   const catMeta = categoryMeta(task.category)
   const CatIcon = catMeta.icon
@@ -70,7 +72,7 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
     const added: string[] = []
     for (const file of files) {
       const res = await upload(file, task.id)
-      if (res.ok && res.url) added.push(res.url)
+      if (res.ok && res.path) added.push(res.path)
       else if (res.error) window.alert(res.error)
     }
     if (added.length) onPhotosChange(task, [...task.photo_urls, ...added])
@@ -185,11 +187,18 @@ export function TaskRow({ task, onToggleDone, onOpen, onPhotosChange, showDate }
         {/* Photo report thumbnails */}
         {task.photo_urls.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {task.photo_urls.map((url) => (
-              <a key={url} href={url} target="_blank" rel="noreferrer" className="block h-11 w-11 overflow-hidden rounded-md border border-slate-700">
-                <img src={url} alt="report" className="h-full w-full object-cover" />
-              </a>
-            ))}
+            {task.photo_urls.map((ref) => {
+              // null while the signature is in flight or if signing failed — the
+              // bucket is private, so the stored ref is not a usable fallback.
+              const src = resolvePhoto(ref)
+              return (
+                <a key={ref} href={src ?? undefined} target="_blank" rel="noreferrer" className="block h-11 w-11 overflow-hidden rounded-md border border-slate-700">
+                  {src
+                    ? <img src={src} alt="report" className="h-full w-full object-cover" />
+                    : <span className="block h-full w-full animate-pulse bg-slate-800" />}
+                </a>
+              )
+            })}
           </div>
         )}
       </div>
