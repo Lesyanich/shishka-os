@@ -24,6 +24,17 @@
 | `GAS_WEB_APP_URL` | Edge Function (parse-receipts) | Pinned GAS deployment URL |
 | `GEMINI_API_KEY` | GAS Script Properties | For Gemini 2.5 Flash |
 
+## Remote Sessions (claude.ai/code)
+
+MCP servers (`shishka-mission-control`, `shishka-chef`, `shishka-finance`) need `SUPABASE_SERVICE_ROLE_KEY`.
+Locally the launch scripts read it from macOS Keychain; in remote containers there is no Keychain, so the
+env var must be set in the remote environment configuration:
+
+1. Open claude.ai/code → the shishka-os environment → settings → Environment variables.
+2. Add `SUPABASE_SERVICE_ROLE_KEY` = service-role key from the Supabase Dashboard (never commit the value).
+3. Launch scripts prefer the env var and fall back to Keychain (`scripts/launch-*-mcp.sh`), and `.mcp.json`
+   uses repo-relative paths, so the same config works locally and remotely.
+
 ## Dev Server
 
 - **Path:** `apps/admin-panel/`
