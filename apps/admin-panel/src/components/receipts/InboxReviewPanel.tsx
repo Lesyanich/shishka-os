@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, X, Loader2, FolderOpen, Pencil, Plus, Trash2, AlertTriangle, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import type { InboxRow } from '../../hooks/useReceiptInbox'
 import { supabase } from '../../lib/supabase'
+import { isPdfReceipt, useSignedReceiptUrls } from '../../lib/receiptUrls'
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -140,6 +141,9 @@ function splitItemsToPayload(items: UnifiedItem[]) {
 /* ────────────────────────── Component ────────────────────────── */
 
 export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: Props) {
+  // Stored values stay the identity (and drive PDF detection); only what lands
+  // in src/href is swapped for a short-lived signed URL.
+  const { resolve: resolvePhoto } = useSignedReceiptUrls(row.photo_urls)
   const [isApproving, setIsApproving] = useState(false)
   const [isSkipping, setIsSkipping] = useState(false)
   const [isReopening, setIsReopening] = useState(false)
@@ -632,15 +636,15 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
             onMouseLeave={handleMouseUp}
             className={`${imgCollapsed ? 'h-14' : 'h-[26vh]'} lg:h-[500px] w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 ${zoom > 1 ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
           >
-            {row.photo_urls[selectedPhotoIdx]?.toLowerCase().endsWith('.pdf') ? (
+            {isPdfReceipt(row.photo_urls[selectedPhotoIdx] ?? '') ? (
               <iframe
-                src={row.photo_urls[selectedPhotoIdx]}
+                src={resolvePhoto(row.photo_urls[selectedPhotoIdx] ?? '')}
                 title="Receipt PDF"
                 className="h-full w-full border-0"
               />
             ) : (
               <img
-                src={row.photo_urls[selectedPhotoIdx]}
+                src={resolvePhoto(row.photo_urls[selectedPhotoIdx] ?? '')}
                 alt="Receipt"
                 draggable={false}
                 className="h-full w-full select-none"
@@ -685,9 +689,9 @@ export function InboxReviewPanel({ row, onApprove, onSkip, onReopen, onClose }: 
                 onClick={() => setSelectedPhotoIdx(i)}
                 className={`h-14 w-10 overflow-hidden rounded border ${i === selectedPhotoIdx ? 'border-indigo-500 ring-1 ring-indigo-500/50' : 'border-slate-700 hover:border-slate-500'} bg-slate-800`}
               >
-                {url.toLowerCase().endsWith('.pdf')
+                {isPdfReceipt(url)
                   ? <span className="flex h-full w-full items-center justify-center text-[8px] text-slate-400">PDF</span>
-                  : <img src={url} alt={`page ${i + 1}`} className="h-full w-full object-cover" />
+                  : <img src={resolvePhoto(url)} alt={`page ${i + 1}`} className="h-full w-full object-cover" />
                 }
               </button>
             ))}

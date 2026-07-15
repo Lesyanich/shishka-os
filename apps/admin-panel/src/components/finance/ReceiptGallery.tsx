@@ -8,6 +8,7 @@ import {
   ZoomOut,
   RotateCw,
 } from 'lucide-react'
+import { isPdfReceipt, useSignedReceiptUrls } from '../../lib/receiptUrls'
 
 /* ═══════════════════════════════════════════════════════════
    ReceiptGallery — fullscreen multi-page receipt viewer
@@ -35,8 +36,11 @@ function toGoogleDrivePreview(url: string): string {
   return url
 }
 
+/** Delegates to the shared helper, which strips the query string first — a
+ *  signed URL ends in `?token=…`, so a naive endsWith('.pdf') would render
+ *  every signed PDF into an <img> as a broken thumbnail. */
 function isPdfUrl(url: string) {
-  return url.toLowerCase().endsWith('.pdf')
+  return isPdfReceipt(url)
 }
 
 export function ReceiptGallery({
@@ -50,7 +54,12 @@ export function ReceiptGallery({
   const imgRef = useRef<HTMLImageElement>(null)
 
   const total = pages.length
+  // `url` stays the ORIGINAL stored value — it is the identity used for type
+  // detection and as the key into the signed-URL map. `src` is what actually
+  // goes into the DOM.
   const url = pages[current] ?? ''
+  const { resolve } = useSignedReceiptUrls(pages)
+  const src = url ? resolve(url) : ''
 
   // Reset zoom/rotation when page changes
   useEffect(() => {
@@ -135,7 +144,7 @@ export function ReceiptGallery({
             </>
           )}
           <a
-            href={url}
+            href={src}
             target="_blank"
             rel="noopener noreferrer"
             className="rounded-lg p-2 text-cream/60 hover:bg-[var(--s-2)] hover:text-white"
@@ -185,14 +194,14 @@ export function ReceiptGallery({
             />
           ) : isPdf ? (
             <iframe
-              src={url}
+              src={src}
               title={`Receipt page ${current + 1}`}
               className="h-[80vh] w-[70vw] rounded-lg border border-[var(--line-strong)]"
             />
           ) : (
             <img
               ref={imgRef}
-              src={url}
+              src={src}
               alt={`Receipt page ${current + 1}`}
               className="max-h-[80vh] max-w-[85vw] rounded-lg object-contain transition-transform duration-200"
               style={{
@@ -206,7 +215,7 @@ export function ReceiptGallery({
                   'afterend',
                   `<div class="flex flex-col items-center gap-3 p-12 text-cream/60">
                     <p class="text-sm">Could not load image</p>
-                    <a href="${url}" target="_blank" rel="noopener noreferrer"
+                    <a href="${src}" target="_blank" rel="noopener noreferrer"
                        class="text-xs text-mint-200 hover:underline">Open in new tab</a>
                   </div>`,
                 )
@@ -247,7 +256,7 @@ export function ReceiptGallery({
                 </div>
               ) : (
                 <img
-                  src={pageUrl}
+                  src={resolve(pageUrl)}
                   alt={`Thumb ${i + 1}`}
                   className="h-full w-full object-cover"
                 />
