@@ -7,6 +7,9 @@
 //   morning               → DM every linked staff their tasks for today (ICT)
 //   schedule              → post today's shift schedule to the group chat
 //   reminders             → DM due/overdue, not-done tasks once (reminder_sent_at)
+//   attendance            → alert owners when a scheduled shift has no clock-in
+//                           past its grace window (shop may be unopened) — once
+//                           per shift, deduped via attendance_alerts
 //
 // Auth: deployed WITH verify_jwt (default). Callable by the authenticated admin
 // (supabase.functions.invoke attaches the user token) and by pg_cron via pg_net
@@ -19,6 +22,7 @@
 import { db } from "../_shared/supabase.ts"
 import { json } from "../_shared/cors.ts"
 import {
+  escapeHtml,
   formatTask,
   getChatMenuButton,
   getWebhookInfo,
@@ -192,6 +196,105 @@ async function actionReminders() {
   return json({ ok: true, sent, scanned: tasks.length })
 }
 
+/**
+ * Alert owners about scheduled shifts with no clock-in past the grace window.
+ *
+ * The shop not opening on time is the expensive failure this whole system
+ * exists to catch (policy LEG-004 §4), so this fires as soon as a punch is
+ * overdue — `v_shift_punctuality` only flips a shift to 'no_clock_in' once
+ * start_time + grace has passed (Asia/Bangkok), which is exactly the trigger.
+ *
+ * Covers EVERY scheduled employee (CEO decision 2026-07-17), but sends ONE
+ * grouped message per sweep rather than a DM per person — four separate pings
+ * for the same 09:00 roster is how an owner learns to swipe the channel away.
+ * Whoever opens the shop (`staff.opening_critical`) is called out first: that
+ * absence is the one that costs money by the minute.
+ *
+ * Excused shifts never reach here (v_shift_punctuality.is_excused, mig 370) —
+ * "warned us at 07:00 that the bus broke down" is not an alarm. Days off need
+ * no special case: no shift row, no alert.
+ *
+ * Deduped via `attendance_alerts` (PK on shift_id): rows are written only
+ * after a successful send, so a failure retries on the next sweep.
+ */
+async function actionAttendance() {
+  const today = todayICT()
+
+  const { data: pending } = await db
+    .from("v_shift_punctuality")
+    .select("shift_id, staff_id, start_time, end_time, grace_min")
+    .eq("shift_date", today)
+    .eq("punch_status", "no_clock_in")
+    .eq("is_excused", false)
+
+  type PunctRow = {
+    shift_id: string
+    staff_id: string
+    start_time: string
+    end_time: string
+    grace_min: number
+  }
+  const rows = (pending ?? []) as PunctRow[]
+  if (rows.length === 0) return json({ ok: true, sent: 0, scanned: 0 })
+
+  // Drop shifts already alerted on.
+  const { data: alerted } = await db
+    .from("attendance_alerts")
+    .select("shift_id")
+    .in("shift_id", rows.map((r) => r.shift_id))
+  const alreadySent = new Set(((alerted ?? []) as Array<{ shift_id: string }>).map((a) => a.shift_id))
+  const fresh = rows.filter((r) => !alreadySent.has(r.shift_id))
+  if (fresh.length === 0) return json({ ok: true, sent: 0, scanned: rows.length })
+
+  // Recipients: owners' DMs; fall back to the group chat if none are linked.
+  const { data: owners } = await db.from("staff").select("id").eq("app_role", "owner")
+  const ownerChats: string[] = []
+  for (const o of (owners ?? []) as Array<{ id: string }>) {
+    const chatId = await chatForStaff(o.id)
+    if (chatId) ownerChats.push(chatId)
+  }
+  const targets = ownerChats.length > 0 ? ownerChats : GROUP_CHAT_ID ? [GROUP_CHAT_ID] : []
+  if (targets.length === 0) return json({ ok: false, error: "no_owner_chat_configured" }, 200)
+
+  const { data: staffRows } = await db
+    .from("staff")
+    .select("id, name, opening_critical")
+    .in("id", fresh.map((r) => r.staff_id))
+  type StaffRow = { id: string; name: string; opening_critical: boolean }
+  const staffById = new Map(((staffRows ?? []) as StaffRow[]).map((s) => [s.id, s]))
+
+  // Openers first — that line is the one that means "the door is still shut".
+  const ordered = [...fresh].sort((a, b) => {
+    const ao = staffById.get(a.staff_id)?.opening_critical ? 0 : 1
+    const bo = staffById.get(b.staff_id)?.opening_critical ? 0 : 1
+    return ao - bo || a.start_time.localeCompare(b.start_time)
+  })
+
+  const lines = ordered.map((row) => {
+    const s = staffById.get(row.staff_id)
+    const overdue = Math.max(nowMinICT() - ((timeToMin(row.start_time) ?? 0) + row.grace_min), 0)
+    const shift = `${row.start_time.slice(0, 5)}–${row.end_time.slice(0, 5)}`
+    return s?.opening_critical
+      ? `🔴 <b>${escapeHtml(s.name)}</b> — opens the shop · ${shift} · ${overdue} min overdue`
+      : `• ${escapeHtml(s?.name ?? "Unknown")} — ${shift} · ${overdue} min overdue`
+  })
+
+  const text =
+    `⏰ <b>No clock-in · ยังไม่ได้ลงเวลา</b> (${ordered.length})\n` +
+    lines.join("\n")
+
+  let sentToAny = false
+  for (const chatId of targets) {
+    const res = await sendMessage(chatId, text)
+    if (res.ok) sentToAny = true
+  }
+
+  if (!sentToAny) return json({ ok: false, error: "send_failed", scanned: rows.length }, 200)
+
+  await db.from("attendance_alerts").insert(ordered.map((r) => ({ shift_id: r.shift_id })))
+  return json({ ok: true, sent: ordered.length, scanned: rows.length })
+}
+
 // One-shot maintenance: clear the stale web_app/ngrok menu button (both the
 // global default AND every linked chat's per-chat override) and re-register the
 // webhook with our secret. Idempotent — safe to call repeatedly.
@@ -249,10 +352,12 @@ Deno.serve(async (req) => {
         return await actionSchedule()
       case "reminders":
         return await actionReminders()
+      case "attendance":
+        return await actionAttendance()
       case "setup":
         return await actionSetup()
       default:
-        return json({ ok: false, error: "unknown_action", actions: ["assign", "morning", "schedule", "reminders", "setup"] }, 400)
+        return json({ ok: false, error: "unknown_action", actions: ["assign", "morning", "schedule", "reminders", "attendance", "setup"] }, 400)
     }
   } catch (e) {
     console.error("[telegram-push] error:", e)

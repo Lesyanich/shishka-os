@@ -11,6 +11,10 @@ export interface Staff {
   phone: string | null
   pin_code: string | null
   is_active: boolean
+  /** Opens the shop — a missing clock-in DMs the owners (LEG-004 §4a). */
+  opening_critical: boolean
+  /** Date they signed the punctuality policy; null = not enforceable (§3). */
+  punctuality_ack_on: string | null
   created_at: string
 }
 
@@ -21,6 +25,8 @@ export interface StaffInsert {
   phone?: string | null
   pin_code?: string | null
   is_active?: boolean
+  opening_critical?: boolean
+  punctuality_ack_on?: string | null
 }
 
 export interface StaffUpdate {
@@ -30,6 +36,8 @@ export interface StaffUpdate {
   phone?: string | null
   pin_code?: string | null
   is_active?: boolean
+  opening_critical?: boolean
+  punctuality_ack_on?: string | null
 }
 
 export interface UseStaffResult {
@@ -56,7 +64,7 @@ export function useStaff(): UseStaffResult {
 
     const { data, error: fetchError } = await supabase
       .from('staff')
-      .select('id, name, name_th, role, app_role, phone, pin_code, is_active, created_at')
+      .select('id, name, name_th, role, app_role, phone, pin_code, is_active, opening_critical, punctuality_ack_on, created_at')
       .order('name', { ascending: true })
 
     if (fetchError) {

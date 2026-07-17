@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
+  AlarmClock,
   BarChart3,
   BookOpen,
   CalendarDays,
@@ -37,6 +38,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useAppRole, type AppRole } from '../contexts/AppRoleContext'
 import { hasAccess } from '../lib/roles'
+import { ClockInNudge } from '../components/ClockInNudge'
 
 /* ─── Types ─── */
 
@@ -122,6 +124,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'HR & Payroll',
     items: [
       { path: '/hr/attendance', icon: CalendarCheck, label: 'Attendance', minRole: 'owner' },
+      { path: '/hr/punctuality', icon: AlarmClock, label: 'Punctuality', minRole: 'owner' },
       { path: '/hr/payroll', icon: Banknote, label: 'Payroll', minRole: 'owner' },
       { path: '/hr/staff', icon: Users, label: 'Staff', minRole: 'owner' },
     ],
@@ -370,6 +373,10 @@ export function AppShell() {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto p-6">
+          {/* Clock-in prompt — the punch record is the factual basis for pay
+              and discipline (LEG-004 §2), so it has to reach staff wherever
+              they are, not wait on one page. Self-hides when not applicable. */}
+          <ClockInNudge />
           <Outlet />
         </main>
       </div>
