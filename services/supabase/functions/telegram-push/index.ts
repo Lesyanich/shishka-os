@@ -211,8 +211,16 @@ async function actionReminders() {
  * absence is the one that costs money by the minute.
  *
  * Excused shifts never reach here (v_shift_punctuality.is_excused, mig 370) —
- * "warned us at 07:00 that the bus broke down" is not an alarm. Days off need
- * no special case: no shift row, no alert.
+ * "warned us at 07:00 that the bus broke down" is not an alarm. Leave, days off
+ * and holidays are dropped upstream too (mig 377 reads staff_attendance), and a
+ * plain day off has no shift row to begin with.
+ *
+ * Only people who have signed the policy are alerted on (is_enforced, mig 374).
+ * Without that filter the alarm fires on staff for whom the punch is not yet a
+ * duty — at zero adoption that is a daily "nobody clocked in" DM where every
+ * line is false, which teaches the owner to swipe the channel away before the
+ * first real signal ever arrives. An unsigned employee not punching is not news;
+ * a signed one not punching is.
  *
  * Deduped via `attendance_alerts` (PK on shift_id): rows are written only
  * after a successful send, so a failure retries on the next sweep.
@@ -226,6 +234,7 @@ async function actionAttendance() {
     .eq("shift_date", today)
     .eq("punch_status", "no_clock_in")
     .eq("is_excused", false)
+    .eq("is_enforced", true)
 
   type PunctRow = {
     shift_id: string

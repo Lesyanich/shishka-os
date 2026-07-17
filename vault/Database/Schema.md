@@ -701,6 +701,26 @@ Sales data pulled from Syrve POS (Phase 19).
 - **nomenclature**: Trimmings/stems/cores moved to `F-ZW-BYP`. Garbage auto-created rows merged/deleted. USDA nutrition data (calories, protein, carbs, fat) for ~50 RAW items.
 - **nomenclature_tags**: Seeded ~200 rows linking products to dietary, allergen, storage, taste, booster, technique, cuisine tags.
 
+## Attendance Control / Punctuality (LEG-004, Migrations 366-377)
+
+Policy: [`docs/domain/working-hours-punctuality-policy.md`](../../docs/domain/working-hours-punctuality-policy.md). Input is `shifts` (the plan) × `shift_clock_events` (the punch, written only by `fn_clock`). Everything downstream is a read model or an owner decision — nothing writes a consequence automatically.
+
+| Table / View | PK | Key Columns | Notes | Migration |
+|---|---|---|---|---|
+| `v_shift_punctuality` | VIEW | shift_id, staff_id, shift_date, punch_status (on_time/late/pending/no_clock_in), late_minutes, is_excused, is_enforced | Stateless: recomputed per read, so config changes apply retroactively. `security_invoker`. Grace from `payroll_config.late_grace_minutes` (10). Excludes shifts whose `staff_attendance` says leave/holiday/day_off/absent (377) | 366, 370, 374, 377 |
+| `v_warning_proposals` | VIEW | staff_id, period, late_count, no_punch_count, threshold | Proposes at `payroll_config.late_warning_threshold` (3) unexcused incidents/month. Gated on `staff.punctuality_ack_on`. A month with any `staff_warnings.for_period` row never re-proposes | 371, 374 |
+| `staff_warnings` | `id` UUID | kind (verbal/written_1/written_2_final), status (approved/dismissed), issued_on, `expires_on` GENERATED (+1 yr, LPA §119(4)), for_period, signed_on | staff_id, issued_by -> staff. **Writes owner-only since 376** (was owner+task_manager — the policy's own subject could file a `dismissed` row and bury her proposal) | 367, 371, 376 |
+| `attendance_excuses` | `shift_id` UUID | reason, excused_by, excused_at | shift_id -> shifts (CASCADE). Owner-only writes; excused incidents leave both the ladder and the unpaid-minutes total | 370 |
+| `unworked_time_adjustments` | `id` UUID | period_month, late_minutes, amount, approved_by, UNIQUE(staff_id, period_month) | staff_id -> staff. Owner-approved only; feeds `fn_calculate_payroll` → `payroll_lines.other_deductions` → net_pay. No row = no effect. Value is client-computed (salary/30/9/60/min) | 372 |
+| `attendance_alerts` | `shift_id` UUID | sent_at | Dedupe ledger for the Telegram no-clock-in alarm (one alert per shift, ever). RLS on, zero policies — service-role writes only | 368 |
+| `shifts_audit` | `id` UUID | shift_id (**no FK on purpose** — a deleted shift must not erase its own trace), action, actor_uid, actor_staff_id, old_row/new_row JSONB | Append-only history of every `shifts` write. Owners read; no INSERT policy (trigger is SECURITY DEFINER — a forgeable audit trail is not one) | 375 |
+
+Columns added to existing tables: `staff.opening_critical` (369 — flags the shop opener for the alarm), `staff.punctuality_ack_on` (374 — per-employee signature date; NULL = facts recorded, zero consequence).
+
+Triggers: `trg_shifts_audit` (AFTER INS/UPD/DEL → `shifts_audit`), `trg_shifts_guard_started` (BEFORE UPD/DEL — non-owners cannot touch a shift once its start has passed in Asia/Bangkok; keeps the administrator's roster planning from PR os#480 while closing retroactive edits to the yardstick). Both migration 375.
+
+Cron: `attendance-no-show` `*/15 2-11 * * *` UTC (09:00-18:45 ICT) → `fn_staff_tasks_push('attendance')` → `telegram-push?action=attendance`.
+
 ## Related
 
 - [[Shishka OS Architecture]] -- System overview and module map

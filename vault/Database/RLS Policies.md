@@ -108,6 +108,16 @@ This is the **first** Phase-D-style scoping in production — earlier than the b
 
 This is why "wide-open" is acceptable today (small team, trusted users) but unacceptable as the team grows past CEO + cooks.
 
+## Attendance control — where "wide-open" stopped being acceptable (2026-07-17, migs 375-376)
+
+The LEG-004 audit found the first case where the blanket `auth.role() = 'authenticated'` write policy was not merely loose but self-defeating: the administrator is both a writer and the subject of the policy being enforced against her.
+
+- **`shifts`** (`shifts_write_auth` = any authenticated) is the yardstick lateness is measured against. Left open, the measured party could move her own `start_time` after the fact, or delete the shift outright, with no trace. Not closed to owner-only, because CEO decision 2026-07-03 (PR os#480) deliberately gave the administrator direct roster editing. Instead **mig 375** freezes the past: `trg_shifts_guard_started` blocks non-owner UPDATE/DELETE once a shift's start has passed (Asia/Bangkok), and `trg_shifts_audit` records every write with its actor. Planning forward stays hers; rewriting history does not. INSERT is deliberately unguarded (a new past shift erases no incident, and guarding it would break bulk roster generation).
+- **`staff_warnings`** granted INSERT/UPDATE to `task_manager` (mig 367) while mig 367's sibling 371 declared "the system proposes, only an owner issues". The gap let the subject file a `status='dismissed'` row for her own month — `v_warning_proposals` hides any month with a warning row, so the proposal disappeared permanently. No DELETE needed. **Mig 376** closes writes to owner-only; SELECT unchanged (the administrator still needs the team register).
+- Reminder from this audit: `/hr/punctuality` being owner-gated proves nothing — `RoleGuard` is a client-side redirect. It stops a menu click, not a POST.
+
+Still open here: `shifts_read_anon` (`SELECT true`) exposes the roster without auth. Tracked with the wider gap in MC task 79f3e983.
+
 ## See Also
 
 - [[Database/Domain Contracts]] — table ownership matrix this RLS will enforce

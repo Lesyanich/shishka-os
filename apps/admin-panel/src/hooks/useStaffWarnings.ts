@@ -40,9 +40,16 @@ export function useStaffWarnings(issuedBy: string | null): UseStaffWarningsResul
     setIsLoading(true)
     setError(null)
 
+    // status/for_period/signed_on arrived with mig 371 and MUST stay in this
+    // list: they are not decorative. `status` gates activeWarnings(), which
+    // drives the ladder — omit it and every check reads undefined, the ladder
+    // silently never leaves 'verbal', and dismissed proposals render as issued
+    // warnings. Nothing throws; it just quietly reports "no violations".
     const { data, error: fetchError } = await supabase
       .from('staff_warnings')
-      .select('id, staff_id, kind, issued_on, expires_on, reason, doc_url, notes, issued_by, created_at')
+      .select(
+        'id, staff_id, kind, status, for_period, signed_on, issued_on, expires_on, reason, doc_url, notes, issued_by, created_at',
+      )
       .order('issued_on', { ascending: false })
 
     if (fetchError) {
