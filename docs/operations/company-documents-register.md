@@ -1,7 +1,7 @@
 # Shishka Co. — Company Documents Register
 
 > Maintained by `/lawyer` agent.
-> Last updated: 2026-07-06
+> Last updated: 2026-07-17
 > Physical files: Google Drive — `Shishka healthy kitchen/00_Legal/`
 > Source of truth for "what doc exists, where, expiry, purpose"
 > Phase 1 entries. Will grow with each document intake via `/lawyer`.
@@ -13,6 +13,8 @@
 | LEG-001 | registration | 0835568025951 | Shishka Healthy Food Co., Ltd. | 2025-12-16 | — | 01_Company_Registration/2025-12-16__Company_Registration__0835568025951.pdf | Corporate hygiene, bank KYC, supplier agreements, FDA application, BOI eligibility | active |
 | LEG-002 | work_permit | 0769830000874 | Lesia Kostiukova | 2026-04-25 | 2027-04-24 | 02_Work_Permits/Lesia_Kostiukova/2026-04-25__Work_Permit__0769830000874__Lesia_Kostiukova.pdf | Signing authority for Shishka Co., visa basis, BOI eligibility, employment permission as General Manager | active |
 | LEG-003 | employment | POL-ATT-001 | Shishka Healthy Food Co., Ltd. | 2026-07-06 | — | 08_Employment_Contracts/Policies/2026-07-06__Attendance_Sick_Leave_Discipline_Policy.pdf | Attendance, sick-leave & absence discipline (LPA §32/§34/§57/§119) — paid vs unpaid leave, medical-certificate rule, warning ladder, dismissal for cause. Source of truth: `docs/domain/labour-attendance-sick-leave-policy.md`. CEO-approved 2026-07-06; signed PDF to be filed. | active |
+| LEG-004 | employment | POL-PUN-001 | Shishka Healthy Food Co., Ltd. | 2026-07-17 | — | 08_Employment_Contracts/Policies/2026-07-17__Working_Hours_Punctuality_Policy.pdf | Working hours & punctuality (LPA §23/§76/§119(4)) — clock-in duty, 10-min grace, no-work-no-pay for late minutes (salary/30/9h), written-warning ladder → §119(4) dismissal, per-employee signed acknowledgment gate. Source of truth: `docs/domain/working-hours-punctuality-policy.md`. CEO-approved 2026-07-17; signed acknowledgments (Appendix B) to be filed. | active |
+| LEG-005 | employment | WW1-2026-001 | Administrator (name TBC — Mint?) | 2026-07-17 | — | _drafts/2026-07-17__Written_Warning_Lateness__DRAFT__Administrator.md | Written Warning #1 for systematic lateness (LEG-004 Appendix A). Facts table (dates/minutes) to be filled by CEO from records; name to confirm before issuing. Valid 1 year from violation per LPA §119(4) once signed. | draft |
 
 ## Doc type taxonomy
 

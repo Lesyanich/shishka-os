@@ -57,6 +57,13 @@ assets:
   - label: "LEG-002 — Work Permit 0769830000874 (Lesia Kostiukova)"
     path: "Drive: 00_Legal/02_Work_Permits/Lesia_Kostiukova/2026-04-25__Work_Permit__0769830000874__Lesia_Kostiukova.pdf"
     url: "https://drive.google.com/file/d/1XOpM7siD27LF0IPn9vNNHdPvd0WaE5BN/view?usp=drivesdk"
+  - label: "LEG-003 — Attendance & Sick-Leave Policy POL-ATT-001 (Shishka Co.)"
+    path: "Drive: 00_Legal/08_Employment_Contracts/Policies/2026-07-06__Attendance_Sick_Leave_Discipline_Policy.pdf"
+  - label: "LEG-004 — Working Hours & Punctuality Policy POL-PUN-001 (Shishka Co.)"
+    path: "Drive: 00_Legal/08_Employment_Contracts/Policies/2026-07-17__Working_Hours_Punctuality_Policy.pdf"
+  - label: "LEG-005 — Written Warning #1 lateness DRAFT (Administrator)"
+    path: "Drive: 00_Legal/_drafts/2026-07-17__Written_Warning_Lateness__DRAFT__Administrator.md"
+    url: "https://drive.google.com/file/d/121OhkkqMhSzoFycpsx1tmu8EVuRYBqiA/view?usp=drivesdk"
 related:
   - "[[Operations/]]"
   - "[[Operations/Staff]]"
@@ -98,6 +105,9 @@ The `/lawyer` agent (also `/saul`) owns this folder. See [`agents/lawyer/AGENT.m
 |---|---|---|---|---|
 | LEG-001 | registration | 0835568025951 | Shishka Healthy Food Co., Ltd. | — |
 | LEG-002 | work_permit | 0769830000874 | Lesia Kostiukova | 2027-04-24 |
+| LEG-003 | employment (policy) | POL-ATT-001 | Shishka Healthy Food Co., Ltd. | — |
+| LEG-004 | employment (policy) | POL-PUN-001 | Shishka Healthy Food Co., Ltd. | — |
+| LEG-005 | employment (warning, draft) | WW1-2026-001 | Administrator (TBC) | — |
 
 Full register with paths, status, and history: [`docs/operations/company-documents-register.md`](../../docs/operations/company-documents-register.md).
 
