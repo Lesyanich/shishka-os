@@ -26,3 +26,12 @@ Technical / agent-side steps. Business outcomes go to `business_tasks` via MC, n
 - Drafted Written Warning #1 for administrator (LEG-005, WW1-2026-001, name TBC — Mint?) → GDrive `00_Legal/_drafts/2026-07-17__Written_Warning_Lateness__DRAFT__Administrator.md` (file id 121OhkkqMhSzoFycpsx1tmu8EVuRYBqiA). Facts table + name to be filled by CEO before issuing.
 - Register: added LEG-004 (active) + LEG-005 (draft) rows. Vault: added LEG-004/LEG-005 assets rows + repaired missing LEG-003 row (drift — register had it, vault didn't).
 - MC task 24ae6b0c (legal, high) claimed in_progress — also tracks tech part (migs 366-368, /hr/punctuality, TG alert) built in same session on branch claude/admin-attendance-control-system-c8888d.
+
+## 2026-07-17 (round 2) — CEO revisions: all staff, excuses, approval gate, handbook
+
+- CEO: system must cover every employee (not just Mint); warnings only with owner approval; excused reasons must not count; handbook instruction needed. Drew 3 flow diagrams before building; CEO answered: alerts for all scheduled staff, excuse = owners only, approved minutes DO hit the payslip.
+- Migs 370-374 applied to prod: `attendance_excuses` + `is_excused` on the view; `staff_warnings.status/for_period/signed_on` + `v_warning_proposals` (threshold in payroll_config); `unworked_time_adjustments` + fn_calculate_payroll carries `other_deductions`; kb page `working-hours-and-punctuality` (EN/TH/MY); `staff.punctuality_ack_on` gate.
+- **Caught in testing:** v_warning_proposals suggested 10 warnings for pre-policy no-clock-in history (people who worked but never pressed a button that didn't exist as a duty). Fixed by the ack gate (mig 374) — LEG-004 §3 already required it. 10 → 0.
+- **fn_calculate_payroll drift:** repo 171a ≠ live (config keys `ot_multiplier_*` vs `ot_*_multiplier` → would NULL net_pay; live also has hire/fire pro-rating + sso_number check + draft guard). Mig 372 rebuilt from pg_get_functiondef. Regression-verified against June baseline.
+- telegram-push redeployed twice (v8/v9): action=attendance now covers all scheduled staff in one grouped message, opener flagged first, excused skipped.
+- LEG-004 updated (§4 excuses, §4a alarm scope, §5 proposal flow, §7 system of record). PR #520 updated with a round-2 comment.
