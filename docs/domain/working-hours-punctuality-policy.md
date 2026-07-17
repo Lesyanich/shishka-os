@@ -103,6 +103,9 @@ ladder for the same day.
 - Punches → `shift_clock_events` (via `fn_clock`).
 - Per-shift status (on time / late N min / no clock-in) → `v_shift_punctuality`
   (grace-aware, Asia/Bangkok), visible to owners at `/hr/punctuality`.
+- The §4 alarm fires for staff flagged `staff.opening_critical` (ticked in the
+  staff form). Everyone else's lateness is recorded and visible on
+  `/hr/punctuality`, but does not raise a push alert.
 - Warnings → `staff_warnings` (kind: verbal / written #1 / written #2 final;
   auto-expiry at 1 year).
 - Monthly "hours not worked" summary → payroll notes; the statutory payroll
