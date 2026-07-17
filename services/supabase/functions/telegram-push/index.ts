@@ -197,38 +197,35 @@ async function actionReminders() {
 }
 
 /**
- * Alert owners when the shop opener has no clock-in past the grace window.
+ * Alert owners about scheduled shifts with no clock-in past the grace window.
  *
  * The shop not opening on time is the expensive failure this whole system
- * exists to catch (policy LEG-004 §4), so this fires as soon as the punch is
+ * exists to catch (policy LEG-004 §4), so this fires as soon as a punch is
  * overdue — `v_shift_punctuality` only flips a shift to 'no_clock_in' once
  * start_time + grace has passed (Asia/Bangkok), which is exactly the trigger.
  *
- * Scoped to `staff.opening_critical` (mig 369): alerting on every rostered
- * no-punch would mean a DM per cook per day while punch-clock adoption is
- * still ramping, and an owner who ignores the channel is worse than no alert.
- * Everyone else's missed punches surface on /hr/punctuality instead.
+ * Covers EVERY scheduled employee (CEO decision 2026-07-17), but sends ONE
+ * grouped message per sweep rather than a DM per person — four separate pings
+ * for the same 09:00 roster is how an owner learns to swipe the channel away.
+ * Whoever opens the shop (`staff.opening_critical`) is called out first: that
+ * absence is the one that costs money by the minute.
  *
- * Deduped via `attendance_alerts` (PK on shift_id): a failed send leaves no
- * row, so the next cron sweep retries it.
+ * Excused shifts never reach here (v_shift_punctuality.is_excused, mig 370) —
+ * "warned us at 07:00 that the bus broke down" is not an alarm. Days off need
+ * no special case: no shift row, no alert.
+ *
+ * Deduped via `attendance_alerts` (PK on shift_id): rows are written only
+ * after a successful send, so a failure retries on the next sweep.
  */
 async function actionAttendance() {
   const today = todayICT()
-
-  const { data: openers } = await db
-    .from("staff")
-    .select("id, name")
-    .eq("opening_critical", true)
-    .eq("is_active", true)
-  const openerRows = (openers ?? []) as Array<{ id: string; name: string }>
-  if (openerRows.length === 0) return json({ ok: true, sent: 0, scanned: 0, note: "no_opening_critical_staff" })
 
   const { data: pending } = await db
     .from("v_shift_punctuality")
     .select("shift_id, staff_id, start_time, end_time, grace_min")
     .eq("shift_date", today)
     .eq("punch_status", "no_clock_in")
-    .in("staff_id", openerRows.map((s) => s.id))
+    .eq("is_excused", false)
 
   type PunctRow = {
     shift_id: string
@@ -259,29 +256,43 @@ async function actionAttendance() {
   const targets = ownerChats.length > 0 ? ownerChats : GROUP_CHAT_ID ? [GROUP_CHAT_ID] : []
   if (targets.length === 0) return json({ ok: false, error: "no_owner_chat_configured" }, 200)
 
-  const nameById = new Map(openerRows.map((s) => [s.id, s.name]))
+  const { data: staffRows } = await db
+    .from("staff")
+    .select("id, name, opening_critical")
+    .in("id", fresh.map((r) => r.staff_id))
+  type StaffRow = { id: string; name: string; opening_critical: boolean }
+  const staffById = new Map(((staffRows ?? []) as StaffRow[]).map((s) => [s.id, s]))
 
-  let sent = 0
-  for (const row of fresh) {
-    const name = nameById.get(row.staff_id) ?? "Unknown"
-    const lateBy = nowMinICT() - ((timeToMin(row.start_time) ?? 0) + row.grace_min)
-    const text =
-      `⏰ <b>No clock-in · ยังไม่ได้ลงเวลา</b>\n` +
-      `${escapeHtml(name)} — shift ${row.start_time.slice(0, 5)}–${row.end_time.slice(0, 5)}\n` +
-      `Overdue by ${Math.max(lateBy, 0)} min (grace ${row.grace_min} min).`
+  // Openers first — that line is the one that means "the door is still shut".
+  const ordered = [...fresh].sort((a, b) => {
+    const ao = staffById.get(a.staff_id)?.opening_critical ? 0 : 1
+    const bo = staffById.get(b.staff_id)?.opening_critical ? 0 : 1
+    return ao - bo || a.start_time.localeCompare(b.start_time)
+  })
 
-    let any = false
-    for (const chatId of targets) {
-      const res = await sendMessage(chatId, text)
-      if (res.ok) any = true
-    }
-    if (any) {
-      await db.from("attendance_alerts").insert({ shift_id: row.shift_id })
-      sent++
-    }
+  const lines = ordered.map((row) => {
+    const s = staffById.get(row.staff_id)
+    const overdue = Math.max(nowMinICT() - ((timeToMin(row.start_time) ?? 0) + row.grace_min), 0)
+    const shift = `${row.start_time.slice(0, 5)}–${row.end_time.slice(0, 5)}`
+    return s?.opening_critical
+      ? `🔴 <b>${escapeHtml(s.name)}</b> — opens the shop · ${shift} · ${overdue} min overdue`
+      : `• ${escapeHtml(s?.name ?? "Unknown")} — ${shift} · ${overdue} min overdue`
+  })
+
+  const text =
+    `⏰ <b>No clock-in · ยังไม่ได้ลงเวลา</b> (${ordered.length})\n` +
+    lines.join("\n")
+
+  let sentToAny = false
+  for (const chatId of targets) {
+    const res = await sendMessage(chatId, text)
+    if (res.ok) sentToAny = true
   }
 
-  return json({ ok: true, sent, scanned: rows.length })
+  if (!sentToAny) return json({ ok: false, error: "send_failed", scanned: rows.length }, 200)
+
+  await db.from("attendance_alerts").insert(ordered.map((r) => ({ shift_id: r.shift_id })))
+  return json({ ok: true, sent: ordered.length, scanned: rows.length })
 }
 
 // One-shot maintenance: clear the stale web_app/ngrok menu button (both the

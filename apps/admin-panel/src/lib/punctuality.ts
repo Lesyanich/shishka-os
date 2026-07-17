@@ -15,6 +15,11 @@ export interface PunctualityRow {
   grace_min: number
   punch_status: PunchStatus
   late_minutes: number
+  /** Owner marked this shift excused — it leaves the counter and the pay total. */
+  is_excused: boolean
+  excuse_reason: string | null
+  /** Employee had signed the policy by this date (LEG-004 §3). */
+  is_enforced: boolean
 }
 
 export interface StaffPunctuality {
@@ -25,6 +30,11 @@ export interface StaffPunctuality {
   noClockInDays: number
   /** Shifts already past their grace window (excludes 'pending'). */
   settledShifts: number
+  /** Excused incidents — shown for the record, counted against nothing. */
+  excusedCount: number
+  /** Unenforceable incidents (before the employee signed) — facts, not grounds. */
+  unenforcedCount: number
+  /** Late + no-punch shifts, newest first; excused ones included but flagged. */
   incidents: PunctualityRow[]
 }
 
@@ -61,13 +71,19 @@ export const WARNING_KIND_META: Record<
 
 export type WarningKind = 'verbal' | 'written_1' | 'written_2_final'
 
-/** One row of `staff_warnings` (see migration 367). */
+export type WarningStatus = 'approved' | 'dismissed'
+
+/** One row of `staff_warnings` (see migrations 367 + 371). */
 export interface StaffWarning {
   id: string
   staff_id: string
   kind: WarningKind
+  status: WarningStatus
   issued_on: string
   expires_on: string
+  /** Month a punctuality proposal was raised for; null = logged by hand. */
+  for_period: string | null
+  signed_on: string | null
   reason: string
   doc_url: string | null
   notes: string | null
@@ -92,6 +108,8 @@ export function aggregateByStaff(rows: PunctualityRow[]): Map<string, StaffPunct
       lateMinutesTotal: 0,
       noClockInDays: 0,
       settledShifts: 0,
+      excusedCount: 0,
+      unenforcedCount: 0,
       incidents: [],
     }
 
@@ -99,13 +117,23 @@ export function aggregateByStaff(rows: PunctualityRow[]): Map<string, StaffPunct
 
     if (row.punch_status === 'on_time') {
       entry.onTimeCount += 1
-    } else if (row.punch_status === 'late') {
-      entry.lateCount += 1
-      entry.lateMinutesTotal += row.late_minutes
+    } else if (row.punch_status === 'late' || row.punch_status === 'no_clock_in') {
       entry.incidents.push(row)
-    } else if (row.punch_status === 'no_clock_in') {
-      entry.noClockInDays += 1
-      entry.incidents.push(row)
+      // An excused shift stays visible in the drill-down but must not feed the
+      // discipline counter or the unpaid-minutes total: issuing a warning over
+      // an excused absence is what gets the whole ladder thrown out (LEG-004).
+      // Same for anything before the employee signed the policy (§3) — those
+      // are historical facts about a button nobody was asked to press yet.
+      if (!row.is_enforced) {
+        entry.unenforcedCount += 1
+      } else if (row.is_excused) {
+        entry.excusedCount += 1
+      } else if (row.punch_status === 'late') {
+        entry.lateCount += 1
+        entry.lateMinutesTotal += row.late_minutes
+      } else {
+        entry.noClockInDays += 1
+      }
     }
 
     byStaff.set(row.staff_id, entry)
@@ -133,7 +161,7 @@ export function lateTrend(
 /** Warnings still within their 1-year §119(4) validity window, newest first. */
 export function activeWarnings(warnings: StaffWarning[], todayIso: string): StaffWarning[] {
   return warnings
-    .filter((w) => w.expires_on >= todayIso)
+    .filter((w) => w.status === 'approved' && w.expires_on >= todayIso)
     .sort((a, b) => b.issued_on.localeCompare(a.issued_on))
 }
 
@@ -150,10 +178,34 @@ export function strongestActiveWarning(
   return strongest
 }
 
+/** One row of `v_warning_proposals` (see migration 371). */
+export interface WarningProposal {
+  staff_id: string
+  period: string
+  late_count: number
+  no_punch_count: number
+  late_minutes_total: number
+  threshold: number
+}
+
+/**
+ * The next rung of the LEG-004 §5 ladder for a staff member.
+ * Verbal warnings carry no §119(4) weight but are the documented first step;
+ * only live (approved, unexpired) warnings move the ladder along.
+ */
+export function nextWarningKind(activeWarnings: StaffWarning[]): WarningKind {
+  const kinds = new Set(activeWarnings.map((w) => w.kind))
+  if (kinds.has('written_2_final')) return 'written_2_final'
+  if (kinds.has('written_1')) return 'written_2_final'
+  if (kinds.has('verbal')) return 'written_1'
+  return 'verbal'
+}
+
 /**
  * Value of unworked time per LEG-004 §3: monthly_salary / 30 days / 9 hours,
- * pro-rated per minute. Informational only — never applied automatically by
- * payroll (`fn_calculate_payroll` deducts full `absent` days only).
+ * pro-rated per minute. This is a proposal, never an effect — it reaches a
+ * payslip only once an owner approves it for that month
+ * (`unworked_time_adjustments`, mig 372).
  */
 export function unworkedTimeValue(monthlySalary: number, lateMinutes: number): number {
   if (monthlySalary <= 0 || lateMinutes <= 0) return 0

@@ -58,22 +58,46 @@ updated_by: lawyer-agent
   fine**: wages are simply not earned for time not worked. Fixed monetary
   fines for lateness are prohibited and are never applied.
 - The pay rule applies only to lateness occurring **on or after the date the
-  employee signed Appendix B**.
+  employee signed Appendix B**. This is enforced in the system, not by
+  goodwill: `staff.punctuality_ack_on` gates both the pay rule and the §5
+  ladder per employee. Unsigned = the dashboard records the facts and nothing
+  else happens.
 
-## 4. No-show that blocks shop opening
+## 4. Excused incidents (the safety valve)
 
-If the employee responsible for opening the shop has not clocked in by
-shift start + grace, the system alerts the owners immediately (Telegram).
-A no-show or lateness that **prevents the shop from opening on time** is a
-**serious breach** of this policy: it skips the verbal step and goes
-directly to a written warning (§5), independent of the LEG-003 absence
-ladder for the same day.
+An employee who **gives notice before the shift** and has a genuine reason
+(own illness, sick child, transport failure, emergency) has their lateness or
+absence marked **excused** by an owner. An excused incident:
+
+- does **not** count towards the §5 ladder;
+- does **not** enter the unpaid-minutes total (§3).
+
+Only owners (Lesia / Bas) may excuse, and nobody may excuse their own
+incident. Every excuse is recorded with its reason and author.
+
+This is not leniency, it is the load-bearing part of the whole policy:
+warnings issued over excused absences collapse in a labour inspection and
+take the §5 ladder down with them. The excuse valve is what makes the
+warnings we *do* issue unassailable.
+
+## 4a. No-show that blocks shop opening
+
+If a scheduled employee has not clocked in by shift start + grace, the system
+alerts the owners (Telegram). Whoever opens the shop (`staff.opening_critical`)
+is flagged first — that absence costs money by the minute. Lateness that
+**prevents the shop from opening on time** is a **serious breach**: it skips
+the verbal step and goes directly to a written warning (§5), independent of
+the LEG-003 absence ladder for the same day.
 
 ## 5. Discipline ladder (lateness pattern)
 
+**No warning is ever issued by the system.** On crossing the threshold the
+system raises a **proposal**; an owner then either issues the warning or
+dismisses the proposal. Both decisions are recorded.
+
 | Step | Trigger | Action |
 |---|---|---|
-| 1 | 3+ late incidents in a rolling calendar month | **Verbal warning**, logged in the warnings register |
+| 1 | 3+ unexcused incidents in a calendar month (`late_warning_threshold`) | **Verbal warning**, logged in the warnings register |
 | 2 | Further lateness after verbal warning | **Written Warning #1** (Appendix A), signed, copy to employee |
 | 3 | Further lateness after Written Warning #1 | **Written Warning #2 (Final)** |
 | 4 | Further lateness after Final warning | **Termination for cause** — violation of work rules after written warning, **LPA §119(4)**: no severance pay, no advance notice |
@@ -81,7 +105,7 @@ ladder for the same day.
 - A written warning is valid for **1 year** from the date of the violation
   (**LPA §119(4)**). Warnings are recorded in the company warnings register
   (`staff_warnings`) with issue and expiry dates.
-- Serious breach (§4) enters the ladder directly at step 2 or 3.
+- Serious breach (§4a) enters the ladder directly at step 2 or 3.
 - The ladder is cumulative with LEG-003: unexcused full-day absence keeps
   its own track (LEG-003 §3–4); warnings under either policy count as
   written warnings for §119(4) purposes when the violation type matches the
@@ -101,16 +125,24 @@ ladder for the same day.
 ## 7. System of record
 
 - Punches → `shift_clock_events` (via `fn_clock`).
+- Excuses → `attendance_excuses` (owner-only; reason + author recorded).
+- Acknowledgment date → `staff.punctuality_ack_on` (set in the staff form when
+  the signed Appendix B is filed). Nothing before it ever counts.
+- Warning proposals → `v_warning_proposals`; decisions → `staff_warnings.status`
+  (`approved` = live warning, `dismissed` = reviewed and rejected).
+- Approved unworked-time value → `unworked_time_adjustments` → payslip line
+  `other_deductions` ("hours not worked"). No row = nothing deducted.
+- Staff-facing version of this policy → handbook page
+  `working-hours-and-punctuality` (EN/TH/MY).
 - Per-shift status (on time / late N min / no clock-in) → `v_shift_punctuality`
   (grace-aware, Asia/Bangkok), visible to owners at `/hr/punctuality`.
-- The §4 alarm fires for staff flagged `staff.opening_critical` (ticked in the
-  staff form). Everyone else's lateness is recorded and visible on
-  `/hr/punctuality`, but does not raise a push alert.
+- The §4a alarm covers every scheduled employee, sent as one grouped message;
+  `staff.opening_critical` (ticked in the staff form) only decides who is
+  flagged first in it.
 - Warnings → `staff_warnings` (kind: verbal / written #1 / written #2 final;
   auto-expiry at 1 year).
-- Monthly "hours not worked" summary → payroll notes; the statutory payroll
-  calculation itself (`fn_calculate_payroll`) is unchanged and deducts only
-  full `absent` days per LEG-003.
+- `fn_calculate_payroll` still deducts only full `absent` days per LEG-003; the
+  only unworked-time money it moves is an amount an owner explicitly approved.
 
 ---
 

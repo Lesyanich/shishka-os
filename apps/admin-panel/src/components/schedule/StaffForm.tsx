@@ -29,6 +29,7 @@ export function StaffForm({ staff, onSave, onClose }: StaffFormProps) {
   const [pinCode, setPinCode] = useState(staff?.pin_code ?? '')
   const [isActive, setIsActive] = useState(staff?.is_active ?? true)
   const [openingCritical, setOpeningCritical] = useState(staff?.opening_critical ?? false)
+  const [ackOn, setAckOn] = useState(staff?.punctuality_ack_on ?? '')
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -44,6 +45,7 @@ export function StaffForm({ staff, onSave, onClose }: StaffFormProps) {
       pin_code: pinCode.trim() || null,
       is_active: isActive,
       opening_critical: openingCritical,
+      punctuality_ack_on: ackOn || null,
     }
     await onSave(payload)
     setSaving(false)
@@ -145,8 +147,26 @@ export function StaffForm({ staff, onSave, onClose }: StaffFormProps) {
             </div>
           </div>
 
+          {/* Signed the punctuality policy → lateness starts counting for them
+              (LEG-004 §3). Without it the dashboard still shows the facts, but
+              no warning is proposed and no minute is ever deducted. */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-400">
+              Punctuality policy signed on
+            </label>
+            <input
+              type="date"
+              value={ackOn}
+              onChange={(e) => setAckOn(e.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Empty = not signed: lateness is recorded but never counted against them.
+            </p>
+          </div>
+
           {/* Opens the shop → owners get a Telegram alert if this person has no
-              clock-in past the grace window (LEG-004 §4). */}
+              clock-in past the grace window (LEG-004 §4a). */}
           <label className="flex items-start gap-2 text-sm text-slate-300">
             <input
               type="checkbox"

@@ -9,6 +9,8 @@ export interface PunctualityStaff {
   role: string
   app_role: string
   monthly_salary: number | null
+  /** LEG-004 acknowledgment date; null = policy not enforceable against them. */
+  punctuality_ack_on: string | null
 }
 
 export interface UsePunctualityResult {
@@ -35,7 +37,7 @@ function prevMonthOf(year: number, month: number): { year: number; month: number
 }
 
 const ROW_COLUMNS =
-  'shift_id, staff_id, shift_date, start_time, end_time, first_in_at, first_in_local, grace_min, punch_status, late_minutes'
+  'shift_id, staff_id, shift_date, start_time, end_time, first_in_at, first_in_local, grace_min, punch_status, late_minutes, is_excused, excuse_reason, is_enforced'
 
 /**
  * Per-shift punctuality for a month (+ the previous month, for trend).
@@ -60,7 +62,7 @@ export function usePunctuality(year: number, month: number): UsePunctualityResul
     const [staffRes, rowsRes, prevRes] = await Promise.all([
       supabase
         .from('staff')
-        .select('id, name, role, app_role, monthly_salary')
+        .select('id, name, role, app_role, monthly_salary, punctuality_ack_on')
         .eq('is_active', true)
         .order('name'),
       supabase

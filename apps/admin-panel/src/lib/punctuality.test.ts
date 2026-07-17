@@ -4,6 +4,7 @@ import {
   lateTrend,
   activeWarnings,
   strongestActiveWarning,
+  nextWarningKind,
   unworkedTimeValue,
   formatMinutes,
   type PunctualityRow,
@@ -16,6 +17,8 @@ function row(
   shift_date: string,
   punch_status: PunchStatus,
   late_minutes = 0,
+  is_excused = false,
+  is_enforced = true,
 ): PunctualityRow {
   return {
     shift_id: `${staff_id}-${shift_date}`,
@@ -28,6 +31,9 @@ function row(
     grace_min: 10,
     punch_status,
     late_minutes,
+    is_excused,
+    excuse_reason: is_excused ? 'told us in advance' : null,
+    is_enforced,
   }
 }
 
@@ -36,13 +42,17 @@ function warning(
   kind: StaffWarning['kind'],
   issued_on: string,
   expires_on: string,
+  status: StaffWarning['status'] = 'approved',
 ): StaffWarning {
   return {
     id,
     staff_id: 'mint',
     kind,
+    status,
     issued_on,
     expires_on,
+    for_period: null,
+    signed_on: null,
     reason: 'lateness',
     doc_url: null,
     notes: null,
@@ -98,6 +108,51 @@ describe('aggregateByStaff', () => {
   it('returns an empty map for no rows', () => {
     expect(aggregateByStaff([]).size).toBe(0)
   })
+
+  it('never counts incidents from before the employee signed the policy', () => {
+    // The punch clock predates the policy: everyone has months of "no clock-in"
+    // days they actually worked. Those must not become grounds for anything.
+    const result = aggregateByStaff([
+      row('alex', '2026-06-01', 'no_clock_in', 0, false, false),
+      row('alex', '2026-06-02', 'late', 40, false, false),
+      row('alex', '2026-07-20', 'late', 25, false, true),
+    ])
+
+    const alex = result.get('alex')!
+    expect(alex.unenforcedCount).toBe(2)
+    expect(alex.lateCount).toBe(1)
+    expect(alex.lateMinutesTotal).toBe(25)
+    expect(alex.noClockInDays).toBe(0)
+    expect(alex.incidents).toHaveLength(3)
+  })
+
+  it('keeps excused incidents out of the counter and the pay total', () => {
+    const result = aggregateByStaff([
+      row('mint', '2026-07-01', 'late', 25),
+      row('mint', '2026-07-02', 'late', 30, true),
+      row('mint', '2026-07-03', 'no_clock_in', 0, true),
+    ])
+
+    const mint = result.get('mint')!
+    expect(mint.lateCount).toBe(1)
+    expect(mint.lateMinutesTotal).toBe(25)
+    expect(mint.noClockInDays).toBe(0)
+    expect(mint.excusedCount).toBe(2)
+    // still visible in the drill-down — excused is not erased, just not counted
+    expect(mint.incidents).toHaveLength(3)
+  })
+})
+
+describe('nextWarningKind', () => {
+  it('walks the LEG-004 ladder', () => {
+    expect(nextWarningKind([])).toBe('verbal')
+    expect(nextWarningKind([warning('w', 'verbal', '2026-01-01', '2027-01-01')])).toBe('written_1')
+    expect(nextWarningKind([warning('w', 'written_1', '2026-01-01', '2027-01-01')])).toBe('written_2_final')
+  })
+
+  it('stays at final once a final warning is live', () => {
+    expect(nextWarningKind([warning('w', 'written_2_final', '2026-01-01', '2027-01-01')])).toBe('written_2_final')
+  })
 })
 
 describe('lateTrend', () => {
@@ -133,6 +188,12 @@ describe('activeWarnings', () => {
 
   it('keeps a warning that expires today (LPA §119(4) — inclusive)', () => {
     expect(activeWarnings([warning('w', 'written_1', '2025-07-17', '2026-07-17')], '2026-07-17')).toHaveLength(1)
+  })
+
+  it('ignores dismissed proposals — a rejected warning is not a warning', () => {
+    const dismissed = warning('d', 'written_1', '2026-06-01', '2027-06-01', 'dismissed')
+    expect(activeWarnings([dismissed], '2026-07-17')).toHaveLength(0)
+    expect(strongestActiveWarning([dismissed], '2026-07-17')).toBeNull()
   })
 
   it('picks the highest-severity active warning', () => {
