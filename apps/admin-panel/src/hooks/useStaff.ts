@@ -11,6 +11,8 @@ export interface Staff {
   phone: string | null
   pin_code: string | null
   is_active: boolean
+  /** Opens the shop — a missing clock-in DMs the owners (LEG-004 §4). */
+  opening_critical: boolean
   created_at: string
 }
 
@@ -21,6 +23,7 @@ export interface StaffInsert {
   phone?: string | null
   pin_code?: string | null
   is_active?: boolean
+  opening_critical?: boolean
 }
 
 export interface StaffUpdate {
@@ -30,6 +33,7 @@ export interface StaffUpdate {
   phone?: string | null
   pin_code?: string | null
   is_active?: boolean
+  opening_critical?: boolean
 }
 
 export interface UseStaffResult {

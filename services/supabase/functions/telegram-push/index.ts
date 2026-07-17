@@ -7,6 +7,9 @@
 //   morning               → DM every linked staff their tasks for today (ICT)
 //   schedule              → post today's shift schedule to the group chat
 //   reminders             → DM due/overdue, not-done tasks once (reminder_sent_at)
+//   attendance            → alert owners when a scheduled shift has no clock-in
+//                           past its grace window (shop may be unopened) — once
+//                           per shift, deduped via attendance_alerts
 //
 // Auth: deployed WITH verify_jwt (default). Callable by the authenticated admin
 // (supabase.functions.invoke attaches the user token) and by pg_cron via pg_net
@@ -19,6 +22,7 @@
 import { db } from "../_shared/supabase.ts"
 import { json } from "../_shared/cors.ts"
 import {
+  escapeHtml,
   formatTask,
   getChatMenuButton,
   getWebhookInfo,
@@ -192,6 +196,94 @@ async function actionReminders() {
   return json({ ok: true, sent, scanned: tasks.length })
 }
 
+/**
+ * Alert owners when the shop opener has no clock-in past the grace window.
+ *
+ * The shop not opening on time is the expensive failure this whole system
+ * exists to catch (policy LEG-004 §4), so this fires as soon as the punch is
+ * overdue — `v_shift_punctuality` only flips a shift to 'no_clock_in' once
+ * start_time + grace has passed (Asia/Bangkok), which is exactly the trigger.
+ *
+ * Scoped to `staff.opening_critical` (mig 369): alerting on every rostered
+ * no-punch would mean a DM per cook per day while punch-clock adoption is
+ * still ramping, and an owner who ignores the channel is worse than no alert.
+ * Everyone else's missed punches surface on /hr/punctuality instead.
+ *
+ * Deduped via `attendance_alerts` (PK on shift_id): a failed send leaves no
+ * row, so the next cron sweep retries it.
+ */
+async function actionAttendance() {
+  const today = todayICT()
+
+  const { data: openers } = await db
+    .from("staff")
+    .select("id, name")
+    .eq("opening_critical", true)
+    .eq("is_active", true)
+  const openerRows = (openers ?? []) as Array<{ id: string; name: string }>
+  if (openerRows.length === 0) return json({ ok: true, sent: 0, scanned: 0, note: "no_opening_critical_staff" })
+
+  const { data: pending } = await db
+    .from("v_shift_punctuality")
+    .select("shift_id, staff_id, start_time, end_time, grace_min")
+    .eq("shift_date", today)
+    .eq("punch_status", "no_clock_in")
+    .in("staff_id", openerRows.map((s) => s.id))
+
+  type PunctRow = {
+    shift_id: string
+    staff_id: string
+    start_time: string
+    end_time: string
+    grace_min: number
+  }
+  const rows = (pending ?? []) as PunctRow[]
+  if (rows.length === 0) return json({ ok: true, sent: 0, scanned: 0 })
+
+  // Drop shifts already alerted on.
+  const { data: alerted } = await db
+    .from("attendance_alerts")
+    .select("shift_id")
+    .in("shift_id", rows.map((r) => r.shift_id))
+  const alreadySent = new Set(((alerted ?? []) as Array<{ shift_id: string }>).map((a) => a.shift_id))
+  const fresh = rows.filter((r) => !alreadySent.has(r.shift_id))
+  if (fresh.length === 0) return json({ ok: true, sent: 0, scanned: rows.length })
+
+  // Recipients: owners' DMs; fall back to the group chat if none are linked.
+  const { data: owners } = await db.from("staff").select("id").eq("app_role", "owner")
+  const ownerChats: string[] = []
+  for (const o of (owners ?? []) as Array<{ id: string }>) {
+    const chatId = await chatForStaff(o.id)
+    if (chatId) ownerChats.push(chatId)
+  }
+  const targets = ownerChats.length > 0 ? ownerChats : GROUP_CHAT_ID ? [GROUP_CHAT_ID] : []
+  if (targets.length === 0) return json({ ok: false, error: "no_owner_chat_configured" }, 200)
+
+  const nameById = new Map(openerRows.map((s) => [s.id, s.name]))
+
+  let sent = 0
+  for (const row of fresh) {
+    const name = nameById.get(row.staff_id) ?? "Unknown"
+    const lateBy = nowMinICT() - ((timeToMin(row.start_time) ?? 0) + row.grace_min)
+    const text =
+      `⏰ <b>No clock-in · ยังไม่ได้ลงเวลา</b>\n` +
+      `${escapeHtml(name)} — shift ${row.start_time.slice(0, 5)}–${row.end_time.slice(0, 5)}\n` +
+      `Overdue by ${Math.max(lateBy, 0)} min (grace ${row.grace_min} min).`
+
+    let any = false
+    for (const chatId of targets) {
+      const res = await sendMessage(chatId, text)
+      if (res.ok) any = true
+    }
+    if (any) {
+      await db.from("attendance_alerts").insert({ shift_id: row.shift_id })
+      sent++
+    }
+  }
+
+  return json({ ok: true, sent, scanned: rows.length })
+}
+
 // One-shot maintenance: clear the stale web_app/ngrok menu button (both the
 // global default AND every linked chat's per-chat override) and re-register the
 // webhook with our secret. Idempotent — safe to call repeatedly.
@@ -249,10 +341,12 @@ Deno.serve(async (req) => {
         return await actionSchedule()
       case "reminders":
         return await actionReminders()
+      case "attendance":
+        return await actionAttendance()
       case "setup":
         return await actionSetup()
       default:
-        return json({ ok: false, error: "unknown_action", actions: ["assign", "morning", "schedule", "reminders", "setup"] }, 400)
+        return json({ ok: false, error: "unknown_action", actions: ["assign", "morning", "schedule", "reminders", "attendance", "setup"] }, 400)
     }
   } catch (e) {
     console.error("[telegram-push] error:", e)

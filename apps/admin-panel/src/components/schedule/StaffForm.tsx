@@ -28,6 +28,7 @@ export function StaffForm({ staff, onSave, onClose }: StaffFormProps) {
   const [phone, setPhone] = useState(staff?.phone ?? '')
   const [pinCode, setPinCode] = useState(staff?.pin_code ?? '')
   const [isActive, setIsActive] = useState(staff?.is_active ?? true)
+  const [openingCritical, setOpeningCritical] = useState(staff?.opening_critical ?? false)
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -42,6 +43,7 @@ export function StaffForm({ staff, onSave, onClose }: StaffFormProps) {
       phone: phone.trim() || null,
       pin_code: pinCode.trim() || null,
       is_active: isActive,
+      opening_critical: openingCritical,
     }
     await onSave(payload)
     setSaving(false)
@@ -142,6 +144,23 @@ export function StaffForm({ staff, onSave, onClose }: StaffFormProps) {
               </button>
             </div>
           </div>
+
+          {/* Opens the shop → owners get a Telegram alert if this person has no
+              clock-in past the grace window (LEG-004 §4). */}
+          <label className="flex items-start gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={openingCritical}
+              onChange={(e) => setOpeningCritical(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-emerald-500"
+            />
+            <span>
+              Opens the shop
+              <span className="block text-xs text-slate-500">
+                Alerts the owners on Telegram if there is no clock-in after the shift starts
+              </span>
+            </span>
+          </label>
 
           {/* Active */}
           {isEdit && (
