@@ -47,7 +47,7 @@ If the message contains both tech and strategic signals, or neither, default to 
 
 ## Mis-Classification Recovery
 
-- Both agents share the same MC and MemPalace — a mis-routed idea is still captured, just by the wrong reflector
+- Both agents share the same MC — a mis-routed idea is still captured, just by the wrong reflector
 - If CEO says "нет, это в tech" — current agent ends with "понял, передаю `/techlead`, <task-id> в inbox с тегом needs-tech-lead", and CEO follows up with explicit `/techlead` on the next turn
 - **No silent re-routing mid-session** — prevents identity confusion. Complete the current turn as the classified agent, then let CEO re-invoke explicitly.
 
