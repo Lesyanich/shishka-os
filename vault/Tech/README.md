@@ -21,7 +21,7 @@ The infrastructure substrate Shishka runs on — stack, MCP servers, agent syste
 - [[Tech/Architecture]] — high-level system architecture (moved from `Architecture/`)
 - [[Tech/Stack]] — Vite/React/Tailwind + Supabase + AI SDKs (versions, packages)
 - [[Tech/Agent System]] — multi-agent coordination, claim-gate, session IDs, MC-as-coordinator
-- [[Tech/MCP Servers]] — `mcp-mission-control`, `mcp-finance`, `mcp-chef`, `mcp-graphify`
+- [[Tech/MCP Servers]] — `mcp-mission-control`, `mcp-finance`, `mcp-chef`
 
 ## Where things live
 

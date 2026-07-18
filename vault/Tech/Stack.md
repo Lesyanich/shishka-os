@@ -70,12 +70,11 @@ Source: `TECH_STACK.md`, `PROJECT_MAP.md`, Auto Memory `project_admin_panel_stac
 See [[Tech/MCP Servers]] for the full catalog. Quick list:
 
 ```
-.claude/.mcp.json
+.mcp.json
 ├── shishka-mission-control     services/mcp-mission-control/
-└── shishka-graphify            services/mcp-graphify/
-                                (mcp-chef and mcp-finance run as in-app
-                                 services or are invoked via Vercel API
-                                 routes; not registered as Claude Code MCPs)
+├── shishka-chef                services/mcp-chef/
+└── shishka-finance             services/mcp-finance/
+    (shishka-graphify was retired 2026-07-18 — see docs/plans/spec-graphify-retirement.md)
 ```
 
 ## Monorepo layout
@@ -94,9 +93,6 @@ shishka-os/
 │   ├── mcp-mission-control/    Mission Control MCP server
 │   ├── mcp-finance/            Finance domain logic
 │   ├── mcp-chef/               Chef domain logic
-│   ├── mcp-graphify/           Graphify wrapper MCP server (B-2)
-│   ├── brain/                  Brain quality (Python — judge, gap monitor, regression)
-│   ├── graphify/               Graphify CLI install (Python venv)
 │   ├── gas/                    Google Apps Script for receipt parsing bridge
 │   ├── local-receipt-parser/   Local OCR pipeline (alternative to GAS)
 │   └── supabase/               Migrations + shared types

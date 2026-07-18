@@ -35,7 +35,7 @@ Other apps: `apps/kds/` (kitchen display), `apps/web/` (public site lives in the
 | Tool | Notes |
 |------|-------|
 | Claude Code | Primary development + operations AI |
-| MCP servers | `services/mcp-chef`, `mcp-finance`, `mcp-mission-control`, `mcp-graphify` |
+| MCP servers | `services/mcp-chef`, `mcp-finance`, `mcp-mission-control` |
 | Agent prompts | `agents/{chef,finance,coo,lawyer,procurement,strategy,tech-lead,designer}/` |
 | Skills / hooks | `.claude/skills/`, `.claude/hooks/` (claim-gate, skill-advisor, status generation) |
 
