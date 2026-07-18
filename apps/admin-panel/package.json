@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/build-vault-json.mjs && vite",
-    "build": "node scripts/build-vault-json.mjs && tsc -b && vite build",
+    "build": "node ../../scripts/gen-project-map.mjs && node scripts/build-vault-json.mjs && tsc -b && vite build",
+    "build:map": "node ../../scripts/gen-project-map.mjs",
     "build:vault": "node scripts/build-vault-json.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
