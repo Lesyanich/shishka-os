@@ -2,15 +2,17 @@
 domain: [all]
 agents: [all]
 load_when: "brand questions, investor materials, marketing tasks, onboarding, positioning"
-last_updated: 2026-04-05
-updated_by: CEO
+last_updated: 2026-07-18
+updated_by: CEO (2026-04-05) + code-agent factual sync (2026-07-18)
 source: "Notion SHISHKA CORE HUB, Section 1 + Section 7"
 ---
 
 # Shishka — Brand Identity & Vision
 
 ## Project Name
-**Shishka Eat Healthy**
+**Shishka Healthy Kitchen**
+<!-- Canonical per CLAUDE.md (CEO decision 2026-07-18). "Eat Healthy" survives only as a brand mantra, below. -->
+
 
 ## Slogan
 "Fresh as creation, alive like the soul"
@@ -20,6 +22,8 @@ Rawai, Phuket, Thailand (two sites ~1km apart)
 
 ## Target Opening
 Phase 1: March 2026 — L2 as store + L1 as kitchen
+<!-- ⚠ 2026-07-18: this target date is now in the past. Confirm actual opening status with CEO before citing. -->
+
 
 ## Vision
 Become a global leader in healthy fast-food retail and restaurants, with franchise potential.

@@ -1,6 +1,8 @@
 # Nomenclature — Product Type System
 
 > Lego-Architecture for menu construction.
+> **Storage:** all items live in the `nomenclature` table; the human code is the `product_code` column.
+> A separate `product_categories` axis carries non-food codes (`NF`, `NF-PKG`, `NF-DSP`) used by packaging-as-BOM. (Verified 2026-07-18 vs live DB.)
 
 ## Product Types (BOM Chain)
 

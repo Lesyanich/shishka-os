@@ -4,9 +4,9 @@
 > then read only the files relevant to their current task.
 >
 > **SSoT**: These files are the canonical source of business knowledge.
-> Field notes (Supabase `field_notes`) are raw input; only CEO-approved content lands here.
+> Field notes (Supabase `brain_inbox`) are raw input; only CEO-approved content lands here.
 >
-> **Last updated**: 2026-04-05
+> **Last updated**: 2026-07-18
 
 ## How to Use
 
@@ -33,14 +33,16 @@
 
 ## Field Notes Protocol
 
-Staff observations, CEO ideas, and agent discoveries flow through Supabase `field_notes` table:
+Staff observations, CEO ideas, and agent discoveries flow through the Supabase `brain_inbox` table
+(there is no `field_notes` table — that name never shipped):
 
 ```
-field_note → morning triage (COO) → reviewed → applied to bible / MC task / dismissed
+brain_inbox note → morning triage (COO) → reviewed → applied to bible / MC task / dismissed
 ```
 
 Types: `idea` | `problem` | `observation` | `decision`
 Sources: `ceo` | `cook` | `admin` | `agent` | `partner`
+> Note: verify the exact `type`/`source` enums against the live `brain_inbox` schema before coding against them.
 
 ## Change Log
 
@@ -51,3 +53,9 @@ Sources: `ceo` | `cook` | `admin` | `agent` | `partner`
 | 2026-07-03 | kitchen-philosophy.md | Chef recalibration: rice-bran + all RBD seed/grain oils named banned; animal-fat gate; Approved Fats Matrix (deodorized-coconut exception); Protocol 4 Protein Sourcing Integrity | CEO directive |
 | 2026-07-03 | (new) agents/chef/domain/knowledge/food-science.md, process-technology.md, sourcing-rules.md; docs/operations/sop-salmon-prep.md; sop-shrimp-prep.md into VCS | Chef recalibration — mechanism-organized culinary science foundation so the agent reasons from physics/chemistry, not per-product rules | CEO directive |
 | 2026-07-03 | operations.md | Chef recalibration follow-up: added L2 Point-of-Sale equipment list + Equipment-by-Zone quick reference. Fixes "Infrastructural Blindness" — agent had put char/sear at L2 (no lava grill there); char is L1-only, L2 = Merrychef regen. New RULE-EQUIPMENT-REALITY. | CEO directive |
+| 2026-07-18 | INDEX.md | Staleness sync (MC c6d04062): `field_notes` → `brain_inbox` (that table never shipped); bumped Last updated | code-agent, CEO-directed |
+| 2026-07-18 | identity.md | Project name → "Shishka Healthy Kitchen" (CEO decision, matches CLAUDE.md); flagged now-past March-2026 opening date | code-agent, CEO-directed |
+| 2026-07-18 | sources.md | Repointed dead `vault/Architecture/Database Schema.md` → `vault/Database/Schema.md`; Master Tasks = Mission Control (GAS export retired) | code-agent, CEO-directed |
+| 2026-07-18 | menu-items.md | Added "April-2026 concept snapshot, live menu = nomenclature SALE items" banner; not rewritten (full reconcile = separate chef task) | code-agent, CEO-directed |
+| 2026-07-18 | menu-concept.md | Added concept-snapshot banner (CBS Core Booster Menu unshipped; equipment codes are placeholders) | code-agent, CEO-directed |
+| 2026-07-18 | equipment.md | Re-verified existing live-`equipment`-table disclaimer; bumped date only | code-agent, CEO-directed |

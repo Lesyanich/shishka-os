@@ -2,12 +2,19 @@
 domain: [kitchen, marketing]
 agents: [chef, marketing]
 load_when: "menu design, CBS application, new dish creation, food philosophy, flavor development"
-last_updated: 2026-04-05
-updated_by: CEO
+last_updated: 2026-07-18
+updated_by: CEO (2026-04-05) + code-agent freshness banner (2026-07-18)
 source: "Notion SHISHKA CORE HUB, Section 2.1 + 2.3"
+status: concept-snapshot
 ---
 
 # Menu Concept & Culinary Architecture
+
+> ⚠️ **April-2026 concept snapshot.** The L1→L2 production model and CBS framework below are the
+> original design intent. Some elements are shipped, some remain aspirational (e.g. the "Core Booster
+> Menu" is unshipped — verify against live `nomenclature` PF/MOD items before treating as real).
+> Equipment codes (`L1-OVN-01`, `L1-BCH-01`) are placeholders; live scheme is `L-1-K-…` (see `operations.md`).
+> — noted 2026-07-18
 
 ## Production Model: L1 (The Factory) → L2 (The Assembly Line)
 

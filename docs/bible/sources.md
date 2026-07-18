@@ -2,8 +2,8 @@
 domain: [all]
 agents: [all]
 load_when: "looking for external resources, GDrive files, reference materials, Notion exports"
-last_updated: 2026-04-05
-updated_by: CEO
+last_updated: 2026-07-18
+updated_by: CEO (2026-04-05) + code-agent link sync (2026-07-18)
 source: "Notion SHISHKA CORE HUB, Section 5.1"
 ---
 
@@ -21,7 +21,7 @@ source: "Notion SHISHKA CORE HUB, Section 5.1"
 | Products Expenses & Waste Control | Google Docs | Waste tracking |
 | Photos Folder (Locations & Renovations) | Google Drive | Visual documentation |
 | Graphic Content Folder | Google Drive | Marketing assets |
-| Master Tasks Database | Notion → Google Drive | Exported daily via script.google.com and API PDF |
+| Master Tasks Database | Mission Control (`business_tasks`) | Live task SSoT. (The old Notion→GDrive daily GAS export is retired.) |
 
 ## Internal Documentation (This Repo)
 
@@ -32,7 +32,7 @@ source: "Notion SHISHKA CORE HUB, Section 5.1"
 | Domain Models | `docs/domain/` | Technical data dictionaries |
 | Business Domains | `docs/business/domains/` | Per-department context |
 | Architecture Notes | `vault/Architecture/` | System design documents |
-| DB Schema | `vault/Architecture/Database Schema.md` | Full database schema |
+| DB Schema | `vault/Database/Schema.md` | Full database schema (SSoT). Lightweight summary: `docs/domain/db-schema-summary.md` |
 
 ## Reference Books (Culinary)
 Mentioned in menu items as recipe references:

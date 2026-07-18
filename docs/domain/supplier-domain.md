@@ -1,5 +1,7 @@
 # Supplier Domain
 
+> **Freshness:** refreshed 2026-07-18 against live DB. Verify table names against `vault/Database/Schema.md`.
+
 ## Supplier Model
 
 Each supplier has:
@@ -19,7 +21,7 @@ SSoT for "what can we buy and where":
 
 Each product can have multiple supplier SKUs:
 - `product_id` -> `supplier_catalog.product_id`
-- Barcodes stored in `sku_barcodes` table
+- Barcodes stored in `sku_identifiers` table
 - Used for receiving station scanning
 
 ## Key Suppliers
