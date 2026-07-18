@@ -65,6 +65,41 @@ interface GroupResult {
 // Grouping algorithm (deterministic, server-side)
 // ═══════════════════════════════════════════════════════════
 
+/**
+ * Makro prints one purchase across several continuous-form sheets: the head
+ * sheet carries the line items, each later sheet carries only the VAT footer
+ * and says "items continued from sheet N". Every sheet repeats the same printed
+ * receipt number — but GCV drops digits from it often enough that the sheets of
+ * one chit arrive with *different* numbers (66021319658 came back as
+ * 6221319658 on sheet 1 and 62212719658 on sheet 2), so grouping on an exact
+ * number match files them as two receipts and the inbox shows a phantom
+ * duplicate.
+ *
+ * So we read the continuation marker off the OCR text instead of trusting the
+ * number. Fuzzy-matching the numbers would be the obvious move and is the wrong
+ * one: Makro numbers a same-day run sequentially (…19658, …19659), so two
+ * near-identical numbers are just as likely to be two genuinely different
+ * chits, and silently merging those is worse than the bug. A sheet that
+ * declares itself a continuation, by contrast, is never a standalone receipt.
+ *
+ * Checked against every parsed row in receipt_inbox before relying on it: no
+ * single-image sheet carrying this marker has any line items, i.e. a head sheet
+ * never matches it. MC ea2a7a5d.
+ */
+const CONTINUATION_MARKERS = [
+  /ต่อจากแผ่นที่/, // "items continued from sheet N" — Makro, Thai
+  /continued\s+from\s+(?:sheet|page)/i,
+]
+
+function isContinuationSheet(ocrText: string): boolean {
+  return CONTINUATION_MARKERS.some((re) => re.test(ocrText))
+}
+
+function sameSupplier(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
 function groupImages(triageItems: TriageItem[], imageOcrs: ImageOcr[]): ReceiptGroup[] {
   const groups: ReceiptGroup[] = []
   const assigned = new Set<number>()
@@ -103,6 +138,51 @@ function groupImages(triageItems: TriageItem[], imageOcrs: ImageOcr[]): ReceiptG
       },
     })
     for (const idx of indices) assigned.add(idx)
+  }
+
+  // Step 1.5: re-attach continuation sheets that OCR noise split off the rest
+  // of their receipt. Step 1 keys on an exact receipt_number match, so a
+  // mangled digit is enough to strand sheet 2 in its own group; both sheets are
+  // then marked assigned and Step 2 never gets to reunite them. Merging is
+  // deliberately narrow — a group of nothing but continuation sheets, folded
+  // into the group holding the head sheet of the same supplier on the same day
+  // — so two distinct same-day chits stay distinct. MC ea2a7a5d.
+  const pageNumberOf = new Map<number, number>()
+  for (const item of triageItems) {
+    pageNumberOf.set(item.image_index, parsePageHint(item.page_hint))
+  }
+
+  const holdsOnlyContinuations = (g: ReceiptGroup) =>
+    g.ocrTexts.length > 0 && g.ocrTexts.every(isContinuationSheet)
+  const holdsHeadSheet = (g: ReceiptGroup) => g.ocrTexts.some((t) => !isContinuationSheet(t))
+
+  for (const orphan of groups.filter(holdsOnlyContinuations)) {
+    const target = groups.find(
+      (g) =>
+        g !== orphan &&
+        holdsHeadSheet(g) &&
+        sameSupplier(g.meta.supplier_name, orphan.meta.supplier_name) &&
+        !!g.meta.date &&
+        !!orphan.meta.date &&
+        datesWithinOneDay(g.meta.date, orphan.meta.date),
+    )
+    if (!target) continue
+
+    console.log(
+      `[batch] ${orphan.id} is a continuation sheet (images ${orphan.imageIndices.join(",")}) — merging into ${target.id}; OCR split the receipt number (${orphan.meta.receipt_number} vs ${target.meta.receipt_number})`,
+    )
+
+    const indices = [...target.imageIndices, ...orphan.imageIndices].sort(
+      (a, b) => (pageNumberOf.get(a) ?? 0) - (pageNumberOf.get(b) ?? 0) || a - b,
+    )
+    target.imageIndices = indices
+    target.urls = indices.map((i) => imageOcrs[i].url)
+    target.ocrTexts = indices.map((i) => imageOcrs[i].ocrText)
+    orphan.imageIndices = [] // emptied — dropped just below
+  }
+
+  for (let i = groups.length - 1; i >= 0; i--) {
+    if (groups[i].imageIndices.length === 0) groups.splice(i, 1)
   }
 
   // Step 2: Cluster ungrouped by (supplier_name + date ±1 day)
