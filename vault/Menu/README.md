@@ -1,57 +1,21 @@
 ---
 title: Menu
-type: entity
+type: pointer
 tags: [menu]
-date: 2026-04-29
-status: active
-assets:
-  - label: "Menu photos & PDFs (Drive)"
-    path: "Drive: 01_Business/Menu/"
-    url: "https://drive.google.com/drive/folders/1T6aMaLB0Wtc-J1O3LUYSW_FJ3ZQXjLDf"
-  - label: "Salad Bar R&D"
-    path: "Drive: 01_Business/Salad_Bar/"
-    url: "https://drive.google.com/drive/folders/1vU64GVWOfKmbZ75vDN7rV3pZYJqnA8HW"
+date: 2026-07-18
+status: pointer
 related:
-  - "[[Brand/]]"
-  - "[[Recipes/]]"
+  - "[[Recipes/README]]"
   - "[[Finance/Targets & KPIs]]"
 ---
 
 # Menu
 
-The customer-facing menu of Shishka — what a guest sees, picks, and pays for. Built from the [[Recipes/]] layer (BOMs, technique) but presented from the **guest's** angle: categories, pricing, modifiers, customer experience.
+> **Pointer page.** The detail that used to live here was a 2026-04-29 snapshot that drifted out of date. Trust the source of truth below, not a copy. _(Wiki staleness audit, 2026-07-18.)_
 
-> [!info] One-line definition
-> Shishka's menu is a **modular salad-bar + grab-and-go + chef-led mains** offering, engineered around the Culinary Booster System (CBS) so 90% of flavor is pre-locked at L1 and L2 only assembles.
+**Source of truth:** the live `/menu` admin route + `nomenclature` `SALE-%` rows (via the `menu_public` view). The `/menu` UI renders the same data the customer site shows.
 
-## Sub-pages
+- Customer category routing lives in `apps/admin-panel/src/components/menu/customer/CategorySection.tsx`; menu photos live in Drive `01_Business/Menu/`.
+- ⚠️ The old "salad-bar + grab-and-go + chef-led mains" framing is an unshipped concept — the live menu is chocolate/drinks-led. See the sub-pages for where each topic now points.
 
-- [[Menu/Concept]] — what the menu IS: CBS, L1/L2 production model, food-cost philosophy, dish design constraints
-- [[Menu/Categories]] — current category structure (Breakfasts, Salads, Bowls, Soups, Mains, Sandwiches/Rolls, Dairy)
-- [[Menu/Pricing & Margins]] — FC ≤ 30% target, margin zones, color-coded health-check
-- [[Menu/Product Categorization]] — the database-side structure (`product_categories` + `nomenclature` SALE-* + tags) that backs the customer view
-
-## Where things live
-
-| Asset | Location |
-|---|---|
-| Menu photos | Drive: `01_Business/Menu/` |
-| Customer preview UI | `apps/admin-panel/src/pages/menu/` (the `/menu` admin route renders the same data the customer site will) |
-| Database SSoT | `nomenclature` table (filtered `type='dish'` + `product_code LIKE 'SALE-%'`) joined with `product_categories` and `bom_structures` |
-| Customer category routing | `apps/admin-panel/src/components/menu/customer/CategorySection.tsx` |
-
-## Adjacent entities
-
-- [[Brand/]] — voice, photography, visual system that the menu inherits
-- [[Recipes/]] — the BOM + technique layer feeding the menu
-- [[Procurement/]] — sourcing for the RAW layer
-- [[Finance/Targets & KPIs]] — FC% target this menu must hit
-- [[Operations/]] — daily operations that produce the menu in the kitchen
-
-## Recent decisions
-
-- [[Decisions/D-001-mempalace-deprecated]] (not menu-related, kept for backlink demo)
-
-## Open questions
-
-- TBD — none currently tracked in `Open Questions/`
+_See also:_ [[Menu/Categories]], [[Menu/Concept]], [[Menu/Pricing & Margins]], [[Menu/Product Categorization]]

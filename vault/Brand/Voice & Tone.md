@@ -11,6 +11,8 @@ related:
 
 # Brand Voice & Tone
 
+> **📅 As of April 2026 — historical record, not current state.** Kept for history; not maintained as current.
+
 How Shishka talks — to a guest in front of the salad bar, to an investor in a deck, to a partner in an email, to its own staff in a checklist. Synthesised from [[Brand/Identity]] + agent-personality conventions used in `agents/coo/AGENT.md` and `agents/chef/AGENT.md`.
 
 ## Voice principles

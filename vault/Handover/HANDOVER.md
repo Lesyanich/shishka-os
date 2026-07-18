@@ -1,4 +1,7 @@
 # HANDOVER — Architectural Cleanup & Dynamic BOM Ready
+
+> **📅 As of March 2026 — historical record, not current state.** Kept for history; not maintained as current. The anon-key / pre-auth architecture described below is long superseded by Supabase Auth and 300+ later migrations.
+
 **Date:** 2026-03-07
 **From Agent:** Backend Specialist (@backend-specialist)
 **Status:** ✅ PHASE 0-4 COMPLETE (Supabase P0 Refactoring)
