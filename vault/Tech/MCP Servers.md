@@ -24,10 +24,6 @@ The MCPs registered in `.claude/.mcp.json` (the ones Claude Code actually loads)
     "shishka-mission-control": {
       "command": "node",
       "args": ["services/mcp-mission-control/dist/index.js"]
-    },
-    "shishka-graphify": {
-      "command": "node",
-      "args": ["services/mcp-graphify/dist/index.js"]
     }
   }
 }
@@ -57,20 +53,9 @@ Source: `services/mcp-mission-control/`. Owns: `business_tasks`, `business_initi
 
 Every agent uses MC tools — these are the most-called MCP tools in the system.
 
-## `shishka-graphify` (knowledge graph queries)
+## `shishka-graphify` — RETIRED 2026-07-18
 
-Source: `services/mcp-graphify/` (B-2 deliverable). Owns: read-only access to `apps/admin-panel/public/graph.json` + `graph-analytics.json`.
-
-### Tools
-
-| Tool | Input | Returns |
-|---|---|---|
-| `graphify_query_topic` | `{ keywords, limit? }` | top-N relevant nodes + 1-paragraph summaries |
-| `graphify_neighborhood` | `{ node_id, depth? }` | k-hop subgraph around a node |
-| `graphify_god_nodes` | `{ category?, limit? }` | most-central nodes (high degree) |
-| `graphify_communities` | `{ category? }` | community clusters |
-
-**Goal**: 10–20× cheaper architectural queries for agents (200–500 tokens of pre-clustered structure vs. 5–20K tokens of raw file reads). When an agent asks "where is receipt parsing in the codebase?" it should reach for `graphify_query_topic` first, fall through to file `Read` only if the structure is unfamiliar.
+The knowledge-graph MCP server was removed. An A/B test showed it was **net-negative**: forcing agents to query the graph first cost *more* tokens (37–52k vs 32–37k without) because the graph gives approximate hits, so the agent still greps + reads the files afterward — the graph added a step instead of replacing one. The served `graph.json` also went stale while reporting itself fresh, and maintenance was manual. For code navigation use **grep + targeted `Read`**; for a human-readable view of project structure use the vault wiki (`/brain/wiki`). Full record: `docs/plans/spec-graphify-retirement.md`.
 
 ## `mcp-chef` (chef domain — internal service)
 
@@ -108,7 +93,6 @@ Same pattern as `mcp-chef` — invoked from admin / Vercel API routes.
 | MCP | Claude-Code-registered? | Why |
 |---|---|---|
 | `shishka-mission-control` | ✅ Yes | Used directly by every Claude Code session for task coordination |
-| `shishka-graphify` | ✅ Yes | Cross-cutting: every agent needs to query the codebase graph |
 | `shishka-chef` | ❌ No (today) | Chef domain writes are coordinated through MC tasks; admin/API does the writes |
 | `shishka-finance` | ❌ No (today) | Same pattern as chef |
 

@@ -391,8 +391,8 @@ When CEO shares a test plan, results, or conclusions:
 | "What kitchen tasks are open?" | Mission Control | `list_tasks(domain="kitchen")` |
 
 ### Facts vs discovery — never confuse the two
-- **Live facts** (equipment/zone, cost, КБЖУ, inventory, supplier specs) → **query the MCP tool** (`list_equipment`, `calculate_cost`, `search_makro_catalog`…). These have a single live source in the DB. Never read a fact off a markdown/vault snapshot or off `graphify` — they lag.
-- **Discovery** ("which doc covers X / what connects to Y / where does this concept live") → `graphify` (GRAPH-BEFORE-GREP) is fine as a **map**, then open the file / query the live tool. graphify is a weekly snapshot and is **never authoritative for a fact** — its own rule: don't quote from the graph, open the source.
+- **Live facts** (equipment/zone, cost, КБЖУ, inventory, supplier specs) → **query the MCP tool** (`list_equipment`, `calculate_cost`, `search_makro_catalog`…). These have a single live source in the DB. Never read a fact off a markdown/vault snapshot — it lags.
+- **Discovery** ("which doc covers X / what connects to Y / where does this concept live") → grep + targeted Read (or `Explore`), then open the file / query the live tool for the authoritative fact.
 
 ### Mandatory Write Protocol
 

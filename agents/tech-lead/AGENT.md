@@ -164,8 +164,8 @@ Route by question shape.
 | Question shape | Layer | Tool |
 |---|---|---|
 | "How did we handle X last handoff?" | Native auto-memory files | Read auto-memory |
-| "What's RULE-HANDOFF-PACKET?" | Project docs / Graphify | Read `docs/constitution/operational-rules.md` |
-| "Where is function X? What calls Y?" | Graphify | `graphify query "function X"` |
+| "What's RULE-HANDOFF-PACKET?" | Project docs | Read `docs/constitution/operational-rules.md` |
+| "Where is function X? What calls Y?" | grep + Read | `grep -rn "functionX" src/` then open the file |
 | "What tasks are open?" | Action ledger | MC `shishka-mission-control` |
 
 ## Tracking Protocol (Tier 1 / Tier 2)

@@ -14,7 +14,7 @@ shishka-os/
 ├── docs/           Brains: constitution (rules), modules, business domains, plans, projects
 ├── agents/         Brains: agent prompts (chef, finance, coo, lawyer, procurement, strategy, tech-lead, designer)
 ├── apps/           Hands: admin-panel (React+Vite → Vercel), kds, web
-├── services/       Hands: supabase (migrations, edge fns), MCP servers (chef, finance, mission-control, graphify), print-bridge
+├── services/       Hands: supabase (migrations, edge fns), MCP servers (chef, finance, mission-control), print-bridge
 ├── tools/          Hands: standalone utilities (parsers, sync scripts)
 ├── scripts/        Repo automation (status generation, hook helpers)
 ├── packages/       Shared packages

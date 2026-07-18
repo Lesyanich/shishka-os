@@ -18,7 +18,7 @@ The vault is Shishka's **business-knowledge layer**. Plain markdown files descri
 
 - **Lesia (CEO)** in Obsidian (direct edit, Graph View) and in the admin panel at `/brain` (read + inline edit)
 - **Other humans** in the admin panel `/brain` Confluence reader
-- **AI agents** through file reads and the Graphify MCP (planned)
+- **AI agents** through file reads (grep + `Read`)
 
 All three see the same content. There is no agent-private fork and no human-private fork.
 
@@ -63,7 +63,7 @@ The vault has two zones: **front-door entity folders** (where humans browse) and
 
 ## Edges = wikilinks only
 
-The vault graph is built **only** from `[[Note Name]]` wikilinks inside note bodies. No edge JSON, no manual edge maintenance. Graphify reads wikilinks during the pipeline run.
+Notes connect **only** through `[[Note Name]]` wikilinks inside note bodies. No edge JSON, no manual edge maintenance. Obsidian's Graph View renders these locally. (The generated `graph.json` / graphify pipeline was retired 2026-07-18 — see `docs/plans/spec-graphify-retirement.md`.)
 
 ## Frontmatter
 
@@ -106,7 +106,7 @@ The vault is maintained automatically by agents AND manually by Lesia. Both path
 - **Admin Pages tab** at `/brain` — `Edit` button → markdown editor in browser → `Save` commits to git via GitHub App. Works from any device with admin login.
 - **Obsidian on Mac** — direct file edit → `git pull` / `git push` (Obsidian Git plugin recommended). Live Graph View, drag-and-drop image attachments.
 
-Both paths write to the same `vault/<path>.md`. Graphify picks up the edit on the next run regardless of source.
+Both paths write to the same `vault/<path>.md`, so Obsidian and the admin Pages tab always show the same content.
 
 ## Render Pipeline
 
@@ -119,17 +119,15 @@ vault/*.md
    │       │
    │       └─→ GitHub App commit → git
    │
-   └─→ graphify run (nightly)
+   └─→ build-vault-json.mjs (on build)
           │
-          ├─→ apps/admin-panel/public/graph.json
-          └─→ apps/admin-panel/public/graph-analytics.json
+          └─→ apps/admin-panel/public/vault.json
                    │
-                   ├─→ /brain (Map tab, vis-network)
-                   ├─→ /brain (Pages tab, Confluence reader)
+                   ├─→ /brain (Pages tab, Confluence reader) ← default landing
                    └─→ /brain (Drive Map tab)
 ```
 
-`BrainKnowledgePage.tsx` colours nodes by category. Categories matching `^vault/<Folder>/` regex live in the `CATEGORIES` array — see `apps/admin-panel/src/pages/brain/BrainKnowledgePage.tsx`.
+The `/brain` graph (Map) tab was retired 2026-07-18 — `/brain/wiki` (Pages) is now the default landing. See `docs/plans/spec-graphify-retirement.md`.
 
 ## What the Vault Is NOT
 

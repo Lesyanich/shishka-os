@@ -1,6 +1,8 @@
 # Spec: Shishka Brain System — Consolidated
 
-> **Status:** active (replaces 7 prior specs, see §11)
+> **⚠️ PARTIALLY SUPERSEDED 2026-07-18:** the **Graphify / knowledge-graph layer (L2, §5.2, the graph pipeline & MCP)** was retired — net-negative vs grep in an A/B; see `docs/plans/spec-graphify-retirement.md`. Agents navigate code with **grep + `Read`**; humans read structure via the **vault wiki (`/brain/wiki`)**. The vault-wiki and Drive-Map layers of this spec remain accurate; treat every Graphify mention below as historical.
+>
+> **Status:** active for the vault/wiki layers; Graphify layer retired (replaces 7 prior specs, see §11)
 > **Author:** consolidated 2026-04-29 from audit task `a180ff33`
 > **MC Initiative:** `8ee586b9` Brain — knowledge graph + entity navigation
 > **Branch:** `feature/brain/system-consolidation`

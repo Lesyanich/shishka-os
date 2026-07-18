@@ -38,8 +38,6 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "tailwindcss": "^4.2.1",
-    "vis-data": "^8.0.3",
-    "vis-network": "^10.0.2",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },

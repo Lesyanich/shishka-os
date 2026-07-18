@@ -17,12 +17,6 @@
       "args": [
         "scripts/launch-finance-mcp.sh"
       ]
-    },
-    "shishka-graphify": {
-      "command": "bash",
-      "args": [
-        "scripts/launch-graphify-mcp.sh"
-      ]
     }
   }
 }

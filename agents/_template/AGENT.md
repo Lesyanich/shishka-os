@@ -17,7 +17,7 @@
 
 ## Tracking Protocol
 - Read `docs/constitution/operational-rules.md` before any session.
-- Navigation: for "what connects to / depends on / where does X live" questions, query `graphify_query_topic` before grep (see operational-rules.md § LK-GRAPH); fall back to grep if the graph is stale or unavailable.
+- Navigation: for "what connects to / depends on / where does X live" questions, use grep + targeted Read (or the `Explore` agent when scope is uncertain).
 - Business outcomes → `business_tasks` (Tier 1) via `emitBusinessTask()`.
 - Technical steps → append to `agents/{name}/session-log.md` (Tier 2).
 - NEVER create business_task for: SQL fixes, TS errors, retries, read-only lookups.
