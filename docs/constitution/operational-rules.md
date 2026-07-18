@@ -504,7 +504,7 @@ Code is responsible for surfacing the right tool — proactively, not "when it r
 
 **At the start of a task** (and whenever the work shifts domain):
 - If a registered tool fits the job, **name it and offer to run it** — e.g. "для этого есть `/lawyer`, запустить?". Do not run it silently; the CEO decides.
-- **Never hand-roll** what a skill/MCP does more reliably (e.g. don't parse a receipt by eye when `/finance` exists; don't grep the codebase for "what depends on X" when `shishka-graphify` answers it — see GRAPH-BEFORE-GREP).
+- **Never hand-roll** what a skill/MCP does more reliably (e.g. don't parse a receipt by eye when `/finance` exists).
 - The catalog of "task → tool" is `docs/operations/skill-advisor.md`. For code tasks, the REQUIRED/RECOMMENDED/**FORBIDDEN** skill set per `kind:*` tag lives in `docs/operations/skills-services-policy.md` § Task-Kind Taxonomy — respect FORBIDDEN entries even if a tool seems to apply.
 
 **Automation.** The `UserPromptSubmit` hook `scripts/skill-advisor.sh` reads each message,
@@ -592,24 +592,15 @@ Specs: project-specific → `docs/projects/{project}/plans/spec-*.md`, shared �
 - Technical Rules → `docs/constitution/technical-rules.md`
 - Keys → `docs/keys-config.md`
 
-## LK-GRAPH: Knowledge Graph (try before grep for "what connects to X")
+## Code navigation: grep + targeted Read
 
-A pre-clustered knowledge graph of the whole repo (code + docs + vault) is served by the **`shishka-graphify`** MCP server (tools: `graphify_query_topic`, `graphify_neighborhood`, `graphify_god_nodes`, `graphify_communities`). It is regenerated weekly; every response carries a `graph_freshness` stamp — if `stale: true`, treat answers as a map that may miss recent files and confirm with grep.
-
-**Reach for the graph FIRST (cheaper than reading files) when the question is about _connections_, not _contents_:**
-- "What touches / depends on / connects to X?" → `graphify_query_topic` then `graphify_neighborhood`
-- "Where does concept/feature X live across the codebase?" → `graphify_query_topic`
-- "What are the architectural hotspots / most-connected pieces?" → `graphify_god_nodes`
-- Cross-domain or cross-document links a single grep can't surface (e.g. how a business entity, a table, an agent, and a doc relate) → `graphify_communities` / `graphify_query_topic`
-
-**Keep using grep / Read (NOT the graph) for:** exact string/symbol search, reading a specific file's current contents, anything where you already know the file. The graph is a map of relationships, not a source of truth for file contents — never quote code from it; open the file.
-
-**Fallback:** if the `shishka-graphify` tools are unavailable (server not connected) or `graph_freshness.stale` is true, fall back to grep/Explore. Do not block on the graph.
+To find code — "where does X live", "what depends on X", exact strings/symbols — use grep/`Explore` then Read the specific files. There is no knowledge-graph shortcut: the `shishka-graphify` graph was retired 2026-07-18 (net-negative vs grep in an A/B; see `docs/plans/spec-graphify-retirement.md`). For repo structure a human can read, use the vault wiki (`/brain/wiki`).
 
 ## Dead Zones (DO NOT load, DO NOT reference for new work)
 
 | Path | Why |
 |------|-----|
+| `services/mcp-graphify/` | RETIRED 2026-07-18 — graphify knowledge graph removed (net-negative vs grep; see `docs/plans/spec-graphify-retirement.md`). Use grep + Read for code, `/brain/wiki` for readable structure |
 | `services/gas/` | DEPRECATED — legacy GAS+Gemini receipt parser, replaced by Finance Agent |
 | `services/supabase/functions/parse-receipts/` | DEPRECATED — proxy to GAS, dead |
 | `services/supabase/functions/update-receipt-job/` | DEPRECATED — GAS callback, dead |

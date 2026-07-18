@@ -66,8 +66,8 @@ _Installed from `petrkindlmann/qa-skills` (7 of 50; markdown-only; see `skills-l
 ### Data / Supabase
 - **mcp `supabase`** — migrations (`apply_migration`), `execute_sql`, advisors, logs. Respect RULE-NO-DIRECT-DB-EDITS.
 
-### Code navigation / knowledge graph
-- **mcp `shishka-graphify`** (`graphify_query_topic`) — "what connects to / depends on / where does X live". GRAPH-BEFORE-GREP.
+### Code navigation
+- **grep / Read** — "where does X live", "what depends on X", exact strings/symbols. Primary tool. (The `shishka-graphify` knowledge graph was retired 2026-07-18 — net-negative vs grep; see `docs/plans/spec-graphify-retirement.md`.)
 - **`Explore` agent** — broad read-only codebase search when scope is uncertain.
 
 ### Design / UI
@@ -126,7 +126,6 @@ specific. The header and separator rows are skipped by the parser.
 | поставщик,закупк,оборудован,купить,sourcing,supplier,procurement,price comparison,equipment | `/procurement` | sourcing & price comparison |
 | виза,work permit,fda,лиценз,контракт,аренд,налог,vat,pnd,юрист,закон,штраф,visa,contract,legal,immigration | `/lawyer` | Thai legal, visas, contracts, tax |
 | миграц,migration,row-level security,execute_sql,supabase sql,db schema,схему бд | `mcp supabase` | DB migrations & SQL (apply_migration) |
-| где находит,что зависит,что связан,depends on,what connects,where does | `mcp shishka-graphify` | code graph — what connects to X (GRAPH-BEFORE-GREP) |
 | сделай ревью,проведи ревью,ревью кода,code review,review the diff,review changes,баги в коде | `/code-review` | review diff for correctness bugs |
 | упрост,рефактор,simplify,refactor,dead code,cleanup the code | `/simplify` | simplify & refactor changed code |
 | уязвим,инъекц,xss,sql injection,secret leak,security audit,безопасн | `security-review` | security audit (injections, secrets, RLS) |
