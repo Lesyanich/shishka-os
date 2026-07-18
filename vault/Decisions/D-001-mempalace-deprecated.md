@@ -14,6 +14,8 @@ aliases: [mempalace-deprecated]
 
 # D-001 — MemPalace deprecated
 
+> **📅 As of April 2026 — historical record, not current state.** Kept for history; not maintained as current.
+
 > [!info] Decision
 > Archive MemPalace (`services/mempalace/`) as the L1 conversation memory layer. Do not wire MCP. Do not invest further until cross-session conversation memory becomes a real pain again.
 

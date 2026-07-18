@@ -1,12 +1,13 @@
 ---
 title: Shishka OS Architecture
+type: pointer
 tags:
   - architecture
   - shishka-os
   - erp
   - overview
-date: 2026-03-16
-status: active
+date: 2026-07-18
+status: pointer
 aliases:
   - System Architecture
   - ERP Architecture
@@ -14,118 +15,11 @@ aliases:
 
 # Shishka OS Architecture
 
-> [!info] Single Source of Truth
-> Supabase (PostgreSQL 17.6) is the ONLY source of truth. The frontend is a mirror.
+> **Pointer page.** The detail that used to live here was a 2026-03-16 snapshot that drifted out of date. Trust the source of truth below, not a copy. _(Wiki staleness audit, 2026-07-18.)_
 
-## System Overview
+**Source of truth:** [[Tech/Project Map]] (live routes + structure) + `services/supabase/migrations/`
 
-Shishka OS is a unified ERP/KDS system for Shishka Healthy Kitchen, built on **React + Vite + Tailwind v4 + Supabase**.
+- The system shape: admin-panel routes, backend tables, development phases, and key DB functions.
+- ⚠️ There are ~374 migrations (not 69); the POS is Loyverse (the Syrve integration was abandoned).
 
-```mermaid
-graph TD
-    subgraph Frontend ["Frontend (React 19 + Vite 7)"]
-        CC[Control Center /]
-        BOM[BOM Hub /bom]
-        KDS[KDS Board /kds]
-        COOK[Cook Station /cook]
-        WASTE[Waste Tracker /waste]
-        LOG[Logistics /logistics]
-        PROC[Procurement /procurement]
-        ORD[Orders /orders]
-        MRP[Master Planner /planner]
-        FIN[Finance /finance]
-        SKU[SKU Manager /sku]
-        RCV[Receiving Station /receive]
-        SET[Settings /settings]
-    end
-
-    subgraph Backend ["Supabase (PostgreSQL 17.6)"]
-        NOM[nomenclature]
-        BS[bom_structures]
-        PT[production_tasks]
-        EQ[equipment]
-        INV[inventory_batches + balances]
-        WL[waste_logs]
-        SUP[suppliers + purchase_logs]
-        ORDERS[orders + order_items]
-        PLANS[production_plans + plan_targets]
-        EXP[expense_ledger + receipts]
-    end
-
-    CC --> PT & EQ & NOM
-    BOM --> NOM & BS
-    KDS --> PT & EQ
-    COOK --> PT & INV
-    WASTE --> WL & INV & NOM
-    LOG --> INV
-    PROC --> SUP & NOM
-    ORD --> ORDERS & NOM
-    MRP --> PLANS & BS & INV & NOM
-    FIN --> EXP & SUP
-```
-
-## Lego Architecture (BOM)
-
-The core data model follows a 4-tier Bill of Materials:
-
-| Tier | Prefix | Example | Role |
-|------|--------|---------|------|
-| RAW | `RAW-` | RAW-PUMPKIN | Raw ingredients from suppliers |
-| PF | `PF-` | PF-PUMPKIN_COCONUT_BASE | Semi-finished products (prep) |
-| MOD | `MOD-` | MOD-ANCIENT_CRUNCH | Toppings and modifiers |
-| SALE | `SALE-` | SALE-PUMPKIN_SOUP | Final dishes sold to customers |
-
-## Development Phases
-
-| Phase | Module | Status | Notes |
-|-------|--------|--------|-------|
-| 1.0 | [[Control Center]] + [[BOM Hub]] | ✅ LIVE | CEO Dashboard, KPI widgets |
-| 1.5 | [[Storefront & Pricing]] | ✅ LIVE | Pricing engine, KBZHU, slugs |
-| 2.0 | [[Kitchen KDS]] + [[Cook Station]] | ✅ LIVE | Gantt scheduling, cook execution |
-| 3.0 | [[Waste & Inventory]] | ✅ LIVE | Stocktake, waste logging, predictive PO |
-| 3.5 | [[Batch Tracking & Logistics]] | ✅ LIVE | Barcodes, locations, transfers |
-| 3.6 | [[BOM Hub Editor]] | ✅ LIVE | Full CRUD, cost validation, DB sync |
-| 4.0 | [[Procurement Module]] | ✅ LIVE | Supplier CRUD, purchase logs, auto-cost |
-| 5.1 | [[Orders Pipeline]] | ✅ LIVE | Kanban, Realtime, BOM explosion |
-| 5.2 | [[MRP Engine]] | ✅ LIVE | Scenario planning, inventory-aware |
-| 5.3 | [[Knowledge Base Refactoring]] | ✅ LIVE | Obsidian Skills, vault cleanup |
-| 5.4 | [[Agent Skills & Capabilities]] | ✅ LIVE | PDF, XLSX, skill-creator, invoice parser |
-| 4.1 | [[Financial Ledger]] | ✅ LIVE | Expense ledger, multi-currency, receipt storage |
-| 4.2 | [[Financial Ledger]] | ✅ LIVE | Historical sync (62 rows), Magic Dropzone, Receipt Lightbox, component extraction |
-| 6.x | [[Receipt Routing Architecture]] | ✅ LIVE | Gemini 2.5 OCR, async pipeline, auto-mapping, searchable dropdown, net weight |
-| 6.8 | [[Database Schema]] | ✅ LIVE | Product Catalog Overhaul, supplier_products, nomenclature dedup |
-| 7.0 | [[Product Categorization Architecture]] | ✅ LIVE | FMCG+Restaurant hybrid: 3-level product_categories, brands, tags, auto-derive financial codes |
-| 7.1 | DB Architecture Audit | ✅ LIVE | WAC costing, supplier_catalog SSoT, production outputs |
-| 8.0 | Supabase Auth | ✅ LIVE | Email/password, RLS, fn_is_authenticated |
-| 9.0 | Tech Debt Cleanup | ✅ LIVE | Migration consolidation, orphan cleanup |
-| 10.0 | SKU Layer | ✅ LIVE | 3-tier: nomenclature → sku → supplier_catalog |
-| 11-16 | [[Procurement & Receiving Architecture]] | ✅ LIVE | PO management, receiving station, financial reconciliation, MRP→PO |
-| 17.0 | Syrve Integration | 🔄 IN PROGRESS | Nomenclature mapping, sync queue, UoM map |
-
-## Key Database Functions (RPCs)
-
-| Function | Purpose |
-|----------|---------|
-| `fn_start_production_task` | Start cook task, freeze BOM snapshot |
-| `fn_create_batches_from_task` | Create inventory batches from completed task |
-| `fn_open_batch` / `fn_transfer_batch` | Batch lifecycle management |
-| `fn_predictive_procurement` | Recursive BOM walk for shortage detection |
-| `fn_process_new_order` | Order BOM explosion into production tasks |
-| `fn_run_mrp` | 2-level MRP engine with inventory deduction |
-| `fn_approve_plan` | Convert MRP results into kitchen tasks |
-| `fn_approve_receipt` | Hub+Spoke receipt approval (v11: auto-derive sub_category, multi-image, document classification) |
-| `fn_create_purchase_order` | Create PO from procurement list or MRP output |
-| `fn_approve_po` | Financial reconciliation (ordered vs received diff) |
-
-## Migrations Index
-
-69 migrations (001-068). See [[Database Schema]] for full table index.
-
-## Related
-
-- [[Database Schema]] — Full erDiagram and tables index
-- [[Receipt Routing Architecture]] — AI OCR pipeline (Gemini Vision)
-- [[Financial Ledger]] — Expense ledger, multi-currency, WHT
-- [[Procurement & Receiving Architecture]] — PO management, receiving
-- [[Product Categorization Architecture]] — FMCG+Restaurant hybrid category system
-- [[HANDOVER]] — Agent handover reports
+_See also:_ [[Tech/Stack]] · [[Database/Schema]]

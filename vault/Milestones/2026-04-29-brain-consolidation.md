@@ -11,6 +11,8 @@ aliases: [brain-consolidation-2026-04-29]
 
 # 2026-04-29 — Brain consolidation
 
+> **📅 As of April 2026 — historical record, not current state.** Kept for history; not maintained as current. Graphify (the B-2 layer referenced below) was retired 2026-07-18.
+
 > [!info] Milestone
 > Single consolidated brain spec replaces 7 prior specs. Vault ontology pivots to entity-first (9 front-door folders + 4 sidebar folders). MemPalace deprecated.
 
