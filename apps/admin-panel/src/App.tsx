@@ -45,8 +45,6 @@ const SaladBarPage = lazyWithReload(() => import('./pages/SaladBarPage').then(m 
 const BrainPage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
 const BrainWikiPage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainWikiPage })))
 const BrainDriveMapPage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainDriveMapPage })))
-const BrainExplorePage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainExplorePage })))
-const BrainKnowledgePage = lazyWithReload(() => import('./pages/brain/BrainKnowledgePage').then(m => ({ default: m.BrainKnowledgePage })))
 const ProductionTargets = lazyWithReload(() => import('./pages/ProductionTargets').then(m => ({ default: m.ProductionTargets })))
 const ApiCostPage = lazyWithReload(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
 const HRLayout = lazyWithReload(() => import('./pages/hr/HRLayout').then(m => ({ default: m.HRLayout })))
@@ -127,8 +125,7 @@ function App() {
                   <Route path="/" element={<OpeningRoadmap />} />
                   <Route path="/mission" element={<Suspense fallback={<PageLoader />}><MissionControl /></Suspense>} />
                   <Route path="/brain" element={<Suspense fallback={<PageLoader />}><BrainPage /></Suspense>}>
-                    <Route index element={<Suspense fallback={<PageLoader />}><BrainExplorePage /></Suspense>} />
-                    <Route path="knowledge" element={<Suspense fallback={<PageLoader />}><BrainKnowledgePage /></Suspense>} />
+                    <Route index element={<Navigate to="/brain/wiki" replace />} />
                     <Route path="wiki/*" element={<Suspense fallback={<PageLoader />}><BrainWikiPage /></Suspense>} />
                     <Route path="drive" element={<Suspense fallback={<PageLoader />}><BrainDriveMapPage /></Suspense>} />
                   </Route>

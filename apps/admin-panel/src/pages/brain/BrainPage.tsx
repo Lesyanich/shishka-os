@@ -1,11 +1,11 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Brain, Sparkles, MapPin } from 'lucide-react'
+import { Brain, BookOpen, MapPin } from 'lucide-react'
 import { BrainErrorBoundary } from '../../components/brain/BrainErrorBoundary'
 
 const TABS = [
-  // Unified explore view = graph + reader side-by-side, default landing
-  { to: '/brain', label: 'Brain', icon: Sparkles, end: true },
-  // Drive Map (Cost + Quality tabs removed — dead MemPalace/LightRAG stack, Brain v2 Phase 0)
+  // Vault wiki = readable knowledge/project pages, default landing
+  // (the graph explore view was retired 2026-07-18 — see docs/plans/spec-graphify-retirement.md)
+  { to: '/brain/wiki', label: 'Pages', icon: BookOpen },
   { to: '/brain/drive', label: 'Drive Map', icon: MapPin },
 ]
 
@@ -14,7 +14,7 @@ export function BrainPage() {
   // Use the route path as the boundary key so a thrown error on one tab
   // doesn't persist into a different tab — switching tabs resets the boundary.
   const scope =
-    location.pathname.replace(/^\/brain\/?/, '').split('/')[0] || 'Map'
+    location.pathname.replace(/^\/brain\/?/, '').split('/')[0] || 'Pages'
   return (
     <div className="flex h-full flex-col">
       <header className="mb-4 flex items-center gap-3">
@@ -24,17 +24,16 @@ export function BrainPage() {
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Brain</h1>
           <p className="text-xs text-slate-500">
-            Map · Pages · Drive
+            Pages · Drive
           </p>
         </div>
       </header>
 
       <nav className="mb-4 flex gap-1 border-b border-slate-800">
-        {TABS.map(({ to, label, icon: Icon, end }) => (
+        {TABS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
-            end={end}
             className={({ isActive }) =>
               [
                 '-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-xs font-medium transition',
