@@ -2,88 +2,117 @@
 domain: [kitchen, procurement, sales]
 agents: [chef, procurement]
 load_when: "specific dishes, ingredients, BOM planning, procurement, menu updates"
-last_updated: 2026-07-18
-updated_by: CEO (2026-04-05) + code-agent freshness banner (2026-07-18)
-source: "Notion SHISHKA CORE HUB, Section 2.2"
-status: concept-snapshot (live menu = nomenclature SALE items)
+last_updated: 2026-07-19
+updated_by: CEO (2026-04-05 concept) + code-agent shipped-menu reconcile (2026-07-19)
+source: "Part 1 = live DB (nomenclature SALE / menu_public); Part 2 = Notion SHISHKA CORE HUB Section 2.2 (original concept)"
+status: live-snapshot + roadmap
 ---
 
 # Menu Items
 
-> ⚠️ **April-2026 concept snapshot — NOT the live menu.** The shipped menu has evolved since
-> (smoothies, L1/L2 manakish, summer rolls, beef-salami manakish, honey-syrup drinks, etc.).
-> **Canonical live menu = `nomenclature` `SALE-*` items** (public views `menu_public` / `v_public_menu`,
-> surfaced on shishka.health). Equipment codes below use the retired `L1-…` scheme; live scheme is `L-1-K-…`
-> (see `operations.md`). Treat the dishes here as original design intent, not current fact — full
-> reconciliation to the shipped menu is a separate chef task. — noted 2026-07-18
+> **This doc has two parts.**
+> **Part 1 — Current Menu** is a human-readable **snapshot of the shipped menu as of 2026-07-19**.
+> The canonical live source is `nomenclature` `SALE-*` items (public view `menu_public` /
+> `v_public_menu`, surfaced on shishka.health). Prices/availability drift — trust the DB, not this list.
+> **Part 2 — Roadmap / Original Concept** preserves the April-2026 design intent (breakfasts, big
+> bowls, 56-container salad bar, own dairy) that has **not** shipped. Kept as roadmap, not current fact.
 
-## 1. BREAKFASTS (AM / Circadian Nutrition)
-*We use a combi-oven for baking and a lava grill for proteins.*
+---
 
-### Healthy English Breakfast Variants
-- **Shishka Classic**: Poached (or soft-boiled) eggs, sous-vide chicken breast (regenerated in Merrychef for crispy crust), roasted cherry tomatoes, mixed greens, and a toast of our artisan sourdough tartine bread
-- **Nordic Morning** *(Ref: Fire and Ice)*: Eggs, lightly salted salmon (Makro), spinach, fermented radish, and buckwheat bread
-- **Levantine Start** *(Ref: Boustany/Tahini & Turmeric)*: Eggs, grilled halloumi from the lava grill, hummus, fresh cucumbers, and gluten-free flatbread
+# PART 1 — Current Menu (shipped, snapshot 2026-07-19)
 
-### Porridges — Functional Carbohydrates
-- **Buckwheat Porridge (Umami Bomb)**: Buckwheat (gas stove), fresh Lion's Mane mushrooms, drop of truffle oil, poached egg, and pumpkin seeds
-- **Oatmeal (Tropical)**: Oatmeal on coconut milk, fresh mango, freeze-dried berries, and chia seeds
-- **Rice Porridge (Asian Comfort)**: Brown/wild rice on coconut milk with dates and nuts
+Fast-casual **manakish + salads + fresh spring rolls + dips**, with a large **drinks program**
+(coffee, matcha, smoothies, juices, lemonades, shots) and retail chocolate. Prices in ฿.
 
-## 2. SANDWICHES, ROLLS, BURGERS, AND MANAKISH
-*Base for Grab & Go. Assembled at L2, reheated in Contact Grill or Merrychef (60 seconds).*
+## 🫓 Manakish (potato-taco / flatbread base)
+| Tier | Items | Price |
+|------|-------|-------|
+| Classic | Za'atar Potato Tacos · Olive & Cheese · Pumpkin & Cheese Mix · 6 Cheese Potato Tacos | 59 |
+| Signature | Beef · Lamb · Falafel · Chilli & Cheese · Za'atar & Cheese Potato Tacos | 69 |
+| Premium | Truffle & Lamb Signature · Salami Potato Tacos · Sujuk · Pumpkin & Goat Cheese | 79 |
 
-### Fresh Rolls (Rice Paper)
-- **Shrimp & Mango Roll**: Shrimp, mango, carrots, spinach, cilantro + "Sugar-free Sweet Chili" sauce or peanut dip
-- **Vegan Rainbow**: Tofu, avocado, red cabbage, microgreens + tahini-miso sauce
+## 🥗 Salads
+Tabbouleh (269) · Fattoush (249) · Chicken Caesar — avocado dressing, seed crackers, grana padano (249) · Chicken Mexican — chipotle honey (199) · Shrimp Caesar (349) · Smoked Salmon — eggs, avocado, lemon (299) · Beetroot Walnut (149).
+*Several Caesar/Mexican/Salmon/Beetroot variants are marked `coming_soon` — check `stock_state`.*
 
-### Rice-Nori Bun (Rice Burgers — Ref: The Gaijin Cookbook)
-- **Salmon Tartare Rice-Burger**: Pressed rice buns with nori, chopped red fish, avocado, and light spicy mayo (yogurt-based)
-- **Chicken Teriyaki Rice-Burger**: Grilled chicken, marinated daikon, and spinach
+## 🥟 Fresh Spring Rolls (rice paper)
+Veggie (169) · Chicken (199) · Tuna & Corn (219) · Shrimp (239)
 
-### Toasts (On our own sourdough — Ref: Super Sourdough)
-- Avocado toast with tomatoes, hemp seeds, and microgreens
-- Lightly salted salmon with light cream cheese (Labneh) and dill
+## 🥣 Dips
+Hummus (111) · Beetroot Hummus (111) · Mutabal — smoked eggplant (195) · Muhammara — smoky pepper & walnut (199)
 
-### Manakish (Arabian Pizza on a tortilla/flatbread)
-- **Za'atar & Cheese**: Za'atar, olive oil, and halloumi/mozzarella cheese
-- **Meat Lahmacun Style**: Lean ground beef (Prime Food), tomatoes, onions, and sumac (baked in oven)
+## 🥖 Bread & Crackers
+Sourdough Mini Bun — 1 pc (35) / 2 pcs (60) · Seed Crackers — chia, sunflower & pumpkin (120)
 
-## 3. SOUPS (Stored in L2 Bain-maries)
-*Cooked in kettles on gas stoves at L1, processed in high-power blenders (Bowl Cutter/Blender), vacuum-sealed, and delivered to L2.*
+## 🥤 Smoothies
+Custom / Build-Your-Own (89) · Green Ice (100) · Strawberry Banana (100) · Peach Apricot (120) · Mixed Berry (120) · Passion Mango (120) · Mango Strawberry (120) · Choco Avocado (140) · Protein Peach (140)
 
-- **Traditional Borscht (Bio-Active Borscht)**: Vibrant, red, without excess fat. Available with chicken or vegan (beans). Served with homemade sour cream/yogurt and garlic bread
-- **Mushroom Cream Soup (Functional Fungi)**: Coconut milk or light cream using local mushrooms. Blended (L1-KITCH-BLND) to silky texture
-- **Asian Pumpkin (Pumpkin Fusion)**: Pumpkin roasted in combi-oven (to concentrate sugars), blended with lemongrass, ginger, and coconut milk. Garnished with fried corn and sesame seeds
-- **Healthy Chicken Ramen** *(Ref: Homemade Ramen)*: Collagen broth (long-simmered at L1), noodles (buckwheat soba or rice), sous-vide chicken, marinated egg, and nori seaweed
+## ☕ Coffee
+Espresso (60) · Americano / Iced Americano (65) · Latte / Cappuccino (75) · Iced Latte / Iced Cappuccino (85) · Caramel Latte (105) · Espresso Tonic (110) · Iced Caramel Latte (115) · Orange Coffee (145) · Passion Fruit Coffee (145)
 
-## 4. SALADS AND BOWLS (The Algorithm Bowl)
-*We operate 2 salad bars with 56 gastro-containers. We use the "Fiber Base + Sustain-Pro + Bio-Active + Crunch" principle. Vegetables sliced on auto-slicer (L1-VEG-SLCR) for perfect standardization.*
+## 🍵 Matcha
+Matcha Latte (90) · Iced Dirty Matcha (95) · Iced Matcha Latte (100) · Orange Matcha (135) · Passion Fruit Matcha (135) · Matcha Green Smoothie (140)
 
-### Salad Bar 1: Base and Proteins (28 slots)
-- **Greens (4)**: Romaine, Baby Spinach, Kale, Salad Mix
-- **Grains/Complex Carbs (6)**: Quinoa, Brown Rice, Wild Rice, Buckwheat (al dente), Rice Noodles, Roasted Sweet Potato
-- **Raw Vegetables (8)**: Cherry Tomatoes, Cucumbers, Bell Peppers, Carrots (julienne), Red Onion, Edamame, Radish, Broccoli (blanched)
-- **Proteins (10)**: Sous-vide chicken (sliced), Lava-grilled chicken (ShishTaouk), Salmon (flakes), Shrimp, Tofu, Boiled eggs, Beans/Chickpeas, Roast beef
+## 🧃 Juices
+Fresh Carrot / Guava / Orange & Carrot / Pineapple (90) · Fresh Orange (100) · Glow — carrot, orange, ginger, turmeric (100)
 
-### Salad Bar 2: Superfoods, Ferments, Crunch, and Sauces (28 slots)
-- **Roasted Veg/Fruits (6)**: Roasted Beets, Cauliflower, Fresh Mango, Pomegranate, Dragonfruit
-- **Live Element — Fermentation (Wild Fermentation) (4)**: Shishka Sauerkraut (our own), Pineapple Kimchi, Marinated Red Onions, Kalamata Olives
-- **Cheeses (3)**: Feta, Parmesan, Goat Cheese
-- **Crunch/Texture (TextureMaxxing) (6)**: Walnuts, Almond flakes, Pumpkin seeds, Freeze-dried berries/fruits, Crispy onions, Sesame seeds
-- **Dressings (9)**: Golden Tahini with Turmeric, Berry Vinaigrette, Citrus-Olive Oil, Asian Sesame-Ginger, Green Goddess (herb and yogurt-based), Spicy Peanut, Classic Pesto, Balsamic
+## 🍋 Lemonades  (all 85)
+Classic (lime, honey) · Ginger · Mint · Passionfruit
 
-## 5. MAIN COURSES (Medical-Grade Nutrition)
-*Prepared at L1 using the "90% Cooked" rule (lava grill for Maillard, keeping inside moist), moisture-locked in Blast Chiller, vacuum-sealed. Regenerated at L2 in Merrychef (Oven) in 60 seconds.*
+## ⚡ Shots  (all 60)
+Ginger (ginger, lime, honey) · Beetroot Energy (beetroot, apple, lime, ginger) · Turmeric Immunity (orange, ginger, turmeric, lime)
 
-- **Lava-Grilled Chicken & Quinoa**: Grilled chicken breast + tri-color quinoa + roasted broccoli + Chimichurri sauce. High thermal effect, protein-rich
-- **Salmon "Tsar" Bowl**: Salmon (sous-vide, then Merrychef finish) + buckwheat + roasted root vegetables (carrots/beets) + Tahini-Dill sauce
-- **Shrimp & Avocado Cauliflower Rice**: Grilled tiger shrimp + cauliflower "rice" + fresh avocado + salsa fresca (Mexican fusion)
-- **Vegan Power Meatball**: Lentil and mushroom patty + wild rice + Shishka-style sauerkraut + umami tomato sauce
+## 🥫 Sauces & Dressings  (all 39)
+Hummus · Mango · Tahini Tamarind · Yogurt Tahini
 
-## 6. FUTURE: OWN DAIRY (Fermentation)
-*CAPEX includes Yogurt Maker 10L (L1-YOG-10L) and high-power mixer (L1-D-MIX-10KG). Based on home fermentation guides.*
+## 🍫 Chocolate  (100g bars, all 197)
+70% Dark · 70% Dark with Roasted Almond · High Cocoa Milk
 
-- **Live Yogurt and Kefir**: For morning porridges, Green Goddess sauce base, and healthy smoothies
-- **Homemade Tvorog**: Pure product without preservatives
-- **Shishka Syrniki (Oven-baked)**: Not fried — baked in combi-oven at L1 until golden brown, vacuum-sealed, regenerated at L2 with berry vinaigrette and fresh sour cream
+## In-store / POS-only (not yet web-published)
+Available at the counter but not on shishka.health (`is_web_visible = false`):
+- **🍗 Proteins & Grills** (add-ons, POS-priced): Grilled Chicken Breast · Grilled Salmon · Grilled Shrimp · Lamb Kebab · Cured Salmon (house-made) · Beef & Lamb Sausage (homemade)
+- **🎁 Bundles**: Potato Tacos Bundle ×4 / ×8 / ×12 (POS-configured)
+- **🥟 Sides**: Baked Potato — grilled half (80) · Mashed Potato Classic (80) · Mashed Potato Vegan (55)
+- **🥖 Bread**: Potato Pita — grilled, GF (15) · Potato Pita Set ×3 (40)
+- **🥤 Soft Drinks**: Coca-Cola / Coke Zero / Fanta / Sprite / Tonic (35) · Singha Soda (30) · Mont Fleur Mineral Water 500ml (20)
+- **🧋 Thai Tea** (100): Caramel · Hazelnut · Honey · Mint · Vanilla
+- **🧃 Juices**: Fresh Coconut (80) · Fresh Pomegranate
+- **🥫 Sauces** (POS add-ons): Tahini · Cashew · Pesto · Lemon & Olive Oil · Peanut-Lime (39)
+- **Premium manakish**: Lion's Mane Superfood (89)
+
+---
+
+# PART 2 — Roadmap / Original Concept (April 2026 — NOT yet shipped)
+
+> Preserved from the original Notion concept. Manakish, salads, fresh spring rolls, smoothies and
+> dips **shipped in evolved form** (see Part 1). The items below — full breakfasts, porridges,
+> rice-nori burgers, big protein main-courses, the 56-container "Algorithm Bowl" salad bar, and
+> the own-dairy line — remain **design intent / roadmap**, not on the current menu.
+
+## Breakfasts (AM / Circadian Nutrition)
+*Combi-oven for baking, lava grill for proteins.*
+- **Shishka Classic**: poached eggs, sous-vide chicken breast (Merrychef-regenerated for crispy crust), roasted cherry tomatoes, mixed greens, sourdough tartine
+- **Nordic Morning** *(Ref: Fire and Ice)*: eggs, lightly salted salmon, spinach, fermented radish, buckwheat bread
+- **Levantine Start** *(Ref: Boustany/Tahini & Turmeric)*: eggs, lava-grilled halloumi, hummus, fresh cucumbers, GF flatbread
+- **Porridges**: Buckwheat "Umami Bomb" (Lion's Mane, truffle oil, poached egg, pumpkin seeds) · Tropical Oatmeal (coconut milk, mango, freeze-dried berries, chia) · Rice Porridge (brown/wild rice, coconut milk, dates, nuts)
+
+## Sandwiches / Burgers / Toasts (concept)
+- **Rice-Nori Burgers** *(Ref: The Gaijin Cookbook)*: Salmon Tartare · Chicken Teriyaki
+- **Toasts** *(own sourdough)*: Avocado + hemp seeds + microgreens · Salmon + Labneh + dill
+
+## Soups (L2 bain-maries)
+*Cooked in L1 kettles, blended, vacuum-sealed, delivered to L2.*
+- **Bio-Active Borscht** (chicken or vegan) · **Mushroom Cream (Functional Fungi)** · **Asian Pumpkin Fusion** · **Healthy Chicken Ramen** *(Ref: Homemade Ramen)*
+
+## Salads & Bowls — "The Algorithm Bowl"
+*Concept: 2 salad bars, 56 gastro-containers, "Fiber Base + Sustain-Pro + Bio-Active + Crunch".*
+- **Bar 1 (Base & Proteins, 28 slots)**: greens, complex carbs (quinoa/rice/buckwheat/sweet potato), raw vegetables, 10 proteins (sous-vide & lava-grilled chicken, salmon, shrimp, tofu, eggs, beans, roast beef)
+- **Bar 2 (Superfoods, Ferments, Crunch, Sauces, 28 slots)**: roasted veg/fruits, wild ferments (own sauerkraut, pineapple kimchi), cheeses, TextureMaxxing crunch, 9 dressings (Golden Tahini-Turmeric, Berry Vinaigrette, Green Goddess, etc.)
+
+## Main Courses (Medical-Grade Nutrition)
+*"90% Cooked" at L1 → blast-chilled → vacuum-sealed → Merrychef-regenerated at L2 in ~60s.*
+- **Lava-Grilled Chicken & Quinoa** · **Salmon "Tsar" Bowl** · **Shrimp & Avocado Cauliflower Rice** · **Vegan Power Meatball**
+
+## Future: Own Dairy (Fermentation)
+*CAPEX: Yogurt Maker 10L + high-power mixer.*
+- **Live Yogurt & Kefir** · **Homemade Tvorog** · **Shishka Syrniki** (oven-baked, not fried)

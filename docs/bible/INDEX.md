@@ -59,3 +59,4 @@ Sources: `ceo` | `cook` | `admin` | `agent` | `partner`
 | 2026-07-18 | menu-items.md | Added "April-2026 concept snapshot, live menu = nomenclature SALE items" banner; not rewritten (full reconcile = separate chef task) | code-agent, CEO-directed |
 | 2026-07-18 | menu-concept.md | Added concept-snapshot banner (CBS Core Booster Menu unshipped; equipment codes are placeholders) | code-agent, CEO-directed |
 | 2026-07-18 | equipment.md | Re-verified existing live-`equipment`-table disclaimer; bumped date only | code-agent, CEO-directed |
+| 2026-07-19 | menu-items.md | Full reconcile (MC 325ef27d): replaced April concept with the shipped-menu snapshot (Part 1, from live `nomenclature`/`menu_public` — manakish/salads/spring-rolls/dips/drinks/chocolate + in-store POS items); April concept preserved as Part 2 "Roadmap / not-yet-shipped" per CEO | code-agent, CEO-directed |
