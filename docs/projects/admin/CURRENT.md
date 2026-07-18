@@ -229,7 +229,7 @@ New modules added in session 2026-03-21:
 - 077: ~~DELETED~~ — MCP agent updated directly instead of DB compatibility hacks
 
 -> Full table/RPC reference: `docs/domain/db-schema-summary.md`
--> Full schema with erDiagram: `vault/Architecture/Database Schema.md`
+-> Full schema with erDiagram: `vault/Database/Schema.md`
 
 ## Auth & Security (Phase 8)
 

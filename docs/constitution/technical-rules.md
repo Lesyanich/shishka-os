@@ -42,7 +42,7 @@ After every major development phase, the agent **must**:
 
 ## RULE-DB-SCHEMA-DOCS
 
-When any migration creates or alters a table / function / trigger / enum, the agent **must** update `vault/Architecture/Database Schema.md`:
+When any migration creates or alters a table / function / trigger / enum, the agent **must** update `vault/Database/Schema.md`:
 
 1. Keep the Mermaid `erDiagram` block in sync with all current tables and FK relationships
 2. Keep the Tables index up to date: `Table | PK | Key Columns | FKs | Migration`
@@ -55,7 +55,7 @@ When any migration creates or alters a table / function / trigger / enum, the ag
 **Never** run `git push` until the following are all true:
 
 1. The MC task for this work is updated (status, notes) — see `operational-rules.md` § RULE-TASK-CLOSURE
-2. `vault/Architecture/Database Schema.md` is updated if any migration touched tables, policies, RPCs, or ENUMs
+2. `vault/Database/Schema.md` is updated if any migration touched tables, policies, RPCs, or ENUMs
 3. The relevant architecture note (mapping below) is updated if it exists
 4. `STATUS.md` is **not** edited manually — it auto-generates on commit (see `operational-rules.md` § RULE-COMPUTED-STATUS)
 5. All files staged are intentional — no accidental `.env`, no leftover scratch files
@@ -398,5 +398,5 @@ Any admin-panel hook that backs a live list/table (fetch + Supabase realtime + m
 - Foundational rules, agents, routing, sessions → `operational-rules.md`
 - Migration spec/process → `docs/plans/spec-migration-tracking.md`
 - AI-Native Ops modernization → `docs/plans/spec-ai-native-ops.md`
-- DB schema → `vault/Architecture/Database Schema.md`
+- DB schema → `vault/Database/Schema.md`
 - Architecture notes → `vault/Architecture/*.md`

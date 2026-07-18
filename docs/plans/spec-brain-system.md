@@ -53,7 +53,7 @@ Pages here are **encyclopedic** (50–500 lines): real content, diagrams, links,
 | `Procurement/` | Suppliers, sourcing, purchase logs, comparison protocol | `supplier_catalog`, `purchase_logs`, `vault/Architecture/Procurement & Receiving Architecture.md` |
 | `Finance/` | Receipts, COGS/CAPEX/OPEX, ledger model, financial targets | `expense_ledger`, `capex_assets`, `vault/Architecture/Financial Ledger.md`, `docs/bible/targets.md` |
 | `Operations/` | Locations, shifts, staff workflow, food safety, KDS, daily standards | TBD with CEO; current sources include `docs/bible/operations.md`, KDS spec |
-| `Database/` | Schema, RLS, migrations index, RPC catalog | `vault/Architecture/Database Schema.md`, `services/supabase/migrations/`, `services/mcp-*/` |
+| `Database/` | Schema, RLS, migrations index, RPC catalog | `vault/Database/Schema.md`, `services/supabase/migrations/`, `services/mcp-*/` |
 | `Tech/` | Stack, infra, CI/CD, deployment, agent-system architecture, security | `docs/tech-stack.md`, `vault/Architecture/Shishka OS Architecture.md`, `.github/`, hooks |
 
 ### 3.2 Sidebar (audit log — 4 history folders)
