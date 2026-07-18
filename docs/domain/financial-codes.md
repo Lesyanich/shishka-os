@@ -1,5 +1,7 @@
 # Financial Codes & Tax
 
+> Ledger table: `expense_ledger` (categories below). Receipt intake: `receipt_inbox` → `receipt_jobs`. (Verified 2026-07-18 vs live DB.)
+
 ## Expense Categories
 
 | Code | Name | Description |

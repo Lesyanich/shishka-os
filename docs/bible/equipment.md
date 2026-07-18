@@ -2,8 +2,8 @@
 domain: [kitchen, ops, procurement]
 agents: [chef, ops]
 load_when: "equipment specs, maintenance, zone mapping, capacity planning, bottleneck analysis"
-last_updated: 2026-04-05
-updated_by: CEO
+last_updated: 2026-07-18
+updated_by: CEO (2026-04-05); disclaimer re-verified by code-agent (2026-07-18)
 source: "Notion SHISHKA CORE HUB, Section 3.2"
 ---
 

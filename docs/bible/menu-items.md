@@ -2,12 +2,20 @@
 domain: [kitchen, procurement, sales]
 agents: [chef, procurement]
 load_when: "specific dishes, ingredients, BOM planning, procurement, menu updates"
-last_updated: 2026-04-05
-updated_by: CEO
+last_updated: 2026-07-18
+updated_by: CEO (2026-04-05) + code-agent freshness banner (2026-07-18)
 source: "Notion SHISHKA CORE HUB, Section 2.2"
+status: concept-snapshot (live menu = nomenclature SALE items)
 ---
 
 # Menu Items
+
+> ⚠️ **April-2026 concept snapshot — NOT the live menu.** The shipped menu has evolved since
+> (smoothies, L1/L2 manakish, summer rolls, beef-salami manakish, honey-syrup drinks, etc.).
+> **Canonical live menu = `nomenclature` `SALE-*` items** (public views `menu_public` / `v_public_menu`,
+> surfaced on shishka.health). Equipment codes below use the retired `L1-…` scheme; live scheme is `L-1-K-…`
+> (see `operations.md`). Treat the dishes here as original design intent, not current fact — full
+> reconciliation to the shipped menu is a separate chef task. — noted 2026-07-18
 
 ## 1. BREAKFASTS (AM / Circadian Nutrition)
 *We use a combi-oven for baking and a lava grill for proteins.*
