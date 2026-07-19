@@ -587,7 +587,7 @@ Specs: project-specific → `docs/projects/{project}/plans/spec-*.md`, shared �
 
 ## L3: On-demand
 
-- DB Schema → `vault/Architecture/Database Schema.md`
+- DB Schema → `vault/Database/Schema.md`
 - Architecture → `vault/Architecture/*.md`
 - Technical Rules → `docs/constitution/technical-rules.md`
 - Keys → `docs/keys-config.md`

@@ -46,7 +46,7 @@ apps/admin-panel/
 - Не добавлять npm зависимости без обсуждения.
 
 ## Контекст при необходимости
-- Полная схема БД: vault/Architecture/Database Schema.md
+- Полная схема БД: vault/Database/Schema.md
 - Frontend rules: docs/constitution/frontend-rules.md
 - Модуль finance: docs/modules/finance.md
 - Модуль kitchen: docs/modules/kitchen.md

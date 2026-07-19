@@ -86,7 +86,7 @@ src/
 ## Контекст (загружать по необходимости)
 | Нужно | Файл |
 |-------|------|
-| Схема БД | `../../vault/Architecture/Database Schema.md` |
+| Схема БД | `../../vault/Database/Schema.md` |
 | Frontend rules | `../../docs/constitution/frontend-rules.md` |
 | Kitchen модуль | `../../docs/modules/kitchen.md` |
 | Finance модуль | `../../docs/modules/finance.md` |
