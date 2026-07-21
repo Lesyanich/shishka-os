@@ -6,6 +6,7 @@ import { usePredictivePO } from '../hooks/usePredictivePO'
 import { ZeroDayStocktake } from '../components/waste/ZeroDayStocktake'
 import { WasteLogForm } from '../components/waste/WasteLogForm'
 import { PredictivePO } from '../components/waste/PredictivePO'
+import { ExpiringSoon } from '../components/waste/ExpiringSoon'
 
 export function WasteTracker() {
   const inventory = useInventory()
@@ -27,6 +28,9 @@ export function WasteTracker() {
           Stocktake, write-off logging with financial liability, and predictive procurement
         </p>
       </div>
+
+      {/* Expiring batches — use-or-toss before they go off */}
+      <ExpiringSoon />
 
       {/* Grid: left = Stocktake, right = Waste + PO */}
       <div className="grid gap-6 xl:grid-cols-2">

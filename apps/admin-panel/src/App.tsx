@@ -22,6 +22,7 @@ const BOMHub = lazyWithReload(() => import('./pages/BOMHub').then(m => ({ defaul
 const KDSBoard = lazyWithReload(() => import('./pages/KDSBoard').then(m => ({ default: m.KDSBoard })))
 const CookStation = lazyWithReload(() => import('./pages/CookStation').then(m => ({ default: m.CookStation })))
 const WasteTracker = lazyWithReload(() => import('./pages/WasteTracker').then(m => ({ default: m.WasteTracker })))
+const StockControlReport = lazyWithReload(() => import('./pages/StockControlReport').then(m => ({ default: m.StockControlReport })))
 const Procurement = lazyWithReload(() => import('./pages/Procurement').then(m => ({ default: m.Procurement })))
 const ShoppingList = lazyWithReload(() => import('./pages/ShoppingList').then(m => ({ default: m.ShoppingList })))
 const StocktakeReviewPage = lazyWithReload(() => import('./pages/StocktakeReviewPage').then(m => ({ default: m.StocktakeReviewPage })))
@@ -135,6 +136,7 @@ function App() {
                   <Route path="/nomenclature" element={<Navigate to="/menu" replace />} />
                   <Route path="/bom" element={<Suspense fallback={<PageLoader />}><BOMHub /></Suspense>} />
                   <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
+                  <Route path="/stock-control" element={<Suspense fallback={<PageLoader />}><StockControlReport /></Suspense>} />
                   <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
                     <Route index element={<Navigate to="dashboard" replace />} />
                     <Route path="dashboard" element={<FinanceDashboard />} />

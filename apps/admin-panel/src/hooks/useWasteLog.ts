@@ -1,21 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import {
+  recordWaste,
+  type WasteReason,
+  type FinancialLiability,
+  WASTE_REASON_LABELS,
+  LIABILITY_LABELS,
+} from '../lib/waste'
 
-export type WasteReason = 'expiration' | 'spillage_damage' | 'quality_reject' | 'rd_testing'
-export type FinancialLiability = 'cafe' | 'employee' | 'supplier'
-
-export const WASTE_REASON_LABELS: Record<WasteReason, string> = {
-  expiration: 'Expiration',
-  spillage_damage: 'Spillage / Damage',
-  quality_reject: 'Quality Reject',
-  rd_testing: 'R&D Testing',
+// Re-export so existing imports (`WasteLogForm`, etc.) keep working unchanged.
+export {
+  WASTE_REASON_LABELS,
+  LIABILITY_LABELS,
 }
-
-export const LIABILITY_LABELS: Record<FinancialLiability, string> = {
-  cafe: 'Cafe (business expense)',
-  employee: 'Employee',
-  supplier: 'Supplier',
-}
+export type { WasteReason, FinancialLiability }
 
 export interface WasteLogEntry {
   id: string
@@ -99,35 +97,9 @@ export function useWasteLog(): UseWasteLogResult {
       financial_liability: FinancialLiability
       comment: string | null
     }): Promise<{ ok: boolean; error?: string }> => {
-      const { error: insertError } = await supabase
-        .from('waste_logs')
-        .insert(entry)
-
-      if (insertError) {
-        return { ok: false, error: insertError.message }
-      }
-
-      // Phase 10: Deduct from sku_balances (FIFO — oldest received first)
-      let remaining = entry.quantity
-      const { data: skuBalances } = await supabase
-        .from('sku_balances')
-        .select('sku_id, quantity')
-        .eq('nomenclature_id', entry.nomenclature_id)
-        .order('last_received_at', { ascending: true, nullsFirst: true })
-
-      for (const bal of skuBalances ?? []) {
-        if (remaining <= 0) break
-        const deduct = Math.min(remaining, Number(bal.quantity))
-        const newQty = Math.max(0, Number(bal.quantity) - deduct)
-        await supabase
-          .from('sku_balances')
-          .update({ quantity: newQty })
-          .eq('sku_id', bal.sku_id)
-        remaining -= deduct
-      }
-
-      await fetchLogs()
-      return { ok: true }
+      const result = await recordWaste(entry)
+      if (result.ok) await fetchLogs()
+      return result
     },
     [fetchLogs],
   )
