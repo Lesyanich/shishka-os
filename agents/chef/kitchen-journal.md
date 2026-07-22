@@ -247,3 +247,51 @@ Coconut sugar rejected (strong aftertaste). Cane sugar approved for L1 productio
 - **Фото:** (если есть)
 
 -->
+
+---
+
+## 2026-05-22 / 2026-05-23 — Smoothie Menu Development
+
+### Summary
+Designed and recorded 7 smoothies in Supabase with full BOM. Researched Makro frozen fruit catalog, calculated FC and margins, iterated recipes with CEO.
+
+### Smoothie Menu (all 500ml, recorded in DB)
+
+| Code | Name | Key Ingredients | FC* | Price | Margin |
+|------|------|-----------------|-----|-------|--------|
+| SALE-SMOOTHIE_CHOCO_AVO | Choco Avocado | avocado, banana, cocoa, dates, coconut milk, cashew butter | ฿36 | ฿199 | 82% |
+| SALE-SMOOTHIE_STRAWBERRY_BANANA | Strawberry Banana | strawberry, banana, milk, chia | ฿27 | ฿149 | 82% |
+| SALE-SMOOTHIE_ISLAND_GREEN | Island Green | pineapple, kiwi, spinach, water | ~฿22 | ฿149 | 85% |
+| SALE-SMOOTHIE_PASSION_MANGO | Passion Mango | mango chunks, passion fruit (seedless), water | ~฿49 | ฿179 | 73% |
+| SALE-SMOOTHIE_MIXED_BERRY | Mixed Berry | strawberry, blueberry, banana, milk, chia | ฿36 | ฿159 | 77% |
+| SALE-SMOOTHIE_PEACH_APRICOT | Peach Apricot | peach, apricot, banana, yogurt+milk, almond | ~฿30 | ฿169 | 82% |
+| SALE-SMOOTHIE_PROTEIN_PEACH | Protein Peach | peach, banana, milk, peanut butter, whey protein (MOD) | ~฿80/฿28 | TBD | TBD |
+
+*FC marked ~ where WAC not yet available (new RAW items need first purchase)
+
+### New Products Created
+- **PF-CASHEW_BUTTER** — homemade cashew butter (RAW-CASHEWS, 5% yield loss)
+- **PF-FROZEN_PINEAPPLE_CHUNKS** — fresh pineapple cut & frozen (RAW-PINEAPPLE, 30% yield loss)
+- **MOD-WHEY_PROTEIN_ADD** — Add Whey Protein 30g (for protein smoothies)
+- **MOD-CASHEW_BUTTER_ADD** — created but unused (MOD→PF not allowed)
+- **RAW**: frozen kiwi, frozen spinach, frozen peach, frozen apricot, frozen mango chunks, almond sliced, whey protein
+
+### Architecture Change
+- Lego chain updated: SALE can now contain RAW/PF/MOD (was PF/MOD only)
+- Code in validators.ts already had this change; docs updated in 10 files
+- Motivation: smoothies are single-step L2 blending — wrapping RAW in PF just for Lego compliance adds no value
+
+### Decisions by CEO
+- Boosters: protein, creatine, lion's mane (ежовик) — not spirulina/matcha
+- Toppings: chia seeds, almond slices (decoration, not boosters)
+- Format: fixed menu + lego constructor (customer can customize)
+- Bases: milk, coconut milk, yogurt (3 options)
+- Portion: 500ml
+- Pineapple: regular freezer OK for smoothies (no blast freezer needed)
+- Mango: chunks > puree for smoothies without banana/milk (body & texture)
+
+### Pending
+- Set price for Protein Peach Smoothie
+- First purchase of new RAW items to populate WAC
+- Lion's mane supplier search (not available at Makro)
+- Creatine supplier (ON Creatine at Makro ฿1,900/600g)

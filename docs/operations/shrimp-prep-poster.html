@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shrimp Prep — Station Poster</title>
+<style>
+  :root{ --l1:#1f6feb; --l1bg:#e8f1ff; --l2:#b7791f; --l2bg:#fff4e0; --ink:#14210a; --mut:#5b6650; --line:#d7ddcf; --danger:#a01818; --dangerbg:#fdecec; }
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:var(--ink); margin:0; padding:14mm; background:#fff; }
+  h1{ font-size:30px; margin:0 0 2px; }
+  .sub{ color:var(--mut); font-size:13px; margin:0 0 14px; }
+  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .col{ border:2px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .col.l1{ border-color:var(--l1); }
+  .col.l2{ border-color:var(--l2); }
+  .tag{ display:inline-block; font-size:13px; font-weight:700; padding:3px 10px; border-radius:999px; margin-bottom:8px; }
+  .tag.l1{ background:var(--l1bg); color:var(--l1); }
+  .tag.l2{ background:var(--l2bg); color:var(--l2); }
+  h3{ font-size:16px; margin:10px 0 4px; }
+  ol,ul{ margin:4px 0 8px; padding-left:20px; }
+  li{ font-size:14px; line-height:1.5; margin-bottom:3px; }
+  b{ font-weight:700; }
+  .marin{ background:#f4f8ee; border:1px solid var(--line); border-radius:10px; padding:8px 12px; font-size:13px; margin:8px 0 0; }
+  .strip{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+  .chip{ font-size:14px; font-weight:600; border:1.5px solid var(--line); border-radius:999px; padding:5px 12px; }
+  .waste{ margin-top:10px; background:var(--dangerbg); border:1.5px solid var(--danger); color:var(--danger); border-radius:10px; padding:9px 13px; font-size:14px; font-weight:600; }
+  .foot{ margin-top:12px; font-size:12px; color:var(--mut); }
+  @media print{ body{ padding:8mm; } @page{ size:A4 landscape; margin:8mm; } }
+</style>
+</head>
+<body>
+  <h1>🦐 Shrimp — how we prep it</h1>
+  <p class="sub">Less waste, better flavor. Long life is frozen; we cook to order. · Buy fresh Size L head-on (Makro 118692, ~239฿/kg) · smell = sea, not ammonia · keep cold.</p>
+
+  <div class="cols">
+    <div class="col l1">
+      <span class="tag l1">🔪 L1 — KITCHEN · make the bags</span>
+      <ol>
+        <li>Peel: head, shell, <b>tail OFF</b>. Devein. Rinse.</li>
+        <li><b>Dry well</b> with paper towel.</li>
+      </ol>
+      <h3>🔥 Marinated (raw → hot dishes)</h3>
+      <ol>
+        <li>Thin coat of marinade — <b>8 ml per 6 shrimp</b>. No lemon.</li>
+        <li><b>6 shrimp</b> per bag → vacuum → <b>blast-freeze −18°C</b>.</li>
+      </ol>
+      <h3>🌯 Sous-vide (cooked → cold dishes)</h3>
+      <ol>
+        <li><b>Salt only.</b> 6 shrimp, single layer → vacuum.</li>
+        <li><b>Sous-vide 60°C / 30 min.</b></li>
+        <li><b>Straight into blast freezer</b> — no ice water. Don't cut yet.</li>
+      </ol>
+      <div class="marin">🧄 <b>Marinade batch (~1 L):</b> rice-bran oil 900 ml · garlic 70 g · parsley 30 g · thyme 10 g · salt 30 g. No acid.</div>
+    </div>
+
+    <div class="col l2">
+      <span class="tag l2">🍳 L2 — LINE · to order</span>
+      <h3>🔥 Marinated (hot)</h3>
+      <ol>
+        <li>Take a bag → <b>cook straight from frozen</b>. Pan hot, until pink + firm + hot inside.</li>
+      </ol>
+      <h3>🌯 Sous-vide (cold / rolls)</h3>
+      <ol>
+        <li>Keep <b>2 bags thawing in the fridge</b>. Top up each morning. Write <b>"Thawed:"</b> date.</li>
+        <li>No thawed bag? Cold running water <b>5–10 min</b> (don't open).</li>
+        <li>Open <b>1 bag = 6 shrimp = 1 dish</b>. Butterfly each. <b>3 per roll</b>, 2 rolls. Serve cold.</li>
+      </ol>
+      <div class="strip">
+        <span class="chip">❄️ Frozen 30 d</span>
+        <span class="chip">Thawed sealed 7 d</span>
+        <span class="chip">Opened 48 h</span>
+        <span class="chip">Never refreeze</span>
+      </div>
+      <div class="waste">🗑️ Old / torn / no vacuum / freezer-burn / bad smell → don't use · tell shift lead · log write-off.</div>
+    </div>
+  </div>
+
+  <p class="foot">Questions → ask before service, not during. · Source: docs/operations/sop-shrimp-prep.md (edit there, reprint here). TH / MY versions from the chat cards.</p>
+</body>
+</html>
