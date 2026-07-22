@@ -1,0 +1,114 @@
+-- 228: Add portion size and tool to salad bar slots
+-- Each cell gets a dedicated scoop/tool — assembler does "1 scoop = 1 portion"
+-- Standardized: same ingredient = same portion weight in every salad
+
+-- ─── Schema ─────────────────────────────────────────────
+ALTER TABLE public.salad_bar_slots
+  ADD COLUMN IF NOT EXISTS portion_grams NUMERIC(6,1),
+  ADD COLUMN IF NOT EXISTS portion_tool  TEXT;
+
+COMMENT ON COLUMN public.salad_bar_slots.portion_grams IS 'Standard portion weight in grams (one scoop/grab = this many grams)';
+COMMENT ON COLUMN public.salad_bar_slots.portion_tool  IS 'Portioning tool: tongs, scoop_#6..#60, tbsp, pieces_N';
+
+-- ─── Populate by ingredient (via nomenclature join) ─────
+-- Update slots that have ingredient_id assigned
+
+-- Bases (tongs — one grab)
+UPDATE public.salad_bar_slots s SET portion_grams = 120, portion_tool = 'tongs'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'PF-SALAD_BASE_CRISPY';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 100, portion_tool = 'tongs'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'PF-SALAD_BASE_SUPERFOOD';
+
+-- Vegetables (scoops)
+UPDATE public.salad_bar_slots s SET portion_grams = 40, portion_tool = 'scoop_#24'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-CHERRY-TOMATO';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 40, portion_tool = 'scoop_#24'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-CUCUMBER';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 20, portion_tool = 'scoop_#40'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-BELL-PEPPER-RED';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 30, portion_tool = 'scoop_#30'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-FROZEN-SWEET-CORN';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 20, portion_tool = 'scoop_#40'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-RED_CABBAGE';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 15, portion_tool = 'scoop_#60'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-CARROT';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 15, portion_tool = 'scoop_#60'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-RADISH';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 10, portion_tool = 'tbsp'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-RED_ONION';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 5, portion_tool = 'tbsp'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-PARSLEY';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 5, portion_tool = 'tbsp'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-SPRING-ONION';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 5, portion_tool = 'tbsp'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-DILL';
+
+-- Proteins
+UPDATE public.salad_bar_slots SET portion_grams = 80, portion_tool = 'scoop_#10'
+  WHERE display_name = 'Chicken' AND ingredient_id IS NULL;  -- no ingredient_id yet
+
+UPDATE public.salad_bar_slots s SET portion_grams = 50, portion_tool = 'tongs'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-SMOKED_TROUT';
+
+UPDATE public.salad_bar_slots s SET portion_grams = NULL, portion_tool = 'pieces_2'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-EGG';
+
+-- Grains
+UPDATE public.salad_bar_slots s SET portion_grams = 40, portion_tool = 'scoop_#24'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'PF-COOKED_QUINOA';
+
+-- Vegetables (large portion)
+UPDATE public.salad_bar_slots s SET portion_grams = 150, portion_tool = 'scoop_#6'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'PF-BAKED_BEETROOT';
+
+-- Legumes
+UPDATE public.salad_bar_slots s SET portion_grams = 30, portion_tool = 'scoop_#30'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'MOD-RED_BEANS';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 30, portion_tool = 'scoop_#30'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-FROZEN-EDAMAME';
+
+-- Accents
+UPDATE public.salad_bar_slots s SET portion_grams = 15, portion_tool = 'scoop_#60'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-POMEGRANATE-SEEDS';
+
+-- Cheese
+UPDATE public.salad_bar_slots s SET portion_grams = 15, portion_tool = 'scoop_#60'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-CHEESE-FETA';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 15, portion_tool = 'scoop_#60'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-CHEESE-PARMESAN';
+
+-- Nuts & seeds (small toppings)
+UPDATE public.salad_bar_slots s SET portion_grams = 20, portion_tool = 'scoop_#40'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-WALNUTS';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 10, portion_tool = 'tbsp'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-ALMOND_SLICED';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 10, portion_tool = 'tbsp'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-DRIED-CRANBERRIES';
+
+UPDATE public.salad_bar_slots s SET portion_grams = 10, portion_tool = 'tbsp'
+  FROM nomenclature n WHERE n.id = s.ingredient_id AND n.product_code = 'RAW-PUMPKIN-SEEDS';
+
+-- ─── Self-register ──────────────────────────────────────
+INSERT INTO migration_log (filename, applied_by, checksum, notes)
+VALUES (
+  '228_salad_bar_portion_scoops.sql',
+  'claude-code',
+  NULL,
+  'Add portion_grams + portion_tool to salad_bar_slots — 1 scoop per cell, standardized portions'
+)
+ON CONFLICT DO NOTHING;
