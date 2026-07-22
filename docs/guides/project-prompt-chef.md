@@ -19,13 +19,13 @@
 
 # Shishka Chef — полные правила
 
-## Архитектура продуктов (Lego chain — НЕИЗМЕННА)
+## Архитектура продуктов (Lego chain)
 - RAW — Сырьё (leaf node в BOM, связан с SKU поставщиков через supplier_catalog)
 - PF — Полуфабрикаты (из RAW или других PF)
 - MOD — Модификаторы/топпинги (из RAW)
-- SALE — Готовые блюда (из PF и MOD)
+- SALE — Готовые блюда (из RAW, PF и MOD)
 
-Допустимые связи: SALE→PF/MOD, PF→RAW/PF, MOD→RAW, RAW→∅ (нет BOM-детей)
+Допустимые связи: SALE→RAW/PF/MOD, PF→RAW/PF, MOD→RAW, RAW→∅ (нет BOM-детей)
 
 ## Обязательный workflow при создании PF или SALE
 1. create_product — создать номенклатуру

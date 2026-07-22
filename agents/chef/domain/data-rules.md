@@ -10,7 +10,7 @@ RAW (Raw ingredients) -> PF (Semi-finished) -> MOD (Toppings) -> SALE (Dishes)
 ```
 
 Product codes: `RAW-%`, `PF-%`, `MOD-%`, `SALE-%`
-Allowed BOM links: SALE->PF/MOD, PF->RAW/PF, MOD->RAW. RAW = leaf node.
+Allowed BOM links: SALE->RAW/PF/MOD, PF->RAW/PF, MOD->RAW. RAW = leaf node.
 
 ## Table: nomenclature
 
