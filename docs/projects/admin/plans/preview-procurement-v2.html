@@ -293,12 +293,12 @@
 
         <div class="grp">8 items · editable</div>
         <div class="line-ed">
-          <div class="grow"><div class="iname" style="font-size:12.5px">Bell pepper red</div><div class="ith">RAW_BELL_PEPPER_RED</div></div>
+          <div class="grow"><div class="iname" style="font-size:12.5px">Bell pepper red <span class="chip" style="background:rgba(122,180,90,.16);color:#A8D08A;margin-left:4px">→ L1</span></div><div class="ith">RAW_BELL_PEPPER_RED</div></div>
           <div class="stepper"><i>−</i><b>5 kg</b><i>+</i></div>
           <div class="pricebox">฿58</div>
         </div>
         <div class="line-ed">
-          <div class="grow"><div class="iname" style="font-size:12.5px">Salad mix</div><div class="ith">RAW_SALAD_MIX</div></div>
+          <div class="grow"><div class="iname" style="font-size:12.5px">Salad mix <span class="chip" style="background:rgba(240,206,131,.14);color:var(--gold);margin-left:4px">→ L2 · Salad Bar</span></div><div class="ith">RAW_SALAD_MIX</div></div>
           <div class="stepper"><i>−</i><b>3 kg</b><i>+</i></div>
           <div class="pricebox">฿85</div>
         </div>
@@ -322,6 +322,7 @@
         </li>
         <li>«+ Add item» открывает мини-каталог, отфильтрованный по этому поставщику.</li>
         <li><b>Платная доставка</b> — редактируемое поле прямо в заказе, входит в Grand total (колонки delivery_fee / discount / VAT в БД уже есть). У поставщика можно задать дефолтную стоимость доставки — подставится сама.</li>
+        <li><b>Метка станции у каждой строки</b> («→ L1», «→ L2 · Salad Bar») — видно, что куда разгружать; наследуется из заявки отдела. Полный пример распределения по локациям и разбивки доставки — экран 07 ниже.</li>
         <li>Когда заказ «shipped» — главная кнопка меняется на <b>Receive delivery</b> → экран приёмки со сверкой (уже реализован: расхождения, брак, недовоз — по каждой строке).</li>
       </ul>
     </div>
