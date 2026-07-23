@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Procurement v2 — превью дизайна</title>
+<style>
+  :root{
+    --royal:#2D3F1C; --royal-soft:#2C4D0C; --cream:#FBF8F0; --gold:#F0CE83;
+    --red:#B62A23; --s1:#10150D; --s2:#171E12; --s3:#1F2818;
+    --line:rgba(240,234,214,.12); --line-strong:rgba(240,234,214,.18);
+    --font:-apple-system,"SF Pro Display","Albert Sans",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0B0F09;color:var(--cream);font-family:var(--font);padding:28px 20px 60px;line-height:1.45}
+  .wrap{max-width:1180px;margin:0 auto}
+  .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(251,248,240,.45)}
+  h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:6px 0 4px}
+  .sub{color:rgba(251,248,240,.55);font-size:14px;max-width:760px}
+  /* flow strip */
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:22px 0 34px;padding:14px 16px;background:var(--s1);border:1px solid var(--line);border-radius:16px}
+  .flow .step{background:var(--s2);border:1px solid var(--line-strong);border-radius:10px;padding:7px 12px;font-size:12.5px;font-weight:600}
+  .flow .arr{color:rgba(251,248,240,.35);font-size:13px}
+  .flow .who{display:block;font-size:10px;font-weight:500;color:rgba(251,248,240,.45);margin-top:1px}
+  /* sections */
+  section{margin-bottom:46px}
+  .sec-h{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+  .sec-n{font-size:13px;font-weight:800;color:var(--gold)}
+  .sec-t{font-size:20px;font-weight:800;letter-spacing:-.01em}
+  .sec-d{color:rgba(251,248,240,.55);font-size:13.5px;margin-bottom:16px;max-width:820px}
+  .cols{display:grid;gap:22px;align-items:start}
+  @media(min-width:900px){.cols-2{grid-template-columns:1fr 1fr}.cols-cart{grid-template-columns:1.6fr 1fr}}
+  /* device frame */
+  .frame{background:linear-gradient(180deg,rgba(255,255,255,.035),transparent 42%),var(--s1);border:1px solid var(--line-strong);border-radius:20px;padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+  .frame-h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .seal{width:34px;height:34px;border-radius:10px;background:linear-gradient(160deg,var(--royal-soft),var(--royal));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+  .frame-h .t{font-size:15px;font-weight:800}
+  .frame-h .s{font-size:11px;color:rgba(251,248,240,.45)}
+  /* tabs */
+  .seg{display:inline-flex;flex-wrap:wrap;background:var(--s2);border:1px solid var(--line);border-radius:12px;padding:4px;gap:2px;margin-bottom:14px}
+  .seg b,.seg span{font-size:11.5px;padding:6px 11px;border-radius:9px;font-weight:600}
+  .seg b{background:linear-gradient(180deg,var(--royal-soft),var(--royal));color:var(--cream)}
+  .seg span{color:rgba(251,248,240,.6)}
+  /* generic bits */
+  .grp{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:rgba(251,248,240,.42);margin:14px 0 6px}
+  .card{background:var(--s2);border:1px solid var(--line-strong);border-radius:13px;padding:11px 13px;margin-bottom:8px}
+  .row{display:flex;align-items:center;gap:10px}
+  .grow{flex:1;min-width:0}
+  .po{font-size:13px;font-weight:700}
+  .meta{font-size:11px;color:rgba(251,248,240,.5)}
+  .thb{font-size:13px;font-weight:700;color:var(--gold);white-space:nowrap}
+  .chip{font-size:10px;font-weight:700;border-radius:99px;padding:2.5px 8px;white-space:nowrap}
+  .chip.lesia{background:rgba(240,206,131,.14);color:var(--gold)}
+  .chip.mint{background:rgba(122,180,90,.16);color:#A8D08A}
+  .chip.new{background:var(--red);color:#fff;letter-spacing:.06em}
+  .pill{font-size:10.5px;font-weight:700;border-radius:8px;padding:3px 8px;background:var(--s3);color:rgba(251,248,240,.75)}
+  .pill.ok{color:#A8D08A;background:rgba(122,180,90,.13)}
+  .pill.wait{color:var(--gold);background:rgba(240,206,131,.12)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:12px;font-weight:700;font-size:13px;padding:11px 16px;border:none;color:#fff;width:100%}
+  .btn.red{background:var(--red)}
+  .btn.royal{background:linear-gradient(180deg,var(--royal-soft),var(--royal))}
+  .btn.ghost{background:var(--s3);color:rgba(251,248,240,.75);font-size:12px;padding:9px 14px}
+  .btn.sm{width:auto;padding:7px 12px;font-size:11.5px;border-radius:9px}
+  /* dots */
+  .dot{display:inline-block;width:7px;height:7px;border-radius:99px;margin-right:5px;vertical-align:1px}
+  .dot.g{background:#7FBF5A}.dot.y{background:#E5C15A}.dot.r{background:#D96A5A}
+  /* builder */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
+  .chips .c{font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:99px;background:var(--s2);border:1px solid var(--line);color:rgba(251,248,240,.65)}
+  .chips .c.on{background:linear-gradient(180deg,var(--royal-soft),var(--royal));color:var(--cream);border-color:transparent}
+  .search{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--line-strong);border-radius:12px;padding:10px 13px;font-size:13px;color:rgba(251,248,240,.4)}
+  .item{border-bottom:1px solid var(--line);padding:11px 2px}
+  .item:last-child{border:none}
+  .iname{font-size:13px;font-weight:700}
+  .ith{font-size:11px;color:rgba(251,248,240,.42)}
+  .prices{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .pq{font-size:11px;font-weight:600;border-radius:9px;padding:5px 9px;background:var(--s2);border:1px solid var(--line);color:rgba(251,248,240,.8)}
+  .pq.best{border-color:rgba(240,206,131,.55);background:rgba(240,206,131,.08)}
+  .pq .sup{color:rgba(251,248,240,.5);font-weight:600}
+  .add{width:30px;height:30px;border-radius:9px;background:var(--s3);border:1px solid var(--line-strong);color:var(--cream);font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+  .legend{font-size:10.5px;color:rgba(251,248,240,.45);margin-top:10px}
+  /* detail */
+  .timeline{display:flex;align-items:center;gap:0;margin:12px 0}
+  .tstep{flex:1;text-align:center;font-size:9.5px;color:rgba(251,248,240,.45);position:relative}
+  .tstep .b{width:10px;height:10px;border-radius:99px;background:var(--s3);border:1.5px solid var(--line-strong);margin:0 auto 4px}
+  .tstep.done .b{background:#7FBF5A;border-color:#7FBF5A}
+  .tstep.cur .b{background:var(--gold);border-color:var(--gold)}
+  .tstep:not(:first-child)::before{content:"";position:absolute;left:-50%;top:4.5px;width:100%;height:1.5px;background:var(--line-strong)}
+  .qlinks{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+  .ql{font-size:11px;font-weight:700;padding:7px 11px;border-radius:10px;background:var(--s2);border:1px solid var(--line-strong)}
+  .line-ed{display:flex;align-items:center;gap:9px;background:var(--s2);border:1px solid var(--line-strong);border-radius:12px;padding:9px 11px;margin-bottom:7px}
+  .stepper{display:flex;align-items:center;gap:0;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden;flex:none}
+  .stepper i{font-style:normal;width:26px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--s3);font-weight:800;font-size:14px}
+  .stepper b{min-width:52px;text-align:center;font-size:12px}
+  .pricebox{border:1px solid var(--line-strong);border-radius:9px;padding:5px 8px;font-size:12px;font-weight:700;color:var(--gold);background:var(--s1);flex:none}
+  .dtrow{display:flex;gap:8px;margin:10px 0}
+  .dtrow .f{flex:1;background:var(--s2);border:1px solid var(--line-strong);border-radius:11px;padding:8px 11px}
+  .dtrow .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:rgba(251,248,240,.42)}
+  .dtrow .v{font-size:13px;font-weight:700;margin-top:2px}
+  /* supplier */
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+  .kv:last-child{border:none}
+  .kv .k{color:rgba(251,248,240,.5)}
+  .kv .v{font-weight:700;text-align:right}
+  .kv .v.link{color:var(--gold)}
+  .file{display:flex;align-items:center;gap:10px;background:var(--s2);border:1px solid var(--line-strong);border-radius:11px;padding:9px 11px;margin-bottom:7px}
+  .fic{width:30px;height:30px;border-radius:8px;background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+  .note{margin-top:14px;background:rgba(240,206,131,.06);border:1px solid rgba(240,206,131,.22);border-radius:12px;padding:11px 14px;font-size:12.5px;color:rgba(251,248,240,.75)}
+  .note b{color:var(--gold)}
+  ul.ann{margin:14px 0 0 0;padding:0;list-style:none}
+  ul.ann li{font-size:12.5px;color:rgba(251,248,240,.6);padding:3px 0 3px 18px;position:relative}
+  ul.ann li::before{content:"→";position:absolute;left:0;color:var(--gold);font-weight:700}
+  /* step-by-step scenario (section 08) */
+  .steps{display:grid;gap:16px}
+  @media(min-width:900px){.steps{grid-template-columns:1fr 1fr}}
+  .stepcard{background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 42%),var(--s1);border:1px solid var(--line-strong);border-radius:18px;padding:15px 16px}
+  .stepnum{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);background:rgba(240,206,131,.1);border-radius:99px;padding:3px 10px}
+  .steptitle{font-size:14px;font-weight:800;margin:8px 0 12px;letter-spacing:-.01em}
+  .stepmini{background:var(--s2);border:1px solid var(--line);border-radius:13px;padding:11px 12px}
+  .stepnote{font-size:12px;color:rgba(251,248,240,.6);margin-top:11px;padding-left:14px;position:relative}
+  .stepnote::before{content:"";position:absolute;left:0;top:5px;bottom:3px;width:2px;border-radius:2px;background:var(--gold);opacity:.5}
+  .stepnote b{color:var(--cream)}
+  /* red "click here" highlight */
+  .hot,.hotchip,.hotbox{position:relative;box-shadow:0 0 0 2px var(--red),0 0 0 6px rgba(182,42,35,.22)}
+  .hot{border-radius:9px}
+  .hotchip{cursor:pointer;background:rgba(122,180,90,.16);color:#A8D08A;border-radius:99px}
+  .hotbox{border-radius:12px;padding:8px;background:rgba(182,42,35,.05)}
+  .pop{margin-top:10px;background:var(--s1);border:1px solid var(--line-strong);border-radius:13px;padding:12px}
+  .popttl{font-size:12.5px;font-weight:800;margin-bottom:9px}
+  .pop .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:rgba(251,248,240,.42)}
+  .dropdown{margin-top:5px;background:var(--s1);border:1px solid var(--line-strong);border-radius:11px;overflow:hidden}
+  .dd{font-size:11.5px;padding:8px 11px;border-bottom:1px solid var(--line);color:rgba(251,248,240,.7)}
+  .dd:last-child{border:none}
+  .dd.on{background:rgba(122,180,90,.1);color:#A8D08A;font-weight:700}
+  .askbar{font-size:11.5px;font-weight:600;color:var(--gold);background:rgba(240,206,131,.08);border:1px solid rgba(240,206,131,.25);border-radius:10px;padding:8px 11px;margin-bottom:9px}
+  .recv{margin-top:8px;background:var(--s1);border:1px solid var(--line-strong);border-radius:11px;padding:10px 11px}
+  .days{display:flex;gap:4px}
+  .days i{font-style:normal;font-size:10px;font-weight:700;width:24px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--s3);color:rgba(251,248,240,.4)}
+  .days i.on{background:linear-gradient(180deg,var(--royal-soft),var(--royal));color:var(--cream)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Shishka OS · Admin · превью на согласование</div>
+  <h1>Procurement v2 — заказы CEO ↔ Mint</h1>
+  <p class="sub">Обе стороны формируют заказы из каталога, передают друг другу, исполнитель корректирует количество/цену/время доставки, принимает поставку со сверкой. Всё в существующем разделе <b>/procurement</b>, в фирменном стиле админки.</p>
+
+  <div class="flow">
+    <span class="step">Сборка из каталога<span class="who">Lesia или Mint</span></span><span class="arr">→</span>
+    <span class="step">Заказ отправлен<span class="who">значок «NEW» у получателя</span></span><span class="arr">→</span>
+    <span class="step">Подтверждение + правки<span class="who">кол-во · цена · дата/время</span></span><span class="arr">→</span>
+    <span class="step">Доставка<span class="who">статус shipped</span></span><span class="arr">→</span>
+    <span class="step">Приёмка со сверкой<span class="who">/receive · расхождения</span></span><span class="arr">→</span>
+    <span class="step">Чек → Reconcile<span class="who">чек прямо в заказе → расход</span></span><span class="arr">→</span>
+    <span class="step">Товары → остатки станций<span class="who">каждая строка на свою станцию (L1 · L2 · Bar · Kitchen) → раздел стоков</span></span>
+  </div>
+
+  <!-- ═══════════ 1. ORDER DESK ═══════════ -->
+  <section>
+    <div class="sec-h"><span class="sec-n">01</span><span class="sec-t">Order Desk — доска заказов</span></div>
+    <p class="sec-d">Первая вкладка раздела. Заказы сгруппированы по этапам, у каждого — автор и получатель. Новый заказ «от другой стороны» подсвечен. Realtime уже подключён — список обновляется сам.</p>
+    <div class="cols cols-2">
+      <div class="frame" style="max-width:430px">
+        <div class="frame-h"><span class="seal">S</span><div><div class="t">Procurement</div><div class="s">Orders · Catalog · Suppliers · Price Book</div></div></div>
+        <div class="seg"><b>Orders</b><span>Catalog</span><span>Suppliers</span><span>Price Book</span><span>···</span></div>
+
+        <div class="grp">Draft · мои черновики</div>
+        <div class="card" style="border-color:rgba(240,206,131,.45)">
+          <div class="row">
+            <div class="grow"><div class="po">PO-2026-0014 · DOY FRESH</div><div class="meta">just created from cart · not sent yet</div></div>
+            <span class="pill">draft</span><button class="btn royal sm">Submit ➜</button>
+          </div>
+        </div>
+
+        <div class="grp">Waiting · ждут подтверждения</div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><div class="po">PO-2026-0012 · DOY FRESH</div><div class="meta">8 items · expected Fri 25 Jul · 09:00</div></div>
+            <span class="chip new">NEW</span><span class="chip lesia">от Lesia</span><span class="thb">฿2,450</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><div class="po">PO-2026-0013 · Sangdamrong</div><div class="meta">3 items · packaging</div></div>
+            <span class="chip mint">от Mint</span><span class="thb">฿1,180</span>
+          </div>
+        </div>
+
+        <div class="grp">In delivery</div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><div class="po">PO-2026-0011 · Makro</div><div class="meta">12 items · today 14:00–16:00</div></div>
+            <span class="pill wait">shipped</span><span class="thb">฿4,920</span>
+          </div>
+        </div>
+
+        <div class="grp">To receive · приёмка</div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><div class="po">PO-2026-0010 · Laad Thai</div><div class="meta">delivered · check against order</div></div>
+            <button class="btn red sm">Receive</button>
+          </div>
+        </div>
+
+        <div class="grp">Done</div>
+        <div class="card" style="opacity:.55">
+          <div class="row"><div class="grow"><div class="po">PO-2026-0009 · Makro</div><div class="meta">reconciled → expense ฿3,780</div></div><span class="pill ok">✓ done</span></div>
+        </div>
+      </div>
+      <ul class="ann">
+        <li><b>Draft — рабочая зона автора:</b> корзина создаёт заказы черновиками, они лежат здесь сверху; черновик полностью редактируется и никому не виден, пока не нажат <b>Submit</b> — только тогда он появляется у второй стороны с бейджем NEW.</li>
+        <li><b>Автор заказа</b> — чип «от Lesia» / «от Mint»; заказ, отправленный тебе и ещё не открытый — бейдж <b style="color:#fff;background:var(--red);border-radius:99px;padding:1px 7px;font-size:10px">NEW</b>.</li>
+        <li>Группы = этапы жизненного цикла (статусы уже существуют в БД: draft → submitted → confirmed → shipped → received → reconciled).</li>
+        <li>Из группы «To receive» — кнопка сразу в приёмку <b>/receive</b> с предвыбранным заказом.</li>
+        <li>Сумма заказа — золотым, как цены на сайте.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════ 2. ORDER BUILDER ═══════════ -->
+  <section>
+    <div class="sec-h"><span class="sec-n">02</span><span class="sec-t">Order Builder — сборка заказа из каталога</span></div>
+    <p class="sec-d">Новая вкладка <b>Catalog</b>: категории товаров, сравнение цен поставщиков по каждой позиции, свежесть цены точкой. «+» кладёт позицию в корзину по выбранной цене; корзина сама разбивается на заказы по поставщикам. Каталог наполняется параллельной сессией — данные уже в <b>supplier_catalog</b>.</p>
+    <div class="cols cols-cart">
+      <div class="frame">
+        <div class="seg"><span>Orders</span><b>Catalog</b><span>Suppliers</span><span>Price Book</span><span>···</span></div>
+        <div class="search">🔍&nbsp; Search product…</div>
+        <div class="chips">
+          <span class="c on">Vegetables</span><span class="c">Fruit</span><span class="c">Meat &amp; Fish</span><span class="c">Dairy</span><span class="c">Dry goods</span><span class="c">Sauces</span><span class="c">Packaging</span>
+        </div>
+
+        <div class="item">
+          <div class="row">
+            <div class="grow"><div class="iname">Bell pepper red · <span style="color:rgba(251,248,240,.5)">kg</span></div><div class="ith">พริกหวานแดง · RAW_BELL_PEPPER_RED</div></div>
+            <div class="add">+</div>
+          </div>
+          <div class="prices">
+            <span class="pq best"><span class="dot g"></span><span class="sup">DOY FRESH</span> ฿58/kg</span>
+            <span class="pq"><span class="dot g"></span><span class="sup">Makro</span> ฿62/kg</span>
+            <span class="pq"><span class="dot y"></span><span class="sup">Tops</span> ฿71/kg</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="row">
+            <div class="grow"><div class="iname">Chicken breast · <span style="color:rgba(251,248,240,.5)">kg</span></div><div class="ith">อกไก่ · RAW_CHICKEN_BREAST</div></div>
+            <div class="add">+</div>
+          </div>
+          <div class="prices">
+            <span class="pq best"><span class="dot g"></span><span class="sup">Makro</span> ฿89/kg</span>
+            <span class="pq"><span class="dot r"></span><span class="sup">Laad Thai</span> ฿95/kg</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="row">
+            <div class="grow"><div class="iname">Greek yogurt 2 kg · <span style="color:rgba(251,248,240,.5)">pcs</span></div><div class="ith">กรีกโยเกิร์ต · RAW_YOGURT_GREEK</div></div>
+            <div class="add">+</div>
+          </div>
+          <div class="prices">
+            <span class="pq best"><span class="dot g"></span><span class="sup">Makro</span> ฿218</span>
+            <span class="pq"><span class="dot y"></span><span class="sup">Tops</span> ฿245</span>
+          </div>
+        </div>
+        <div class="legend"><span class="dot g"></span>цена свежая (&lt;30 дн) &nbsp;&nbsp;<span class="dot y"></span>30–90 дн &nbsp;&nbsp;<span class="dot r"></span>устарела / оценка — дата из <b>verified_at</b></div>
+      </div>
+
+      <div class="frame">
+        <div class="frame-h"><div><div class="t">🛒 Cart · 8 items</div><div class="s">разобьётся на 2 заказа</div></div></div>
+        <div class="grp">DOY FRESH · 5 items</div>
+        <div class="card"><div class="row"><div class="grow"><div class="meta" style="color:var(--cream)">Bell pepper red — 5 kg</div></div><span class="thb">฿290</span></div></div>
+        <div class="card"><div class="row"><div class="grow"><div class="meta" style="color:var(--cream)">Salad mix — 3 kg</div></div><span class="thb">฿255</span></div></div>
+        <div class="meta" style="padding:2px 4px 10px">+ 3 more… · subtotal <b style="color:var(--gold)">฿1,240</b></div>
+        <div class="grp">Makro · 3 items</div>
+        <div class="card"><div class="row"><div class="grow"><div class="meta" style="color:var(--cream)">Chicken breast — 6 kg</div></div><span class="thb">฿534</span></div></div>
+        <div class="meta" style="padding:2px 4px 12px">+ 2 more… · subtotal <b style="color:var(--gold)">฿890</b></div>
+        <button class="btn red">Create 2 draft orders</button>
+        <div class="meta" style="text-align:center;margin-top:8px">создаст черновики и откроет Order Desk — там правишь и отправляешь каждый</div>
+      </div>
+    </div>
+    <ul class="ann">
+      <li>Категории — из групп номенклатуры (те же, что в меню/BOM), не отдельный справочник.</li>
+      <li>Тайское название вторым рядом — для Минт (поле <b>product_name_th</b> уже есть в каталоге).</li>
+      <li>Лучшая цена выделена золотой рамкой; точка = свежесть цены по дате верификации.</li>
+      <li>Один заказ = один поставщик (как в БД) — корзина автоматически делит позиции.</li>
+      <li><b>После Cart:</b> заказы создаются черновиками → переход в Order Desk (один заказ — сразу в его карточку). Черновики редактируются без ограничений; каждый отправляется своей кнопкой Submit, когда готов. Если у поставщика уже есть открытый черновик — корзина предложит добавить позиции в него, а не создавать второй.</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════ 3. PO DETAIL ═══════════ -->
+  <section>
+    <div class="sec-h"><span class="sec-n">03</span><span class="sec-t">Карточка заказа — исполнение и правки</span></div>
+    <p class="sec-d">Главный экран Минт. Пока заказ не принят — можно править количество, цену, дату и время доставки, добавлять/убирать позиции. Быстрые ссылки на поставщика — прямо в заказе. Внизу — путь статусов: кто и когда.</p>
+    <div class="cols cols-2">
+      <div class="frame" style="max-width:430px">
+        <div class="row" style="margin-bottom:4px">
+          <div class="grow"><div class="po" style="font-size:15px">PO-2026-0012</div><div class="meta">DOY FRESH · <span class="chip lesia">от Lesia</span> → исполняет Mint</div></div>
+          <span class="pill wait">submitted</span>
+        </div>
+
+        <div class="timeline">
+          <div class="tstep done"><div class="b"></div>Draft</div>
+          <div class="tstep done"><div class="b"></div>Submitted<br>Lesia · 09:12</div>
+          <div class="tstep cur"><div class="b"></div>Confirmed</div>
+          <div class="tstep"><div class="b"></div>Shipped</div>
+          <div class="tstep"><div class="b"></div>Received</div>
+          <div class="tstep"><div class="b"></div>Done</div>
+        </div>
+
+        <div class="qlinks">
+          <span class="ql">📞 Call</span><span class="ql">💬 LINE</span><span class="ql" style="border-color:rgba(240,206,131,.45)">📋 Copy order</span><span class="ql">📄 Files · 2</span><span class="ql" style="color:var(--gold)">📊 Catalog ↗</span>
+        </div>
+
+        <div class="dtrow">
+          <div class="f"><div class="l">Delivery date</div><div class="v">Fri 25 Jul ▾</div></div>
+          <div class="f"><div class="l">Time window</div><div class="v">06:00–09:00 ▾</div></div>
+        </div>
+
+        <div class="grp">8 items · editable</div>
+        <div class="line-ed">
+          <div class="grow"><div class="iname" style="font-size:12.5px">Bell pepper red <span class="chip" style="background:rgba(122,180,90,.16);color:#A8D08A;margin-left:4px">→ L1</span></div><div class="ith">RAW_BELL_PEPPER_RED</div></div>
+          <div class="stepper"><i>−</i><b>5 kg</b><i>+</i></div>
+          <div class="pricebox">฿58</div>
+        </div>
+        <div class="line-ed">
+          <div class="grow"><div class="iname" style="font-size:12.5px">Salad mix <span class="chip" style="background:rgba(240,206,131,.14);color:var(--gold);margin-left:4px">→ L2 · Salad Bar</span></div><div class="ith">RAW_SALAD_MIX</div></div>
+          <div class="stepper"><i>−</i><b>3 kg</b><i>+</i></div>
+          <div class="pricebox">฿85</div>
+        </div>
+        <div class="meta" style="padding:2px 4px 6px">+ 6 more… &nbsp;·&nbsp; <span style="color:var(--gold)">+ Add item</span></div>
+
+        <div class="dtrow" style="margin:6px 0 10px">
+          <div class="f"><div class="l">Subtotal</div><div class="v">฿2,450</div></div>
+          <div class="f"><div class="l">Delivery fee ✎</div><div class="v">฿40</div></div>
+          <div class="f"><div class="l">Grand total</div><div class="v" style="color:var(--gold)">฿2,490</div></div>
+        </div>
+
+        <button class="btn royal">✓ Confirm order</button>
+        <div style="height:8px"></div>
+        <button class="btn ghost">Report a problem / cancel…</button>
+      </div>
+      <ul class="ann">
+        <li><b>Правки исполнителя:</b> степпер количества, цена по факту, дата и окно доставки — доступны до статуса «received». Каждая правка попадает в историю (кто/когда).</li>
+        <li><b>Ссылки поставщика</b> в один тап: позвонить, LINE, файлы каталогов (PDF/фото), «Catalog ↗» — оцифрованный каталог поставщика с датами актуальности цен.</li>
+        <li><b>📋 Copy order</b> — копирует заказ готовым текстом в буфер: открыл LINE → вставил → отправил, ничего не перепечатывая. Тайские названия подставляются автоматически, где есть. Пример скопированного:
+          <div style="margin-top:7px;background:var(--s1);border:1px solid var(--line-strong);border-radius:10px;padding:9px 12px;font-size:11.5px;line-height:1.6;color:rgba(251,248,240,.75);font-family:ui-monospace,Menlo,monospace">Order PO-2026-0012 — Shishka<br>Delivery: Fri 25 Jul, 06:00–09:00<br>• Bell pepper red (พริกหวานแดง) — 5 kg<br>• Salad mix (สลัดมิกซ์) — 3 kg<br>• … 6 more<br>Total: ฿2,450</div>
+        </li>
+        <li>«+ Add item» открывает мини-каталог, отфильтрованный по этому поставщику.</li>
+        <li><b>Платная доставка</b> — редактируемое поле прямо в заказе, входит в Grand total (колонки delivery_fee / discount / VAT в БД уже есть). У поставщика можно задать дефолтную стоимость доставки — подставится сама.</li>
+        <li><b>Метка станции у каждой строки</b> («→ L1», «→ L2 · Salad Bar») — видно, что куда разгружать; наследуется из заявки отдела. Полный пример распределения по локациям и разбивки доставки — экран 07 ниже.</li>
+        <li>Когда заказ «shipped» — главная кнопка меняется на <b>Receive delivery</b> → экран приёмки со сверкой (уже реализован: расхождения, брак, недовоз — по каждой строке).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════ 4. SUPPLIER CARD ═══════════ -->
+  <section>
+    <div class="sec-h"><span class="sec-n">04</span><span class="sec-t">Карточка поставщика — хаб ссылок</span></div>
+    <p class="sec-d">Всё для быстрой навигации: контакты в один тап, файлы каталогов (PDF и фото) с датой загрузки, ссылка на оцифрованный каталог в Price Book с датой актуальности цен, условия доставки.</p>
+    <div class="cols cols-2">
+      <div class="frame" style="max-width:430px">
+        <div class="frame-h"><span class="seal">D</span><div><div class="t">DOY FRESH</div><div class="s">premium fresh · free delivery</div></div></div>
+
+        <div class="grp">Contacts</div>
+        <div class="kv"><span class="k">Contact</span><span class="v">Khun Ploy</span></div>
+        <div class="kv"><span class="k">Phone</span><span class="v link">📞 081-234-5678</span></div>
+        <div class="kv"><span class="k">LINE</span><span class="v link">💬 @doyfresh</span></div>
+        <div class="kv"><span class="k">Website</span><span class="v link">🌐 doyfresh.co.th ↗</span></div>
+
+        <div class="grp">Delivery</div>
+        <div class="kv"><span class="k">Days</span><span class="v"><span class="days"><i class="on">Mo</i><i>Tu</i><i class="on">We</i><i>Th</i><i class="on">Fr</i><i>Sa</i><i>Su</i></span></span></div>
+        <div class="kv"><span class="k">Window · lead · min</span><span class="v">06:00–09:00 · 1 day · ฿500</span></div>
+
+        <div class="grp">Catalog files</div>
+        <div class="file"><span class="fic">📄</span><div class="grow"><div class="iname" style="font-size:12px">Price list July 2026.pdf</div><div class="ith">uploaded 12 Jul</div></div><span class="pill">open</span></div>
+        <div class="file"><span class="fic">🖼</span><div class="grow"><div class="iname" style="font-size:12px">Catalog photos (3)</div><div class="ith">uploaded 05 Jul</div></div><span class="pill">open</span></div>
+        <button class="btn ghost">＋ Upload file…</button>
+
+        <div class="grp">Digitized catalog</div>
+        <div class="card" style="border-color:rgba(240,206,131,.35)">
+          <div class="row">
+            <div class="grow"><div class="iname" style="font-size:12.5px">37 items in Price Book</div><div class="ith"><span class="dot g"></span>prices verified 18 Jul 2026</div></div>
+            <button class="btn red sm">Open ↗</button>
+          </div>
+        </div>
+      </div>
+      <ul class="ann">
+        <li>Телефон, LINE и сайт — настоящие ссылки (<b>tel:</b> / LINE deep-link / сайт в новой вкладке): на телефоне открывается звонок, чат или страница поставщика.</li>
+        <li>Файлы — новый приватный Storage-бакет; загрузка с телефона или компьютера, дата видна сразу.</li>
+        <li>«Open ↗» ведёт в Price Book, отфильтрованный по поставщику — там вся оцифровка с ценами и датой <b>verified_at</b> (то, что сейчас наполняет параллельная сессия).</li>
+        <li>Условия доставки уже редактируются inline — остаются как есть.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════ 5. CATALOG INBOX ═══════════ -->
+  <section>
+    <div class="sec-h"><span class="sec-n">05</span><span class="sec-t">Catalog Inbox — загрузка и оцифровка каталогов</span></div>
+    <p class="sec-d">Минт загружает каталоги поставщиков (PDF или фото) прямо из админки — для текущего поставщика или нового. Файл попадает в очередь «на просмотр» к тебе; ты с нужной периодичностью дёргаешь Клода — он распознаёт файлы и заливает позиции в оцифрованный каталог с датой актуальности. Без внешних API: распознавание запускается только по твоей команде.</p>
+    <div class="cols cols-2">
+      <div class="frame" style="max-width:430px">
+        <div class="seg"><span>Orders</span><span>Catalog</span><span>Suppliers</span><b>Catalog Inbox</b><span>···</span></div>
+
+        <div class="grp">Upload catalog</div>
+        <div class="dtrow" style="margin-top:6px">
+          <div class="f"><div class="l">Supplier</div><div class="v">DOY FRESH ▾</div></div>
+          <div class="f"><div class="l">or new</div><div class="v" style="color:rgba(251,248,240,.45)">+ New supplier…</div></div>
+        </div>
+        <div style="border:1.5px dashed var(--line-strong);border-radius:13px;padding:18px;text-align:center;color:rgba(251,248,240,.5);font-size:12.5px;margin-bottom:10px">📎 Drop PDF or photos here<br><span style="font-size:10.5px">price list, catalog pages, LINE screenshots</span></div>
+        <button class="btn royal">Upload &amp; send for review</button>
+
+        <div class="grp" style="margin-top:16px">Queue</div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><div class="po" style="font-size:12.5px">Makro price list Aug.pdf</div><div class="meta">Makro · by Mint · today 14:02</div></div>
+            <span class="chip new">NEW</span><span class="pill wait">awaiting review</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><div class="po" style="font-size:12.5px">Fresh Farm — 4 photos</div><div class="meta">new supplier · by Mint · yesterday</div></div>
+            <span class="pill wait">to digitize</span>
+          </div>
+        </div>
+        <div class="card" style="opacity:.65">
+          <div class="row">
+            <div class="grow"><div class="po" style="font-size:12.5px">DOY FRESH July.pdf</div><div class="meta">digitized 18 Jul · prices verified</div></div>
+            <span class="pill ok">✓ +37 items</span>
+          </div>
+        </div>
+      </div>
+      <ul class="ann">
+        <li><b>Цикл:</b> Минт загрузила → у тебя бейдж NEW в очереди → ты просмотрела → дёргаешь Клода («разбери каталоги») → Клод читает файлы из Storage, распознаёт и заливает позиции в <b>supplier_catalog</b> (то же место, куда сейчас льёт параллельная сессия) → статус «✓ digitized +N items».</li>
+        <li><b>Новый поставщик:</b> Минт просто пишет название — карточка поставщика создаётся автоматически при оцифровке (find-or-create, как в Price Book).</li>
+        <li>Каждая оцифрованная позиция получает дату актуальности цены (<b>verified_at</b>) и метку источника — видно, из какого файла пришла цена.</li>
+        <li>Файл после оцифровки остаётся в «Catalog files» карточки поставщика — ничего не теряется.</li>
+        <li>Никаких платных API на загрузку: распознавание — только по твоей команде, партиями.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════ 6. RECEIPT ↔ EXPENSE ═══════════ -->
+  <section>
+    <div class="sec-h"><span class="sec-n">06</span><span class="sec-t">Заказ ↔ Чек ↔ Расход — одна цепочка</span></div>
+    <p class="sec-d">После доставки чек прикрепляется прямо к заказу — кнопкой на карточке. Дальше работает наш обычный конвейер чеков (receipt inbox → распознавание finance-агентом), но результат возвращается в заказ: сверка предзаполняется фактическими цифрами из чека. Расход создаётся один раз — двойного учёта нет.</p>
+    <div class="cols cols-2">
+      <div class="frame" style="max-width:430px">
+        <div class="row" style="margin-bottom:10px">
+          <div class="grow"><div class="po" style="font-size:15px">PO-2026-0011</div><div class="meta">Makro · <span class="chip mint">от Mint</span></div></div>
+          <span class="pill ok">received</span>
+        </div>
+
+        <div class="card" style="border-color:rgba(240,206,131,.35)">
+          <div class="meta" style="color:var(--cream);font-weight:700;font-size:12px">Приёмка: 12/12 строк</div>
+          <div class="meta">1 расхождение: Shrimp 16/20 — получено 4.5 kg вместо 5 kg</div>
+        </div>
+
+        <div class="grp">Documents</div>
+        <button class="btn ghost">📸 Attach receipt…</button>
+        <div style="height:7px"></div>
+        <div class="file"><span class="fic">🧾</span><div class="grow"><div class="iname" style="font-size:12px">makro-receipt.jpg</div><div class="ith">attached by Mint · ✓ parsed by finance agent</div></div><span class="pill ok">฿4,882</span></div>
+
+        <div class="card" style="margin-top:8px">
+          <div class="meta" style="color:var(--cream);font-weight:700;font-size:12px">Из чека подставлено:</div>
+          <div class="meta">actual total ฿4,882 (Δ −฿38 vs expected) · delivery fee ฿40 · VAT 7% · invoice #INV-8842</div>
+        </div>
+
+        <div style="height:10px"></div>
+        <button class="btn red">Reconcile &amp; Approve — prefilled from receipt</button>
+        <div class="meta" style="text-align:center;margin-top:8px">создаст расход + обновит склад + закроет чек в inbox — одним действием</div>
+      </div>
+      <ul class="ann">
+        <li><b>Кнопка «Attach receipt» на заказе:</b> фото чека уходит в тот же receipts-бакет и в тот же <b>receipt inbox</b>, что и сейчас, но со связкой «этот чек = заказ PO-…». Никакого второго конвейера.</li>
+        <li><b>Распознавание — как обычно</b> (finance-агент), но результат предзаполняет сверку заказа: фактические цены, доставка, скидка, VAT, номер счёта. Останется нажать подтвердить.</li>
+        <li><b>Без двойного учёта:</b> расход создаёт только Reconcile заказа; чек, привязанный к заказу, автоматически закрывается в inbox с тем же expense_id и не обрабатывается как отдельный расход.</li>
+        <li><b>Перекрёстные ссылки:</b> в разделе чеков видно «этот чек → PO-0011», в заказе — миниатюра чека и итоговый расход. Покупки без заказа (стихийные) идут по старому пути через inbox, как раньше.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════ 7. REQUESTS & LOCATIONS ═══════════ -->
+  <section>
+    <div class="sec-h"><span class="sec-n">07</span><span class="sec-t">Заявки отделов → заказ → локации</span></div>
+    <p class="sec-d">Каждый отдел подаёт свои потребности со своей станции («кухне 2 кг курицы», «бару апельсины») — заявки падают в очередь, из неё собирается заказ, и заявитель видит статус своей позиции до самой доставки. При сборке заказа позиции распределяются по локациям: можно разбить на два заказа (Makro возит и туда и туда) или оставить одну доставку и перебросить самим (порог минимального заказа у поставщика учитывается автоматически).</p>
+    <div class="cols cols-2">
+      <div class="frame" style="max-width:430px">
+        <div class="seg"><span>Orders</span><span>Catalog</span><b>Requests</b><span>Suppliers</span><span>···</span></div>
+
+        <div class="grp">New requests · заявки станций</div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><div class="po" style="font-size:12.5px">Chicken breast — 2 kg</div><div class="meta">Kitchen · L1 · by Chef Somchai · 08:40</div></div>
+            <button class="btn royal sm">→ cart</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><div class="po" style="font-size:12.5px">Oranges — 3 kg</div><div class="meta">Bar · L2 · by Nan · 09:15</div></div>
+            <button class="btn royal sm">→ cart</button>
+          </div>
+        </div>
+
+        <div class="grp">In progress · заявитель видит статус</div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><div class="po" style="font-size:12.5px">Greek yogurt — 6 pcs</div><div class="meta">Kitchen · in PO-2026-0011</div></div>
+            <span class="pill wait">shipped</span>
+          </div>
+        </div>
+        <div class="card" style="opacity:.6">
+          <div class="row">
+            <div class="grow"><div class="po" style="font-size:12.5px">Peanut butter — 2 pcs</div><div class="meta">Bar · PO-2026-0009</div></div>
+            <span class="pill ok">✓ delivered</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="frame" style="max-width:430px">
+        <div class="frame-h"><div><div class="t">🛒 Cart · Butcher Phuket</div><div class="s">min order ฿3,000 · одна точка доставки</div></div></div>
+        <div class="card"><div class="row"><div class="grow"><div class="meta" style="color:var(--cream)">Beef ribeye — 4 kg</div></div><span class="chip" style="background:rgba(122,180,90,.16);color:#A8D08A">→ L1</span><span class="thb">฿1,960</span></div></div>
+        <div class="card"><div class="row"><div class="grow"><div class="meta" style="color:var(--cream)">Beef salami — 2 kg</div></div><span class="chip" style="background:rgba(240,206,131,.14);color:var(--gold)">→ L2</span><span class="thb">฿1,240</span></div></div>
+
+        <div class="grp">Delivery split</div>
+        <div class="card" style="border-color:rgba(240,206,131,.4)">
+          <div class="meta" style="color:var(--cream);font-weight:700">● One order → deliver to L1</div>
+          <div class="meta">позиции L2 перебросим сами · итог ฿3,200 ≥ min ฿3,000 ✓</div>
+        </div>
+        <div class="card" style="opacity:.55">
+          <div class="meta" style="color:var(--cream);font-weight:700">○ Split into 2 orders (per location)</div>
+          <div class="meta">⚠ ฿1,960 и ฿1,240 — оба ниже порога ฿3,000, поставщик не повезёт</div>
+        </div>
+        <button class="btn red">Create 1 draft order</button>
+        <div class="meta" style="text-align:center;margin-top:8px">у Makro тот же экран предложит 2 заказа — он возит в обе точки</div>
+      </div>
+    </div>
+    <ul class="ann">
+      <li><b>Заявки</b> — расширение существующей вкладки Requests: любой повар подаёт потребность со своей станции (с телефона), у каждой строки виден путь: заявка → в заказе → едет → доставлено. Ничего не теряется в чатах.</li>
+      <li><b>Локация у каждой строки заказа:</b> подтягивается из заявки автоматически. Один поставщик в обе точки = два заказа; одна доставка с порогом = один заказ с пометками «→ L1 / → L2» и внутренней переброской. Порог из карточки поставщика (min_order) подсказывает сам.</li>
+      <li><b>Роли:</b> галочка «Ordering» на сотруднике в User Management — новый шеф с галочкой сам собирает и отправляет заказы (без доступа к остальной админке task_manager-уровня). Заявки — доступны всем поварам без галочки.</li>
+      <li><b>Стоки:</b> каждая принятая строка приходит с меткой станции — приёмка автоматически кормит учёт остатков по локациям. Сам раздел стоков проектирует другая сессия (connected-stock) — сцепка заложена здесь.</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════ 8. WHERE IS THE LOCATION BUTTON ═══════════ -->
+  <section>
+    <div class="sec-h"><span class="sec-n">08</span><span class="sec-t">Где именно выбирается локация — по шагам</span></div>
+    <p class="sec-d">Локация («куда это везём и где будет лежать») назначается один раз при добавлении позиции и дальше едет с ней сама. Ниже — все четыре места, где она видна и меняется. Красным обведено то, что нажимается.</p>
+
+    <div class="steps">
+
+      <!-- STEP 1 -->
+      <div class="stepcard">
+        <div class="stepnum">Шаг 1</div>
+        <div class="steptitle">Добавляешь позицию в каталоге → выбираешь станцию</div>
+        <div class="stepmini">
+          <div class="item" style="border:none;padding:0 0 8px">
+            <div class="row">
+              <div class="grow"><div class="iname">Chicken breast · <span style="color:rgba(251,248,240,.5)">kg</span></div></div>
+              <div class="add hot">+</div>
+            </div>
+          </div>
+          <div class="pop">
+            <div class="popttl">Add to cart</div>
+            <div class="row" style="gap:8px;margin-bottom:9px">
+              <div class="stepper"><i>−</i><b>6 kg</b><i>+</i></div>
+              <div class="pricebox">Makro ฿89 ▾</div>
+            </div>
+            <div class="l" style="margin-bottom:5px">Destination · куда везём</div>
+            <div class="hotbox">
+              <div class="chips" style="margin:0">
+                <span class="c on">Kitchen · L1</span><span class="c">Bar · L2</span><span class="c">Salad Bar · L2</span><span class="c">Storage</span>
+              </div>
+            </div>
+            <button class="btn red" style="margin-top:10px">Add</button>
+          </div>
+        </div>
+        <div class="stepnote"><b>Вот она — кнопка выбора локации.</b> Если позиция пришла из заявки отдела, станция уже подставлена (Chef заказывал для Kitchen) — просто подтверждаешь.</div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="stepcard">
+        <div class="stepnum">Шаг 2</div>
+        <div class="steptitle">В корзине можно переназначить — чип это выпадашка</div>
+        <div class="stepmini">
+          <div class="card" style="margin:0 0 7px"><div class="row"><div class="grow"><div class="meta" style="color:var(--cream)">Beef ribeye — 4 kg</div></div><span class="chip hotchip">→ Kitchen · L1 ▾</span><span class="thb">฿1,960</span></div></div>
+          <div class="dropdown">
+            <div class="dd on">Kitchen · L1 ✓</div><div class="dd">Bar · L2</div><div class="dd">Salad Bar · L2</div><div class="dd">Storage</div>
+          </div>
+          <div class="card" style="margin:7px 0 0"><div class="row"><div class="grow"><div class="meta" style="color:var(--cream)">Beef salami — 2 kg</div></div><span class="chip" style="background:rgba(240,206,131,.14);color:var(--gold)">→ Bar · L2</span><span class="thb">฿1,240</span></div></div>
+        </div>
+        <div class="stepnote">Передумала — тапнула по чипу и поменяла. Никаких отдельных экранов.</div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="stepcard">
+        <div class="stepnum">Шаг 3</div>
+        <div class="steptitle">Система видит две локации у одного поставщика и спрашивает</div>
+        <div class="stepmini">
+          <div class="askbar">⚠ В корзине Butcher Phuket позиции для двух точек. Как везём?</div>
+          <div class="hotbox">
+            <div class="card" style="margin:0 0 6px;border-color:rgba(240,206,131,.5)">
+              <div class="meta" style="color:var(--cream);font-weight:700">● Один заказ → привезут на L1</div>
+              <div class="meta">колбасу перебросим сами · ฿3,200 ≥ минимума ฿3,000 ✓</div>
+            </div>
+            <div class="card" style="margin:0;opacity:.6">
+              <div class="meta" style="color:var(--cream);font-weight:700">○ Два заказа — на каждую точку свой</div>
+              <div class="meta">⚠ ฿1,960 и ฿1,240 — оба ниже минимума ฿3,000</div>
+            </div>
+          </div>
+        </div>
+        <div class="stepnote"><b>Вот второй выбор.</b> У Makro (возит в обе точки, порога нет) по умолчанию будет предложен вариант «два заказа».</div>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="stepcard">
+        <div class="stepnum">Шаг 4</div>
+        <div class="steptitle">В заказе и на приёмке — видно, что куда разгружать</div>
+        <div class="stepmini">
+          <div class="line-ed" style="margin:0 0 7px">
+            <div class="grow"><div class="iname" style="font-size:12.5px">Beef ribeye <span class="chip hotchip" style="margin-left:4px">→ Kitchen · L1 ▾</span></div></div>
+            <div class="stepper"><i>−</i><b>4 kg</b><i>+</i></div>
+          </div>
+          <div class="recv">
+            <div class="meta" style="color:var(--cream);font-weight:700;font-size:12px">Приёмка · PO-2026-0016</div>
+            <div class="meta">Beef ribeye 4 kg &nbsp;<span style="color:#A8D08A">✓ принято</span> &nbsp;→ <b style="color:var(--cream)">на Kitchen · L1</b></div>
+            <div class="meta">Beef salami 2 kg &nbsp;<span style="color:#A8D08A">✓ принято</span> &nbsp;→ <b style="color:var(--cream)">переброска на Bar · L2</b></div>
+          </div>
+        </div>
+        <div class="stepnote">После приёмки остаток встаёт на свою станцию — это и есть вход в учёт стоков.</div>
+      </div>
+
+    </div>
+
+    <ul class="ann">
+      <li><b>Короткий ответ:</b> кнопка выбора локации — в момент добавления позиции (шаг 1) и чип-выпадашка везде дальше (шаги 2 и 4). Отдельного экрана «распределение по локациям» нет намеренно — иначе это лишний шаг в рутине.</li>
+      <li><b>Разбивка доставки</b> (шаг 3) спрашивается только когда она реально нужна — если все позиции в одну точку, вопроса не будет вообще.</li>
+      <li><b>Из заявок отделов</b> локация приходит сама: повар подал заявку со своей станции — она и есть назначение.</li>
+    </ul>
+  </section>
+
+  <div class="note"><b>Что уже готово и не переделывается:</b> статусная модель заказа в БД, создание заказа, приёмка со сверкой (/receive: принято/брак/недовоз по строкам), Reconcile → расход + склад, Price Book со сравнением цен. Мы достраиваем: редактирование заказа, доску с автором и «NEW», хаб ссылок поставщика, сборку из каталога — и прогоняем весь цикл E2E-тестом под ролью Минт.<br><br><b>Ревизия старого раздела</b> (им ни разу не пользовались — 0 заказов, 0 заявок): остаются 6 вкладок <b>Orders · Catalog · Requests · Suppliers · Price Book · Catalog Inbox</b>. Уходят: Stock и Sheet Items (заменяет connected-stock), Quick Purchase (заменяет цепочка заказ→чек→расход), Shelf Life (переедет в /menu). Данные нигде не удаляются.</div>
+
+</div>
+</body>
+</html>
