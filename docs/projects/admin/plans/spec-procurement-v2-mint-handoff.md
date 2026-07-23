@@ -179,6 +179,15 @@ Four surfaces, all inside the existing `/procurement` hub (tab set reshuffled):
    rest** (e.g. butcher with a ฿3,000 minimum). The existing
    `suppliers.min_order_thb` powers the guard: the split option warns when a
    partial order would fall below the supplier's minimum.
+
+   **Exact interaction points (design preview §08 — no separate "assign
+   locations" screen, by design):**
+   | # | Where | Control |
+   |---|---|---|
+   | 1 | Order Builder, `+` add-to-cart popover | **Destination** station chip row (pre-selected from the source request when the line came from one) |
+   | 2 | Cart line | destination chip is a dropdown — tap to reassign |
+   | 3 | Cart, per supplier | split-vs-one-delivery choice — shown **only** when one supplier's lines target 2+ destinations; `min_order_thb` warning on the split option |
+   | 4 | PO Detail line (until `received`) | same chip dropdown; receiving screen shows the unload target per line, and lines destined elsewhere are flagged as internal transfer |
 9. **Ordering role** (CEO addition 2026-07-23): new per-user toggle
    `staff.can_create_orders` — grants the ordering workflow (build cart,
    create/edit/submit POs, receive deliveries) WITHOUT the full task_manager

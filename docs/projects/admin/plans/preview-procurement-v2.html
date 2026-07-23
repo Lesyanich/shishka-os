@@ -110,6 +110,30 @@
   ul.ann{margin:14px 0 0 0;padding:0;list-style:none}
   ul.ann li{font-size:12.5px;color:rgba(251,248,240,.6);padding:3px 0 3px 18px;position:relative}
   ul.ann li::before{content:"→";position:absolute;left:0;color:var(--gold);font-weight:700}
+  /* step-by-step scenario (section 08) */
+  .steps{display:grid;gap:16px}
+  @media(min-width:900px){.steps{grid-template-columns:1fr 1fr}}
+  .stepcard{background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 42%),var(--s1);border:1px solid var(--line-strong);border-radius:18px;padding:15px 16px}
+  .stepnum{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);background:rgba(240,206,131,.1);border-radius:99px;padding:3px 10px}
+  .steptitle{font-size:14px;font-weight:800;margin:8px 0 12px;letter-spacing:-.01em}
+  .stepmini{background:var(--s2);border:1px solid var(--line);border-radius:13px;padding:11px 12px}
+  .stepnote{font-size:12px;color:rgba(251,248,240,.6);margin-top:11px;padding-left:14px;position:relative}
+  .stepnote::before{content:"";position:absolute;left:0;top:5px;bottom:3px;width:2px;border-radius:2px;background:var(--gold);opacity:.5}
+  .stepnote b{color:var(--cream)}
+  /* red "click here" highlight */
+  .hot,.hotchip,.hotbox{position:relative;box-shadow:0 0 0 2px var(--red),0 0 0 6px rgba(182,42,35,.22)}
+  .hot{border-radius:9px}
+  .hotchip{cursor:pointer;background:rgba(122,180,90,.16);color:#A8D08A;border-radius:99px}
+  .hotbox{border-radius:12px;padding:8px;background:rgba(182,42,35,.05)}
+  .pop{margin-top:10px;background:var(--s1);border:1px solid var(--line-strong);border-radius:13px;padding:12px}
+  .popttl{font-size:12.5px;font-weight:800;margin-bottom:9px}
+  .pop .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:rgba(251,248,240,.42)}
+  .dropdown{margin-top:5px;background:var(--s1);border:1px solid var(--line-strong);border-radius:11px;overflow:hidden}
+  .dd{font-size:11.5px;padding:8px 11px;border-bottom:1px solid var(--line);color:rgba(251,248,240,.7)}
+  .dd:last-child{border:none}
+  .dd.on{background:rgba(122,180,90,.1);color:#A8D08A;font-weight:700}
+  .askbar{font-size:11.5px;font-weight:600;color:var(--gold);background:rgba(240,206,131,.08);border:1px solid rgba(240,206,131,.25);border-radius:10px;padding:8px 11px;margin-bottom:9px}
+  .recv{margin-top:8px;background:var(--s1);border:1px solid var(--line-strong);border-radius:11px;padding:10px 11px}
   .days{display:flex;gap:4px}
   .days i{font-style:normal;font-size:10px;font-weight:700;width:24px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--s3);color:rgba(251,248,240,.4)}
   .days i.on{background:linear-gradient(180deg,var(--royal-soft),var(--royal));color:var(--cream)}
@@ -513,6 +537,103 @@
       <li><b>Локация у каждой строки заказа:</b> подтягивается из заявки автоматически. Один поставщик в обе точки = два заказа; одна доставка с порогом = один заказ с пометками «→ L1 / → L2» и внутренней переброской. Порог из карточки поставщика (min_order) подсказывает сам.</li>
       <li><b>Роли:</b> галочка «Ordering» на сотруднике в User Management — новый шеф с галочкой сам собирает и отправляет заказы (без доступа к остальной админке task_manager-уровня). Заявки — доступны всем поварам без галочки.</li>
       <li><b>Стоки:</b> каждая принятая строка приходит с меткой станции — приёмка автоматически кормит учёт остатков по локациям. Сам раздел стоков проектирует другая сессия (connected-stock) — сцепка заложена здесь.</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════ 8. WHERE IS THE LOCATION BUTTON ═══════════ -->
+  <section>
+    <div class="sec-h"><span class="sec-n">08</span><span class="sec-t">Где именно выбирается локация — по шагам</span></div>
+    <p class="sec-d">Локация («куда это везём и где будет лежать») назначается один раз при добавлении позиции и дальше едет с ней сама. Ниже — все четыре места, где она видна и меняется. Красным обведено то, что нажимается.</p>
+
+    <div class="steps">
+
+      <!-- STEP 1 -->
+      <div class="stepcard">
+        <div class="stepnum">Шаг 1</div>
+        <div class="steptitle">Добавляешь позицию в каталоге → выбираешь станцию</div>
+        <div class="stepmini">
+          <div class="item" style="border:none;padding:0 0 8px">
+            <div class="row">
+              <div class="grow"><div class="iname">Chicken breast · <span style="color:rgba(251,248,240,.5)">kg</span></div></div>
+              <div class="add hot">+</div>
+            </div>
+          </div>
+          <div class="pop">
+            <div class="popttl">Add to cart</div>
+            <div class="row" style="gap:8px;margin-bottom:9px">
+              <div class="stepper"><i>−</i><b>6 kg</b><i>+</i></div>
+              <div class="pricebox">Makro ฿89 ▾</div>
+            </div>
+            <div class="l" style="margin-bottom:5px">Destination · куда везём</div>
+            <div class="hotbox">
+              <div class="chips" style="margin:0">
+                <span class="c on">Kitchen · L1</span><span class="c">Bar · L2</span><span class="c">Salad Bar · L2</span><span class="c">Storage</span>
+              </div>
+            </div>
+            <button class="btn red" style="margin-top:10px">Add</button>
+          </div>
+        </div>
+        <div class="stepnote"><b>Вот она — кнопка выбора локации.</b> Если позиция пришла из заявки отдела, станция уже подставлена (Chef заказывал для Kitchen) — просто подтверждаешь.</div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="stepcard">
+        <div class="stepnum">Шаг 2</div>
+        <div class="steptitle">В корзине можно переназначить — чип это выпадашка</div>
+        <div class="stepmini">
+          <div class="card" style="margin:0 0 7px"><div class="row"><div class="grow"><div class="meta" style="color:var(--cream)">Beef ribeye — 4 kg</div></div><span class="chip hotchip">→ Kitchen · L1 ▾</span><span class="thb">฿1,960</span></div></div>
+          <div class="dropdown">
+            <div class="dd on">Kitchen · L1 ✓</div><div class="dd">Bar · L2</div><div class="dd">Salad Bar · L2</div><div class="dd">Storage</div>
+          </div>
+          <div class="card" style="margin:7px 0 0"><div class="row"><div class="grow"><div class="meta" style="color:var(--cream)">Beef salami — 2 kg</div></div><span class="chip" style="background:rgba(240,206,131,.14);color:var(--gold)">→ Bar · L2</span><span class="thb">฿1,240</span></div></div>
+        </div>
+        <div class="stepnote">Передумала — тапнула по чипу и поменяла. Никаких отдельных экранов.</div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="stepcard">
+        <div class="stepnum">Шаг 3</div>
+        <div class="steptitle">Система видит две локации у одного поставщика и спрашивает</div>
+        <div class="stepmini">
+          <div class="askbar">⚠ В корзине Butcher Phuket позиции для двух точек. Как везём?</div>
+          <div class="hotbox">
+            <div class="card" style="margin:0 0 6px;border-color:rgba(240,206,131,.5)">
+              <div class="meta" style="color:var(--cream);font-weight:700">● Один заказ → привезут на L1</div>
+              <div class="meta">колбасу перебросим сами · ฿3,200 ≥ минимума ฿3,000 ✓</div>
+            </div>
+            <div class="card" style="margin:0;opacity:.6">
+              <div class="meta" style="color:var(--cream);font-weight:700">○ Два заказа — на каждую точку свой</div>
+              <div class="meta">⚠ ฿1,960 и ฿1,240 — оба ниже минимума ฿3,000</div>
+            </div>
+          </div>
+        </div>
+        <div class="stepnote"><b>Вот второй выбор.</b> У Makro (возит в обе точки, порога нет) по умолчанию будет предложен вариант «два заказа».</div>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="stepcard">
+        <div class="stepnum">Шаг 4</div>
+        <div class="steptitle">В заказе и на приёмке — видно, что куда разгружать</div>
+        <div class="stepmini">
+          <div class="line-ed" style="margin:0 0 7px">
+            <div class="grow"><div class="iname" style="font-size:12.5px">Beef ribeye <span class="chip hotchip" style="margin-left:4px">→ Kitchen · L1 ▾</span></div></div>
+            <div class="stepper"><i>−</i><b>4 kg</b><i>+</i></div>
+          </div>
+          <div class="recv">
+            <div class="meta" style="color:var(--cream);font-weight:700;font-size:12px">Приёмка · PO-2026-0016</div>
+            <div class="meta">Beef ribeye 4 kg &nbsp;<span style="color:#A8D08A">✓ принято</span> &nbsp;→ <b style="color:var(--cream)">на Kitchen · L1</b></div>
+            <div class="meta">Beef salami 2 kg &nbsp;<span style="color:#A8D08A">✓ принято</span> &nbsp;→ <b style="color:var(--cream)">переброска на Bar · L2</b></div>
+          </div>
+        </div>
+        <div class="stepnote">После приёмки остаток встаёт на свою станцию — это и есть вход в учёт стоков.</div>
+      </div>
+
+    </div>
+
+    <ul class="ann">
+      <li><b>Короткий ответ:</b> кнопка выбора локации — в момент добавления позиции (шаг 1) и чип-выпадашка везде дальше (шаги 2 и 4). Отдельного экрана «распределение по локациям» нет намеренно — иначе это лишний шаг в рутине.</li>
+      <li><b>Разбивка доставки</b> (шаг 3) спрашивается только когда она реально нужна — если все позиции в одну точку, вопроса не будет вообще.</li>
+      <li><b>Из заявок отделов</b> локация приходит сама: повар подал заявку со своей станции — она и есть назначение.</li>
     </ul>
   </section>
 
