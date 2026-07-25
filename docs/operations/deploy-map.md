@@ -62,3 +62,33 @@ deployment → repo**, never code → domain.
 > one-click Promote of `10a01aa` (Jul 5) — but diagnosis cost ~25 extra minutes because
 > this map didn't exist and reasoning ran code→domain. Post-mortem PRs: os#495 (git
 > revert of the stray code), this doc.
+
+## Failure signatures (seen in the wild)
+
+### All builds ERROR at the clone step — `Root Directory "apps/web" does not exist`
+
+Origin: 2026-07-25 (MC `77788edc`). shishka.health was frozen on the 2026-07-05 build
+for ~3 weeks: EVERY git build of `shishka-health` had silently ERRORed since mid-July,
+at the very first step —
+
+```
+Cloning github.com/Lesyanich/shishka-health …
+The specified Root Directory "apps/web" does not exist. Please update your Project Settings.
+```
+
+- **Cause:** the `shishka-web` project's **Root Directory** setting was set to `apps/web` —
+  a `shishka-os`-shaped path (that repo has `apps/web`; `shishka-health` is a FLAT Vite app
+  built from the repo root). Almost certainly a spillover from the 2026-07-11 CLI-incident
+  cleanup, when the two repos/projects were confused.
+- **Why it hid for weeks:** the build dies *before* install/vite runs, so (a) the `errorsOnly`
+  build-log filter returns NOTHING — you must read the full log **tail**; (b) local
+  `npm run build` is CLEAN (Root Directory is a Vercel-only setting, absent locally);
+  (c) DB-driven content (`menu_public`) keeps updating live at runtime, so only CODE/COPY
+  silently froze while the menu still looked fresh.
+- **Fix (CEO-only):** Settings → Build & Deployment → **Root Directory → clear it**
+  (empty = repo root) → Save → Redeploy latest `main`. `vercel.json` at the repo root already
+  carries buildCommand/outputDirectory/framework, so clearing Root Directory is necessary AND
+  sufficient — `vercel.json` can override build/install/output but NOT Root Directory (that's
+  resolved before `vercel.json` is read).
+- **Verify:** `curl -s "https://shishka.health/?cb=$(date +%s)"` → new `/assets/index-*.js`
+  hash + expected copy; `x-vercel-cache: MISS` confirms it's fresh, not edge-cached.
