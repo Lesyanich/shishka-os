@@ -1,91 +1,115 @@
 # Data Health Sheriff Report
-**Date:** 2026-07-12  
+**Date:** 2026-07-26  
 **Run type:** Scheduled weekly audit  
-**Status:** ⛔ BLOCKED — No database credentials available (2nd consecutive missed run)
+**Status:** ⛔ BLOCKED — Network policy denies Supabase (3rd consecutive missed run)
 
 ---
 
-## ⚠️ URGENT: Audit Has Now Missed 2 Consecutive Weeks
+## Progress Since Last Run (2026-07-12)
 
-Previous blocked run: **2026-06-21**  
-This run: **2026-07-12**  
-Total weeks without data quality checks: **3 weeks**
+✅ `DATABASE_URL` is now set in the scheduled environment — that blocker is resolved!
 
-The audit **cannot run** until `DATABASE_URL` is added to the scheduled routine's environment variables.
+❌ **New blockers found** (two remaining issues):
 
----
+| Blocker | Diagnosis | Fix |
+|---------|-----------|-----|
+| Proxy denies `qcqgtcsjoacuktcewpvo.supabase.co:443` | HTTP 403 from egress proxy — policy denial | Add host to network allowlist |
+| `SUPABASE_URL` not set | MCP tools (Chef/Finance) need this to init Supabase client | Add env var to scheduled routine |
+| `SUPABASE_SERVICE_ROLE_KEY` not set | MCP tools check for this too | Add env var to scheduled routine |
 
-## Root Cause
-
-| Method | Result |
-|--------|--------|
-| `DATABASE_URL` env var | Not set |
-| `SUPABASE_SERVICE_ROLE_KEY` env var | Not set |
-| `SUPABASE_URL` env var | Not set |
-| `POSTGRES_URL` env var | Not set |
-| macOS Keychain `shishka-database-url` | Unavailable (Linux, no `security` CLI) |
-| `.env` files in repo | Gitignored — not present in clone |
+**Proxy proof:** `recentRelayFailures: [{"kind":"connect_rejected","detail":"gateway answered 403 to CONNECT (policy denial)","host":"qcqgtcsjoacuktcewpvo.supabase.co:443"}]`
 
 ---
 
 ## Fix Required (One Time)
 
-Add to the **scheduled routine environment** in Claude Code web settings:
+### Step 1 — Add environment variables to scheduled routine
+
+In Claude Code web settings → this scheduled session → Environment:
 
 ```
-DATABASE_URL=postgresql://postgres.[project-id]:[password]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+SUPABASE_URL=https://qcqgtcsjoacuktcewpvo.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service_role_key_from_supabase_dashboard>
 ```
 
-Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
+DATABASE_URL is already set correctly — don't change it.
 
-Instructions: https://code.claude.com/docs/en/claude-code-on-the-web (Environment configuration section)
+### Step 2 — Add Supabase to network allowlist
+
+In the environment settings, add `qcqgtcsjoacuktcewpvo.supabase.co` to the outbound allowlist.  
+See: https://code.claude.com/docs/en/claude-code-on-the-web (Environment configuration → network policy)
+
+Once both steps are done, this audit will run fully on the next scheduled fire.
+
+---
+
+## What Has Been Accumulating (4+ Weeks Unaudited)
+
+### High-Risk: OCR Duplicate Accumulation
+Every Makro receipt creates OCR name variants for the same physical product. Based on learned patterns:
+- **Thai produce & meat**: potatoes, chicken, lamb — each receipt generates a slightly different transliteration
+- **Known example barcode 831436**: lamb shoulder / lamb leg / minced lamb — all same product
+- Without weekly dedup, the catalog grows noisier every procurement cycle
+
+### High-Risk: Zero-Cost WAC Recalculation Not Running
+Items with `cost_per_unit = 0` that now have paid `purchase_logs` haven't had their Weighted Average Cost auto-calculated for 4+ weeks. This breaks:
+- BOM cost calculations
+- Dish margin reports
+- Profit & Loss accuracy
+
+### Medium-Risk: g vs kg Confusion (Gouda pattern)
+Any item with `base_unit='g'` and `cost_per_unit < 5` is likely misconfigured as grams instead of kilograms. Cost appears to be per-gram (e.g., WAC=0.82) instead of per-kg (WAC=820). Affects all weight-priced items.
+
+### Medium-Risk: Price Drift / Broken Conversion Factors
+Supplier prices change monthly. Items like Olive Oil (known: WAC=440/L, last_price=2200 for 5L) show >1000% "drift" when `conversion_factor` is wrong. Every week without the audit adds more undetected conversion errors.
+
+### Low-Risk: Unlinked Makro Barcodes
+New purchased barcodes that aren't linked to any nomenclature item. These cause manual matching work during next receipt processing.
 
 ---
 
 ## Phases Blocked
 
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 1: data_health_rules (all active rules) | ⛔ BLOCKED | Needs DB |
-| Phase 2: Smart duplicate detection | ⛔ BLOCKED | Needs DB |
-| Phase 3: Full Makro barcode audit (~222 barcodes) | ⛔ BLOCKED | Needs DB + Makro API |
-| Phase 4: Price drift + conversion sanity | ⛔ BLOCKED | Needs DB |
-| Phase 5: Report | ⚠ PARTIAL | This file only |
-
----
-
-## What Is Accumulating Without Checks
-
-Based on learned patterns, the following issues are growing undetected:
-
-### High-Risk: OCR Duplicate Accumulation
-Every week Makro receipts are processed, OCR creates new name variants for the same physical product.  
-- Pattern: same supplier + similar price (±20%) + overlapping purchase dates → duplicate RAW items  
-- Known example: lamb shoulder/leg/minced lamb all barcode 831436  
-- **Without weekly dedup, the catalog grows noisier each week**
-
-### Medium-Risk: Zero-Cost Items With Purchases
-Items that had cost_per_unit = 0 but now have purchase_logs with real prices — WAC should be recalculated automatically (auto_apply rule). This has not run in 3 weeks.
-
-### Medium-Risk: Price Drift
-Supplier prices change; if conversion_factor is wrong, cost_per_unit may be wildly off (>1000% drift pattern from Olive Oil case). Undetected for 3 weeks.
-
-### Low-Risk: Unlinked Makro Barcodes
-New purchases may have barcodes not yet linked to nomenclature. Makro barcode audit would catch these.
+| Phase | Status | Blocker |
+|-------|--------|---------|
+| Phase 1: Execute all active data_health_rules | ⛔ BLOCKED | Network policy |
+| Phase 1a: Auto WAC recalculation | ⛔ BLOCKED | Network policy |
+| Phase 2: Smart duplicate detection (similarity) | ⛔ BLOCKED | Network policy |
+| Phase 2b: g vs kg unit confusion detection | ⛔ BLOCKED | Network policy |
+| Phase 3: Full Makro barcode audit (~222 barcodes) | ⛔ BLOCKED | Network policy + Makro API |
+| Phase 4: Price drift + conversion sanity | ⛔ BLOCKED | Network policy |
+| Phase 5: Report | ⚠️ PARTIAL | This file only |
 
 ---
 
 ## Health Score
 **N/A** — unable to compute (no DB access)
 
-Last successful audit: **never** (all runs blocked since this routine started)
+Last successful audit: **never** (all runs blocked since routine started)  
+Consecutive blocked runs: **3**  
+Weeks of unaudited data: **5+ weeks**
 
 ---
 
-## Action Required
+## Diagnostic Log (this run)
 
-1. **Add `DATABASE_URL` to scheduled routine environment** (see fix above) — this unblocks everything
-2. Re-run the audit after credentials are configured
-3. Consider also running a manual `/techlead` session to catch up on 3 weeks of unaudited procurement data
+```
+DATABASE_URL:           ✅ SET  (postgresql://postgres.qcqgtcsjoacuktcewpvo:...@aws-0-ap-south-1.pooler.supabase.com:5432/postgres)
+SUPABASE_URL:           ❌ NOT SET
+SUPABASE_SERVICE_ROLE_KEY: ❌ NOT SET
 
-_Report generated: 2026-07-12 | Session: claude-opus-session-85e8f658 | Consecutive blocked runs: 2_
+psycopg2 direct connect: TIMEOUT (TCP to port 5432 not routed through HTTPS proxy)
+Supabase REST API:       403 FORBIDDEN (egress policy denies *.supabase.co)
+MCP Chef tools:          ERROR: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
+MCP Finance tools:       ERROR: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
+
+Proxy status: selective=false, standalone=false
+Recent relay failure: connect_rejected for qcqgtcsjoacuktcewpvo.supabase.co:443
+```
+
+Per proxy README §"403/407 from the proxy":
+> "The destination host is not allowed by your organization's egress policy for this session. Do not retry or route around it — report the blocked host."
+
+---
+
+_Report generated: 2026-07-26 | Session: claude-opus-session-5d286ad5 | Consecutive blocked runs: 3_
