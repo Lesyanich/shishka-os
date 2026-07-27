@@ -15,18 +15,7 @@ import type {
   ParsedReceiptItem,
   ReceivedLineSummary,
 } from '../types/procurement'
-
-/** Mirrors OcrModel in useReceiptInbox — kept as data so the stored preference can be validated. */
-const VALID_OCR_MODELS: string[] = [
-  'gemini-flash',
-  'gemini-flash-lite',
-  'gemini-3-flash',
-  'gemini-pro',
-  'claude-sonnet',
-  'claude-haiku',
-  'gpt-4o',
-  'claude-sub',
-]
+import { runOcrParse, getStoredOcrModel, type OcrParseResult } from '../lib/ocrParse'
 
 /* ───────────────────────── Order Desk grouping ───────────────────────── */
 
@@ -467,22 +456,10 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
    * this a PO receipt could be attached but never read.
    */
   const parseLinkedReceipt = useCallback(
-    async (inboxId: string): Promise<{ ok: boolean; error?: string }> => {
-      try {
-        // Same stored preference the receipt inbox uses, so the model chosen
-        // there applies here too. Falls back to the inbox's own default.
-        const stored = localStorage.getItem('receipt-ocr-model')
-        const model = VALID_OCR_MODELS.includes(stored ?? '') ? (stored as string) : 'gemini-flash'
-        const { data, error: fnErr } = await supabase.functions.invoke(
-          `ocr-receipt?inbox_id=${inboxId}&model=${model}`,
-        )
-        if (fnErr) return { ok: false, error: fnErr.message }
-        if (data && !data.ok) return { ok: false, error: data.error || 'Parse failed' }
-        return { ok: true }
-      } catch (e) {
-        return { ok: false, error: e instanceof Error ? e.message : String(e) }
-      }
-    },
+    async (inboxId: string): Promise<OcrParseResult> =>
+      // Same trigger, same model preference, same claude-sub handling as the
+      // receipt inbox — one implementation, in lib/ocrParse.
+      runOcrParse(inboxId, getStoredOcrModel()),
     [],
   )
 
