@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Trash2, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { SearchableSelect, type SearchableOption } from '../ui/SearchableSelect'
+import { CategoryFilter } from '../ui/CategoryFilter'
+import { useProductCategories } from '../../hooks/useProductCategories'
 import type { CreatePOPayload, CreatePOResult, POLineInput } from '../../types/procurement'
 
 interface Supplier {
@@ -10,6 +12,7 @@ interface Supplier {
 }
 
 interface NomItem {
+  category_id?: string | null
   id: string
   product_code: string
   name: string
@@ -52,16 +55,41 @@ export function PurchaseOrderForm({
   ])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [catFilter, setCatFilter] = useState<{
+    categoryId: string | null
+    subCategoryId: string | null
+  }>({ categoryId: null, subCategoryId: null })
 
-  // Search matches the product code too, so "RAW-CHK" finds it as readily as
-  // "chicken" — the code is what appears on supplier paperwork.
+  const { mainCategories, subCategoriesOf, pathOf, mainCategoryIdOf } = useProductCategories()
+
   const supplierOptions: SearchableOption[] = useMemo(
     () => suppliers.map((s) => ({ value: s.id, label: s.name })),
     [suppliers],
   )
+
+  /** Items left after the category/subcategory filter. */
+  const filteredItems = useMemo(() => {
+    if (!catFilter.categoryId && !catFilter.subCategoryId) return items
+    return items.filter((i) => {
+      if (catFilter.subCategoryId) return i.category_id === catFilter.subCategoryId
+      return mainCategoryIdOf(i.category_id ?? null) === catFilter.categoryId
+    })
+  }, [items, catFilter, mainCategoryIdOf])
+
+  /**
+   * The readable line is the CATEGORY, not the product code: codes are often
+   * RAW-AUTO-0b4e881a, which tells a human nothing. The code stays searchable
+   * via `keywords` for anyone reading it off a supplier invoice.
+   */
   const itemOptions: SearchableOption[] = useMemo(
-    () => items.map((i) => ({ value: i.id, label: i.name, sublabel: i.product_code })),
-    [items],
+    () =>
+      filteredItems.map((i) => ({
+        value: i.id,
+        label: i.name,
+        sublabel: pathOf(i.category_id ?? null) ?? 'Uncategorized',
+        keywords: i.product_code,
+      })),
+    [filteredItems, pathOf],
   )
 
   useEffect(() => {
@@ -70,7 +98,7 @@ export function PurchaseOrderForm({
         supabase.from('suppliers').select('id, name').eq('is_deleted', false).order('name'),
         supabase
           .from('nomenclature')
-          .select('id, product_code, name, base_unit')
+          .select('id, product_code, name, base_unit, category_id')
           .or('product_code.ilike.RAW-%,product_code.ilike.PF-%')
           .eq('is_deleted', false)
           .order('product_code'),
@@ -97,7 +125,7 @@ export function PurchaseOrderForm({
     const ids = initialLines.map((l) => l.nomenclature_id)
     supabase
       .from('nomenclature')
-      .select('id, product_code, name, base_unit')
+      .select('id, product_code, name, base_unit, category_id')
       .in('id', ids)
       .then(({ data }) => {
         if (!data) return
@@ -245,6 +273,18 @@ export function PurchaseOrderForm({
       {/* Line items */}
       <div className="space-y-2">
         <label className="block text-[11px] text-cream/45">Items</label>
+        <CategoryFilter
+          categoryId={catFilter.categoryId}
+          subCategoryId={catFilter.subCategoryId}
+          onChange={setCatFilter}
+          mainCategories={mainCategories}
+          subCategoriesOf={subCategoriesOf}
+          countLabel={
+            filteredItems.length === items.length
+              ? undefined
+              : `${filteredItems.length} of ${items.length}`
+          }
+        />
         {lines.map((line, idx) => (
           <div key={idx} className="flex items-start gap-2">
             <div className="min-w-0 flex-1">

@@ -6,6 +6,12 @@ export interface SearchableOption {
   label: string
   /** Secondary line — product code, supplier category, anything disambiguating. */
   sublabel?: string | null
+  /**
+   * Searchable but never rendered. Product codes live here: RAW-AUTO-0b4e881a
+   * means nothing to a human, but someone reading a supplier invoice may still
+   * type it.
+   */
+  keywords?: string | null
 }
 
 interface Props {
@@ -50,7 +56,8 @@ export function SearchableSelect({
     return options.filter(
       (o) =>
         o.label.toLowerCase().includes(q) ||
-        (o.sublabel ? o.sublabel.toLowerCase().includes(q) : false),
+        (o.sublabel ? o.sublabel.toLowerCase().includes(q) : false) ||
+        (o.keywords ? o.keywords.toLowerCase().includes(q) : false),
     )
   }, [options, query])
 

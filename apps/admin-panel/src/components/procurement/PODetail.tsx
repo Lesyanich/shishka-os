@@ -8,6 +8,8 @@ import { POLineEditor } from './POLineEditor'
 import { supabase } from '../../lib/supabase'
 import { compressImage, uploadToStorage } from '../receipts/upload-helpers'
 import { signReceiptUrls } from '../../lib/receiptUrls'
+import { CategoryFilter } from '../ui/CategoryFilter'
+import { useProductCategories } from '../../hooks/useProductCategories'
 import type {
   PurchaseOrder, POLine, POStatus, POLinePatch, UpdatePOPatch, UpdatePOResult,
   Station, LinkedReceipt, ReceivedLineSummary,
@@ -52,6 +54,7 @@ export function buildCopyOrderText(order: PurchaseOrder, lines: POLine[]): strin
 }
 
 interface CatalogOption {
+  category_id?: string | null
   nomenclature_id: string
   display_name: string
   purchase_unit: string | null
@@ -113,6 +116,11 @@ export function PODetail({
   const [isPickerOpen, setPickerOpen] = useState(false)
   const [catalog, setCatalog] = useState<CatalogOption[]>([])
   const [pickerQuery, setPickerQuery] = useState('')
+  const [pickerCat, setPickerCat] = useState<{
+    categoryId: string | null
+    subCategoryId: string | null
+  }>({ categoryId: null, subCategoryId: null })
+  const { mainCategories, subCategoriesOf, pathOf, mainCategoryIdOf } = useProductCategories()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const editable = EDITABLE.includes(order.status)
@@ -206,7 +214,7 @@ export function PODetail({
     if (catalog.length > 0) return
     const { data } = await supabase
       .from('v_order_builder')
-      .select('nomenclature_id, display_name, purchase_unit, last_seen_price')
+      .select('nomenclature_id, display_name, purchase_unit, last_seen_price, category_id')
       .eq('supplier_id', order.supplier_id)
       .not('nomenclature_id', 'is', null)
       // Ordered and generous on purpose: the cap used to be 500 with no
@@ -315,8 +323,13 @@ export function PODetail({
 
   const action = NEXT_ACTIONS[order.status]
   const takenIds = new Set(lines.map((l) => l.nomenclature_id))
-  const pickerResults = catalog
-    .filter((c) => !takenIds.has(c.nomenclature_id))
+  const pickerAvailable = catalog.filter((c) => !takenIds.has(c.nomenclature_id))
+  const pickerInCategory = pickerAvailable.filter((c) => {
+    if (pickerCat.subCategoryId) return c.category_id === pickerCat.subCategoryId
+    if (pickerCat.categoryId) return mainCategoryIdOf(c.category_id ?? null) === pickerCat.categoryId
+    return true
+  })
+  const pickerResults = pickerInCategory
     .filter((c) => c.display_name?.toLowerCase().includes(pickerQuery.toLowerCase()))
     .slice(0, 30)
 
@@ -493,7 +506,20 @@ export function PODetail({
               value={pickerQuery}
               onChange={(e) => setPickerQuery(e.target.value)}
               placeholder={`Search ${order.supplier_name} catalog…`}
+              aria-label="Search catalog"
               className="w-full rounded-lg bg-[var(--s-2)] px-2.5 py-2 text-xs text-cream outline-none placeholder:text-cream/30"
+            />
+            <CategoryFilter
+              categoryId={pickerCat.categoryId}
+              subCategoryId={pickerCat.subCategoryId}
+              onChange={setPickerCat}
+              mainCategories={mainCategories}
+              subCategoriesOf={subCategoriesOf}
+              countLabel={
+                pickerInCategory.length === pickerAvailable.length
+                  ? undefined
+                  : `${pickerInCategory.length} of ${pickerAvailable.length}`
+              }
             />
             <div className="max-h-56 space-y-1 overflow-y-auto">
               {pickerResults.length === 0 && (
@@ -509,7 +535,12 @@ export function PODetail({
                   onClick={() => handleAddItem(c)}
                   className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-[var(--s-3)]"
                 >
-                  <span className="min-w-0 flex-1 truncate text-xs text-cream">{c.display_name}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs text-cream">{c.display_name}</span>
+                    <span className="block truncate text-[10px] text-cream/45">
+                      {pathOf(c.category_id ?? null) ?? 'Uncategorized'}
+                    </span>
+                  </span>
                   {c.last_seen_price != null && (
                     <span className="text-[11px] font-bold text-honey-300">
                       ฿{Number(c.last_seen_price).toLocaleString()}
