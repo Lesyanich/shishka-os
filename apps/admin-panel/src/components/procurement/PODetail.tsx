@@ -69,6 +69,8 @@ interface Props {
   attachReceipt: (poId: string, storagePath: string, uploadedBy: string) => Promise<string | null>
   fetchReceivedSummary: (poId: string) => Promise<ReceivedLineSummary[]>
   stations: Station[]
+  /** Signed-in person's name — recorded as the receipt's uploader. */
+  myName: string | null
   onReconcile?: (order: PurchaseOrder) => void
   onReceive?: (order: PurchaseOrder) => void
   onOpenSupplierCatalog?: (supplierId: string) => void
@@ -78,7 +80,7 @@ interface Props {
 export function PODetail({
   order, onBack, fetchLines, updateStatus, updatePO,
   fetchLinkedReceipts, parseLinkedReceipt, attachReceipt, fetchReceivedSummary,
-  stations, onReconcile, onReceive, onOpenSupplierCatalog, onOpenSupplierCard,
+  stations, myName, onReconcile, onReceive, onOpenSupplierCatalog, onOpenSupplierCard,
 }: Props) {
   const [lines, setLines] = useState<POLine[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -167,19 +169,36 @@ export function PODetail({
       // and the totals beside it would contradict the lines.
       const before = lines
       setLines((prev) =>
-        prev.map((l) => (l.id === patch.id ? { ...l, ...patch } as POLine : l)),
+        prev.map((l) => {
+          if (l.id !== patch.id) return l
+          const next = { ...l, ...patch } as POLine
+          // total_expected is GENERATED in Postgres as qty * COALESCE(price,0);
+          // mirroring it here is what lets us skip a refetch per keystroke.
+          next.total_expected = next.qty_ordered * (next.unit_price_expected ?? 0)
+          return next
+        }),
       )
-      const ok = await applyPatch({ lines_upsert: [patch] }, { reloadLines: true })
+      // No reload: everything shown for this line is known locally, and the
+      // totals block reads the order row the RPC already updated. Refetching
+      // cost 4 extra queries (one of them the whole nomenclature table) on
+      // every single stepper click.
+      const ok = await applyPatch({ lines_upsert: [patch] })
       if (!ok) setLines(before)
     },
     [lines, applyPatch],
   )
 
   const handleLineRemove = useCallback(
-    (lineId: string) => {
-      applyPatch({ lines_delete: [lineId] }, { reloadLines: true })
+    async (lineId: string) => {
+      const before = lines
+      setLines((prev) => prev.filter((l) => l.id !== lineId))
+      // fn_update_po refuses to delete a line that has already been received,
+      // and refuses to empty an order — so a rejection here is expected and the
+      // row must come back.
+      const ok = await applyPatch({ lines_delete: [lineId] })
+      if (!ok) setLines(before)
     },
-    [applyPatch],
+    [lines, applyPatch],
   )
 
   const openPicker = useCallback(async () => {
@@ -190,7 +209,11 @@ export function PODetail({
       .select('nomenclature_id, display_name, purchase_unit, last_seen_price')
       .eq('supplier_id', order.supplier_id)
       .not('nomenclature_id', 'is', null)
-      .limit(500)
+      // Ordered and generous on purpose: the cap used to be 500 with no
+      // ORDER BY, so for the one supplier with 673 catalog rows the search
+      // silently hid ~173 of them, and WHICH ones changed between loads.
+      .order('display_name')
+      .limit(5000)
     setCatalog((data ?? []) as CatalogOption[])
   }, [catalog.length, order.supplier_id])
 
@@ -268,7 +291,8 @@ export function PODetail({
           setError(uploaded.error)
           return
         }
-        const failure = await attachReceipt(order.id, uploaded.path, order.author_name ?? 'Admin')
+        // Who UPLOADED, not who ordered — this feeds finance provenance.
+        const failure = await attachReceipt(order.id, uploaded.path, myName ?? 'Admin')
         if (failure) {
           setError(failure)
           return
@@ -280,7 +304,7 @@ export function PODetail({
         setIsBusy(false)
       }
     },
-    [order.id, order.author_name, attachReceipt, fetchLinkedReceipts],
+    [order.id, myName, attachReceipt, fetchLinkedReceipts],
   )
 
   const openReceipt = useCallback(async (path: string) => {

@@ -79,9 +79,7 @@ export interface UsePurchaseOrdersResult {
   orders: PurchaseOrder[]
   isLoading: boolean
   error: string | null
-  refetch: () => Promise<void>
-  statusFilter: POStatus | 'all'
-  setStatusFilter: (s: POStatus | 'all') => void
+  refetch: (opts?: { silent?: boolean }) => Promise<void>
   createPO: (payload: CreatePOPayload) => Promise<CreatePOResult>
   isCreating: boolean
   updateStatus: (poId: string, status: POStatus) => Promise<boolean>
@@ -93,16 +91,18 @@ export interface UsePurchaseOrdersResult {
   fetchReceivedSummary: (poId: string) => Promise<ReceivedLineSummary[]>
   stations: Station[]
   myUserId: string | null
+  /** Display name of the signed-in person — who UPLOADED, not who ordered. */
+  myName: string | null
 }
 
 export function usePurchaseOrders(): UsePurchaseOrdersResult {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<POStatus | 'all'>('all')
   const [isCreating, setIsCreating] = useState(false)
   const [stations, setStations] = useState<Station[]>([])
   const [myUserId, setMyUserId] = useState<string | null>(null)
+  const [myName, setMyName] = useState<string | null>(null)
 
   // Identity drives the author chip and the NEW badge.
   useEffect(() => {
@@ -114,6 +114,24 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
       cancelled = true
     }
   }, [])
+
+  // Who is attaching a receipt — the uploader, which is NOT necessarily the
+  // person who created the order.
+  useEffect(() => {
+    if (!myUserId) return
+    let cancelled = false
+    supabase
+      .from('staff')
+      .select('name')
+      .eq('auth_user_id', myUserId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setMyName((data?.name as string | undefined) ?? null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [myUserId])
 
   useEffect(() => {
     let cancelled = false
@@ -134,17 +152,13 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
     if (!opts?.silent) setIsLoading(true)
     setError(null)
 
-    let query = supabase
+    const query = supabase
       .from('purchase_orders')
       .select(
         'id, po_number, supplier_id, status, expected_date, delivery_window, notes, subtotal, discount_total, vat_amount, delivery_fee, grand_total, deliver_to_station_id, created_by, created_at',
       )
       .order('created_at', { ascending: false })
       .limit(100)
-
-    if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter)
-    }
 
     // Separate queries + JS join (RULE: no implicit .select('table(col)') joins).
     const [poRes, suppRes, staffRes] = await Promise.all([
@@ -225,7 +239,7 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
 
     setOrders(merged)
     setIsLoading(false)
-  }, [statusFilter])
+  }, [])
 
   useEffect(() => {
     fetchOrders()
@@ -258,17 +272,12 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
         .eq('id', poId)
 
       if (updateError) return false
-      // Optimistic status change — no full refetch. If a status filter is
-      // active and the row no longer matches it, drop it from the view;
-      // otherwise patch the status in place (supplier_name / line_count kept).
-      setOrders((prev) =>
-        statusFilter !== 'all' && status !== statusFilter
-          ? prev.filter((o) => o.id !== poId)
-          : prev.map((o) => (o.id === poId ? { ...o, status } : o)),
-      )
+      // Optimistic status change — no full refetch, so supplier_name and
+      // line_count survive.
+      setOrders((prev) => prev.map((o) => (o.id === poId ? { ...o, status } : o)))
       return true
     },
-    [statusFilter],
+    [],
   )
 
   /**
@@ -493,10 +502,23 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
     const recordIds = (records ?? []).map((r: { id: string }) => r.id)
     if (recordIds.length === 0) return []
 
-    const { data: lines } = await supabase
-      .from('receiving_lines')
-      .select('po_line_id, qty_expected, qty_received, qty_rejected, reject_reason')
-      .in('receiving_id', recordIds)
+    // "Expected" must come from the ORDER, not from receiving_lines: receiving
+    // writes qty_expected as the qty OUTSTANDING at that moment, so on a second
+    // partial delivery it is the remainder. Reading it back produced phantom
+    // discrepancies ("ordered 4, received 10") on the screen shown right before
+    // the irreversible approve.
+    const [{ data: lines }, { data: poLines }] = await Promise.all([
+      supabase
+        .from('receiving_lines')
+        .select('po_line_id, qty_received, qty_rejected, reject_reason')
+        .in('receiving_id', recordIds)
+        .order('po_line_id'),
+      supabase.from('po_lines').select('id, qty_ordered').eq('po_id', poId),
+    ])
+
+    const orderedByLine = new Map(
+      (poLines ?? []).map((l: { id: string; qty_ordered: number }) => [l.id, Number(l.qty_ordered)]),
+    )
 
     // A line can be received across several partial deliveries — sum them.
     const byLine = new Map<string, ReceivedLineSummary>()
@@ -505,7 +527,7 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
       const prev = byLine.get(key)
       const next: ReceivedLineSummary = {
         po_line_id: l.po_line_id,
-        qty_expected: Number(l.qty_expected ?? 0),
+        qty_expected: orderedByLine.get(key) ?? prev?.qty_expected ?? 0,
         qty_received: (prev?.qty_received ?? 0) + Number(l.qty_received ?? 0),
         qty_rejected: (prev?.qty_rejected ?? 0) + Number(l.qty_rejected ?? 0),
         reject_reason: (l.reject_reason as string | null) ?? prev?.reject_reason ?? null,
@@ -517,10 +539,9 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
 
   return {
     orders, isLoading, error, refetch: fetchOrders,
-    statusFilter, setStatusFilter,
     createPO, isCreating,
     updateStatus, updatePO, fetchLines,
     fetchLinkedReceipts, parseLinkedReceipt, attachReceipt, fetchReceivedSummary,
-    stations, myUserId,
+    stations, myUserId, myName,
   }
 }

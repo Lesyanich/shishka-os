@@ -47,8 +47,16 @@ export function POLineEditor({ line, stations, editable, onPatch, onRemove, isBu
   }
 
   const step = (delta: number) => {
-    const next = Number((Number(qty) + delta).toFixed(3))
-    if (next <= 0) return
+    // Number('1,5') is NaN (comma decimals are routine on Thai/RU keyboards),
+    // and NaN <= 0 is false — so without the isFinite check a stray keystroke
+    // followed by a stepper click sent qty_ordered: null to the RPC.
+    const base = Number(qty)
+    if (!Number.isFinite(base)) {
+      setQty(String(line.qty_ordered))
+      return
+    }
+    const next = Number((base + delta).toFixed(3))
+    if (!Number.isFinite(next) || next <= 0) return
     setQty(String(next))
     onPatch({ id: line.id, qty_ordered: next })
   }

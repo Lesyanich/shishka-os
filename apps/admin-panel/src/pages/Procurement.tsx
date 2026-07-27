@@ -41,6 +41,8 @@ export function Procurement() {
   const [poPrefill, setPoPrefill] = useState<{ lines: PrefillLine[]; notes: string } | null>(null)
   const [seenIds, setSeenIds] = useState<Set<string>>(() => loadSeenPOs())
   const [busyId, setBusyId] = useState<string | null>(null)
+  /** Failure of a desk-level action (Submit) — the cards have no error surface. */
+  const [actionError, setActionError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const handleAddToPO = useCallback(
@@ -66,6 +68,7 @@ export function Procurement() {
     fetchReceivedSummary,
     stations,
     myUserId,
+    myName,
     refetch,
   } = usePurchaseOrders()
 
@@ -76,7 +79,10 @@ export function Procurement() {
   )
 
   const handlePOCreated = useCallback(() => {
-    refetch()
+    // Brand-new row with joined fields we cannot build locally — refetch, but
+    // silently: the list is already on screen and a spinner over populated
+    // data is the flicker RULE-REALTIME-LIST-HOOK exists to prevent.
+    refetch({ silent: true })
   }, [refetch])
 
   const handleSelectPO = useCallback((po: PurchaseOrder) => {
@@ -91,7 +97,10 @@ export function Procurement() {
     setSelectedPOId(null)
     setSelectedPOFallback(null)
     setScreen('list')
-    refetch()
+    // The row was already patched by updatePO/updateStatus and the coalesced
+    // realtime subscription reconciles the rest — this is a belt-and-braces
+    // reconcile, so it must not flash a spinner.
+    refetch({ silent: true })
   }, [refetch])
 
   const handleReconcile = useCallback((po: PurchaseOrder) => {
@@ -104,15 +113,19 @@ export function Procurement() {
     setSelectedPOId(null)
     setSelectedPOFallback(null)
     setScreen('list')
-    refetch()
+    refetch({ silent: true })
   }, [refetch])
 
   /** Hand a draft over to the other side straight from the desk. */
   const handleSubmitDraft = useCallback(
     async (po: PurchaseOrder) => {
       setBusyId(po.id)
-      await updateStatus(po.id, 'submitted')
+      setActionError(null)
+      const ok = await updateStatus(po.id, 'submitted')
       setBusyId(null)
+      // Without this the card just stayed in Draft with no explanation — the
+      // handover silently never happened.
+      if (!ok) setActionError(`Could not submit ${po.po_number}. Check the connection and retry.`)
     },
     [updateStatus],
   )
@@ -181,6 +194,15 @@ export function Procurement() {
       )}
 
       {/* === Orders Tab — Order Desk === */}
+      {activeTab === 'orders' && screen === 'list' && actionError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-brick-soft/40 bg-brick-soft/10 px-3 py-2 text-[11px] text-brick-bright"
+        >
+          {actionError}
+        </div>
+      )}
+
       {activeTab === 'orders' && screen === 'list' && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,0.58fr)_minmax(0,0.42fr)]">
           <POHistory
@@ -216,6 +238,7 @@ export function Procurement() {
           attachReceipt={attachReceipt}
           fetchReceivedSummary={fetchReceivedSummary}
           stations={stations}
+          myName={myName}
           onReconcile={handleReconcile}
           onReceive={handleReceive}
           onOpenSupplierCatalog={handleOpenSupplierCatalog}

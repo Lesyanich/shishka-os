@@ -55,6 +55,7 @@ function renderDetail(order: PurchaseOrder, over?: { updatePO?: Mock; lines?: PO
     attachReceipt: vi.fn().mockResolvedValue(null),
     fetchReceivedSummary: vi.fn().mockResolvedValue([]),
     stations: [],
+    myName: 'Mint',
     onReceive: vi.fn(),
     onReconcile: vi.fn(),
   }
@@ -178,6 +179,52 @@ describe('PODetail follows the live order row', () => {
     rerenderWith({ ...baseOrder, status: 'shipped' as POStatus })
     expect((feeInput() as HTMLInputElement).disabled).toBe(false)
     expect(screen.getByText('Receive delivery')).toBeTruthy()
+  })
+
+  it('does NOT refetch the lines on an accepted edit', async () => {
+    // The reload used to run on every keystroke commit: 4 extra queries, one of
+    // them the whole nomenclature table. Everything shown for the line is known
+    // locally, so the only fetchLines call should be the initial mount.
+    const updatePO = vi.fn().mockResolvedValue({ ok: true, subtotal: 464, grand_total: 464 })
+    const fetchLines = vi.fn().mockResolvedValue([poLine])
+    render(
+      <PODetail
+        order={baseOrder}
+        onBack={vi.fn()}
+        fetchLines={fetchLines}
+        updateStatus={vi.fn().mockResolvedValue(true)}
+        updatePO={updatePO}
+        fetchLinkedReceipts={vi.fn().mockResolvedValue([])}
+        parseLinkedReceipt={vi.fn().mockResolvedValue({ ok: true })}
+        attachReceipt={vi.fn().mockResolvedValue(null)}
+        fetchReceivedSummary={vi.fn().mockResolvedValue([])}
+        stations={[]}
+        myName="Mint"
+      />,
+    )
+
+    const qty = (await screen.findByLabelText(/Quantity of Bell pepper red/)) as HTMLInputElement
+    expect(fetchLines).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(qty, { target: { value: '8' } })
+    fireEvent.blur(qty)
+    await waitFor(() => expect(updatePO).toHaveBeenCalled())
+
+    expect(fetchLines).toHaveBeenCalledTimes(1)
+  })
+
+  it('puts a removed line back when the server refuses the delete', async () => {
+    const updatePO = vi
+      .fn()
+      .mockResolvedValue({ ok: false, error: 'Bell pepper red has already been received' })
+    renderDetail(baseOrder, { updatePO, lines: [poLine] })
+
+    const remove = await screen.findByRole('button', { name: /Remove Bell pepper red/i })
+    fireEvent.click(remove)
+
+    await waitFor(() => expect(updatePO).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByText(/already been received/)).toBeTruthy())
+    expect(screen.getByLabelText(/Quantity of Bell pepper red/)).toBeTruthy()
   })
 
   it('closes the edit gate once the order is received', () => {
