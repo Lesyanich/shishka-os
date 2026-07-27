@@ -1,4 +1,4 @@
--- 380_procurement_v2_hardening.sql
+-- 382_procurement_v2_hardening.sql
 -- Procurement v2 — hardening pass after the code review of PR #540.
 -- Fixes review findings #6 and #7 (blocking, security), plus four smaller
 -- integrity gaps found in the same review.
@@ -7,7 +7,9 @@
 --
 -- Verified before writing (2026-07-27): purchase_orders 0 rows, po_lines 0 rows,
 -- stock_request_lines 0 rows, no negative prices or fees -> every CHECK below
--- validates immediately, no NOT VALID needed. Migration number 380 is free.
+-- validates immediately, no NOT VALID needed.
+-- Numbered 382: drafted as 380, but parallel sessions took 380 and 381 while
+-- this SQL was waiting for CEO approval. Re-checked free at apply time.
 --
 -- SECTION MAP (each is independent — any section can be struck before applying):
 --   1. #7  auth guard on fn_create_purchase_order + EXECUTE revoked from anon/PUBLIC
@@ -399,7 +401,7 @@ WHERE is_active = true
 -- ============================================================
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '380_procurement_v2_hardening.sql',
+  '382_procurement_v2_hardening.sql',
   'claude-code',
   NULL,
   'Procurement v2 hardening: auth guard + anon revoke on PO RPCs, scoped request_line_ids, duplicate/empty-order guards, non-negative money, supplier-files bucket limits, ordering toggle seed (MC 6df2f888)'
