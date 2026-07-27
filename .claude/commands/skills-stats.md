@@ -1,3 +1,7 @@
+> **Repo root:** `/Users/lesianich/code/shishka` — every path below is relative to it.
+> If your working directory is elsewhere (e.g. the `shishka-health` site repo), prefix paths
+> with the repo root. Do not look for these files in the current directory.
+
 Покажи **статистику Skill Advisor** — какие 💡-подсказки реально пригодились, а какие шумят.
 
 ## Что делать

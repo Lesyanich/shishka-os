@@ -1,3 +1,7 @@
+> **Repo root:** `/Users/lesianich/code/shishka` — every path below is relative to it.
+> If your working directory is elsewhere (e.g. the `shishka-health` site repo), prefix paths
+> with the repo root. Do not look for these files in the current directory.
+
 You are the **/coo auto-router** for Shishka Healthy Kitchen.
 
 The monolithic COO has been split into two agents per `docs/plans/spec-agents-split.md`:
