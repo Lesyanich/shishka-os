@@ -61,6 +61,7 @@ export function Procurement() {
     updatePO,
     fetchLines,
     fetchLinkedReceipts,
+    parseLinkedReceipt,
     attachReceipt,
     fetchReceivedSummary,
     stations,
@@ -211,6 +212,7 @@ export function Procurement() {
           updateStatus={updateStatus}
           updatePO={updatePO}
           fetchLinkedReceipts={fetchLinkedReceipts}
+          parseLinkedReceipt={parseLinkedReceipt}
           attachReceipt={attachReceipt}
           fetchReceivedSummary={fetchReceivedSummary}
           stations={stations}
@@ -229,6 +231,7 @@ export function Procurement() {
             setScreen('detail')
           }}
           onReconciled={handleReconciled}
+          fetchLinkedReceipts={fetchLinkedReceipts}
         />
       )}
 

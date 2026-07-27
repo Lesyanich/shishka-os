@@ -224,7 +224,21 @@ export interface LinkedReceipt {
     invoice_number: string | null
     transaction_date: string | null
     has_tax_invoice: boolean | null
+    payment_method: string | null
+    paid_by: string | null
+    /**
+     * Per-item actuals, only for items the parser resolved to a real product.
+     * Items without a nomenclature_id are dropped: matching them to PO lines
+     * by name would be guessing, and this feeds a financial screen.
+     */
+    items: ParsedReceiptItem[]
   } | null
+}
+
+export interface ParsedReceiptItem {
+  nomenclature_id: string
+  unit_price: number | null
+  quantity: number | null
 }
 
 export interface CreatePOResult {

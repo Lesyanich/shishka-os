@@ -12,8 +12,21 @@ import type {
   UpdatePOResult,
   Station,
   LinkedReceipt,
+  ParsedReceiptItem,
   ReceivedLineSummary,
 } from '../types/procurement'
+
+/** Mirrors OcrModel in useReceiptInbox — kept as data so the stored preference can be validated. */
+const VALID_OCR_MODELS: string[] = [
+  'gemini-flash',
+  'gemini-flash-lite',
+  'gemini-3-flash',
+  'gemini-pro',
+  'claude-sonnet',
+  'claude-haiku',
+  'gpt-4o',
+  'claude-sub',
+]
 
 /* ───────────────────────── Order Desk grouping ───────────────────────── */
 
@@ -87,6 +100,7 @@ export interface UsePurchaseOrdersResult {
   fetchLines: (poId: string) => Promise<POLine[]>
   fetchLinkedReceipts: (poId: string) => Promise<LinkedReceipt[]>
   attachReceipt: (poId: string, storagePath: string, uploadedBy: string) => Promise<string | null>
+  parseLinkedReceipt: (inboxId: string) => Promise<{ ok: boolean; error?: string }>
   fetchReceivedSummary: (poId: string) => Promise<ReceivedLineSummary[]>
   stations: Station[]
   myUserId: string | null
@@ -391,6 +405,35 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
 
     const num = (v: unknown): number | null => (v == null ? null : Number(v))
 
+    /**
+     * The parser splits items across food_items / opex_items / capex_items and
+     * also keeps a flat line_items. Read them all, but keep only entries it
+     * resolved to a real product — a name-based match into a screen that
+     * writes expenses would be guesswork.
+     */
+    const items = (p: Record<string, unknown> | null): ParsedReceiptItem[] => {
+      if (!p) return []
+      const buckets = ['line_items', 'food_items', 'opex_items', 'capex_items']
+      const seen = new Set<string>()
+      const out: ParsedReceiptItem[] = []
+      for (const key of buckets) {
+        const arr = p[key]
+        if (!Array.isArray(arr)) continue
+        for (const raw of arr) {
+          const it = raw as Record<string, unknown>
+          const nomId = it.nomenclature_id
+          if (typeof nomId !== 'string' || seen.has(nomId)) continue
+          seen.add(nomId)
+          out.push({
+            nomenclature_id: nomId,
+            unit_price: num(it.unit_price),
+            quantity: num(it.quantity),
+          })
+        }
+      }
+      return out
+    }
+
     return data.map((r) => {
       const p = (r.parsed_payload ?? null) as Record<string, unknown> | null
       return {
@@ -408,11 +451,40 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
               invoice_number: (p.invoice_number as string | null) ?? null,
               transaction_date: (p.transaction_date as string | null) ?? null,
               has_tax_invoice: (p.has_tax_invoice as boolean | null) ?? null,
+              payment_method: (p.payment_method as string | null) ?? null,
+              paid_by: (p.paid_by as string | null) ?? null,
+              items: items(p),
             }
           : null,
       }
     })
   }, [])
+
+  /**
+   * Runs the SAME ocr-receipt function the standalone inbox uses. It exists
+   * here because linking a receipt to a PO removes it from the inbox list
+   * (single-writer rule), which also removed its only parse trigger — without
+   * this a PO receipt could be attached but never read.
+   */
+  const parseLinkedReceipt = useCallback(
+    async (inboxId: string): Promise<{ ok: boolean; error?: string }> => {
+      try {
+        // Same stored preference the receipt inbox uses, so the model chosen
+        // there applies here too. Falls back to the inbox's own default.
+        const stored = localStorage.getItem('receipt-ocr-model')
+        const model = VALID_OCR_MODELS.includes(stored ?? '') ? (stored as string) : 'gemini-flash'
+        const { data, error: fnErr } = await supabase.functions.invoke(
+          `ocr-receipt?inbox_id=${inboxId}&model=${model}`,
+        )
+        if (fnErr) return { ok: false, error: fnErr.message }
+        if (data && !data.ok) return { ok: false, error: data.error || 'Parse failed' }
+        return { ok: true }
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) }
+      }
+    },
+    [],
+  )
 
   /**
    * Files the photo in the SAME receipts bucket + inbox the standalone flow
@@ -471,7 +543,7 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
     statusFilter, setStatusFilter,
     createPO, isCreating,
     updateStatus, updatePO, fetchLines,
-    fetchLinkedReceipts, attachReceipt, fetchReceivedSummary,
+    fetchLinkedReceipts, parseLinkedReceipt, attachReceipt, fetchReceivedSummary,
     stations, myUserId,
   }
 }

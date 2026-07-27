@@ -51,6 +51,7 @@ function renderDetail(order: PurchaseOrder, over?: { updatePO?: Mock; lines?: PO
     updateStatus: vi.fn().mockResolvedValue(true),
     updatePO,
     fetchLinkedReceipts: vi.fn().mockResolvedValue([]),
+    parseLinkedReceipt: vi.fn().mockResolvedValue({ ok: true }),
     attachReceipt: vi.fn().mockResolvedValue(null),
     fetchReceivedSummary: vi.fn().mockResolvedValue([]),
     stations: [],

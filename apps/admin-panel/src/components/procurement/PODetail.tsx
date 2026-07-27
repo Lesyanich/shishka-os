@@ -65,6 +65,7 @@ interface Props {
   updateStatus: (poId: string, status: POStatus) => Promise<boolean>
   updatePO: (poId: string, patch: UpdatePOPatch) => Promise<UpdatePOResult>
   fetchLinkedReceipts: (poId: string) => Promise<LinkedReceipt[]>
+  parseLinkedReceipt: (inboxId: string) => Promise<{ ok: boolean; error?: string }>
   attachReceipt: (poId: string, storagePath: string, uploadedBy: string) => Promise<string | null>
   fetchReceivedSummary: (poId: string) => Promise<ReceivedLineSummary[]>
   stations: Station[]
@@ -76,7 +77,7 @@ interface Props {
 
 export function PODetail({
   order, onBack, fetchLines, updateStatus, updatePO,
-  fetchLinkedReceipts, attachReceipt, fetchReceivedSummary,
+  fetchLinkedReceipts, parseLinkedReceipt, attachReceipt, fetchReceivedSummary,
   stations, onReconcile, onReceive, onOpenSupplierCatalog, onOpenSupplierCard,
 }: Props) {
   const [lines, setLines] = useState<POLine[]>([])
@@ -84,6 +85,8 @@ export function PODetail({
   const [isBusy, setIsBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  /** Receipt currently being read, so only its own button shows progress. */
+  const [parsingId, setParsingId] = useState<string | null>(null)
 
   // `order` is the LIVE row (the page derives it from the orders list), so
   // totals are read straight off it — fn_update_po recomputes them and the
@@ -235,6 +238,24 @@ export function PODetail({
       setError('Clipboard blocked by the browser — copy manually from the lines above')
     }
   }, [order, lines])
+
+  /**
+   * Linking a receipt to a PO takes it out of the standalone inbox, which is
+   * also where the parse button lived — so the trigger has to exist here or an
+   * attached receipt can never be read. Reading it is what fills the reconcile
+   * screen (spec §4.6).
+   */
+  const handleParseReceipt = useCallback(
+    async (inboxId: string) => {
+      setParsingId(inboxId)
+      setError(null)
+      const result = await parseLinkedReceipt(inboxId)
+      if (!result.ok) setError(result.error ?? 'Could not read the receipt')
+      setReceipts(await fetchLinkedReceipts(order.id))
+      setParsingId(null)
+    },
+    [parseLinkedReceipt, fetchLinkedReceipts, order.id],
+  )
 
   const handleAttachReceipt = useCallback(
     async (file: File) => {
@@ -570,12 +591,23 @@ export function PODetail({
                 </p>
                 <p className="text-[10px] text-cream/45">
                   {r.parsed
-                    ? `parsed · ฿${(r.parsed.amount_original ?? 0).toLocaleString()}${
+                    ? `read · ฿${(r.parsed.amount_original ?? 0).toLocaleString()}${
                         r.parsed.invoice_number ? ` · ${r.parsed.invoice_number}` : ''
-                      }`
-                    : `status: ${r.status} — the finance pipeline will parse it`}
+                      } — fills the reconcile screen`
+                    : parsingId === r.id
+                      ? 'reading…'
+                      : 'not read yet — read it to fill the reconcile screen'}
                 </p>
               </div>
+              {!r.parsed && (
+                <button
+                  onClick={() => handleParseReceipt(r.id)}
+                  disabled={parsingId === r.id}
+                  className="shrink-0 rounded-lg bg-honey-600/20 px-2 py-1 text-[10.5px] font-bold text-honey-300 transition hover:bg-honey-600/30 disabled:opacity-50"
+                >
+                  {parsingId === r.id ? '…' : 'Read'}
+                </button>
+              )}
               {r.photo_urls[0] && (
                 <button
                   onClick={() => openReceipt(r.photo_urls[0])}
