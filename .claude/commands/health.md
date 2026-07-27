@@ -1,10 +1,14 @@
+> **Repo root:** `/Users/lesianich/code/shishka` — every path below is relative to it.
+> If your working directory is elsewhere (e.g. the `shishka-health` site repo), prefix paths
+> with the repo root. Do not look for these files in the current directory.
+
 Покажи **здоровье Shishka OS** — единый снимок состояния системы для CEO.
 
 ## Что делать
 
-1. Запусти `bash scripts/health.sh` (находится в корне репо).
+1. Запусти `bash /Users/lesianich/code/shishka/scripts/health.sh` (абсолютный путь — команда вызывается из любой папки, в том числе из репо сайта).
 2. **Покажи stdout как есть** — он уже отформатирован для пользователя (русский, человекочитаемо, без технических ID).
-3. Если скрипт вернул ненулевой код — покажи его stderr и предложи `bash scripts/health.sh --json` для отладки.
+3. Если скрипт вернул ненулевой код — покажи его stderr и предложи `bash /Users/lesianich/code/shishka/scripts/health.sh --json` для отладки.
 
 ## Что включено в отчёт
 

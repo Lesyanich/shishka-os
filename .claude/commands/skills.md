@@ -1,3 +1,7 @@
+> **Repo root:** `/Users/lesianich/code/shishka` — every path below is relative to it.
+> If your working directory is elsewhere (e.g. the `shishka-health` site repo), prefix paths
+> with the repo root. Do not look for these files in the current directory.
+
 Покажи CEO, какие **скиллы / команды / MCP-инструменты** подходят под задачу. Это
 браузер по реестру Skill Advisor — `docs/operations/skill-advisor.md`.
 
