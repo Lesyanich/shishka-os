@@ -3,6 +3,9 @@
 **File:** `agents/designer/designs/roadmap-public-v1/index.html`
 **Deliverable for:** `/opening` on `shishka.health` (customer-facing public countdown page, if we ship it).
 **Status:** exploratory draft v0.1 — no commitment to ship. Designer/CEO review before tech port.
+**⚠️ Not a token source.** The cream/paper palette below is a one-off concept for this page.
+Brand tokens live in the `shishka-health` repo (`design-system/MASTER.md` + `src/styles/tokens/`).
+Do not copy hexes from here into any product surface.
 **Date:** 2026-04-24.
 **Companion to:** `agents/designer/designs/roadmap-v1/` (dark, owner-facing variant).
 
@@ -131,5 +134,5 @@ Keeping the exploration tight:
 ## 8. Sources
 
 - Owner variant: `agents/designer/designs/roadmap-v1/SPEC.md` (design tokens borrowed)
-- Brand tokens: `agents/designer/brand-tokens.md`
+- Brand tokens: repo `shishka-health` → `design-system/MASTER.md` (admin UI tokens: `agents/designer/admin-ui-tokens.md`)
 - Design principles: `agents/designer/design-principles.md`

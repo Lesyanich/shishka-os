@@ -27,9 +27,10 @@ interface CustomerPreviewProps {
 
 /** Adapter layer: translates admin-panel `MenuDish` rows into the pure
  * `DishSummary` shape consumed by `components/menu/customer/` so the
- * customer folder stays portable (zero admin-panel imports). When the
- * public shishka.health/menu site ships, customer/* lifts unchanged;
- * only this adapter stays behind in the admin repo. */
+ * customer folder stays portable (zero admin-panel imports).
+ * This is an admin-side preview of the customer menu. The live site is the
+ * separate `shishka-health` repo with its own components — customer/* is not
+ * shared with it and must not be "lifted" there. */
 export function CustomerPreview({
   dishes,
   categories,

@@ -3,6 +3,21 @@
 ## Identity
 Shishka Healthy Kitchen ERP. Multiple projects, one Supabase backend.
 
+<!-- REPO-BOUNDARY-BLOCK: keep byte-identical in shishka-os/CLAUDE.md and shishka-health/CLAUDE.md -->
+## Repo Boundary
+Two repos, one Supabase project (`qcqgtcsjoacuktcewpvo`):
+- **`shishka-os`** — everything that *writes*: migrations, admin panel, KDS, MCP services, agents.
+- **`shishka-health`** — reads only: the public menu at shishka.health + the brand design system.
+
+**Rule: whoever writes to the database is OS; whoever only shows the guest is HEALTH.**
+Unsure → OS. A new field is always born in OS (migration) and only then rendered in HEALTH.
+
+- Dish price, photo, composition → *neither repo*: admin panel or `/chef`. That is data, not code.
+- Site copy in `site_content` → data lives in the DB; only the fallback defaults are HEALTH code.
+- The team (`/chef`, `/finance`, `/procurement`, `/strategy`, `/techlead`) lives in OS only.
+- The DB contract HEALTH depends on: `contracts/menu-contract.json`, canonical in the HEALTH repo.
+<!-- /REPO-BOUNDARY-BLOCK -->
+
 ## Language Contract
 - Conversation: human's language (CEO → Russian, partner → their language)
 - Storage (DB, MC, code, commits, specs): English only, no exceptions
