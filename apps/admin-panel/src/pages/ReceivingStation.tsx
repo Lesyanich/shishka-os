@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ClipboardCheck } from 'lucide-react'
 import { useReceiving } from '../hooks/useReceiving'
 import { PendingDeliveries } from '../components/receiving/PendingDeliveries'
@@ -18,10 +19,27 @@ export function ReceivingStation() {
   const [selectedPO, setSelectedPO] = useState<PendingDelivery | null>(null)
   const [lastResult, setLastResult] = useState<ReceiveGoodsResult | null>(null)
 
+  const [searchParams] = useSearchParams()
+  const preselectedPO = searchParams.get('po')
+  const didPreselect = useRef(false)
+
   const handleSelect = useCallback((delivery: PendingDelivery) => {
     setSelectedPO(delivery)
     setScreen('checklist')
   }, [])
+
+  /**
+   * `/receive?po=<id>` jumps straight into that delivery's checklist — the
+   * Receive button on the Order Desk and PO Detail links here. Runs once, so
+   * going Back leaves the operator on the list instead of bouncing them in.
+   */
+  useEffect(() => {
+    if (didPreselect.current || !preselectedPO || deliveries.length === 0) return
+    const match = deliveries.find((d) => d.po_id === preselectedPO)
+    if (!match) return
+    didPreselect.current = true
+    handleSelect(match)
+  }, [preselectedPO, deliveries, handleSelect])
 
   const handleBack = useCallback(() => {
     setSelectedPO(null)
