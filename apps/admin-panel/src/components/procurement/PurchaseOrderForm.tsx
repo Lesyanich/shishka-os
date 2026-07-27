@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Trash2, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { SearchableSelect, type SearchableOption } from '../ui/SearchableSelect'
 import type { CreatePOPayload, CreatePOResult, POLineInput } from '../../types/procurement'
 
 interface Supplier {
@@ -51,6 +52,17 @@ export function PurchaseOrderForm({
   ])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // Search matches the product code too, so "RAW-CHK" finds it as readily as
+  // "chicken" — the code is what appears on supplier paperwork.
+  const supplierOptions: SearchableOption[] = useMemo(
+    () => suppliers.map((s) => ({ value: s.id, label: s.name })),
+    [suppliers],
+  )
+  const itemOptions: SearchableOption[] = useMemo(
+    () => items.map((i) => ({ value: i.id, label: i.name, sublabel: i.product_code })),
+    [items],
+  )
 
   useEffect(() => {
     async function load() {
@@ -210,18 +222,14 @@ export function PurchaseOrderForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-[11px] text-cream/45">Supplier</label>
-          <select
+          <SearchableSelect
+            label="Supplier"
             value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
-            className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
-          >
-            <option value="">Select...</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            onChange={setSupplierId}
+            options={supplierOptions}
+            placeholder="Select…"
+            emptyText="No supplier matches"
+          />
         </div>
         <div>
           <label className="mb-1 block text-[11px] text-cream/45">Expected Date</label>
@@ -239,18 +247,16 @@ export function PurchaseOrderForm({
         <label className="block text-[11px] text-cream/45">Items</label>
         {lines.map((line, idx) => (
           <div key={idx} className="flex items-start gap-2">
-            <select
-              value={line.nomenclature_id}
-              onChange={(e) => updateLine(idx, { nomenclature_id: e.target.value })}
-              className="h-9 min-w-0 flex-1 rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
-            >
-              <option value="">Select item...</option>
-              {items.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.product_code} — {i.name}
-                </option>
-              ))}
-            </select>
+            <div className="min-w-0 flex-1">
+              <SearchableSelect
+                label={`Item ${idx + 1}`}
+                value={line.nomenclature_id}
+                onChange={(v) => updateLine(idx, { nomenclature_id: v })}
+                options={itemOptions}
+                placeholder="Select item…"
+                emptyText="No product matches"
+              />
+            </div>
             <input
               type="number"
               value={line.qty_ordered}
