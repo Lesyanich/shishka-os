@@ -78,14 +78,23 @@ export function PODetail({
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  // Totals track the RPC's authoritative recompute, seeded from the list row.
-  const [totals, setTotals] = useState({
-    subtotal: order.subtotal ?? 0,
-    grand_total: order.grand_total ?? 0,
-  })
+  // `order` is the LIVE row (the page derives it from the orders list), so
+  // totals are read straight off it — fn_update_po recomputes them and the
+  // hook patches the row with what the RPC returned.
+  const subtotal = order.subtotal ?? 0
+  const grandTotal = order.grand_total ?? 0
+
+  // Text fields need local state while typing, but the server still owns the
+  // value: re-sync whenever the live row changes, so an edit made by the other
+  // person (or our own saved patch) lands here instead of being shadowed by a
+  // stale snapshot.
   const [deliveryFee, setDeliveryFee] = useState(String(order.delivery_fee ?? 0))
   const [expectedDate, setExpectedDate] = useState(order.expected_date ?? '')
   const [deliveryWindow, setDeliveryWindow] = useState(order.delivery_window ?? '')
+
+  useEffect(() => setDeliveryFee(String(order.delivery_fee ?? 0)), [order.delivery_fee])
+  useEffect(() => setExpectedDate(order.expected_date ?? ''), [order.expected_date])
+  useEffect(() => setDeliveryWindow(order.delivery_window ?? ''), [order.delivery_window])
 
   const [receipts, setReceipts] = useState<LinkedReceipt[]>([])
   const [received, setReceived] = useState<ReceivedLineSummary[]>([])
@@ -133,14 +142,10 @@ export function PODetail({
         setError(result.error ?? 'Update failed')
         return false
       }
-      setTotals({
-        subtotal: result.subtotal ?? totals.subtotal,
-        grand_total: result.grand_total ?? totals.grand_total,
-      })
       if (opts?.reloadLines) await reload({ silent: true })
       return true
     },
-    [order.id, updatePO, reload, totals.subtotal, totals.grand_total],
+    [order.id, updatePO, reload],
   )
 
   const handleLinePatch = useCallback(
@@ -471,7 +476,7 @@ export function PODetail({
         <div className="flex-1 rounded-xl border border-[var(--line-strong)] bg-[var(--s-2)] p-2.5">
           <span className="block text-[9.5px] uppercase tracking-[0.1em] text-cream/40">Subtotal</span>
           <span className="mt-0.5 block text-[13px] font-bold text-cream">
-            ฿{totals.subtotal.toLocaleString()}
+            ฿{subtotal.toLocaleString()}
           </span>
         </div>
         <label className="flex-1 rounded-xl border border-[var(--line-strong)] bg-[var(--s-2)] p-2.5">
@@ -499,7 +504,7 @@ export function PODetail({
             Grand total
           </span>
           <span className="mt-0.5 block text-[13px] font-bold text-honey-300">
-            ฿{totals.grand_total.toLocaleString()}
+            ฿{grandTotal.toLocaleString()}
           </span>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SupplierManager } from '../components/procurement/SupplierManager'
 import { PurchaseOrderForm } from '../components/procurement/PurchaseOrderForm'
@@ -31,7 +31,13 @@ const TAB_LABELS: Record<Tab, string> = {
 export function Procurement() {
   const [activeTab, setActiveTab] = useTabParam(TABS, 'orders')
   const [screen, setScreen] = useState<Screen>('list')
-  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null)
+  // Hold the ID, not the row. The detail screen must follow the live order —
+  // if the other side confirms or ships it while it is open, the status,
+  // totals and the edit gate have to move with it.
+  const [selectedPOId, setSelectedPOId] = useState<string | null>(null)
+  // Last known copy, so the screen survives the row dropping out of the list
+  // (status filter, the 100-row window) instead of blanking mid-edit.
+  const [selectedPOFallback, setSelectedPOFallback] = useState<PurchaseOrder | null>(null)
   const [poPrefill, setPoPrefill] = useState<{ lines: PrefillLine[]; notes: string } | null>(null)
   const [seenIds, setSeenIds] = useState<Set<string>>(() => loadSeenPOs())
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -62,6 +68,12 @@ export function Procurement() {
     refetch,
   } = usePurchaseOrders()
 
+  /** The live row wins; the snapshot only covers it disappearing from the list. */
+  const selectedPO = useMemo(
+    () => orders.find((o) => o.id === selectedPOId) ?? selectedPOFallback,
+    [orders, selectedPOId, selectedPOFallback],
+  )
+
   const handlePOCreated = useCallback(() => {
     refetch()
   }, [refetch])
@@ -69,23 +81,27 @@ export function Procurement() {
   const handleSelectPO = useCallback((po: PurchaseOrder) => {
     // Opening an order clears its NEW badge for this browser.
     setSeenIds(markPOSeen(po.id))
-    setSelectedPO(po)
+    setSelectedPOId(po.id)
+    setSelectedPOFallback(po)
     setScreen('detail')
   }, [])
 
   const handleBackToList = useCallback(() => {
-    setSelectedPO(null)
+    setSelectedPOId(null)
+    setSelectedPOFallback(null)
     setScreen('list')
     refetch()
   }, [refetch])
 
   const handleReconcile = useCallback((po: PurchaseOrder) => {
-    setSelectedPO(po)
+    setSelectedPOId(po.id)
+    setSelectedPOFallback(po)
     setScreen('reconcile')
   }, [])
 
   const handleReconciled = useCallback(() => {
-    setSelectedPO(null)
+    setSelectedPOId(null)
+    setSelectedPOFallback(null)
     setScreen('list')
     refetch()
   }, [refetch])
@@ -151,7 +167,8 @@ export function Procurement() {
               key={key}
               onClick={() => {
                 setActiveTab(key)
-                setSelectedPO(null)
+                setSelectedPOId(null)
+                setSelectedPOFallback(null)
               }}
               className="shk-seg-btn"
               aria-pressed={activeTab === key}
