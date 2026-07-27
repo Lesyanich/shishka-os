@@ -9,6 +9,12 @@ interface Props {
   editable: boolean
   onPatch: (patch: POLinePatch) => void
   onRemove: (lineId: string) => void
+  /**
+   * Kept for callers, intentionally NOT used to disable the controls: a shared
+   * busy flag disabled whatever field the user clicked into next and swallowed
+   * their keystrokes — that is how a typed delivery window reached the server
+   * as nothing (QA, 2026-07-28).
+   */
   isBusy?: boolean
 }
 
@@ -18,7 +24,7 @@ interface Props {
  * "no Save button" model: every committed change is sent straight to
  * `fn_update_po`, which is the only thing allowed to touch totals.
  */
-export function POLineEditor({ line, stations, editable, onPatch, onRemove, isBusy }: Props) {
+export function POLineEditor({ line, stations, editable, onPatch, onRemove }: Props) {
   const [qty, setQty] = useState(String(line.qty_ordered))
   const [price, setPrice] = useState(
     line.unit_price_expected == null ? '' : String(line.unit_price_expected),
@@ -84,7 +90,6 @@ export function POLineEditor({ line, stations, editable, onPatch, onRemove, isBu
             <select
               value={line.destination_station_id ?? ''}
               onChange={(e) => onPatch({ id: line.id, destination_station_id: e.target.value || null })}
-              disabled={isBusy}
               aria-label={`Destination for ${line.product_name}`}
               className="rounded-full bg-forest-soft/20 px-2 py-0.5 text-[10px] font-semibold text-mint-200 outline-none focus:ring-1 focus:ring-honey-300 disabled:opacity-50"
             >
@@ -111,7 +116,6 @@ export function POLineEditor({ line, stations, editable, onPatch, onRemove, isBu
             <button
               type="button"
               onClick={() => step(-1)}
-              disabled={isBusy}
               aria-label="Decrease quantity"
               className="flex h-7 w-6 items-center justify-center bg-[var(--s-3)] text-sm font-bold text-cream transition hover:bg-[var(--s-2)] disabled:opacity-50"
             >
@@ -124,7 +128,7 @@ export function POLineEditor({ line, stations, editable, onPatch, onRemove, isBu
               onKeyDown={(e) => {
                 if (e.key === 'Enter') e.currentTarget.blur()
               }}
-              disabled={isBusy}
+              
               inputMode="decimal"
               aria-label={`Quantity of ${line.product_name} in ${unit}`}
               className="w-12 bg-transparent text-center text-xs text-cream outline-none disabled:opacity-50"
@@ -133,7 +137,6 @@ export function POLineEditor({ line, stations, editable, onPatch, onRemove, isBu
             <button
               type="button"
               onClick={() => step(1)}
-              disabled={isBusy}
               aria-label="Increase quantity"
               className="flex h-7 w-6 items-center justify-center bg-[var(--s-3)] text-sm font-bold text-cream transition hover:bg-[var(--s-2)] disabled:opacity-50"
             >
@@ -150,7 +153,7 @@ export function POLineEditor({ line, stations, editable, onPatch, onRemove, isBu
               onKeyDown={(e) => {
                 if (e.key === 'Enter') e.currentTarget.blur()
               }}
-              disabled={isBusy}
+              
               inputMode="decimal"
               placeholder="—"
               aria-label={`Unit price of ${line.product_name}`}
@@ -161,7 +164,6 @@ export function POLineEditor({ line, stations, editable, onPatch, onRemove, isBu
           <button
             type="button"
             onClick={() => onRemove(line.id)}
-            disabled={isBusy}
             aria-label={`Remove ${line.product_name}`}
             className="shrink-0 rounded-lg p-1.5 text-cream/35 transition hover:bg-brick-soft/10 hover:text-brick-bright disabled:opacity-50"
           >

@@ -98,8 +98,10 @@ export function PurchaseOrderForm({
         supabase.from('suppliers').select('id, name').eq('is_deleted', false).order('name'),
         supabase
           .from('nomenclature')
+          // Only RAW is purchasable. PF/MOD/SALE are produced in-house — you
+          // cannot order our own hummus from a supplier (QA, 2026-07-28).
           .select('id, product_code, name, base_unit, category_id')
-          .or('product_code.ilike.RAW-%,product_code.ilike.PF-%')
+          .ilike('product_code', 'RAW-%')
           .eq('is_deleted', false)
           .order('product_code'),
       ])

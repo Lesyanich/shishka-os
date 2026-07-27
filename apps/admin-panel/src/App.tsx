@@ -150,15 +150,19 @@ function App() {
                   </Route>
                   <Route path="/api-costs" element={<Suspense fallback={<PageLoader />}><ApiCostPage /></Suspense>} />
                   <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
-                  {/* Inventory/waste + receiving — owner-only, pulled off the cook floor */}
+                  {/* Inventory/waste — owner-only, pulled off the cook floor */}
                   <Route path="/kitchen/waste" element={<Suspense fallback={<PageLoader />}><WasteTracker /></Suspense>} />
-                  <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                 </Route>
 
                 {/* ── Task-manager tier (Mint / L2 assembly admin) + owner ── */}
                 <Route element={<RoleGuard minRole="task_manager" />}>
                   {/* Receipt inbox — managers upload receipts + verify OCR. Full finance views (dashboard/ledger/analytics) stay owner-only. */}
                   <Route path="/receipts" element={<Suspense fallback={<PageLoader />}><ReceiptInbox /></Suspense>} />
+                  {/* Receiving — Mint executes deliveries, so it belongs on her tier.
+                      It was pulled off the COOK floor, not off the manager tier;
+                      leaving it owner-only silently redirected her to Staff Tasks
+                      and broke the order -> receive -> reconcile chain. */}
+                  <Route path="/receive" element={<Suspense fallback={<PageLoader />}><ReceivingStation /></Suspense>} />
                   <Route path="/staff-tasks" element={<Suspense fallback={<PageLoader />}><StaffTasksPage /></Suspense>} />
                   <Route path="/salad-bar" element={<Suspense fallback={<PageLoader />}><SaladBarPage /></Suspense>} />
                   <Route path="/cashier" element={<Suspense fallback={<PageLoader />}><CashierPage /></Suspense>} />

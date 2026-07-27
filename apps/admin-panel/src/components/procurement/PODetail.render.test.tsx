@@ -179,6 +179,10 @@ describe('PODetail follows the live order row', () => {
     rerenderWith({ ...baseOrder, status: 'shipped' as POStatus })
     expect((feeInput() as HTMLInputElement).disabled).toBe(false)
     expect(screen.getByText('Receive delivery')).toBeTruthy()
+    // QA reported Cancel disappearing at shipped; it is gated only by
+    // reconciled/cancelled, so it must still be offered here (spec §6.2 gives
+    // Mint cancellation rights with no status cut-off).
+    expect(screen.getByText('Cancel order')).toBeTruthy()
   })
 
   it('does NOT refetch the lines on an accepted edit', async () => {
@@ -225,6 +229,38 @@ describe('PODetail follows the live order row', () => {
     await waitFor(() => expect(updatePO).toHaveBeenCalled())
     await waitFor(() => expect(screen.getByText(/already been received/)).toBeTruthy())
     expect(screen.getByLabelText(/Quantity of Bell pepper red/)).toBeTruthy()
+  })
+
+  it('accepts typing into a second field while the first is still saving', async () => {
+    // QA 2026-07-28: a delivery window typed right after another edit reached
+    // the DB as NULL. Cause was a shared busy flag that disabled every input
+    // while a patch was in flight, so the keystrokes went nowhere and the blur
+    // saw no change. Inputs must stay live; the RPC is the guard.
+    let release: (v: unknown) => void = () => {}
+    const updatePO = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise((r) => { release = r }))
+      .mockResolvedValue({ ok: true, subtotal: 1000, grand_total: 1000 })
+
+    renderDetail(baseOrder, { updatePO })
+
+    // First edit leaves a patch in flight.
+    const date = screen.getByLabelText(/delivery date/i) as HTMLInputElement
+    fireEvent.change(date, { target: { value: '2026-08-05' } })
+    fireEvent.blur(date)
+    await waitFor(() => expect(updatePO).toHaveBeenCalledTimes(1))
+
+    // The window field must still take input and still save it.
+    const win = screen.getByLabelText(/time window/i) as HTMLInputElement
+    expect(win.disabled).toBe(false)
+    fireEvent.change(win, { target: { value: '06:00-09:00' } })
+    expect(win.value).toBe('06:00-09:00')
+    fireEvent.blur(win)
+
+    await waitFor(() =>
+      expect(updatePO).toHaveBeenCalledWith('po-1', { delivery_window: '06:00-09:00' }),
+    )
+    release({ ok: true, subtotal: 1000, grand_total: 1000 })
   })
 
   it('closes the edit gate once the order is received', () => {

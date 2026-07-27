@@ -167,7 +167,7 @@ export function POHistory({
                     </div>
                     <p className="mt-0.5 truncate text-[11px] text-cream/60">{po.supplier_name}</p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[10px] text-cream/45">
-                      <span>{po.line_count} items</span>
+                      <span>{po.line_count} {po.line_count === 1 ? 'item' : 'items'}</span>
                       {when && <span>{when}</span>}
                     </div>
                   </button>

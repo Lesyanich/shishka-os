@@ -435,7 +435,7 @@ export function PODetail({
           <input
             type="date"
             value={expectedDate}
-            disabled={!editable || isBusy}
+            disabled={!editable}
             onChange={(e) => setExpectedDate(e.target.value)}
             onBlur={() => {
               if ((order.expected_date ?? '') !== expectedDate) {
@@ -451,7 +451,7 @@ export function PODetail({
           </span>
           <input
             value={deliveryWindow}
-            disabled={!editable || isBusy}
+            disabled={!editable}
             placeholder="09:00–12:00"
             onChange={(e) => setDeliveryWindow(e.target.value)}
             onBlur={() => {
@@ -573,7 +573,7 @@ export function PODetail({
           </span>
           <input
             value={deliveryFee}
-            disabled={!editable || isBusy}
+            disabled={!editable}
             inputMode="decimal"
             onChange={(e) => setDeliveryFee(e.target.value)}
             onBlur={() => {
