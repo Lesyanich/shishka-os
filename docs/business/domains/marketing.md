@@ -13,7 +13,7 @@ Social media content, promotions, brand identity, food photography, website, cus
 ## Channels
 - Instagram (primary)
 - Google Business Profile (reviews, photos)
-- Website (`apps/web/` — planned)
+- Website (shishka.health — live; repo `shishka-health`)
 - Delivery platforms (Grab, LINE MAN)
 
 ## Content Pillars

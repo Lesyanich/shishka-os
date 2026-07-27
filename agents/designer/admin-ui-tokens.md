@@ -1,10 +1,17 @@
-# Brand Tokens — Shishka Admin Panel (v1.3 prototype snippet)
+# Admin UI Tokens — Shishka Admin Panel (v1.3 prototype snippet)
 
-Authoritative source for the warmer-dark surface palette and motion easing adopted
-by the admin panel. Full reference lands via task `7710fe5a` port PR; this snippet
-is the spec consumed by task `deab9ec5` (token promotion into `@theme`).
+**These are application tokens, not brand tokens.** They describe the admin panel's
+dark working surfaces, borders and motion — the internal tool nobody outside the
+company sees. Live values: `apps/admin-panel/src/index.css` `@theme` block.
 
-When the full `brand-tokens.md` arrives, reconcile any drift against this snippet.
+**Brand** — the palette, typography and voice a guest sees — is owned by the
+`shishka-health` repo (`design-system/MASTER.md` + `src/styles/tokens/`), per
+`docs/constitution/technical-rules.md` § RULE-DESIGN-SYSTEM. This file derives
+brand hues where it needs them; it is not required to match surface for surface,
+and it is never the place to change a brand colour.
+
+Consumed by task `deab9ec5` (token promotion into `@theme`); reconcile drift in
+the admin panel against this snippet.
 
 ## Color System (dark surfaces)
 

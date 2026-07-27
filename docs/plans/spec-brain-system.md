@@ -47,7 +47,7 @@ Pages here are **encyclopedic** (50–500 lines): real content, diagrams, links,
 | Folder | Scope | Sources to extract from |
 |---|---|---|
 | `Menu/` | Customer-facing menu, dish concept, nutrition, pricing | `nomenclature` table (SALE-* + dish), `recipes_flow`, `apps/admin-panel/.../menu` |
-| `Brand/` | Identity, voice, visual system, tokens, logo, photography | `docs/branding/`, `agents/designer/brand-tokens.md`, Drive `Brand/` folder |
+| `Brand/` | Identity, voice, visual system, tokens, logo, photography | `docs/branding/`, repo `shishka-health` → `design-system/MASTER.md` (brand SSoT), Drive `Brand/` folder |
 | `Recipes/` | Cooking knowledge, BOMs, technique, food cost rollup | `recipes_flow` table, `bom_structures`, `RecipeBuilder.tsx`, `extract_recipes.mjs` |
 | `Equipment/` | Machines, kitchen gear, capex, routing, maintenance | `equipment` table, capex flow, `vault/_Archive/03_Infrastructure/` |
 | `Procurement/` | Suppliers, sourcing, purchase logs, comparison protocol | `supplier_catalog`, `purchase_logs`, `vault/Architecture/Procurement & Receiving Architecture.md` |

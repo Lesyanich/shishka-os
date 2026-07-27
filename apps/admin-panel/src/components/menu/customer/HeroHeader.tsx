@@ -8,7 +8,8 @@ interface HeroHeaderProps {
 
 /** Customer-facing menu hero. Editorial feel: Alegreya display title,
  * Geist tagline, dark surface with optional photographic backdrop.
- * Designed to lift unchanged to the future shishka.health/menu site. */
+ * Admin-side preview only. The live customer menu is the separate
+ * `shishka-health` repo and does not import from here — do not "lift" this. */
 export function HeroHeader({
   title = 'The Menu',
   tagline = 'Cooked clean. Served warm. Priced honest.',
