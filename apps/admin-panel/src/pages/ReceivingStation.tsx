@@ -30,16 +30,23 @@ export function ReceivingStation() {
 
   /**
    * `/receive?po=<id>` jumps straight into that delivery's checklist — the
-   * Receive button on the Order Desk and PO Detail links here. Runs once, so
-   * going Back leaves the operator on the list instead of bouncing them in.
+   * Receive button on the Order Desk and PO Detail links here.
+   *
+   * The latch is set as soon as the pending list has loaded, whether or not
+   * the target was in it. It used to latch ONLY on a match, so if the PO was
+   * not pending yet the effect stayed armed — and useReceiving refetches on
+   * every purchase_orders realtime event, handing the effect a new array each
+   * time. An operator who had moved on to counting another delivery could be
+   * switched to this one mid-count, and ReceivingChecklist keeps the lines it
+   * seeded, so the wrong order's quantities were submitted.
    */
   useEffect(() => {
     if (didPreselect.current || !preselectedPO || deliveries.length === 0) return
-    const match = deliveries.find((d) => d.po_id === preselectedPO)
-    if (!match) return
     didPreselect.current = true
-    handleSelect(match)
-  }, [preselectedPO, deliveries, handleSelect])
+    if (screen !== 'list') return
+    const match = deliveries.find((d) => d.po_id === preselectedPO)
+    if (match) handleSelect(match)
+  }, [preselectedPO, deliveries, handleSelect, screen])
 
   const handleBack = useCallback(() => {
     setSelectedPO(null)

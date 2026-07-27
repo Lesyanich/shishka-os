@@ -103,9 +103,15 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     setIsLoading(true)
     setError(null)
 
+    // Receipts attached to a purchase order are OUT of the standalone flow:
+    // fn_approve_po is the single expense writer for PO purchases, so a linked
+    // row must never be approvable here as well (spec §4.6 / §6.8). Without
+    // this filter the same receipt could be booked twice — once via the order,
+    // once via the inbox.
     const { data, error: err } = await supabase
       .from('receipt_inbox')
       .select('*')
+      .is('po_id', null)
       .order('created_at', { ascending: false })
 
     if (err) {
