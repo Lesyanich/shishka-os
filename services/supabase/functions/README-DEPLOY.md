@@ -1,5 +1,17 @@
 # Supabase Edge Functions — Deployment Guide
 
+## Where the functions live
+
+Sources are here, in `services/supabase/functions/`. The Supabase CLI insists on
+finding them at `./supabase/functions/<name>` relative to the working directory,
+so `supabase/functions` is a **relative symlink** pointing back here. Deploy from
+the repo root and the documented commands below just work.
+
+Until 2026-07-28 that symlink pointed at a Google Drive path that no longer
+exists, so `supabase functions deploy` failed with
+`no such file or directory: supabase/functions/<name>/index.ts` for every
+function in this directory. If you see that error again, check the symlink first.
+
 ## Prerequisites
 
 - `OPENAI_API_KEY` must be set in Supabase Secrets:
