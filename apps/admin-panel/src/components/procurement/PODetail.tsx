@@ -149,15 +149,20 @@ export function PODetail({
   )
 
   const handleLinePatch = useCallback(
-    (patch: POLinePatch) => {
-      // Optimistic: the row already shows the new value; a failed RPC restores
-      // truth via the silent reload below.
+    async (patch: POLinePatch) => {
+      // Optimistic: show the new value immediately, but keep the pre-edit rows
+      // so a rejected patch can be put back. fn_update_po refuses edits once
+      // the order moves past `confirmed`, and it rejects duplicates and qty<=0
+      // — without this restore the screen would keep a value the DB never took,
+      // and the totals beside it would contradict the lines.
+      const before = lines
       setLines((prev) =>
         prev.map((l) => (l.id === patch.id ? { ...l, ...patch } as POLine : l)),
       )
-      applyPatch({ lines_upsert: [patch] }, { reloadLines: true })
+      const ok = await applyPatch({ lines_upsert: [patch] }, { reloadLines: true })
+      if (!ok) setLines(before)
     },
-    [applyPatch],
+    [lines, applyPatch],
   )
 
   const handleLineRemove = useCallback(

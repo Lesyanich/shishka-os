@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import type { Mock } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { PODetail } from './PODetail'
-import type { PurchaseOrder, POStatus } from '../../types/procurement'
+import type { PurchaseOrder, POStatus, POLine } from '../../types/procurement'
 
 /**
  * Regression guard for the frozen-snapshot bug, which had two halves:
@@ -41,11 +42,12 @@ const baseOrder: PurchaseOrder = {
   supplier_default_delivery_fee: null,
 }
 
-function renderDetail(order: PurchaseOrder) {
-  const updatePO = vi.fn().mockResolvedValue({ ok: true, subtotal: 1000, grand_total: 1000 })
+function renderDetail(order: PurchaseOrder, over?: { updatePO?: Mock; lines?: POLine[] }) {
+  const updatePO: Mock =
+    over?.updatePO ?? vi.fn().mockResolvedValue({ ok: true, subtotal: 1000, grand_total: 1000 })
   const props = {
     onBack: vi.fn(),
-    fetchLines: vi.fn().mockResolvedValue([]),
+    fetchLines: vi.fn().mockResolvedValue(over?.lines ?? []),
     updateStatus: vi.fn().mockResolvedValue(true),
     updatePO,
     fetchLinkedReceipts: vi.fn().mockResolvedValue([]),
@@ -59,6 +61,24 @@ function renderDetail(order: PurchaseOrder) {
   const rerenderWith = (next: PurchaseOrder) =>
     view.rerender(<PODetail order={next} {...props} />)
   return { updatePO, rerenderWith }
+}
+
+const poLine: POLine = {
+  id: 'line-1',
+  po_id: 'po-1',
+  nomenclature_id: 'nom-1',
+  sku_id: null,
+  product_name: 'Bell pepper red',
+  product_name_th: null,
+  product_code: 'RAW-PEPPER',
+  base_unit: 'kg',
+  qty_ordered: 5,
+  unit: 'kg',
+  unit_price_expected: 58,
+  total_expected: 290,
+  destination_station_id: null,
+  sort_order: 1,
+  notes: null,
 }
 
 const feeInput = () => screen.getByRole('textbox', { name: /delivery fee/i })
@@ -106,6 +126,45 @@ describe('PODetail follows the live order row', () => {
 
     rerenderWith({ ...baseOrder, expected_date: '2026-08-05' })
     expect(date().value).toBe('2026-08-05')
+  })
+
+  it('puts a rejected line edit back instead of leaving a value the DB never took', async () => {
+    // The other side shipped the order while it was open: fn_update_po refuses
+    // the patch, so the optimistic 8 kg must not survive on screen.
+    const updatePO = vi
+      .fn()
+      .mockResolvedValue({ ok: false, error: 'Order is not editable in status shipped' })
+    renderDetail(baseOrder, { updatePO, lines: [poLine] })
+
+    const qty = (await screen.findByLabelText(/Quantity of Bell pepper red/)) as HTMLInputElement
+    expect(qty.value).toBe('5')
+
+    fireEvent.change(qty, { target: { value: '8' } })
+    fireEvent.blur(qty)
+
+    await waitFor(() => expect(updatePO).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText(/Quantity of Bell pepper red/) as HTMLInputElement).value,
+      ).toBe('5'),
+    )
+    expect(screen.getByText(/not editable in status shipped/)).toBeTruthy()
+  })
+
+  it('keeps an accepted line edit', async () => {
+    const updatePO = vi.fn().mockResolvedValue({ ok: true, subtotal: 464, grand_total: 464 })
+    renderDetail(baseOrder, { updatePO, lines: [poLine] })
+
+    const qty = (await screen.findByLabelText(/Quantity of Bell pepper red/)) as HTMLInputElement
+    fireEvent.change(qty, { target: { value: '8' } })
+    fireEvent.blur(qty)
+
+    await waitFor(() =>
+      expect(updatePO).toHaveBeenCalledWith('po-1', {
+        lines_upsert: [{ id: 'line-1', qty_ordered: 8 }],
+      }),
+    )
+    expect(screen.queryByText(/not editable/)).toBeNull()
   })
 
   it('closes the edit gate when the order advances past confirmed', () => {
