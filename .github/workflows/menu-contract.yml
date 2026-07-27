@@ -1,0 +1,51 @@
+name: Menu contract watch
+
+# The public menu at shishka.health (repo shishka-health) reads menu_public,
+# site_content, menu_modifiers and price_tiers from this project's database with
+# the anon key. Those objects are the contract between the two repos.
+#
+# Breaking one of them does NOT error the site: useMenu.js catches the failure and
+# renders hardcoded MOCK_DATA, so guests keep seeing a menu — with stale prices.
+# Nobody finds out. This workflow is how we find out.
+#
+# The hourly run is the one that matters. The dangerous changes are made from a chat
+# window through MCP apply_migration or the Supabase dashboard and never appear in a
+# pull request, so PR-time checking alone would miss them. On failure GitHub Actions
+# emails the repo owner — no new secret, no bot, no extra infrastructure.
+#
+# Deliberately a separate workflow: adding an hourly cron to ci.yml would also fire
+# every tsc, lint and build job in it once an hour.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/supabase/migrations/**"
+      - "scripts/contract-check.mjs"
+      - ".github/workflows/menu-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/supabase/migrations/**"
+      - "scripts/contract-check.mjs"
+  schedule:
+    - cron: "0 * * * *" # hourly
+  workflow_dispatch:
+
+concurrency:
+  group: menu-contract
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Menu contract (live, read-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Reads production with the public anon key and fetches the contract from the
+      # shishka-health repo over raw.githubusercontent.com. Both repos are public,
+      # so this needs no secret and no staging database.
+      - name: Check the menu contract
+        run: node scripts/contract-check.mjs

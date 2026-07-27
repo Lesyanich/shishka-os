@@ -106,6 +106,15 @@ if git diff --cached --name-only --diff-filter=d | grep -q "^services/supabase/m
     echo "BLOCKED: Migration numbering violation. Fix before committing."
     exit 1
   fi
+  # Contract guard: the public menu at shishka.health reads menu_public and
+  # friends. It degrades to stale hardcoded prices instead of erroring, so this
+  # is the only check that can stop the damage before the migration is applied.
+  sh scripts/migration-canary.sh --check-contract
+  CONTRACT_EXIT=$?
+  if [ $CONTRACT_EXIT -ne 0 ]; then
+    echo "BLOCKED: Unreviewed change to the shishka.health menu contract."
+    exit 1
+  fi
   echo "[migration-canary] OK"
 fi
 
