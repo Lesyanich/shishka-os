@@ -160,9 +160,54 @@ check_numbering() {
   exit 0
 }
 
+# --check-contract (repo boundary): the public menu at shishka.health reads
+# menu_public, site_content, menu_modifiers and price_tiers with the anon key.
+# Breaking one of them does not error the site — useMenu.js catches and renders
+# hardcoded MOCK_DATA, so guests keep seeing a menu with last month's prices.
+# This is the only gate that fires BEFORE the migration is applied.
+#
+# It cannot verify contracts/menu-contract.json, which lives in the other repo,
+# so it demands the same explicit acknowledgement the DROP/TRUNCATE checks use.
+check_contract() {
+  local objects='menu_public|site_content|menu_modifiers|price_tiers|nomenclature_tags'
+  local columns='customer_short_name|customer_photo_url|customer_description|customer_ingredients|bundle_min_price|stock_state|section_sort_order|category_sort_order'
+  local staged errors=0
+  staged=$(git diff --cached --name-only --diff-filter=ACMR \
+    | grep -E '^services/supabase/migrations/.*\.sql$' || true)
+
+  for f in $staged; do
+    [ -f "$f" ] || continue
+    if grep -Eqi "$objects|$columns" "$f"; then
+      if ! grep -q -- '-- CONTRACT-REVIEWED' "$f"; then
+        echo "FAIL  $(basename "$f") — touches the public menu contract"
+        echo "  ✗ Matched: $(grep -Eoi "$objects|$columns" "$f" | sort -u | tr '\n' ' ')"
+        echo "  ✗ shishka.health reads these. It breaks by showing stale prices, not by erroring."
+        echo "  ✗ Do this, then add a '-- CONTRACT-REVIEWED: <why it is safe>' line to the migration:"
+        echo "      1. node scripts/contract-check.mjs        (must be green BEFORE you apply)"
+        echo "      2. update contracts/menu-contract.json in the shishka-health repo if columns moved"
+        echo "      3. node scripts/contract-check.mjs        (must be green AFTER you apply)"
+        errors=$((errors + 1))
+      else
+        echo "OK    $(basename "$f") — contract touch acknowledged"
+      fi
+    fi
+  done
+
+  if [ "$errors" -gt 0 ]; then
+    echo ""
+    echo "CANARY FAILED — unreviewed change to the shishka.health menu contract"
+    exit 1
+  fi
+  echo "OK    contract (no unreviewed changes to the public menu contract)"
+  exit 0
+}
+
 # Main
 if [ "${1:-}" = "--check-numbering" ]; then
   check_numbering
+fi
+if [ "${1:-}" = "--check-contract" ]; then
+  check_contract
 fi
 if [ $# -gt 0 ]; then
   # Validate specific file
