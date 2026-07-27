@@ -13,8 +13,15 @@ import type {
   Station, LinkedReceipt, ReceivedLineSummary,
 } from '../../types/procurement'
 
-/** Statuses in which fn_update_po accepts edits — mirror of its own guard. */
-const EDITABLE: POStatus[] = ['draft', 'submitted', 'confirmed']
+/**
+ * Statuses in which fn_update_po accepts edits — mirror of its own guard.
+ * CEO ruling 2026-07-27: edits run until `received`, per spec §4.3/§6.2/§4.8.
+ * A shipped order is exactly when a quantity correction or an unload
+ * destination is learned, so `shipped` and `partially_received` are editable.
+ * The RPC additionally refuses to drop a line's qty below what has already
+ * been received, or to delete a line that has receiving activity.
+ */
+const EDITABLE: POStatus[] = ['draft', 'submitted', 'confirmed', 'shipped', 'partially_received']
 
 const NEXT_ACTIONS: Partial<Record<POStatus, { label: string; next: POStatus }>> = {
   draft: { label: 'Submit to the other side', next: 'submitted' },

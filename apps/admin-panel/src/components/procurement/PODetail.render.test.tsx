@@ -167,14 +167,22 @@ describe('PODetail follows the live order row', () => {
     expect(screen.queryByText(/not editable/)).toBeNull()
   })
 
-  it('closes the edit gate when the order advances past confirmed', () => {
+  it('still allows edits on a shipped order, and offers the receive CTA', () => {
+    // CEO ruling 2026-07-27 (spec §4.3/§6.2/§4.8): editing runs until
+    // `received`. A shipped order is precisely when a quantity correction or
+    // an unload destination gets learned, so the gate must stay open.
     const { rerenderWith } = renderDetail(baseOrder)
     expect((feeInput() as HTMLInputElement).disabled).toBe(false)
 
-    // The other side marks it shipped — fn_update_po would now refuse every
-    // patch, so the UI must stop offering the edit.
     rerenderWith({ ...baseOrder, status: 'shipped' as POStatus })
-    expect((feeInput() as HTMLInputElement).disabled).toBe(true)
+    expect((feeInput() as HTMLInputElement).disabled).toBe(false)
     expect(screen.getByText('Receive delivery')).toBeTruthy()
+  })
+
+  it('closes the edit gate once the order is received', () => {
+    const { rerenderWith } = renderDetail(baseOrder)
+
+    rerenderWith({ ...baseOrder, status: 'received' as POStatus })
+    expect((feeInput() as HTMLInputElement).disabled).toBe(true)
   })
 })
