@@ -12,62 +12,40 @@ export async function resolveSupplier(name: string): Promise<string | null> {
   return resolved.id
 }
 
+/**
+ * Resolve a receipt's supplier name to a supplier, plus its OCR profile.
+ *
+ * Delegates to fn_resolve_supplier (migration 386) — the same ladder the
+ * approval path uses: tax_id → name → alias → normalized name → normalized
+ * alias. p_create is false: the OCR phase reads receipts, it does not decide
+ * that a new company exists. Approval does that.
+ *
+ * This replaced three hand-rolled levels whose fallbacks were substring and
+ * word-by-word ILIKE with `.limit(1)` and no ordering — one shared word was
+ * enough to pick a supplier, and neither filtered `is_deleted`, so a receipt
+ * could resolve onto a soft-deleted `[MERGED] …` row and book spend to a
+ * supplier that no longer exists. The RPC refuses to guess when a normalized
+ * name matches more than one supplier; unresolved is fine, the human picks it
+ * in the approval UI.
+ */
 export async function resolveSupplierWithProfile(name: string): Promise<ResolvedSupplier> {
   if (!name) return { id: null, ocr_profile: null }
 
-  // Level 1: Exact alias match (fastest — learned from previous receipts)
-  const { data: aliasHit } = await db
-    .from("supplier_aliases")
-    .select("supplier_id")
-    .ilike("alias", name)
-    .limit(1)
-  if (aliasHit?.[0]?.supplier_id) {
-    const { data: sup } = await db
-      .from("suppliers")
-      .select("id, ocr_profile")
-      .eq("id", aliasHit[0].supplier_id)
-      .limit(1)
-    if (sup?.[0]) return { id: sup[0].id, ocr_profile: sup[0].ocr_profile ?? null }
-  }
+  const { data: supplierId } = await db.rpc("fn_resolve_supplier", {
+    p_name: name,
+    p_tax_id: null,
+    p_create: false,
+  })
+  if (!supplierId) return { id: null, ocr_profile: null }
 
-  // Level 2: Substring match against suppliers.name
-  const { data: subHit } = await db
+  const { data: sup } = await db
     .from("suppliers")
     .select("id, ocr_profile")
-    .ilike("name", `%${name}%`)
+    .eq("id", supplierId)
     .limit(1)
-  if (subHit?.[0]) {
-    await saveAlias(name, subHit[0].id)
-    return { id: subHit[0].id, ocr_profile: subHit[0].ocr_profile ?? null }
-  }
 
-  // Level 3: Word-by-word fallback
-  const words = name.split(/\s+/).filter(w => w.length >= 3)
-  for (const word of words) {
-    const { data: wordHit } = await db
-      .from("suppliers")
-      .select("id, ocr_profile")
-      .ilike("name", `%${word}%`)
-      .neq("name", "")
-      .limit(1)
-    if (wordHit?.[0]) {
-      await saveAlias(name, wordHit[0].id)
-      return { id: wordHit[0].id, ocr_profile: wordHit[0].ocr_profile ?? null }
-    }
-  }
-
-  return { id: null, ocr_profile: null }
-}
-
-async function saveAlias(alias: string, supplierId: string): Promise<void> {
-  try {
-    await db.from("supplier_aliases").upsert(
-      { alias: alias.trim(), supplier_id: supplierId, source: "auto" },
-      { onConflict: "alias" },
-    )
-  } catch {
-    // Non-critical: if alias save fails, resolution still worked
-  }
+  if (!sup?.[0]) return { id: null, ocr_profile: null }
+  return { id: sup[0].id, ocr_profile: sup[0].ocr_profile ?? null }
 }
 
 export async function matchNomenclature(

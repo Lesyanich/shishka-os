@@ -214,7 +214,7 @@ Counter columns live on **all four self-learning tables**:
 |---|---|---|---|---|
 | `category_overrides` | ✅ (mig 150) | ✅ (mig 166) | ✅ (mig 166) | ✅ via `fn_apply_inbox_overrides` (mig 166) |
 | `correction_rules` | ✅ (mig 165) | ✅ (mig 165) | ✅ (mig 165) | ❌ — no apply phase exists in code yet (only post-approval triggers WRITE rows). Counters dormant until ingestion path consults the table. |
-| `supplier_aliases` | ✅ (mig 166) | ✅ (mig 166) | ✅ (mig 166) | 🔧 schema-only (apply happens in `nomenclature.ts:resolveSupplierWithProfile`; counter wiring is a follow-up — same pattern as `fn_apply_inbox_overrides`) |
+| `supplier_aliases` | ✅ (mig 166) | ✅ (mig 166) | ✅ (mig 166) | ✅ via `fn_resolve_supplier` (mig 386) — increments inside `fn_approve_receipt`'s transaction. The OCR phase calls the same function with `p_create = false`, which is a pure read: no alias learned, no counter moved, because nothing is confirmed until approval. |
 | `gs1_weight_items` | ✅ (mig 166) | ✅ (mig 166) | ✅ (mig 166) | 🔧 schema-only (apply happens in `gs1.ts:matchGS1WeightItem`; counter wiring follow-up) |
 
 `v_learning_metrics` (mig 166) UNIONs across all four tables and aggregates into a single row (`total_rules`, `used_rules`, `sum_applied`, `sum_overridden`, `override_rate_pct`, `last_activity`) for `/health`.
@@ -258,7 +258,7 @@ LIMIT 20;
 
 ### Follow-ups
 
-- Wire counter increments for `supplier_aliases` and `gs1_weight_items` (apply phases exist; mirror the `fn_apply_inbox_overrides` pattern with new ledger entries).
+- Wire counter increments for `gs1_weight_items` (apply phase exists in `gs1.ts:matchGS1WeightItem`; mirror the `fn_apply_inbox_overrides` pattern with new ledger entries). `supplier_aliases` is done — mig 386.
 - Build apply phase for `correction_rules` (currently only post-approval triggers WRITE to it; nothing READS it during ingestion). Until then its counters are reserved schema.
 - mcp-finance `approve-receipt.ts` does not pass `p_inbox_id` to the RPC — MCP-driven approvals bypass the inbox flow entirely, so they have no `applied_overrides` to count. Acceptable: no apply ran for that path either. If MCP starts applying rules in-process, mirror the ledger pattern.
 
