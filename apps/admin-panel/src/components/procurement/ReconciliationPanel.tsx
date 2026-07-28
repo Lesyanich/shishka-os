@@ -6,19 +6,23 @@ import type {
   ReconciliationLine,
   ApprovePOPayload,
   ApprovePOResult,
+  LinkedReceipt,
 } from '../../types/procurement'
 
 interface Props {
   order: PurchaseOrder
   onBack: () => void
   onReconciled: () => void
+  fetchLinkedReceipts: (poId: string) => Promise<LinkedReceipt[]>
 }
 
 const defaultToday = new Date().toISOString().slice(0, 10)
 
-export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
+export function ReconciliationPanel({ order, onBack, onReconciled, fetchLinkedReceipts }: Props) {
   const [lines, setLines] = useState<ReconciliationLine[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  /** Set when the attached receipt supplied values — drives the banner. */
+  const [prefill, setPrefill] = useState<{ parsedAt: string | null; lineCount: number } | null>(null)
   const [isApproving, setIsApproving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -158,8 +162,6 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
         },
       )
 
-      setLines(result)
-
       // Pre-fill amount from sum of (qty_received * unit_price)
       const estimatedTotal = result.reduce((sum, l) => {
         const price = l.unit_price_actual ?? l.unit_price_expected ?? 0
@@ -167,10 +169,50 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
       }, 0)
       if (estimatedTotal > 0) setAmountOriginal(Math.round(estimatedTotal * 100) / 100)
 
+      // 6. Overlay the attached receipt's parsed actuals (spec §4.6/§6.8).
+      // The receipt is what the supplier actually charged, so it wins over the
+      // estimate computed from expected prices — but only field by field, and
+      // only where the parser produced a value. Everything stays editable.
+      const receipts = await fetchLinkedReceipts(order.id)
+      const parsed = receipts.find((r) => r.parsed != null)
+
+      if (parsed?.parsed) {
+        const p = parsed.parsed
+        if (p.amount_original != null) setAmountOriginal(p.amount_original)
+        if (p.vat_amount != null) setVatAmount(p.vat_amount)
+        if (p.discount_total != null) setDiscountTotal(p.discount_total)
+        if (p.delivery_fee != null) setDeliveryFee(p.delivery_fee)
+        if (p.invoice_number) setInvoiceNumber(p.invoice_number)
+        if (p.transaction_date) setTransactionDate(p.transaction_date)
+        if (p.has_tax_invoice != null) setHasTaxInvoice(p.has_tax_invoice)
+        if (p.payment_method) setPaymentMethod(p.payment_method)
+        if (p.paid_by) setPaidBy(p.paid_by)
+
+        // Per-line actual prices, only for items the parser tied to a real
+        // product AND only where receiving did not already record a price.
+        if (p.items.length > 0) {
+          const priceByNom = new Map(
+            p.items
+              .filter((it) => it.unit_price != null)
+              .map((it) => [it.nomenclature_id, it.unit_price as number]),
+          )
+          if (priceByNom.size > 0) {
+            for (const line of result) {
+              if (line.unit_price_actual != null) continue
+              const fromReceipt = priceByNom.get(line.nomenclature_id)
+              if (fromReceipt != null) line.unit_price_actual = fromReceipt
+            }
+          }
+        }
+
+        setPrefill({ parsedAt: parsed.parsed_at, lineCount: p.items.length })
+      }
+
+      setLines(result)
       setIsLoading(false)
     }
     load()
-  }, [order.id])
+  }, [order.id, fetchLinkedReceipts])
 
   const handleApprove = useCallback(async () => {
     setError(null)
@@ -369,6 +411,25 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
           Financial Details
         </h3>
 
+        {prefill && (
+          <div className="mb-3 rounded-lg border border-honey-600/40 bg-honey-600/10 px-3 py-2">
+            <p className="text-[11px] leading-snug text-honey-300">
+              Filled in from the attached receipt
+              {prefill.parsedAt
+                ? ` · read ${new Date(prefill.parsedAt).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                  })}`
+                : ''}
+              {prefill.lineCount > 0 ? ` · ${prefill.lineCount} matched item(s)` : ''}
+            </p>
+            <p className="mt-0.5 text-[10.5px] leading-snug text-cream/55">
+              Check every figure against the paper — approving writes the expense and cannot be
+              undone.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-3">
           {/* Date + Invoice */}
           <div className="grid grid-cols-2 gap-3">
@@ -377,6 +438,7 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
               <input
                 type="date"
                 value={transactionDate}
+                aria-label="Transaction date"
                 onChange={(e) => setTransactionDate(e.target.value)}
                 className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
               />
@@ -386,6 +448,7 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
               <input
                 type="text"
                 value={invoiceNumber}
+                aria-label="Invoice number"
                 onChange={(e) => setInvoiceNumber(e.target.value)}
                 placeholder="Optional"
                 className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
@@ -400,6 +463,7 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
               <input
                 type="number"
                 value={amountOriginal}
+                aria-label="Total amount THB"
                 onChange={(e) => setAmountOriginal(e.target.value ? Number(e.target.value) : '')}
                 placeholder="0.00"
                 step="any"
@@ -411,6 +475,7 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
               <label className="mb-1 block text-[11px] text-cream/45">Payment Method</label>
               <select
                 value={paymentMethod}
+                aria-label="Payment method"
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
               >
@@ -429,6 +494,7 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
               <input
                 type="number"
                 value={discountTotal}
+                aria-label="Discount"
                 onChange={(e) => setDiscountTotal(e.target.value ? Number(e.target.value) : '')}
                 placeholder="0"
                 step="any"
@@ -441,6 +507,7 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
               <input
                 type="number"
                 value={vatAmount}
+                aria-label="VAT"
                 onChange={(e) => setVatAmount(e.target.value ? Number(e.target.value) : '')}
                 placeholder="0"
                 step="any"
@@ -453,6 +520,7 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
               <input
                 type="number"
                 value={deliveryFee}
+                aria-label="Delivery fee"
                 onChange={(e) => setDeliveryFee(e.target.value ? Number(e.target.value) : '')}
                 placeholder="0"
                 step="any"
@@ -469,6 +537,7 @@ export function ReconciliationPanel({ order, onBack, onReconciled }: Props) {
               <input
                 type="text"
                 value={paidBy}
+                aria-label="Paid by"
                 onChange={(e) => setPaidBy(e.target.value)}
                 placeholder="Name"
                 className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"

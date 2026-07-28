@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { runOcrParse } from '../lib/ocrParse'
 
 /* ────────────────────────── Types ────────────────────────── */
 
-export type OcrModel = 'gemini-flash' | 'gemini-flash-lite' | 'gemini-3-flash' | 'gemini-pro' | 'claude-sonnet' | 'claude-haiku' | 'gpt-4o' | 'claude-sub' | 'gemini-flash-vision' | 'gemini-pro-vision'
+// Defined once in lib/ocrParse and re-exported here so existing imports keep
+// working. Do not redeclare the union anywhere else.
+export type { OcrModel } from '../lib/ocrParse'
+import type { OcrModel } from '../lib/ocrParse'
 
 export interface InboxRow {
   id: string
@@ -103,9 +107,15 @@ export function useReceiptInbox(): UseReceiptInboxResult {
     setIsLoading(true)
     setError(null)
 
+    // Receipts attached to a purchase order are OUT of the standalone flow:
+    // fn_approve_po is the single expense writer for PO purchases, so a linked
+    // row must never be approvable here as well (spec §4.6 / §6.8). Without
+    // this filter the same receipt could be booked twice — once via the order,
+    // once via the inbox.
     const { data, error: err } = await supabase
       .from('receipt_inbox')
       .select('*')
+      .is('po_id', null)
       .order('created_at', { ascending: false })
 
     if (err) {
@@ -184,16 +194,15 @@ export function useReceiptInbox(): UseReceiptInboxResult {
   }, [])
 
   const parseReceipt = useCallback(async (inboxId: string, model: OcrModel): Promise<{ ok: boolean; error?: string }> => {
+    // Trigger logic lives in lib/ocrParse so the procurement screen runs the
+    // exact same thing. Only the optimistic UI updates stay here.
     if (model === 'claude-sub') {
-      const { error: err } = await supabase
-        .from('receipt_inbox')
-        .update({ model_used: 'claude-subscription' })
-        .eq('id', inboxId)
-      if (err) return { ok: false, error: err.message }
+      const result = await runOcrParse(inboxId, model)
+      if (!result.ok) return result
       setRows((prev) =>
         prev.map((r) => (r.id === inboxId ? { ...r, model_used: 'claude-subscription' } : r)),
       )
-      return { ok: true }
+      return result
     }
 
     // Immediately reflect 'processing' in UI — don't wait for realtime
@@ -201,17 +210,8 @@ export function useReceiptInbox(): UseReceiptInboxResult {
       prev.map((r) => (r.id === inboxId ? { ...r, status: 'processing' as const } : r)),
     )
 
-    try {
-      const { data, error: fnErr } = await supabase.functions.invoke(
-        `ocr-receipt?inbox_id=${inboxId}&model=${model}`,
-      )
-      if (fnErr) return { ok: false, error: fnErr.message }
-      if (data && !data.ok) return { ok: false, error: data.error || 'Parse failed' }
-      // Realtime will update the row status from processing → parsed/error
-      return { ok: true }
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
-    }
+    // Realtime will update the row status from processing → parsed/error
+    return runOcrParse(inboxId, model)
   }, [])
 
   const batchProcess = useCallback(async (photoUrls: string[], uploadedBy: string, model: OcrModel): Promise<BatchProcessResult> => {

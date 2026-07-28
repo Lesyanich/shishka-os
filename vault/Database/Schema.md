@@ -336,9 +336,11 @@ erDiagram
         UUID supplier_id FK
         po_status status
         DATE expected_date
+        TEXT delivery_window "mig 379"
         TEXT notes
         NUMERIC subtotal
         NUMERIC grand_total
+        UUID deliver_to_station_id FK "mig 379"
         UUID source_plan_id FK
         UUID expense_id FK
         UUID created_by
@@ -353,7 +355,19 @@ erDiagram
         TEXT unit
         NUMERIC unit_price_expected
         NUMERIC total_expected "GENERATED"
+        UUID destination_station_id FK "mig 379"
         SMALLINT sort_order
+    }
+
+    supplier_files {
+        UUID id PK
+        UUID supplier_id FK "NULLABLE - new-supplier uploads"
+        TEXT supplier_name_raw
+        TEXT kind "pdf|image|link"
+        TEXT storage_path "supplier-files bucket"
+        TEXT ingest_status "library|new|to_digitize|digitized|rejected"
+        INTEGER digitized_rows
+        TIMESTAMPTZ created_at
     }
 
     receiving_records {
@@ -433,6 +447,11 @@ erDiagram
     fin_categories ||--o{ supplier_catalog : "category_code"
     fin_sub_categories ||--o{ supplier_catalog : "sub_category_code"
 
+    suppliers ||--o{ supplier_files : "supplier_id"
+    stations ||--o{ purchase_orders : "deliver_to_station_id"
+    stations ||--o{ po_lines : "destination_station_id"
+    purchase_orders ||--o{ receipt_inbox : "po_id"
+    po_lines ||--o{ stock_request_lines : "po_line_id"
     suppliers ||--o{ purchase_orders : "supplier_id"
     purchase_orders ||--o{ po_lines : "po_id"
     purchase_orders ||--o{ receiving_records : "po_id"
@@ -483,10 +502,24 @@ erDiagram
 | `brands` | `id` UUID | name (UNIQUE), name_th, country, is_active | -- | 045 |
 | `tags` | `id` UUID | slug (UNIQUE), name, name_th, tag_group (ENUM), color, sort_order | -- | 045 |
 | `nomenclature_tags` | `(nomenclature_id, tag_id)` composite | -- | nomenclature_id -> nomenclature (CASCADE), tag_id -> tags (CASCADE) | 045 |
-| `purchase_orders` | `id` UUID | po_number (UNIQUE), status (po_status), expected_date, subtotal, discount_total, vat_amount, delivery_fee, grand_total, created_by | supplier_id -> suppliers, source_plan_id -> production_plans, expense_id -> expense_ledger | 061 |
-| `po_lines` | `id` UUID | qty_ordered (CHECK > 0, mig 324), unit, unit_price_expected, total_expected (GENERATED), sort_order, UNIQUE(po_id, nomenclature_id, sku_id); trg_po_lines_rollup rolls totals up to purchase_orders | po_id -> purchase_orders (CASCADE), nomenclature_id -> nomenclature, sku_id -> sku | 061, 323, 324 |
+| `purchase_orders` | `id` UUID | po_number (UNIQUE), status (po_status), expected_date, delivery_window, subtotal, discount_total, vat_amount, delivery_fee, grand_total, created_by, CHECK delivery_fee/discount_total/vat_amount >= 0 (mig 382) | supplier_id -> suppliers, deliver_to_station_id -> stations, source_plan_id -> production_plans, expense_id -> expense_ledger | 061, 379, 382 |
+| `po_lines` | `id` UUID | qty_ordered (CHECK > 0, mig 324), unit, unit_price_expected (CHECK NULL or >= 0, mig 382), total_expected (GENERATED), sort_order, UNIQUE(po_id, nomenclature_id, COALESCE(sku_id,'000…0')) — **one product per order**, so an "add item" flow must exclude lines already present; trg_po_lines_rollup rolls totals up to purchase_orders | po_id -> purchase_orders (CASCADE), nomenclature_id -> nomenclature, sku_id -> sku, destination_station_id -> stations | 061, 323, 324, 379 |
+| `supplier_files` | `id` UUID | kind CHECK (pdf/image/link), title, storage_path (`supplier-files` bucket), url, supplier_name_raw (new-supplier uploads, find-or-create at digitize time), ingest_status CHECK (library/new/to_digitize/digitized/rejected), reviewed_at, digitized_at, digitized_rows, review_note | supplier_id -> suppliers (NULLABLE) | 379 |
 | `receiving_records` | `id` UUID | source (receiving_source), received_by, received_at, status ('received'/'reconciled') | po_id -> purchase_orders, expense_id -> expense_ledger | 062 |
 | `receiving_lines` | `id` UUID | qty_expected, qty_received, qty_rejected, reject_reason (reject_reason), unit_price_actual | receiving_id -> receiving_records (CASCADE), po_line_id -> po_lines, nomenclature_id -> nomenclature, sku_id -> sku | 062 |
+
+### Columns added by mig 379 to tables documented elsewhere
+
+Procurement v2 Phase A also widened five tables that this index does not carry
+rows for. Listed here so the migration's full footprint is greppable:
+
+| Table | Added | Why |
+|---|---|---|
+| `suppliers` | `line_id`, `website`, `default_delivery_fee` | supplier links hub — tap-to-LINE / site, prefill the delivery fee |
+| `receipt_inbox` | `po_id` -> purchase_orders | receipt↔PO link; linked rows are excluded from the standalone receipt flow, and `fn_approve_po` stays the single expense writer |
+| `stock_requests` | `requested_by` -> staff, `station_id` -> stations | who asked, and from which station |
+| `stock_request_lines` | `po_line_id` -> po_lines **ON DELETE SET NULL** | need→order linkage; deleting a PO line reverts the request line to "requested" instead of dangling |
+| `staff` | `can_create_orders` BOOLEAN NOT NULL DEFAULT false | ordering role without the full task_manager tier (UI surface lands in MC 6e4b56bf) |
 
 ## Custom ENUM Types
 
@@ -529,7 +562,8 @@ erDiagram
 | `fn_generate_po_number()` | UTIL FN | Generates next PO code: PO-0001, PO-0002, etc. | 061 |
 | `fn_po_set_number()` | TRIGGER FN | Auto-assigns po_number on INSERT if not provided | 061 |
 | `fn_po_rollup_totals()` | TRIGGER FN | AFTER INS/UPD/DEL on po_lines: recomputes purchase_orders.subtotal (Σ total_expected) + grand_total (− discount + vat + delivery). Skips reconciled/cancelled so fn_approve_po actuals are preserved | 323 |
-| `fn_create_purchase_order(JSONB)` | RPC | Creates PO with lines. Auto-populates prices from supplier_catalog. Pre-validates lines (rejects empty array, qty ≤ 0, missing product) before any INSERT — no orphan header | 064, 324 |
+| `fn_create_purchase_order(JSONB)` | RPC | Creates PO with lines. Auto-populates prices from supplier_catalog. Pre-validates lines (rejects empty array, qty ≤ 0, missing product) before any INSERT — no orphan header. 379 added optional header keys `deliver_to_station_id` / `delivery_window` / `delivery_fee` and per-line `destination_station_id` (falls back to the header station) + `request_line_ids[]` → sets `stock_request_lines.po_line_id`. 382 added the `auth.uid()` NOT NULL guard, scoped the `request_line_ids` UPDATE (only rows with `po_line_id IS NULL` AND matching `nomenclature_id` — it was unscoped and could re-point any request line in the DB), and maps `idx_pol_unique_item` violations to a readable "already on the order" message. EXECUTE revoked from PUBLIC + anon in 382; `authenticated` and `service_role` only | 064, 324, 379, 382 |
+| `fn_update_po(UUID, JSONB)` | RPC | Edits a live order: header keys applied only when present (expected_date, delivery_window, notes, delivery_fee, deliver_to_station_id), `lines_upsert[]` (with `id` updates, without inserts at sort_order max+1), `lines_delete[]`. Guards: `auth.uid()` NOT NULL, PO exists, status ∈ draft/submitted/confirmed. Validates every line BEFORE any write, and recomputes totals in-function because a header-only delivery_fee patch fires no po_lines trigger. Returns `{ok, po_id, line_count, subtotal, grand_total}`. 382 added three guards: a patch may not delete and edit the same line (it used to return ok:true with the edit silently lost), an order may not be left with zero lines (RAISE → full rollback), and duplicate-product inserts return a readable message instead of a raw index error. EXECUTE revoked from PUBLIC + anon in 382. 383 (CEO ruling): editable window widened to draft/submitted/confirmed/**shipped**/**partially_received** — closes only at `received` — plus two guards that widening made necessary: a line's qty_ordered cannot drop below the qty already received against it, and a line with receiving activity cannot be deleted (receiving_lines.po_line_id is ON DELETE SET NULL, so deleting would silently orphan received quantities) | 379, 382, 383 |
 | `fn_receive_goods(JSONB)` | RPC | Physical receiving by Admin/Cook. No inventory update. Sets partially_received/received | 064 |
 | `fn_approve_po(JSONB)` | RPC | Financial reconciliation → expense_ledger + purchase_logs + sku_balances + WAC | 064 |
 | `fn_pending_deliveries()` | RPC | Pending POs for /receive screen. No prices. Includes partial delivery aggregation | 064 |
@@ -540,12 +574,14 @@ erDiagram
 | View | Source | Purpose | Migration |
 |---|---|---|---|
 | `v_inventory_by_nomenclature` | `sku_balances` | Aggregated inventory by nomenclature (SUM quantity, MAX last_counted_at). Drop-in replacement for inventory_balances. Used by WAC trigger, MRP, procurement. | 057 |
+| `v_order_builder` | `supplier_catalog` ⋈ `suppliers` ⋈ `nomenclature` ⋈ `product_categories` | Order Builder / add-item source: per-supplier catalog rows with `unit_cost_base` (last_seen_price ÷ conversion_factor), `verified_at` for price-freshness dots, image_url, min_order_thb, resolved product category. `security_invoker = true` | 379 |
 
 ## Storage Buckets
 
 | Bucket | Public | Max Size | MIME Types | Purpose |
 |---|---|---|---|---|
 | `receipts` | Yes (read) | 5 MB | JPEG, PNG, WebP, PDF | Expense receipt storage (supplier/, bank/, tax/) |
+| `supplier-files` | No (private) | -- | PDF, images | Supplier price lists / catalog photos uploaded from the admin. Policy **quals** (never trust the name): select/insert/update `bucket_id='supplier-files' AND auth.role()='authenticated'`, delete `bucket_id='supplier-files' AND fn_is_owner()` | 379 |
 
 ## RLS Policies (Row Level Security)
 
@@ -586,6 +622,7 @@ erDiagram
 | `nomenclature_tags` | `auth_full_access` | ALL | `fn_is_authenticated()` | 054 |
 | `purchase_orders` | `auth_full_access` | ALL | `fn_is_authenticated()` | 061 |
 | `po_lines` | `auth_full_access` | ALL | `fn_is_authenticated()` | 061 |
+| `supplier_files` | `supplier_files_auth_all` | ALL | `fn_is_authenticated()` | 379 |
 | `receiving_records` | `auth_full_access` | ALL | `fn_is_authenticated()` | 062 |
 | `receiving_lines` | `auth_full_access` | ALL | `fn_is_authenticated()` | 062 |
 | ~~`recipes_flow`~~ | DROPPED (056) | -- | -- | -- |

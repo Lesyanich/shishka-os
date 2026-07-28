@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Trash2, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { SearchableSelect, type SearchableOption } from '../ui/SearchableSelect'
+import { CategoryFilter } from '../ui/CategoryFilter'
+import { useProductCategories } from '../../hooks/useProductCategories'
 import type { CreatePOPayload, CreatePOResult, POLineInput } from '../../types/procurement'
 
 interface Supplier {
@@ -9,6 +12,7 @@ interface Supplier {
 }
 
 interface NomItem {
+  category_id?: string | null
   id: string
   product_code: string
   name: string
@@ -51,6 +55,42 @@ export function PurchaseOrderForm({
   ])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [catFilter, setCatFilter] = useState<{
+    categoryId: string | null
+    subCategoryId: string | null
+  }>({ categoryId: null, subCategoryId: null })
+
+  const { mainCategories, subCategoriesOf, pathOf, mainCategoryIdOf } = useProductCategories()
+
+  const supplierOptions: SearchableOption[] = useMemo(
+    () => suppliers.map((s) => ({ value: s.id, label: s.name })),
+    [suppliers],
+  )
+
+  /** Items left after the category/subcategory filter. */
+  const filteredItems = useMemo(() => {
+    if (!catFilter.categoryId && !catFilter.subCategoryId) return items
+    return items.filter((i) => {
+      if (catFilter.subCategoryId) return i.category_id === catFilter.subCategoryId
+      return mainCategoryIdOf(i.category_id ?? null) === catFilter.categoryId
+    })
+  }, [items, catFilter, mainCategoryIdOf])
+
+  /**
+   * The readable line is the CATEGORY, not the product code: codes are often
+   * RAW-AUTO-0b4e881a, which tells a human nothing. The code stays searchable
+   * via `keywords` for anyone reading it off a supplier invoice.
+   */
+  const itemOptions: SearchableOption[] = useMemo(
+    () =>
+      filteredItems.map((i) => ({
+        value: i.id,
+        label: i.name,
+        sublabel: pathOf(i.category_id ?? null) ?? 'Uncategorized',
+        keywords: i.product_code,
+      })),
+    [filteredItems, pathOf],
+  )
 
   useEffect(() => {
     async function load() {
@@ -58,8 +98,10 @@ export function PurchaseOrderForm({
         supabase.from('suppliers').select('id, name').eq('is_deleted', false).order('name'),
         supabase
           .from('nomenclature')
-          .select('id, product_code, name, base_unit')
-          .or('product_code.ilike.RAW-%,product_code.ilike.PF-%')
+          // Only RAW is purchasable. PF/MOD/SALE are produced in-house — you
+          // cannot order our own hummus from a supplier (QA, 2026-07-28).
+          .select('id, product_code, name, base_unit, category_id')
+          .ilike('product_code', 'RAW-%')
           .eq('is_deleted', false)
           .order('product_code'),
       ])
@@ -85,7 +127,7 @@ export function PurchaseOrderForm({
     const ids = initialLines.map((l) => l.nomenclature_id)
     supabase
       .from('nomenclature')
-      .select('id, product_code, name, base_unit')
+      .select('id, product_code, name, base_unit, category_id')
       .in('id', ids)
       .then(({ data }) => {
         if (!data) return
@@ -210,18 +252,14 @@ export function PurchaseOrderForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-[11px] text-cream/45">Supplier</label>
-          <select
+          <SearchableSelect
+            label="Supplier"
             value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
-            className="h-9 w-full rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-3 text-xs text-cream outline-none focus:border-forest-soft"
-          >
-            <option value="">Select...</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            onChange={setSupplierId}
+            options={supplierOptions}
+            placeholder="Select…"
+            emptyText="No supplier matches"
+          />
         </div>
         <div>
           <label className="mb-1 block text-[11px] text-cream/45">Expected Date</label>
@@ -237,20 +275,30 @@ export function PurchaseOrderForm({
       {/* Line items */}
       <div className="space-y-2">
         <label className="block text-[11px] text-cream/45">Items</label>
+        <CategoryFilter
+          categoryId={catFilter.categoryId}
+          subCategoryId={catFilter.subCategoryId}
+          onChange={setCatFilter}
+          mainCategories={mainCategories}
+          subCategoriesOf={subCategoriesOf}
+          countLabel={
+            filteredItems.length === items.length
+              ? undefined
+              : `${filteredItems.length} of ${items.length}`
+          }
+        />
         {lines.map((line, idx) => (
           <div key={idx} className="flex items-start gap-2">
-            <select
-              value={line.nomenclature_id}
-              onChange={(e) => updateLine(idx, { nomenclature_id: e.target.value })}
-              className="h-9 min-w-0 flex-1 rounded-md border border-[var(--line-strong)] bg-[var(--s-2)] px-2 text-xs text-cream outline-none focus:border-forest-soft"
-            >
-              <option value="">Select item...</option>
-              {items.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.product_code} — {i.name}
-                </option>
-              ))}
-            </select>
+            <div className="min-w-0 flex-1">
+              <SearchableSelect
+                label={`Item ${idx + 1}`}
+                value={line.nomenclature_id}
+                onChange={(v) => updateLine(idx, { nomenclature_id: v })}
+                options={itemOptions}
+                placeholder="Select item…"
+                emptyText="No product matches"
+              />
+            </div>
             <input
               type="number"
               value={line.qty_ordered}
