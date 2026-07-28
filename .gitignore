@@ -102,6 +102,12 @@ POSsystem/
 services/supabase/.temp/
 services/supabase/supabase/
 
+# Supabase CLI scratch state at the repo root. The CLI rewrites these on every
+# command (version strings, linked-project ref, pooler URL), so tracking them
+# means routine `supabase` calls show up as pending changes forever. Same intent
+# as services/supabase/.temp/ above — the root copy just slipped past it.
+supabase/.temp/
+
 # Git worktrees for parallel manual sessions
 .worktrees/
 
