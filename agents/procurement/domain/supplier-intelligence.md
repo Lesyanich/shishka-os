@@ -29,8 +29,13 @@
 - **Slice counts (matters more than weight):** 360 g loaf = 9 slices × 1.9 cm, 360 g *sandwich* loaf = 7 slices × 1.6 cm, 120 g = 6 slices × 1.3 cm, 200 g soft = 5 slices
 - **Lead time:** bakes to order. Dispatch rounds Mon/Tue/Wed/Fri/Sat, 14:00 cut-off; parcel lands 1-2 days after dispatch ⇒ ~3 days to Phuket
 - **Delivery fee / MOQ:** NOT published on the storefront — must be asked in LINE chat. **Open question.**
-- **Also at Makro:** 5 of the 21 SKUs, at **identical shelf prices** (827005/827008 ฿69, 827010/827011 ฿99, 827017 French ฿39). Makro is the same price + instant, but carries 1-4 units at ST166 Rawai and stocks none of the specialty loaves.
-- **Ruling:** buy the 4 core whole-wheat SKUs at Makro when in stock; LINE is only worth the wait for range (sourdough / rye / pumpkin / vegan) or for volume the shelf cannot cover.
+- **Brand total = 24 SKUs across 4 channels** (LINE 21 / Gourmet Market 15 / Tops 11 / Makro 5). Three exist at retail only, never on LINE: Dark Cocoa 120 g, Banana & Honey 195 g, Original Big Slice.
+- **"Sweet" line = flavoured bread, not confectionery.** Red Velvet (beetroot juice), Dark Cocoa, Banana & Honey. No cookies/cakes/brownies exist under this brand.
+- **Price parity, with one exception:** the 360 g / 300 g range is ฿69/79/99/109 on every channel. The **120 g "Cubic Fit" line is ฿4-10 cheaper at Gourmet Market** than on the brand's own LINE shop (Original ฿33 vs ฿39, Red Velvet ฿35 vs ฿45).
+- **Best Phuket channel = Tops**, not Makro: 11 SKUs at 7-10 units each vs Makro's 5 SKUs at 1-4 units, same prices. Makro price is branch-verified (ST166); the Tops figure is tops.co.th online and the site warns branch prices differ.
+- **Composition:** no channel publishes a label-level ingredient list — Tops, Gourmet Market and Big C all render an empty "Ingredients" field, and `cubicbread.com` is offline (resolves to 127.0.0.1). Only marketing-level attributes are available. Read the ส่วนประกอบ off the physical pack.
+- **Allergens (from Big C spec):** contains wheat gluten + **milk and real butter**; NO eggs, no bleached sugar, 0% cholesterol. Dairy-free exceptions: the "JAE/vegetarian" Multi-Grain Sandwich, Vegan Precious Seed, and Organic Pumpkin (oat milk).
+- **Ruling:** buy the core whole-wheat SKUs at Tops or Makro; LINE is only worth the wait for the LINE-exclusive specialty loaves (sourdough / mixed-nuts rye / organic pumpkin) or for volume the shelf cannot cover.
 
 ### Sangdamrong
 
