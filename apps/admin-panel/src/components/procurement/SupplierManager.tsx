@@ -1,5 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useOptimistic, useState } from 'react'
-import { ChevronDown, ChevronRight, Loader2, Package, Plus, Save, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Loader2, Package, Plus, Save, Trash2, Upload, X } from 'lucide-react'
 import {
   useSuppliers,
   WEEKDAYS,
@@ -25,10 +25,15 @@ function SupplierProductsPanel({
   supplierId,
   supplierName,
   fetchProducts,
+  importOpen,
+  onImportOpenChange,
 }: {
   supplierId: string
   supplierName: string
   fetchProducts: (id: string) => Promise<SupplierProduct[]>
+  /** Driven from the collapsed row's Import button so one click gets there. */
+  importOpen: boolean
+  onImportOpenChange: (next: boolean) => void
 }) {
   const [rows, setRows] = useState<SupplierProduct[] | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -46,6 +51,8 @@ function SupplierProductsPanel({
     <CatalogImportPanel
       supplierId={supplierId}
       supplierName={supplierName}
+      open={importOpen}
+      onOpenChange={onImportOpenChange}
       onImported={() => setReloadKey((k) => k + 1)}
     />
   )
@@ -113,6 +120,10 @@ export function SupplierManager() {
 
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  // Which supplier's import panel is open. Lives here, not inside the card, so
+  // the collapsed row's Import button can expand the card AND open the panel in
+  // one click — buried at the bottom of the expanded card, nobody found it.
+  const [importForId, setImportForId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -254,12 +265,30 @@ export function SupplierManager() {
                           if (next && next.trim()) void commitPatch(s.id, { name: next })
                         }}
                       />
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-cream/45">
+                      {/* The meta line doubles as the expand target — the name
+                          itself opens inline edit, so clicking a supplier used
+                          to do nothing visible unless you hit the chevron. */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedId(expanded ? null : s.id)}
+                        className="mt-0.5 flex w-full flex-wrap items-center gap-x-3 gap-y-0.5 text-left text-[11px] text-cream/45 hover:text-cream/70"
+                      >
                         {s.phone && <span>{s.phone}</span>}
                         <span>🚚 {deliverySummary(s)}</span>
                         {s.lead_time_days != null && <span>lead {s.lead_time_days}d</span>}
-                      </div>
+                      </button>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpandedId(s.id)
+                        setImportForId(s.id)
+                      }}
+                      className="inline-flex h-7 items-center rounded-md border border-forest-soft/60 bg-forest-soft/10 px-2.5 text-[11px] font-medium text-mint-200 hover:bg-forest-soft/20"
+                    >
+                      <Upload className="mr-1 h-3 w-3" />
+                      Import
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(s)}
@@ -399,6 +428,10 @@ export function SupplierManager() {
                           supplierId={s.id}
                           supplierName={s.name}
                           fetchProducts={fetchSupplierProducts}
+                          importOpen={importForId === s.id}
+                          onImportOpenChange={(next) =>
+                            setImportForId(next ? s.id : null)
+                          }
                         />
                       </div>
                     </div>

@@ -66,12 +66,29 @@ interface Props {
   supplierId: string
   supplierName: string
   onImported?: () => void
+  /** Controlled open state. Omit to let the panel manage its own button. */
+  open?: boolean
+  onOpenChange?: (next: boolean) => void
 }
 
-export function CatalogImportPanel({ supplierId, supplierName, onImported }: Props) {
+export function CatalogImportPanel({
+  supplierId,
+  supplierName,
+  onImported,
+  open: openProp,
+  onOpenChange,
+}: Props) {
   const { isBusy, preview, result, error, runPreview, commit, reset } = useCatalogImport()
 
-  const [open, setOpen] = useState(false)
+  const [openState, setOpenState] = useState(false)
+  const open = openProp ?? openState
+  const setOpen = useCallback(
+    (next: boolean) => {
+      setOpenState(next)
+      onOpenChange?.(next)
+    },
+    [onOpenChange],
+  )
   const [mode, setMode] = useState<'paste' | 'single'>('paste')
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<ParsedCatalog | null>(null)
@@ -119,7 +136,7 @@ export function CatalogImportPanel({ supplierId, supplierName, onImported }: Pro
     setParsed(null)
     setColumns([])
     reset()
-  }, [reset])
+  }, [reset, setOpen])
 
   const args = useMemo(
     () => ({
