@@ -5,6 +5,7 @@ import { usePriceBook } from '../../hooks/usePriceBook'
 import type { PriceSummaryRow } from '../../types/priceBook'
 import { PriceBookTable } from './PriceBookTable'
 import { QuoteEntryModal } from './QuoteEntryModal'
+import { CatalogMatchQueue } from './CatalogMatchQueue'
 
 type GroupFilter = 'all' | 'multi' | 'packaging' | 'gap'
 
@@ -17,12 +18,16 @@ const FILTERS: ReadonlyArray<{ key: GroupFilter; label: string }> = [
 
 export function PriceBook() {
   const {
-    items, supplierNames, unlinkedCount, isLoading, error,
+    items, supplierNames, unlinkedCount, isLoading, error, refetch,
     fetchComparison, recordQuote, setCanonicalCost,
   } = usePriceBook()
   const [searchParams, setSearchParams] = useSearchParams()
   const [filter, setFilter] = useState<GroupFilter>('all')
   const [quoteItem, setQuoteItem] = useState<PriceSummaryRow | null>(null)
+  /** The matching queue is a sub-screen of the Price Book, reached from the
+   *  banner that reports what the table omits — the omission and its fix in
+   *  one place, rather than a tab nobody would think to open. */
+  const [matching, setMatching] = useState(false)
 
   const search = searchParams.get('q') ?? ''
   const setSearch = (q: string) => {
@@ -55,6 +60,19 @@ export function PriceBook() {
 
   const multiCount = useMemo(() => items.filter((it) => it.supplier_count >= 2).length, [items])
 
+  if (matching) {
+    return (
+      <CatalogMatchQueue
+        onBack={() => {
+          setMatching(false)
+          // The queue writes to supplier_catalog, so the rollups behind this
+          // table are stale by the time we come back.
+          refetch()
+        }}
+      />
+    )
+  }
+
   return (
     <section className="rounded-xl border border-[var(--line)] bg-[var(--s-1)] shadow-sm">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3">
@@ -72,10 +90,15 @@ export function PriceBook() {
           (po_lines.nomenclature_id is NOT NULL), so it renders nowhere — and
           without saying so, the table reads as the complete picture. */}
       {unlinkedCount > 0 && (
-        <p className="border-b border-[var(--line)] bg-[var(--s-2)] px-4 py-2 text-[11px] text-amber-300/80">
+        <button
+          type="button"
+          onClick={() => setMatching(true)}
+          className="block w-full border-b border-[var(--line)] bg-[var(--s-2)] px-4 py-2 text-left text-[11px] text-amber-300/80 transition hover:bg-[var(--s-3)] hover:text-amber-300"
+        >
           {unlinkedCount} supplier price{unlinkedCount === 1 ? '' : 's'} are not shown here — they
-          belong to products not yet linked to an item, so they cannot be compared or ordered yet.
-        </p>
+          belong to products not yet linked to an item, so they cannot be compared or ordered yet.{' '}
+          <span className="underline">Match them →</span>
+        </button>
       )}
 
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
