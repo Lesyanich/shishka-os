@@ -7,6 +7,36 @@
 
 echo "=== Shishka OS pre-commit checks ==="
 
+# Run a dev tool from the package we are standing in.
+#
+# Prefers node_modules/.bin over `npx`. `npx` goes through `npm exec`, which
+# spawns the tool through a shell — and on 2026-07-29 that failed on the CEO's
+# Mac with `spawn ELOOP` (errno -62) for EVERY tool, exiting 194 with no output
+# at all. The gates were healthy; only their runner was broken, and the hook
+# reported a bare "failed (code 194)" that pointed at nothing. Calling the local
+# binary skips npm exec entirely, and is faster besides.
+#
+# The npx fallback stays for the case where the tool genuinely is not installed
+# in that package — and prints where to look if npm exec is the thing failing.
+tool() {
+  name=$1
+  shift
+  if [ -x "./node_modules/.bin/$name" ]; then
+    "./node_modules/.bin/$name" "$@"
+    return $?
+  fi
+
+  npx "$name" "$@"
+  rc=$?
+  if [ $rc -ne 0 ]; then
+    echo "[hint] $name is not in $(pwd)/node_modules/.bin — ran it via npx, exit $rc."
+    echo "[hint] Empty output above means npm exec itself failed, not your code:"
+    echo "[hint]   ls -t ~/.npm/_logs/*debug-0.log | head -1   # the real error"
+    echo "[hint]   npm config set script-shell /bin/sh          # fixed the ELOOP case"
+  fi
+  return $rc
+}
+
 # --- 1. TypeScript strict check (admin-panel) ---
 # Use `tsc -b` (project-reference build mode) to MATCH the Vercel deploy build
 # (`npm run build` = tsc -b && vite build). Plain `tsc --noEmit` is weaker and
@@ -17,7 +47,7 @@ if git diff --cached --name-only | grep -q "^apps/admin-panel/"; then
   echo "[tsc] Checking admin-panel types (tsc -b, matches Vercel build)..."
   cd apps/admin-panel
   rm -rf tsconfig.tsbuildinfo tsconfig.app.tsbuildinfo tsconfig.node.tsbuildinfo
-  npx tsc -b
+  tool tsc -b
   TSC_EXIT=$?
   cd ../..
   if [ $TSC_EXIT -ne 0 ]; then
@@ -32,7 +62,7 @@ fi
 if git diff --cached --name-only --diff-filter=ACMR | grep -q "^apps/admin-panel/.*\.\(ts\|tsx\)$"; then
   echo "[eslint] Linting admin-panel..."
   cd apps/admin-panel
-  npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only --diff-filter=ACMR | grep "^apps/admin-panel/.*\.\(ts\|tsx\)$" | sed 's|^apps/admin-panel/||')
+  tool eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only --diff-filter=ACMR | grep "^apps/admin-panel/.*\.\(ts\|tsx\)$" | sed 's|^apps/admin-panel/||')
   ESLINT_EXIT=$?
   cd ../..
   if [ $ESLINT_EXIT -ne 0 ]; then
@@ -46,7 +76,7 @@ fi
 if git diff --cached --name-only | grep -q "^apps/kds/"; then
   echo "[tsc] Checking kds types..."
   cd apps/kds
-  npx tsc --noEmit
+  tool tsc --noEmit
   KDS_TSC_EXIT=$?
   cd ../..
   if [ $KDS_TSC_EXIT -ne 0 ]; then
@@ -61,7 +91,7 @@ fi
 if git diff --cached --name-only --diff-filter=ACMR | grep -q "^apps/kds/.*\.\(ts\|tsx\)$"; then
   echo "[eslint] Linting kds..."
   cd apps/kds
-  npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only --diff-filter=ACMR | grep "^apps/kds/.*\.\(ts\|tsx\)$" | sed 's|^apps/kds/||')
+  tool eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only --diff-filter=ACMR | grep "^apps/kds/.*\.\(ts\|tsx\)$" | sed 's|^apps/kds/||')
   KDS_ESLINT_EXIT=$?
   cd ../..
   if [ $KDS_ESLINT_EXIT -ne 0 ]; then
@@ -76,7 +106,7 @@ for MCP_SVC in mcp-chef mcp-finance mcp-mission-control; do
   if git diff --cached --name-only --diff-filter=ACMR | grep -q "^services/${MCP_SVC}/src/.*\.ts$"; then
     echo "[eslint] Linting ${MCP_SVC} domain boundaries..."
     cd "services/${MCP_SVC}"
-    npx eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only --diff-filter=ACMR | grep "^services/${MCP_SVC}/src/.*\.ts$" | sed "s|^services/${MCP_SVC}/||")
+    tool eslint --max-warnings 0 $(cd ../.. && git diff --cached --name-only --diff-filter=ACMR | grep "^services/${MCP_SVC}/src/.*\.ts$" | sed "s|^services/${MCP_SVC}/||")
     MCP_LINT_EXIT=$?
     cd ../..
     if [ $MCP_LINT_EXIT -ne 0 ]; then
