@@ -11,17 +11,25 @@ interface UpdateTaskArgs {
   tags?: string[];
   context_files?: string[];
   parent_task_id?: string | null;
+  initiative_id?: string | null;
   related_ids?: Record<string, string | number | boolean>;
   assigned_to?: string;
+}
+
+interface InitiativeRef {
+  id: string;
+  title: string;
+  status: string;
 }
 
 export async function updateTask(args: UpdateTaskArgs) {
   const sb = getSupabase();
 
-  // 1. Fetch current task (need related_ids for merge semantics)
+  // 1. Fetch current task (need related_ids for merge semantics, tags +
+  //    initiative_id for the RULE-EPIC-ON-CREATE detach check)
   const { data: current, error: fetchErr } = await sb
     .from("business_tasks")
-    .select("id, title, status, priority, related_ids")
+    .select("id, title, status, priority, related_ids, initiative_id, tags")
     .eq("id", args.task_id)
     .single();
 
@@ -44,7 +52,23 @@ export async function updateTask(args: UpdateTaskArgs) {
     }
   }
 
-  // 3. Validate related_ids primitives (same rule as emit_business_task)
+  // 3. If initiative_id provided and non-null, verify it exists
+  //    (same guard as emit_business_task). Reuse the fetched row for the
+  //    response so re-filing costs no extra query.
+  let initiative: InitiativeRef | null = null;
+  if (args.initiative_id) {
+    const { data: init } = await sb
+      .from("business_initiatives")
+      .select("id, title, status")
+      .eq("id", args.initiative_id)
+      .single();
+    if (!init) {
+      return { error: `Initiative not found: ${args.initiative_id}` };
+    }
+    initiative = init as InitiativeRef;
+  }
+
+  // 4. Validate related_ids primitives (same rule as emit_business_task)
   if (args.related_ids) {
     for (const [key, val] of Object.entries(args.related_ids)) {
       if (val !== null && typeof val === "object") {
@@ -55,7 +79,7 @@ export async function updateTask(args: UpdateTaskArgs) {
     }
   }
 
-  // 4. Build update object (only provided fields)
+  // 5. Build update object (only provided fields)
   const update: Record<string, any> = {};
   if (args.status) update.status = args.status;
   if (args.priority) update.priority = args.priority;
@@ -66,6 +90,7 @@ export async function updateTask(args: UpdateTaskArgs) {
   if (args.tags !== undefined) update.tags = args.tags;
   if (args.context_files !== undefined) update.context_files = args.context_files;
   if (args.parent_task_id !== undefined) update.parent_task_id = args.parent_task_id;
+  if (args.initiative_id !== undefined) update.initiative_id = args.initiative_id;
   if (args.assigned_to !== undefined) update.assigned_to = args.assigned_to;
 
   // related_ids: merge with existing (JSONB bag semantics — add/replace keys,
@@ -79,20 +104,46 @@ export async function updateTask(args: UpdateTaskArgs) {
     return { error: "No fields to update. Provide at least one field." };
   }
 
-  // 3. Update
+  // 6. Update
   const { data, error } = await sb
     .from("business_tasks")
     .update(update)
     .eq("id", args.task_id)
-    .select("id, title, status, priority, updated_at")
+    .select("id, title, status, priority, initiative_id, assigned_to, updated_at")
     .single();
 
   if (error) return { error: `DB error: ${error.message}` };
 
+  // 7. Epic re-filing report. `initiative` is returned only when this call
+  //    touched initiative_id — the common update (status/phase/notes) stays a
+  //    single round-trip. Shape mirrors get_task's `initiative`.
+  const refiled = args.initiative_id !== undefined;
+  const initiativeChanged = refiled && args.initiative_id !== current.initiative_id;
+
+  let epicNote = "";
+  if (initiativeChanged) {
+    epicNote = args.initiative_id
+      ? ` → re-filed under initiative "${initiative?.title ?? args.initiative_id}"`
+      : " → detached from initiative";
+  }
+
+  // RULE-EPIC-ON-CREATE: a task must end up either linked to an initiative or
+  // tagged kind:standalone. Detaching without that tag creates the forbidden
+  // third state — warn rather than silently allow it.
+  const effectiveTags: string[] =
+    (args.tags ?? (current.tags as string[] | null) ?? []);
+  const warning =
+    refiled && !args.initiative_id && !effectiveTags.includes("kind:standalone")
+      ? "RULE-EPIC-ON-CREATE: task now has neither an initiative nor a 'kind:standalone' tag. " +
+        "Add the tag or link an initiative."
+      : undefined;
+
   return {
     success: true,
     task: data,
+    ...(refiled ? { initiative: data.initiative_id ? initiative : null } : {}),
+    ...(warning ? { warning } : {}),
     change: `${current.status} → ${data.status}`,
-    message: `Updated task: "${data.title}" [${data.status}]`,
+    message: `Updated task: "${data.title}" [${data.status}]${epicNote}`,
   };
 }
