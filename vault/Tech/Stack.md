@@ -23,7 +23,6 @@ Source: `TECH_STACK.md`, `PROJECT_MAP.md`, Auto Memory `project_admin_panel_stac
 | **Vite** | 7 | Build tool + dev server. NOT Next.js (verify via `vite.config.ts`) |
 | **Tailwind CSS** | v4 | Utility-first, with `@theme` block in `apps/admin-panel/src/index.css` |
 | **Recharts** | latest | Data visualization (Brain Cost, Quality, Finance Analytics) |
-| **vis-network** + **vis-data** | 10 / 8 | Knowledge graph rendering on `/brain` (Map tab) |
 | **Sentry** | 10 | Error monitoring |
 | **lucide-react** | 0.577 | Icon set |
 | **react-markdown + remark-gfm + gray-matter** | latest | Vault wiki rendering on `/brain/wiki` |
