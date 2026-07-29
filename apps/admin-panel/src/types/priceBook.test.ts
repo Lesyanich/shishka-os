@@ -17,6 +17,7 @@ describe('priceBook types', () => {
       avg_price: 2.35,
       best_supplier: 'Sangdamrong',
       spread_pct: 23.8,
+      priced_supplier_count: 1,
     }
     expect(row.item_group).toBe('packaging')
     expect(row.supplier_count).toBe(2)
@@ -31,6 +32,7 @@ describe('priceBook types', () => {
       supplier_name: 'Makro',
       last_seen_price: 2.5,
       unit_cost: 2.5,
+      pack_known: true,
       source_family: fam,
       product_name: null,
       original_name: null,

@@ -92,7 +92,20 @@ function SupplierRows({
               <td
                 className={`py-2 pr-3 text-right tabular-nums ${isBest ? 'text-mint-200' : 'text-cream'}`}
               >
-                {fmtMoney(r.unit_cost, baseUnit)}
+                {/* No pack size, no per-unit price. Until mig 388 this cell
+                    showed the pack price as if it were a unit price, so a 5 kg
+                    sack read the same as a 500 g bag. Saying "unknown" is the
+                    honest answer, and it is also what gets it fixed. */}
+                {r.pack_known ? (
+                  fmtMoney(r.unit_cost, baseUnit)
+                ) : (
+                  <span
+                    className="text-[10px] text-amber-300/70"
+                    title={`Quoted ${r.last_seen_price ?? '—'} ฿, but the pack size is unknown — no comparable per-${baseUnit ?? 'unit'} price can be derived.`}
+                  >
+                    pack size unknown
+                  </span>
+                )}
               </td>
               <td className="py-2 pr-4 text-right">
                 <button
@@ -178,11 +191,27 @@ export function PriceBookTable({
                           pkg
                         </span>
                       )}
+                      {it.item_group === 'resale' && (
+                        <span className="rounded bg-[var(--s-3)] px-1 text-[9px] uppercase text-cream/60">
+                          resale
+                        </span>
+                      )}
                     </button>
                     <span className="ml-5 block text-[10px] text-cream/30">{it.product_code}</span>
                   </td>
                   <td className="py-2.5 pr-3 text-center tabular-nums text-cream/80">
                     {it.supplier_count}
+                    {/* Offers held vs offers we can actually compare. Showing
+                        only the first number implied every one of them carried
+                        a usable price. */}
+                    {it.priced_supplier_count < it.supplier_count && (
+                      <span
+                        className="block text-[9px] text-amber-300/70"
+                        title={`${it.supplier_count - it.priced_supplier_count} of these have no pack size, so they cannot be compared`}
+                      >
+                        {it.priced_supplier_count} priced
+                      </span>
+                    )}
                   </td>
                   <td className="py-2.5 pr-3 text-right tabular-nums text-mint-200">
                     {fmtMoney(it.best_price, it.base_unit)}

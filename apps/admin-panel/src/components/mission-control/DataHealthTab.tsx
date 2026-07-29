@@ -31,6 +31,21 @@ interface MetricMeta {
 }
 
 const METRIC_META: Record<HealthMetricKey, MetricMeta> = {
+  catalog_pack_unknown: {
+    label: 'Pack size unknown',
+    description: 'Priced supplier rows with no pack size — no honest per-unit price exists',
+    entityScope: 'supplier_catalog',
+  },
+  catalog_unlinked: {
+    label: 'Unlinked catalog rows',
+    description: 'Supplier prices for products not linked to any item — cannot be compared or ordered',
+    entityScope: 'supplier_catalog',
+  },
+  catalog_stale_price: {
+    label: 'Stale catalog prices',
+    description: 'Supplier prices not re-checked in 90 days but still presented as current',
+    entityScope: 'supplier_catalog',
+  },
   type_mismatch: {
     label: 'Type mismatch',
     description: 'RAW-coded rows with non-raw type',

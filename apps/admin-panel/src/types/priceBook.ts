@@ -1,5 +1,5 @@
 export type SourceFamily = 'quote' | 'receipt' | 'scrape' | 'manual'
-export type ItemGroup = 'packaging' | 'ingredient'
+export type ItemGroup = 'packaging' | 'ingredient' | 'resale'
 
 /** One row of v_price_comparison_summary — a single item with rolled-up stats. */
 export interface PriceSummaryRow {
@@ -9,7 +9,14 @@ export interface PriceSummaryRow {
   base_unit: string | null
   current_cost: number | null
   item_group: ItemGroup
+  /** Offers we hold for this item, comparable or not. */
   supplier_count: number
+  /**
+   * Offers with an honest per-unit price (mig 388). Lower than `supplier_count`
+   * whenever a supplier's pack size is unknown — that gap is the item's data
+   * debt, and the UI must show it rather than implying every offer is priced.
+   */
+  priced_supplier_count: number
   best_price: number | null
   worst_price: number | null
   avg_price: number | null
@@ -24,7 +31,14 @@ export interface PriceQuoteRow {
   supplier_id: string
   supplier_name: string
   last_seen_price: number | null
+  /**
+   * Per-base-unit price, or NULL when the pack size is unknown (mig 388).
+   * Never fall back to `last_seen_price` here — that was exactly the old bug:
+   * a pack price shown as if it were a unit price.
+   */
   unit_cost: number | null
+  /** False = we do not know what the quoted price buys. */
+  pack_known: boolean
   source_family: SourceFamily
   product_name: string | null
   original_name: string | null
