@@ -339,7 +339,7 @@ Never let a widget crash on null.
 | Layer | Mechanism | Strength |
 |---|---|---|
 | 1. Rule | this section + the CEO guide | agents read it |
-| 2. Local hook | `.claude/hooks/git-guard-pretool.sh` (PreToolUse/Bash): **hard-blocks** local `main` mutations (commit/merge/cherry-pick/revert) and any push targeting `main`; **warns** on off-convention branch names (only until the branch has an upstream — after the first push a rename would break the PR) | blocks any Claude session in the terminal |
+| 2. Local hook | `.claude/hooks/git-guard-pretool.sh` (PreToolUse/Bash): **hard-blocks** local `main` mutations (commit/merge/cherry-pick/revert) and any push targeting `main`; **warns** on off-convention branch names (only until the branch has an upstream — after the first push a rename would break the PR). **Scoped to THIS repo** — it resolves the target of a `cd …`/`git -C …` command and stays silent for other repos (the agent-memory store, dotfiles), since their `main` is nobody's production; all shishka-os worktrees stay in scope | blocks any Claude session in the terminal |
 | 3. GitHub settings | branch protection on `main` (block direct push), squash-only merge, required CI checks, auto-delete head branches | server-side; applies to everyone, cannot be bypassed by a prompt |
 
 Layer 3 is set once in the GitHub UI (the proxy blocks settings writes from
