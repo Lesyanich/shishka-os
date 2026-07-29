@@ -13,7 +13,7 @@
 02_Obsidian_Vault/_Archive/CLAUDE_TASK.md
 02_Obsidian_Vault/_Archive/CLAUDE_COMMANDS.md
 
-# Binary / media files — graphify must not vision/transcribe these.
+# Binary / media files — Claude must not vision/transcribe these.
 # Owner decision: no auto-analysis of receipt images, location videos,
 # branding PDFs, or scanned books — the cost-to-knowledge ratio is bad.
 *.webp
@@ -64,12 +64,9 @@ POSsystem/
 # Archived code experiments
 _archive/
 
-# graphify's own intermediate output (don't index your own indexer)
-graphify-out/
-
-# Transactional / fixture data — graphify must NOT pull these into the Brain.
-# Receipt line-items as nodes pollute the knowledge graph (see BrainKnowledgePage
-# EXCLUDED_SOURCE_PATTERNS for the runtime safety net).
+# Transactional / fixture data — Claude must not pull these into context.
+# Thousands of near-identical receipt line-items crowd out the files that
+# actually answer the question.
 services/supabase/migrations/*backfill*
 agents/*/examples/
 agents/finance/RECEIPT_PROCESSING_PROMPT_v1_archive.md

@@ -59,14 +59,12 @@ TARGETS=(
   "services/mcp-mission-control/node_modules"
   "services/mcp-finance/node_modules"
   "services/mcp-chef/node_modules"
-  "services/mcp-graphify/node_modules"
   "tools/gdrive-sync/node_modules"
 
   # Python virtual envs (python -m venv regenerates)
   "venv"
   "services/mempalace/.venv"
   "services/brain/.venv"
-  "services/graphify/.venv"
 
   # Build output (npm run build regenerates)
   "apps/admin-panel/dist"
@@ -75,7 +73,6 @@ TARGETS=(
   "services/mcp-chef/dist"
   "services/mcp-finance/dist"
   "services/mcp-mission-control/dist"
-  "services/mcp-graphify/dist"
 )
 
 # Also catch any other build/cache artifacts we forgot, scoped to known dirs.

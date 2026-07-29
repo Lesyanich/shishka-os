@@ -8,9 +8,7 @@ coverage
 
 # Lockfiles & generated artifacts
 package-lock.json
-graphify-out
 **/public/vault.json
-**/public/graph.json
 
 # Generated / vendored data
 vault/**/*.json
