@@ -331,6 +331,9 @@ Every routing comment from one agent to another on a task with `executor_type = 
 - Status updates on an already-scoped task
 - Questions or clarifications between agents
 - Closing comments (SHA + summary, not new scope)
+- **Below-threshold inline execution** — an agent executing a change of **≤2 files with no migration** in its own session. There is no routing, therefore no packet: the agent commits directly and records the outcome on the MC task. Everything above that (3+ files, any migration, `kind:` security / rls / rpc-backend / feature, or a front-end surface under the CEO preview gate) requires a full packet and a fresh executing session. See `agents/tech-lead/AGENT.md` § Execution Split. Decided 2026-07-29 by CEO; MC task `b0458627`.
+
+> **`/code` is not a command.** `executor_type = "code"` is a task attribute, not something the CEO can type — no such slash command has ever existed. Routing to an executing agent means handing the CEO an MC task id to open in a **new session**. Never write `/code <id>` in a report or handoff.
 
 ### CEO delivery gate (front-end tasks: `apps/admin-panel`, `apps/web`, `apps/kds`)
 
