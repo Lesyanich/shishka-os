@@ -166,7 +166,7 @@ Supabase Postgres is the **single source of truth** — everything else (admin, 
 | **Access / RLS** | auth, roles, row-level security | [[Database/RLS Policies]] |
 
 <!-- AUTO:tables START -->
-[[Database/Schema]]'s Tables Index documents **38 core tables** — a curated subset, not the full live schema (the live DB carries more). Full schema, RLS and RPCs live in the [[Database/]] folder; this map does not duplicate them.
+[[Database/Schema]]'s Tables Index documents **45 core tables** — a curated subset, not the full live schema (the live DB carries more). Full schema, RLS and RPCs live in the [[Database/]] folder; this map does not duplicate them.
 <!-- AUTO:tables END -->
 
 Contracts, migrations and RPCs: [[Database/Domain Contracts]] · [[Database/Migrations]] · [[Database/RPC Catalog]].
@@ -190,5 +190,5 @@ There is **no knowledge-graph shortcut** — use **grep + targeted `Read`** (or 
 
 ---
 <!-- AUTO:stamp START -->
-_Auto sections regenerated from the repo at commit `06fee44c`. Re-run: `node scripts/gen-project-map.mjs`._
+_Auto sections regenerated from the repo at commit `34f07d61`. Re-run: `node scripts/gen-project-map.mjs`._
 <!-- AUTO:stamp END -->

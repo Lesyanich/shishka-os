@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ChevronLeft, Send, XCircle, DollarSign, Phone, MessageCircle, Globe,
   ClipboardCopy, BarChart3, Plus, Camera, Check, ClipboardCheck,
+  Trash2, Eye, EyeOff,
 } from 'lucide-react'
 import { POTimeline } from './POTimeline'
 import { POLineEditor } from './POLineEditor'
@@ -78,12 +79,17 @@ interface Props {
   onReceive?: (order: PurchaseOrder) => void
   onOpenSupplierCatalog?: (supplierId: string) => void
   onOpenSupplierCard?: (supplierId: string) => void
+  /** Permanent, drafts only — the RPC is the guard, this is just the button. */
+  onDelete?: (poId: string) => Promise<{ ok: boolean; error?: string }>
+  /** Hide/unhide a finished order on the desk. */
+  onArchive?: (poId: string, archived: boolean) => Promise<{ ok: boolean; error?: string }>
 }
 
 export function PODetail({
   order, onBack, fetchLines, updateStatus, updatePO,
   fetchLinkedReceipts, parseLinkedReceipt, attachReceipt, fetchReceivedSummary,
   stations, myName, onReconcile, onReceive, onOpenSupplierCatalog, onOpenSupplierCard,
+  onDelete, onArchive,
 }: Props) {
   const [lines, setLines] = useState<POLine[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -255,10 +261,33 @@ export function PODetail({
     [order.id, updateStatus, onBack],
   )
 
+  // Cancelling is NOT irreversible — the order stays, and can then be archived.
+  // The genuinely irreversible action is deleting a draft, below. Saying "cannot
+  // be undone" here trained the reader to ignore the warning where it counts.
   const handleCancel = useCallback(async () => {
-    if (!confirm(`Cancel ${order.po_number}? This cannot be undone.`)) return
+    if (!confirm(`Cancel ${order.po_number}? The order stays on record and can then be archived.`))
+      return
     await handleStatusChange('cancelled')
   }, [order.po_number, handleStatusChange])
+
+  /** Drafts only. The status and reference guards live in fn_delete_purchase_order. */
+  const handleDelete = useCallback(async () => {
+    if (!onDelete) return
+    if (!confirm(`Delete ${order.po_number} permanently? This cannot be undone.`)) return
+    setIsBusy(true)
+    const result = await onDelete(order.id)
+    setIsBusy(false)
+    // On success the parent leaves the detail screen; the order is gone.
+    if (!result.ok) setError(result.error ?? 'Could not delete the order')
+  }, [onDelete, order.id, order.po_number])
+
+  const handleArchiveToggle = useCallback(async () => {
+    if (!onArchive) return
+    setIsBusy(true)
+    const result = await onArchive(order.id, order.archived_at == null)
+    setIsBusy(false)
+    if (!result.ok) setError(result.error ?? 'Could not change the archive state')
+  }, [onArchive, order.id, order.archived_at])
 
   const handleCopyOrder = useCallback(async () => {
     try {
@@ -738,6 +767,33 @@ export function PODetail({
           >
             <XCircle className="h-3.5 w-3.5" />
             Cancel order
+          </button>
+        )}
+
+        {/* Destructive, and deliberately the only place it exists. Drafts have
+            never been shown to the other side, so nothing downstream refers to
+            them — fn_delete_purchase_order re-checks both facts anyway. */}
+        {order.status === 'draft' && onDelete && (
+          <button
+            onClick={handleDelete}
+            disabled={isBusy}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-brick-soft/40 py-2.5 text-xs text-brick-bright transition hover:bg-brick-soft/10 active:scale-[0.99] disabled:opacity-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete draft permanently
+          </button>
+        )}
+
+        {/* Hiding a finished order — the card leaves the desk, the record does
+            not. Still reachable by its own URL and under "show archived". */}
+        {['cancelled', 'reconciled'].includes(order.status) && onArchive && (
+          <button
+            onClick={handleArchiveToggle}
+            disabled={isBusy}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--s-3)] py-2.5 text-xs text-cream/60 transition hover:text-cream active:scale-[0.99] disabled:opacity-50"
+          >
+            {order.archived_at ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {order.archived_at ? 'Unhide from Order Desk' : 'Hide from Order Desk'}
           </button>
         )}
       </div>

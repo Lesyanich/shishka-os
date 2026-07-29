@@ -84,6 +84,14 @@ export interface UsePurchaseOrdersResult {
   isCreating: boolean
   updateStatus: (poId: string, status: POStatus) => Promise<boolean>
   updatePO: (poId: string, patch: UpdatePOPatch) => Promise<UpdatePOResult>
+  /** One order by id — for `?po=<uuid>` deep links the list does not carry. */
+  fetchOrderById: (poId: string) => Promise<PurchaseOrder | null>
+  /** Permanent — drafts only. The RPC refuses anything else. */
+  deletePO: (poId: string) => Promise<{ ok: boolean; error?: string }>
+  /** Hide/unhide a cancelled or reconciled order on the desk. */
+  archivePO: (poId: string, archived: boolean) => Promise<{ ok: boolean; error?: string }>
+  showArchived: boolean
+  setShowArchived: (next: boolean) => void
   fetchLines: (poId: string) => Promise<POLine[]>
   fetchLinkedReceipts: (poId: string) => Promise<LinkedReceipt[]>
   attachReceipt: (poId: string, storagePath: string, uploadedBy: string) => Promise<string | null>
@@ -103,6 +111,7 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
   const [stations, setStations] = useState<Station[]>([])
   const [myUserId, setMyUserId] = useState<string | null>(null)
   const [myName, setMyName] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   // Identity drives the author chip and the NEW badge.
   useEffect(() => {
@@ -152,13 +161,18 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
     if (!opts?.silent) setIsLoading(true)
     setError(null)
 
-    const query = supabase
+    let query = supabase
       .from('purchase_orders')
       .select(
-        'id, po_number, supplier_id, status, expected_date, delivery_window, notes, subtotal, discount_total, vat_amount, delivery_fee, grand_total, deliver_to_station_id, created_by, created_at',
+        'id, po_number, supplier_id, status, expected_date, delivery_window, notes, subtotal, discount_total, vat_amount, delivery_fee, grand_total, deliver_to_station_id, created_by, created_at, archived_at',
       )
       .order('created_at', { ascending: false })
       .limit(100)
+
+    // Archived orders are filtered server-side, not in JS: the 100-row window
+    // is the reason archiving exists at all, and a client-side filter would let
+    // hidden cards eat the slots they were archived to free.
+    if (!showArchived) query = query.is('archived_at', null)
 
     // Separate queries + JS join (RULE: no implicit .select('table(col)') joins).
     const [poRes, suppRes, staffRes] = await Promise.all([
@@ -234,12 +248,13 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
         supplier_line_id: supp?.line_id ?? null,
         supplier_website: supp?.website ?? null,
         supplier_default_delivery_fee: num(supp?.default_delivery_fee),
+        archived_at: p.archived_at,
       }
     })
 
     setOrders(merged)
     setIsLoading(false)
-  }, [])
+  }, [showArchived])
 
   useEffect(() => {
     fetchOrders()
@@ -278,6 +293,113 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
       return true
     },
     [],
+  )
+
+  /**
+   * One order by id, for a deep link (`?po=<uuid>`). The list is capped at 100
+   * rows and excludes archived orders, so without this an emailed link to an
+   * older or archived order opens a blank screen — which would make "archived"
+   * mean "lost", exactly what the archive flag was designed to avoid.
+   */
+  const fetchOrderById = useCallback(async (poId: string): Promise<PurchaseOrder | null> => {
+    const { data, error: qErr } = await supabase
+      .from('purchase_orders')
+      .select(
+        'id, po_number, supplier_id, status, expected_date, delivery_window, notes, subtotal, discount_total, vat_amount, delivery_fee, grand_total, deliver_to_station_id, created_by, created_at, archived_at',
+      )
+      .eq('id', poId)
+      .maybeSingle()
+
+    if (qErr || !data) return null
+
+    const [{ data: supp }, { count }] = await Promise.all([
+      supabase
+        .from('suppliers')
+        .select('name, phone, line_id, website, default_delivery_fee')
+        .eq('id', data.supplier_id)
+        .maybeSingle(),
+      supabase.from('po_lines').select('id', { count: 'exact', head: true }).eq('po_id', poId),
+    ])
+
+    const n = (v: unknown): number | null => (v == null ? null : Number(v))
+    return {
+      id: data.id,
+      po_number: data.po_number,
+      supplier_id: data.supplier_id,
+      supplier_name: supp?.name ?? 'Unknown',
+      status: data.status as POStatus,
+      expected_date: data.expected_date,
+      delivery_window: data.delivery_window,
+      notes: data.notes,
+      subtotal: n(data.subtotal),
+      discount_total: n(data.discount_total),
+      vat_amount: n(data.vat_amount),
+      delivery_fee: n(data.delivery_fee),
+      grand_total: n(data.grand_total),
+      deliver_to_station_id: data.deliver_to_station_id,
+      created_by: data.created_by,
+      author_name: null,
+      created_at: data.created_at,
+      line_count: count ?? 0,
+      supplier_phone: supp?.phone ?? null,
+      supplier_line_id: supp?.line_id ?? null,
+      supplier_website: supp?.website ?? null,
+      supplier_default_delivery_fee: n(supp?.default_delivery_fee),
+      archived_at: data.archived_at,
+    }
+  }, [])
+
+  /**
+   * Permanent removal of a DRAFT order (mig 387). The status and reference
+   * guards live in the RPC, not here — a disabled button is not a guard, and
+   * two of the FKs pointing at purchase_orders are ON DELETE SET NULL, so a
+   * bare delete would silently detach receiving and spend history instead of
+   * failing. The client only reports what the RPC decided.
+   */
+  const deletePO = useCallback(async (poId: string): Promise<{ ok: boolean; error?: string }> => {
+    const { data, error: rpcError } = await supabase.rpc('fn_delete_purchase_order', {
+      p_po_id: poId,
+    })
+    if (rpcError) return { ok: false, error: rpcError.message }
+    const result = (data as { ok: boolean; error?: string } | null) ?? {
+      ok: false,
+      error: 'No response from server',
+    }
+    if (!result.ok) return result
+
+    setOrders((prev) => prev.filter((o) => o.id !== poId))
+    return { ok: true }
+  }, [])
+
+  /**
+   * Hides/unhides a finished order on the desk (mig 387). `archived_at` is a
+   * column, never a `po_status` member — receiving, reconciliation and the
+   * timeline all switch on status, so widening that enum to mean "hidden"
+   * would quietly change their behaviour.
+   */
+  const archivePO = useCallback(
+    async (poId: string, archived: boolean): Promise<{ ok: boolean; error?: string }> => {
+      const { data, error: rpcError } = await supabase.rpc('fn_archive_purchase_order', {
+        p_po_id: poId,
+        p_archived: archived,
+      })
+      if (rpcError) return { ok: false, error: rpcError.message }
+      const result = (data as { ok: boolean; error?: string } | null) ?? {
+        ok: false,
+        error: 'No response from server',
+      }
+      if (!result.ok) return result
+
+      setOrders((prev) =>
+        showArchived
+          ? prev.map((o) =>
+              o.id === poId ? { ...o, archived_at: archived ? new Date().toISOString() : null } : o,
+            )
+          : prev.filter((o) => o.id !== poId),
+      )
+      return { ok: true }
+    },
+    [showArchived],
   )
 
   /**
@@ -540,8 +662,9 @@ export function usePurchaseOrders(): UsePurchaseOrdersResult {
   return {
     orders, isLoading, error, refetch: fetchOrders,
     createPO, isCreating,
-    updateStatus, updatePO, fetchLines,
+    updateStatus, updatePO, deletePO, archivePO, fetchLines, fetchOrderById,
     fetchLinkedReceipts, parseLinkedReceipt, attachReceipt, fetchReceivedSummary,
     stations, myUserId, myName,
+    showArchived, setShowArchived,
   }
 }

@@ -108,6 +108,11 @@ export interface PurchaseOrder {
   supplier_line_id: string | null
   supplier_website: string | null
   supplier_default_delivery_fee: number | null
+  /**
+   * Set = hidden from the Order Desk (mig 387). Presentation state, NOT a
+   * status — the order stays reachable by direct URL and under "show archived".
+   */
+  archived_at: string | null
 }
 
 export interface POLine {

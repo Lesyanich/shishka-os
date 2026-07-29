@@ -40,6 +40,7 @@ const baseOrder: PurchaseOrder = {
   supplier_line_id: null,
   supplier_website: null,
   supplier_default_delivery_fee: null,
+  archived_at: null,
 }
 
 function renderDetail(order: PurchaseOrder, over?: { updatePO?: Mock; lines?: POLine[] }) {
