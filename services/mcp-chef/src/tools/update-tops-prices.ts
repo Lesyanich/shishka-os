@@ -14,10 +14,14 @@
  * when the barcode already maps to one of our products (via supplier_catalog),
  * otherwise left null (still a useful price-book entry).
  *
- * Writes are scoped to the Tops supplier and done as delete-then-insert per
- * batch (the unique index on supplier_catalog is partial — `WHERE barcode IS
- * NOT NULL` — which makes ON CONFLICT upsert unreliable; delete+insert is
- * deterministic and only ever touches Tops rows).
+ * Writes go through `fn_import_supplier_catalog` (mig 393) — the single sink.
+ * This tool used to delete-then-insert its own rows and insert its own supplier
+ * row. Both were wrong once migrations 388/389 shipped: the delete discarded
+ * pack sizes entered by a human via fn_set_catalog_pack and "not ours" verdicts
+ * recorded via fn_dismiss_catalog_row, and the direct suppliers INSERT is the
+ * pattern that produced three Makro rows (fn_resolve_supplier exists for it).
+ * The RPC merges instead, so a sweep refreshes prices without erasing anything
+ * a person decided.
  *
  * Tops sits behind Cloudflare, so the fetch reuses the headless-browser layer
  * from search-tops-catalog (requires playwright).
@@ -27,27 +31,6 @@ import { getSupabase } from "../lib/supabase.js";
 import { fetchTopsProductsBySkus, type TopsProduct } from "./search-tops-catalog.js";
 
 const TOPS_SUPPLIER_NAME = "Tops";
-
-/** Find or create the "Tops" supplier row; returns its UUID. */
-async function ensureTopsSupplier(sb: ReturnType<typeof getSupabase>): Promise<string> {
-  const { data: existing, error: selErr } = await sb
-    .from("suppliers")
-    .select("id")
-    .ilike("name", TOPS_SUPPLIER_NAME)
-    .eq("is_deleted", false)
-    .limit(1)
-    .maybeSingle();
-  if (selErr) throw new Error(`suppliers lookup failed: ${selErr.message}`);
-  if (existing?.id) return existing.id as string;
-
-  const { data: inserted, error: insErr } = await sb
-    .from("suppliers")
-    .insert({ name: TOPS_SUPPLIER_NAME })
-    .select("id")
-    .single();
-  if (insErr) throw new Error(`could not create Tops supplier: ${insErr.message}`);
-  return inserted.id as string;
-}
 
 /**
  * Barcode variants for matching. Our catalog and Tops disagree on UPC-12 vs
@@ -74,12 +57,14 @@ interface MatchedPair {
   p: TopsProduct;
 }
 
-function buildRows(
-  pairs: MatchedPair[],
-  supplierId: string,
-  nomByBarcode: Map<string, string>,
-  nowIso: string,
-) {
+/**
+ * Rows in fn_import_supplier_catalog's payload shape. Note what is NOT here:
+ * no conversion_factor. Tops states a price and a title, not a pack size we can
+ * trust, and an assumed factor of 1 is exactly the fabricated unit price
+ * migration 388 removed. The rows land pack-unknown and show up in
+ * v_catalog_pack_missing until a human fills it in.
+ */
+export function buildRows(pairs: MatchedPair[], nomByBarcode: Map<string, string>) {
   const seen = new Set<string>();
   const rows: Record<string, unknown>[] = [];
   for (const { ourBarcode, p } of pairs) {
@@ -87,20 +72,16 @@ function buildRows(
     if (seen.has(ourBarcode)) continue;
     seen.add(ourBarcode);
     rows.push({
-      supplier_id: supplierId,
       // Store under OUR barcode so the Tops row lines up with our other
       // suppliers' rows for the same product (UPC/EAN forms reconciled).
       barcode: ourBarcode,
       nomenclature_id: nomByBarcode.get(ourBarcode) ?? null,
-      last_seen_price: p.price_thb,
-      product_name: p.name || null,
-      product_name_th: p.name_th || null,
+      price: p.price_thb,
+      name: p.name || null,
+      name_th: p.name_th || null,
       brand: p.brand || null,
       image_url: p.image_url || null,
       external_url: p.product_url || null,
-      source: "tops",
-      verified_at: nowIso,
-      updated_at: nowIso,
     });
   }
   return rows;
@@ -201,9 +182,7 @@ export async function updateTopsPrices(args: {
     if (l.nomenclature_id && !nomByBarcode.has(bc)) nomByBarcode.set(bc, l.nomenclature_id as string);
   }
 
-  const nowIso = new Date().toISOString();
-  const supplierId = await ensureTopsSupplier(sb);
-  const rows = buildRows(pairs, supplierId, nomByBarcode, nowIso);
+  const rows = buildRows(pairs, nomByBarcode);
   const matched = rows.filter((r) => r.nomenclature_id).length;
 
   const summary = {
@@ -216,26 +195,36 @@ export async function updateTopsPrices(args: {
   };
   const sample = rows.slice(0, 8).map((r) => ({
     barcode: r.barcode,
-    name: r.product_name,
-    price_thb: r.last_seen_price,
+    name: r.name,
+    price_thb: r.price,
     linked: !!r.nomenclature_id,
   }));
 
+  // 6. One sink for every catalog write (mig 393). p_dry_run maps straight
+  //    through, so the preview runs the same classification the commit will.
+  //    The supplier is resolved by name, not created here — with p_create tied
+  //    to dry-run inside the RPC, a preview cannot fork "Tops".
+  const { data, error: rpcErr } = await sb.rpc("fn_import_supplier_catalog", {
+    p_supplier_name: TOPS_SUPPLIER_NAME,
+    p_source: "scrape",
+    p_source_detail: `tops_sweep_${new Date().toISOString().slice(0, 10)}`,
+    p_rows: rows,
+    p_dry_run: !!args.dry_run,
+  });
+  if (rpcErr) return { error: `import failed: ${rpcErr.message}`, ...summary };
+  const res = (data ?? {}) as Record<string, unknown>;
+  if (res.ok === false) return { error: String(res.error ?? "import refused"), ...summary };
+
   if (args.dry_run) {
-    return { dry_run: true, ...summary, sample };
+    return { dry_run: true, ...summary, would_insert: res.inserted, would_update: res.updated, sample };
   }
-
-  // 4. Delete-then-insert (scoped to Tops supplier) — deterministic refresh.
-  const writeBarcodes = rows.map((r) => r.barcode as string);
-  const { error: delErr } = await sb
-    .from("supplier_catalog")
-    .delete()
-    .eq("supplier_id", supplierId)
-    .in("barcode", writeBarcodes);
-  if (delErr) return { error: `delete (pre-insert) failed: ${delErr.message}`, ...summary };
-
-  const { error: insErr } = await sb.from("supplier_catalog").insert(rows);
-  if (insErr) return { error: `insert failed: ${insErr.message}`, ...summary };
-
-  return { ok: true, ...summary, supplier_id: supplierId, sample };
+  return {
+    ok: true,
+    ...summary,
+    supplier_id: res.supplier_id,
+    inserted: res.inserted,
+    updated: res.updated,
+    pack_unknown: res.pack_unknown,
+    sample,
+  };
 }

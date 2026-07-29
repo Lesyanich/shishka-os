@@ -28,6 +28,59 @@ describe("barcodeVariants", () => {
   });
 });
 
+describe("buildRows", () => {
+  const product = (over: Record<string, unknown> = {}) => ({
+    barcode: "8850332111118",
+    sku: "T-1",
+    name: "Jasmine rice 5kg",
+    name_th: "ข้าวหอมมะลิ",
+    brand: "Royal Umbrella",
+    price_thb: 320,
+    image_url: null,
+    product_url: null,
+    ...over,
+  });
+
+  it("emits the fn_import_supplier_catalog payload shape", async () => {
+    const { buildRows } = await import("./update-tops-prices.js");
+    const rows = buildRows(
+      [{ ourBarcode: "8850332111118", p: product() as never }],
+      new Map([["8850332111118", "nom-uuid"]]),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      barcode: "8850332111118",
+      name: "Jasmine rice 5kg",
+      price: 320,
+      nomenclature_id: "nom-uuid",
+    });
+  });
+
+  it("never emits a conversion_factor — Tops states a price, not a pack size", async () => {
+    const { buildRows } = await import("./update-tops-prices.js");
+    const [row] = buildRows(
+      [{ ourBarcode: "8850332111118", p: product() as never }],
+      new Map(),
+    );
+    expect("conversion_factor" in row).toBe(false);
+    expect(row.nomenclature_id).toBeNull();
+  });
+
+  it("drops unpriced products and dedupes by our barcode", async () => {
+    const { buildRows } = await import("./update-tops-prices.js");
+    const rows = buildRows(
+      [
+        { ourBarcode: "A", p: product({ price_thb: 0 }) as never },
+        { ourBarcode: "B", p: product() as never },
+        { ourBarcode: "B", p: product({ price_thb: 999 }) as never },
+      ],
+      new Map(),
+    );
+    expect(rows.map((r) => r.barcode)).toEqual(["B"]);
+    expect(rows[0].price).toBe(320);
+  });
+});
+
 describe("updateTopsPrices", () => {
   it("rejects when neither barcodes nor sweep is given", async () => {
     const { updateTopsPrices } = await import("./update-tops-prices.js");

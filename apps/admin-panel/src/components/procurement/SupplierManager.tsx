@@ -10,6 +10,7 @@ import {
 } from '../../hooks/useSuppliers'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
 import { InlineEditCell } from '../menu/owner/InlineEditCell'
+import { CatalogImportPanel } from './CatalogImportPanel'
 
 function deliverySummary(s: Supplier): string {
   if (s.delivery_days.length === 0) return '—'
@@ -22,12 +23,15 @@ function deliverySummary(s: Supplier): string {
  * "sells N products" panel — only when the card is expanded. */
 function SupplierProductsPanel({
   supplierId,
+  supplierName,
   fetchProducts,
 }: {
   supplierId: string
+  supplierName: string
   fetchProducts: (id: string) => Promise<SupplierProduct[]>
 }) {
   const [rows, setRows] = useState<SupplierProduct[] | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   useEffect(() => {
     let alive = true
     fetchProducts(supplierId).then((r) => {
@@ -36,7 +40,15 @@ function SupplierProductsPanel({
     return () => {
       alive = false
     }
-  }, [supplierId, fetchProducts])
+  }, [supplierId, fetchProducts, reloadKey])
+
+  const importer = (
+    <CatalogImportPanel
+      supplierId={supplierId}
+      supplierName={supplierName}
+      onImported={() => setReloadKey((k) => k + 1)}
+    />
+  )
 
   if (rows === null) {
     return (
@@ -46,13 +58,21 @@ function SupplierProductsPanel({
     )
   }
   if (rows.length === 0) {
-    return <div className="py-2 text-[11px] text-cream/45">No catalogued products yet.</div>
+    return (
+      <div className="space-y-2">
+        <div className="text-[11px] text-cream/45">No catalogued products yet.</div>
+        {importer}
+      </div>
+    )
   }
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-1.5 text-[11px] font-medium text-cream/60">
-        <Package className="h-3 w-3" /> Sells {rows.length} catalogued product
-        {rows.length === 1 ? '' : 's'}
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-cream/60">
+          <Package className="h-3 w-3" /> Sells {rows.length} catalogued product
+          {rows.length === 1 ? '' : 's'}
+        </div>
+        {importer}
       </div>
       <ul className="max-h-40 space-y-0.5 overflow-y-auto pr-1">
         {rows.slice(0, 50).map((p) => (
@@ -377,6 +397,7 @@ export function SupplierManager() {
                       <div className="border-t border-[var(--line)] pt-2">
                         <SupplierProductsPanel
                           supplierId={s.id}
+                          supplierName={s.name}
                           fetchProducts={fetchSupplierProducts}
                         />
                       </div>

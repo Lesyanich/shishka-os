@@ -2,7 +2,7 @@
 
 > MC Task: c3289714-3933-46a8-8fe5-3358786d47a5
 > Epic: Procurement & Inventory (8b709aa0) — W2 of the sequencing in MC `31c5715e`
-> Status: **awaiting CEO approval** (packet Step 1). No migration or UI code is written until this is approved.
+> Status: **approved 2026-07-29** — both §11 questions answered by the CEO (wrap the ladder; defer PDF/photo). Implementation in progress.
 > Author: claude-opus-session-9f66ebd8, 2026-07-29
 > Branch: `feature/procurement/supplier-catalog-ingest`
 
@@ -240,7 +240,7 @@ Ladder = mig 388's, with one `pricelist` branch inserted after `receipt`:
 
 1378 rows, 41 → **5**. Acceptance criterion 6 satisfied by construction.
 
-### 4.4 The one place the ladder would contradict itself — proposed deviation
+### 4.4 The one place the ladder would contradict itself — CEO-approved deviation
 
 After the backfill, `v_price_comparison`'s ILIKE ladder maps
 `source = 'pricelist'` to `source_family = 'manual'` (it has no pricelist
@@ -248,9 +248,9 @@ branch). 710 rows — over half the table — would then be labelled "manual" in
 Price Book when they came from a supplier's own price list. That is a
 contradiction, and the addendum asked for redundancy.
 
-The packet forbids changing `v_price_comparison`'s behaviour. **Proposed minimal
-deviation, flagged for the reviewer rather than taken silently:** wrap the
-existing ladder instead of editing it —
+The packet forbids changing `v_price_comparison`'s behaviour. **CEO approved
+this minimal deviation on 2026-07-29** — wrap the existing ladder instead of
+editing it:
 
 ```sql
 CASE WHEN r.source IN ('quote','receipt','scrape','pricelist','manual')
@@ -263,9 +263,9 @@ The ladder is preserved character-for-character as the fallback; the constrained
 vocabulary simply becomes authoritative when present. No column is added,
 removed, or reordered, and `unit_cost` / `pack_known` are untouched.
 
-**If the reviewer prefers zero changes to that view**, the fallback is to ship
-the vocabulary without `pricelist` (4 values) and file the mislabel as a
-follow-up. Say which; do not assume.
+The rejected alternative — ship 4 values without `pricelist` and leave 710
+price-list rows reading as "manual" — is recorded here so the trade-off stays
+visible if the view is ever revisited.
 
 ---
 
@@ -276,7 +276,7 @@ follow-up. Say which; do not assume.
 | Paste a table (TSV/CSV) | **yes** | the fast path — copy out of LINE/WhatsApp and paste |
 | CSV file upload | **yes** | same parser, file reader instead of clipboard |
 | Single-item add | **yes** (folded in from `2c9d0906`) | one-row form → the same RPC |
-| PDF / photo price list | **no — deferred** | reuse the Catalog Inbox + digitize runbook specced as Phase C/F of `6df2f888`. Building a second uploader here would be the duplication the sequencing task explicitly warned about. When it is built, it parses to the same jsonb and calls this RPC. |
+| PDF / photo price list | **no — deferred, CEO-confirmed 2026-07-29** | reuse the Catalog Inbox + digitize runbook specced as Phase C/F of `6df2f888`. Building a second uploader here would be the duplication the sequencing task explicitly warned about. When it is built, it parses to the same jsonb and calls this RPC. |
 | Makro / LINE / Tops scrapers | **partly** — see §6 | |
 
 Deferring PDF/photo is the one place this spec does not fully close Q1 in a
@@ -458,14 +458,15 @@ observed will be reported — not inherited silently.
 
 ---
 
-## 11. What needs a CEO / reviewer answer before code
+## 11. Decisions taken on this spec — CEO, 2026-07-29
 
-1. **§4.4** — approve the `source_family` wrapper on `v_price_comparison`
-   (preserves the mig-388 ladder verbatim as a fallback), or drop `pricelist`
-   from the vocabulary and let 710 price-list rows read as "manual"?
-2. **§5** — PDF/photo deferred to the Catalog Inbox (Phase C/F of `6df2f888`)
-   rather than built here. Confirm that is the right split, or say it must ship
-   in this task.
+1. **§4.4 — wrap the ladder.** `v_price_comparison.source_family` gets the
+   `CASE WHEN source IN (…) THEN source ELSE <mig 388 ladder verbatim> END`
+   wrapper. Approved as an explicit exception to the packet's "do not change
+   `v_price_comparison`" line, so the reviewer does not read it as scope creep.
+2. **§5 — PDF/photo deferred** to the Catalog Inbox (Phase C/F of `6df2f888`).
+   This task ships paste/CSV, single-item add, and the `update_tops_prices`
+   rewire.
 
 Everything else in this spec is a direct consequence of decisions already
 recorded on the MC task.
