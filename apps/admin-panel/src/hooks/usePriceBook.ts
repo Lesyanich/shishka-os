@@ -11,9 +11,9 @@ import type {
 } from '../types/priceBook'
 
 const SUMMARY_COLS =
-  'nomenclature_id, product_code, item_name, base_unit, current_cost, item_group, supplier_count, best_price, worst_price, avg_price, best_supplier, spread_pct'
+  'nomenclature_id, product_code, item_name, base_unit, current_cost, item_group, supplier_count, priced_supplier_count, best_price, worst_price, avg_price, best_supplier, spread_pct'
 const COMPARE_COLS =
-  'nomenclature_id, catalog_id, supplier_id, supplier_name, last_seen_price, unit_cost, source_family, product_name, original_name, verified_at, updated_at'
+  'nomenclature_id, catalog_id, supplier_id, supplier_name, last_seen_price, unit_cost, pack_known, source_family, product_name, original_name, verified_at, updated_at'
 
 function num(v: unknown): number | null {
   return v != null ? Number(v) : null
@@ -28,6 +28,7 @@ function normalizeSummary(r: Record<string, unknown>): PriceSummaryRow {
     current_cost: num(r.current_cost),
     item_group: (r.item_group as ItemGroup) ?? 'ingredient',
     supplier_count: Number(r.supplier_count ?? 0),
+    priced_supplier_count: Number(r.priced_supplier_count ?? 0),
     best_price: num(r.best_price),
     worst_price: num(r.worst_price),
     avg_price: num(r.avg_price),
@@ -44,6 +45,7 @@ function normalizeQuote(r: Record<string, unknown>): PriceQuoteRow {
     supplier_name: (r.supplier_name as string | null) ?? '—',
     last_seen_price: num(r.last_seen_price),
     unit_cost: num(r.unit_cost),
+    pack_known: r.pack_known === true,
     source_family: (r.source_family as SourceFamily) ?? 'manual',
     product_name: (r.product_name as string | null) ?? null,
     original_name: (r.original_name as string | null) ?? null,
@@ -55,6 +57,12 @@ function normalizeQuote(r: Record<string, unknown>): PriceQuoteRow {
 export interface UsePriceBookResult {
   items: PriceSummaryRow[]
   supplierNames: string[]
+  /**
+   * Supplier prices held for products not linked to any item, so absent from
+   * this table entirely (mig 388 / v_supplier_catalog_unlinked). Surfaced so
+   * the Price Book states what it omits instead of reading as complete.
+   */
+  unlinkedCount: number
   isLoading: boolean
   error: string | null
   refetch: () => Promise<void>
@@ -70,16 +78,19 @@ export interface UsePriceBookResult {
 export function usePriceBook(): UsePriceBookResult {
   const [items, setItems] = useState<PriceSummaryRow[]>([])
   const [supplierNames, setSupplierNames] = useState<string[]>([])
+  const [unlinkedCount, setUnlinkedCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchSummary = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setIsLoading(true)
     setError(null)
-    const [{ data, error: fetchError }, { data: sup }] = await Promise.all([
+    const [{ data, error: fetchError }, { data: sup }, { count: unlinked }] = await Promise.all([
       supabase.from('v_price_comparison_summary').select(SUMMARY_COLS).order('item_name', { ascending: true }),
       supabase.from('suppliers').select('name').eq('is_deleted', false).order('name', { ascending: true }),
+      supabase.from('v_supplier_catalog_unlinked').select('catalog_id', { count: 'exact', head: true }),
     ])
+    setUnlinkedCount(unlinked ?? 0)
     if (fetchError) {
       setError(fetchError.message)
     } else {
@@ -137,6 +148,7 @@ export function usePriceBook(): UsePriceBookResult {
   return {
     items,
     supplierNames,
+    unlinkedCount,
     isLoading,
     error,
     refetch: fetchSummary,

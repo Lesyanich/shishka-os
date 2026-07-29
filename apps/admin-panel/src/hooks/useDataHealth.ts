@@ -21,6 +21,12 @@ export type HealthMetricKey =
   | 'equipment_missing_specs'
   // Added by migration 215 — frozen/fresh SKU mismatch in purchase_logs
   | 'purchase_frozen_fresh_mismatch'
+  // Added by migration 388 — the supplier catalog is finally policed too.
+  // `catalog_pack_unknown` is the important one: those rows had a per-unit
+  // price invented for them until 388, so the defect was invisible by design.
+  | 'catalog_unlinked'
+  | 'catalog_pack_unknown'
+  | 'catalog_stale_price'
 
 export interface HealthMetric {
   metric: HealthMetricKey

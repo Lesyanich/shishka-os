@@ -16,8 +16,10 @@ const FILTERS: ReadonlyArray<{ key: GroupFilter; label: string }> = [
 ]
 
 export function PriceBook() {
-  const { items, supplierNames, isLoading, error, fetchComparison, recordQuote, setCanonicalCost } =
-    usePriceBook()
+  const {
+    items, supplierNames, unlinkedCount, isLoading, error,
+    fetchComparison, recordQuote, setCanonicalCost,
+  } = usePriceBook()
   const [searchParams, setSearchParams] = useSearchParams()
   const [filter, setFilter] = useState<GroupFilter>('all')
   const [quoteItem, setQuoteItem] = useState<PriceSummaryRow | null>(null)
@@ -64,6 +66,17 @@ export function PriceBook() {
           </p>
         </div>
       </header>
+
+      {/* What this table does NOT contain. A price for a product we have not
+          linked to an item cannot be compared or ordered
+          (po_lines.nomenclature_id is NOT NULL), so it renders nowhere — and
+          without saying so, the table reads as the complete picture. */}
+      {unlinkedCount > 0 && (
+        <p className="border-b border-[var(--line)] bg-[var(--s-2)] px-4 py-2 text-[11px] text-amber-300/80">
+          {unlinkedCount} supplier price{unlinkedCount === 1 ? '' : 's'} are not shown here — they
+          belong to products not yet linked to an item, so they cannot be compared or ordered yet.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
         <div className="flex gap-1">
