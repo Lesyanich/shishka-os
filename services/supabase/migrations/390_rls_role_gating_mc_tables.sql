@@ -3,10 +3,12 @@
 -- Date: 2026-07-29
 -- Audit: this file's header + docs/security/rls-audit-report.md
 --
--- ⚠ STATUS: PREPARED — NOT APPLIED. Apply is CEO-gated (Phase 4.1).
---   Verify with the queries at the bottom AFTER applying; this file does not
---   self-register — check pg_policies, not the migration ledger
---   (migration_log and schema_migrations drift — see the DB gotchas note).
+-- ✅ STATUS: APPLIED to prod 2026-07-29 (CEO-approved), verified against live
+--   pg_policies — not the ledger (migration_log and schema_migrations drift,
+--   see the DB gotchas note). Helper checked per account by simulating each
+--   staff JWT: 2 owner / 1 task_manager / 3 cook all resolve as intended.
+--   MC read+write smoke test green before and after.
+--   REMAINING: per-tier browser smoke test (needs a real login) — see footer.
 --
 -- ── WHAT THIS IS NOT ────────────────────────────────────────────────
 -- These 6 tables were labelled CRITICAL on the assumption that anon could
