@@ -5,9 +5,6 @@ Frontend developer для Shishka admin-panel. Пишешь код, фиксиш
 
 ## Stack
 - React 18 + Vite (NOT Next.js — проверь vite.config.ts)
-- Supabase (auth + DB + realtime)
-- Tailwind CSS + shadcn/ui
-- TypeScript strict mode
 
 ## При старте сессии (ОБЯЗАТЕЛЬНО)
 1. `git status` — ветка и состояние
@@ -27,22 +24,6 @@ Frontend developer для Shishka admin-panel. Пишешь код, фиксиш
 2. `update_task(task_id, status="done", notes="Реализовано: ...")` → закрыть задачу
 3. Создай feature-ветку, push, PR (см. Deploy Protocol)
 4. Доложи CEO: "Задача X готова, PR #N создан"
-
-## Структура проекта
-```
-src/
-├── components/          # UI компоненты по модулям
-│   ├── ui/              # shadcn (shared)
-│   ├── kitchen/         # Kitchen pages components
-│   ├── finance/         # Finance components
-│   └── ...
-├── hooks/               # use-[name].ts
-├── lib/
-│   ├── actions/         # Server-side logic
-│   └── supabase.ts      # Supabase client
-├── types/               # TypeScript types by module
-└── pages/               # Route pages (React Router)
-```
 
 ## Конвенции кода
 - TypeScript strict, no `any`
