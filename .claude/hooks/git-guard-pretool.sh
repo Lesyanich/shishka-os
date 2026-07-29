@@ -21,10 +21,22 @@
 # honours it in its own env for cron-configured runners. Deliberately
 # NOT advertised in deny messages.
 #
+# Scope: THIS repo only. The hook process runs in the session repo, but
+# the command may target another one (`cd ~/other && git push origin
+# main`, `git -C /elsewhere commit`). Judging a foreign repo by this
+# repo's branch produced false denials — the agent-memory store is a
+# private notes repo whose main is not a deploy target, yet its pushes
+# were blocked by a rule about shishka-os production. So: resolve the
+# command's target repo, and exit silently when it is not ours. Repo
+# identity is the SHARED git dir (`--git-common-dir`), so sibling
+# worktrees of shishka-os all count as ours — their toplevels differ,
+# their common dir does not.
+#
 # Known limits (this layer stops accidents, not adversaries — the
 # server-side GitHub protection is the real fence):
-#   - branch is read from the session repo; `cd /elsewhere && git ...`
-#     is judged against THIS repo's branch
+#   - target-dir extraction is token-based: a path containing spaces,
+#     or one built from a variable, does not resolve → we fall back to
+#     the session repo, i.e. toward enforcing rather than skipping
 #   - a single LINE containing both a `git … push` phrase and a bare
 #     'main' token can still trip the guard, even inside quotes
 #
@@ -47,7 +59,47 @@ CMD=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty')
 # Cheap early-out: only care about commands that invoke git
 printf '%s' "$CMD" | grep -qE '(^|[;&|( ])git([ (]|$)' || exit 0
 
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+# --- Which repo does this command actually touch? ---
+# Identity = the SHARED git dir, so every worktree of this repo resolves
+# equal. Prints nothing when $1 is not inside a git repo.
+repo_id() {
+  ( cd "$1" 2>/dev/null || exit 0
+    g=$(git rev-parse --git-common-dir 2>/dev/null) || exit 0
+    [ -n "$g" ] || exit 0
+    cd "$g" 2>/dev/null || exit 0
+    pwd -P ) 2>/dev/null
+}
+
+# Last token following `flag` in the command text ("" if absent).
+arg_after() {
+  printf '%s' "$CMD" | awk -v flag="$1" '
+    { for (i = 1; i < NF; i++) if ($i == flag) v = $(i+1) }
+    END { print v }'
+}
+
+TARGET_DIR=$(arg_after -C)                      # `git -C <dir>` wins…
+[ -z "$TARGET_DIR" ] && TARGET_DIR=$(arg_after cd)   # …else `cd <dir>`
+case "$TARGET_DIR" in                           # strip one layer of quoting
+  \"*\") TARGET_DIR=${TARGET_DIR#\"}; TARGET_DIR=${TARGET_DIR%\"} ;;
+  \'*\') TARGET_DIR=${TARGET_DIR#\'}; TARGET_DIR=${TARGET_DIR%\'} ;;
+esac
+case "$TARGET_DIR" in "~/"*) TARGET_DIR="$HOME/${TARGET_DIR#\~/}" ;; esac
+
+SESSION_ID=$(repo_id .)
+CTX_DIR="."
+if [ -n "$TARGET_DIR" ]; then
+  TARGET_ID=$(repo_id "$TARGET_DIR")
+  # Resolvably a DIFFERENT repo → not ours to police. Stay silent.
+  if [ -n "$TARGET_ID" ] && [ -n "$SESSION_ID" ] && [ "$TARGET_ID" != "$SESSION_ID" ]; then
+    exit 0
+  fi
+  # Ours, but maybe a sibling worktree → judge THAT checkout's branch.
+  [ -n "$TARGET_ID" ] && CTX_DIR="$TARGET_DIR"
+fi
+# Unresolvable path → CTX stays the session repo, i.e. we fall back to
+# enforcing rather than skipping.
+
+REPO_ROOT=$( (cd "$CTX_DIR" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || pwd)
 BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
 deny() {
