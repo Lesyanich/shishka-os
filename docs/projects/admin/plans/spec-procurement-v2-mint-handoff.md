@@ -57,15 +57,17 @@ passcode. v2 is workflow-first — that is the redesign's thesis.
 | Suppliers | **KEEP — upgraded** | Data alive; becomes the links hub (§4.4) |
 | Price Book | **KEEP — upgraded** | Data layer actively fed by imports; + supplier filter, freshness, thumbnails |
 | Stock Requests | **KEEP concept — rebuilt** | 0 usage because no station/author/status loop; becomes Requests v2 (§4.7) |
-| Shelf Life | **RELOCATE** | Product reference, not a procurement workflow; move to `/menu` (backlog task), remove tab here |
+| Shelf Life | **RELOCATED ✔ 2026-07-29** | Product reference, not a procurement workflow. Now edited on `/menu`: PF items on the L1 Cook tab's storage-label block, SALE dishes on the L2 Assembler tab. `ShelfLifeEditor` + `useShelfLifeItems` deleted (MC `cc57c0fe`) |
 | Stock | **RETIRE here** | Superseded by connected-stock epic (station stock, other session); stale since May |
 | Sheet Items | **RETIRE here** | Curation for the old stock-sheet model; parked with connected-stock |
 | Quick Purchase | **RETIRE** | Already "legacy" in code; superseded by order → receipt → reconcile chain (§4.6) |
 
 **v2 tab set (6):** Orders · Catalog · Requests · Suppliers · Price Book ·
 Catalog Inbox. Legacy components are removed from tabs in Phase B; unreferenced
-component files are deleted in the same PR (ShelfLifeEditor deletion waits for
-the `/menu` relocation task). No data is dropped anywhere.
+component files are deleted in the same PR. `ShelfLifeEditor` waited for the
+`/menu` relocation and was deleted 2026-07-29 once SALE dishes had an editor
+there — until then only PF items did, so 12 SALE dishes carrying a
+`shelf_life_days` had no editable surface at all. No data is dropped anywhere.
 
 ## 3. Gaps → scope
 
@@ -246,7 +248,8 @@ Four surfaces, all inside the existing `/procurement` hub (tab set reshuffled):
 - `/receive` accepts `?po=` preselect.
 - Tab disposition per §2.5: remove Stock / Sheet Items / Quick Purchase /
   Shelf Life tabs from `/procurement`; delete now-unreferenced legacy
-  components (ShelfLifeEditor stays until the `/menu` relocation task lands).
+  components (ShelfLifeEditor stayed until the `/menu` relocation landed —
+  done 2026-07-29, MC `cc57c0fe`).
 
 ### Phase C — Supplier hub + Catalog Inbox + Price Book links
 - SupplierManager v2: contacts links (tel / LINE / website), Files

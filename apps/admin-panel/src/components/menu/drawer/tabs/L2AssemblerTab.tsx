@@ -23,12 +23,28 @@ interface L2AssemblerTabProps {
   /** Merrychef program lives on nomenclature, not dish_card — passed separately. */
   merrychefProgram: MerrychefProgram | null
   onMerrychefChange: (program: MerrychefProgram | null) => void
+  /** Shelf life in days — nomenclature.shelf_life_days (mig 307), held until
+   * Save like the Merrychef program. PF items edit this on the L1 Cook tab's
+   * storage-label block; a finished dish had nowhere at all until now. */
+  shelfLifeDays: number | null
+  onShelfLifeChange: (days: number | null) => void
   /** Packaging (NF-PKG BOM lines) — written immediately, not deferred to Save. */
   packaging: DishPackagingLine[]
   packagingCatalog: PackagingCatalogItem[]
   onAddPackaging: (packagingId: string, qty: number) => Promise<{ ok: boolean; error?: string }>
   onUpdatePackagingQty: (bomId: string, qty: number) => Promise<{ ok: boolean; error?: string }>
   onRemovePackaging: (bomId: string) => Promise<{ ok: boolean; error?: string }>
+}
+
+/**
+ * A shelf life is either absent or a whole number of days in 1–365. Anything
+ * else (0, 2.5, negative, 900) is a data-entry slip that would flow into a
+ * printed use-by date, so it is called out rather than saved quietly.
+ * Exported for testing.
+ */
+export function shelfLifeValid(days: number | null): boolean {
+  if (days === null) return true
+  return Number.isInteger(days) && days >= 1 && days <= 365
 }
 
 /** Packaging editor — lists NF-PKG BOM lines and lets the user add/remove them.
@@ -161,6 +177,8 @@ export function L2AssemblerTab({
   onFormChange,
   merrychefProgram,
   onMerrychefChange,
+  shelfLifeDays,
+  onShelfLifeChange,
   packaging,
   packagingCatalog,
   onAddPackaging,
@@ -220,6 +238,31 @@ export function L2AssemblerTab({
           program={merrychefProgram}
           onChange={onMerrychefChange}
         />
+      </section>
+
+      {/* Shelf life — nomenclature.shelf_life_days (mig 307). Feeds the HACCP
+          label and batch expiry, so it is a food-safety number, not a note.
+          Sous-vide is capped at 10 days by the shelf-life rules. */}
+      <section className="space-y-1">
+        <h4 className="text-[10px] uppercase tracking-widest text-cream/50">
+          Срок хранения (дней)
+        </h4>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={365}
+          value={shelfLifeDays ?? ''}
+          onChange={(e) => {
+            const raw = e.target.value.trim()
+            onShelfLifeChange(raw === '' ? null : Number(raw))
+          }}
+          placeholder="напр. 3 — пусто, если не ограничен"
+          className="w-full rounded-lg border border-surface-3 bg-surface-1 px-3 py-2 text-sm text-cream outline-none focus:border-amber-500/60"
+        />
+        {!shelfLifeValid(shelfLifeDays) && (
+          <p className="text-[11px] text-rose-400">Срок — целое число 1–365 дней.</p>
+        )}
       </section>
 
       {/* Pre/post Merrychef checks */}
