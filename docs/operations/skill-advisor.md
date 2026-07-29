@@ -159,4 +159,5 @@ specific. The header and separator rows are skipped by the parser.
 | исследовательск тестир,поиск багов,exploratory testing,bug hunting,sbtm,test charter | `exploratory-testing` | session-based exploratory bug hunting |
 | проверь удобство,протестировать удобство,юзабилити,с телефона,на телефоне,goal-driven test,agentic browser,natural-language e2e,let an agent explore,usability | `agentic-browser-testing` | goal-driven browser agent walks a flow (Playwright MCP) |
 | неудобно с телефона,вёрстка едет,верстка едет,мобильн вёрстк,мобильн верстк,адаптив,responsive,touch target,horizontal overflow,горизонтальн скролл,review the ui,audit the layout,mobile layout | `web-design-reviewer` | audit responsive/mobile layout in a real browser & fix at source |
+| каталог поставщик,прайс-лист,прайс лист,занеси в базу,занести в бд,ассортимент поставщик,supplier catalog,price list,import catalog,load the catalog | RULE-CATALOG-LANDS-IN-DB (`technical-rules.md`) | catalog = rows in `supplier_catalog`, never a repo file — report the row count |
 <!-- ADVISOR-MAP-END -->

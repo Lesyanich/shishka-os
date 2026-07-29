@@ -264,6 +264,36 @@ LIMIT 20;
 
 > Origin: 2026-05-04. WS-4 of 75e735e5 (MC `30808669`) added counter schema for `correction_rules`; follow-up `15f2a50f` extended counters to all four learning tables, replaced fire-and-forget increment in `learning.ts` with the apply-record / approve-increment pattern, and added `fn_apply_inbox_overrides` for atomic counter updates inside the approval transaction.
 
+## RULE-CATALOG-LANDS-IN-DB
+
+Supplier assortment and price data is **data, not code**.
+
+When an agent is handed a supplier catalog in any form — photo, PDF, link, price list, a paste from LINE — the deliverable is **rows in `supplier_catalog`**. Not a markdown table, not a JSON dump, not a spec, and not an unapplied SQL migration file. Those are all ways of saying "I read it" while the database still knows nothing.
+
+### The completion check is a number
+
+Before reporting the work done, run a count for that supplier and source and report it:
+
+```sql
+SELECT count(*) FROM supplier_catalog WHERE supplier_id = '<uuid>' AND source = '<source>';
+```
+
+"I parsed the catalog" is not a completion claim. "312 rows for Fruit Bound, source `pricelist`" is.
+
+### If there is no path, stop and say so
+
+If no ingest path exists for the format in hand, the agent **stops and reports that**. It does not fall back to writing the data into a repo file. A file is not a smaller version of the deliverable — it is a different thing that looks like progress and produces none.
+
+### Corollaries
+
+- Resolve the supplier through `fn_resolve_supplier` (mig 386). Never `INSERT INTO suppliers` from a parse — that is how Makro became three suppliers.
+- Never write a `conversion_factor` you had to assume. Mig 388 removed the silent `COALESCE(...,1)` that priced an unknown pack as one base unit; re-introducing it anywhere is a regression, not a shortcut. Leave it NULL and let the row surface in `v_catalog_pack_missing`.
+- A line that matches nothing in nomenclature lands **unlinked** (`nomenclature_id IS NULL`), where the matching queue picks it up (mig 389). Do not auto-create `RAW-AUTO` stubs to make it look resolved.
+
+This is the same boundary CLAUDE.md draws for the menu: *"Dish price, photo, composition → neither repo: admin panel or `/chef`. That is data, not code."* A supplier catalog sits on exactly the same side of it.
+
+> Origin: 2026-07-29. CEO: «скидываю тебе поставщика и его каталог, прошу занести в БД, позже узнаю, что каталог был спаршен куда-то на гит и ни одной записи в БД нет». The root cause was structural — `fn_record_supplier_quote` took one row and *required* a `nomenclature_id`, so a 600-item price list could not be entered at all and every session improvised. The tooling fix is MC `c3289714`; this rule is the half that survives it, because a tool nobody is required to use gets bypassed the next time it does not quite fit.
+
 ---
 
 # PART III — Frontend Architecture
