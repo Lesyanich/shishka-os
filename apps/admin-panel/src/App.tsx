@@ -20,7 +20,6 @@ import { StockSheetPage } from './pages/StockSheetPage'
 // Lazy — loaded on-demand per route
 const BOMHub = lazyWithReload(() => import('./pages/BOMHub').then(m => ({ default: m.BOMHub })))
 const KDSBoard = lazyWithReload(() => import('./pages/KDSBoard').then(m => ({ default: m.KDSBoard })))
-const CookStation = lazyWithReload(() => import('./pages/CookStation').then(m => ({ default: m.CookStation })))
 const WasteTracker = lazyWithReload(() => import('./pages/WasteTracker').then(m => ({ default: m.WasteTracker })))
 const Procurement = lazyWithReload(() => import('./pages/Procurement').then(m => ({ default: m.Procurement })))
 const ShoppingList = lazyWithReload(() => import('./pages/ShoppingList').then(m => ({ default: m.ShoppingList })))
@@ -28,15 +27,12 @@ const StocktakeReviewPage = lazyWithReload(() => import('./pages/StocktakeReview
 const StationCountPage = lazyWithReload(() => import('./pages/StationCountPage').then(m => ({ default: m.StationCountPage })))
 const ThawStation = lazyWithReload(() => import('./pages/ThawStation').then(m => ({ default: m.ThawStation })))
 const SkuManagerPage = lazyWithReload(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
-const MasterPlanner = lazyWithReload(() => import('./pages/MasterPlanner').then(m => ({ default: m.MasterPlanner })))
 const FinanceLayout = lazyWithReload(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
 const FinanceLedger = lazyWithReload(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
 const FinanceAnalytics = lazyWithReload(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
 const FinanceDashboard = lazyWithReload(() => import('./pages/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })))
 const ReceivingStation = lazyWithReload(() => import('./pages/ReceivingStation').then(m => ({ default: m.ReceivingStation })))
 const Settings = lazyWithReload(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
-const BatchPlanner = lazyWithReload(() => import('./pages/BatchPlanner').then(m => ({ default: m.BatchPlanner })))
-const ProductionOrdersPage = lazyWithReload(() => import('./pages/ProductionOrdersPage').then(m => ({ default: m.ProductionOrdersPage })))
 const ReceiptInbox = lazyWithReload(() => import('./pages/ReceiptInbox').then(m => ({ default: m.ReceiptInbox })))
 const MissionControl = lazyWithReload(() => import('./pages/MissionControl').then(m => ({ default: m.MissionControl })))
 const MenuPage = lazyWithReload(() => import('./pages/menu/MenuPage').then(m => ({ default: m.MenuPage })))
@@ -45,7 +41,6 @@ const SaladBarPage = lazyWithReload(() => import('./pages/SaladBarPage').then(m 
 const BrainPage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainPage })))
 const BrainWikiPage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainWikiPage })))
 const BrainDriveMapPage = lazyWithReload(() => import('./pages/brain').then(m => ({ default: m.BrainDriveMapPage })))
-const ProductionTargets = lazyWithReload(() => import('./pages/ProductionTargets').then(m => ({ default: m.ProductionTargets })))
 const ApiCostPage = lazyWithReload(() => import('./pages/ApiCostPage').then(m => ({ default: m.ApiCostPage })))
 const HRLayout = lazyWithReload(() => import('./pages/hr/HRLayout').then(m => ({ default: m.HRLayout })))
 const AttendancePage = lazyWithReload(() => import('./pages/hr/AttendancePage').then(m => ({ default: m.AttendancePage })))
@@ -168,17 +163,16 @@ function App() {
                   <Route path="/cashier" element={<Suspense fallback={<PageLoader />}><CashierPage /></Suspense>} />
                   {/* Schedule editor — Mint (task_manager) manages shifts directly, no owner approval; cooks read-only at /staff/schedule */}
                   <Route path="/schedule" element={<Suspense fallback={<PageLoader />}><SchedulePage /></Suspense>} />
-                  <Route path="/planner" element={<Suspense fallback={<PageLoader />}><MasterPlanner /></Suspense>} />
-                  <Route path="/planner/batch" element={<Suspense fallback={<PageLoader />}><BatchPlanner /></Suspense>} />
-                  <Route path="/production" element={<Suspense fallback={<PageLoader />}><ProductionOrdersPage /></Suspense>} />
-                  <Route path="/targets" element={<Suspense fallback={<PageLoader />}><ProductionTargets /></Suspense>} />
                   <Route path="/procurement" element={<Suspense fallback={<PageLoader />}><Procurement /></Suspense>} />
                   <Route path="/shopping-list" element={<Suspense fallback={<PageLoader />}><ShoppingList /></Suspense>} />
                   {/* Stocktake review → apply → route to Shopping/Production (S3) */}
                   <Route path="/count/session/:id" element={<Suspense fallback={<PageLoader />}><StocktakeReviewPage /></Suspense>} />
                   {/* Heavy KDS production tooling — managers only, off the cook floor */}
                   <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
-                  <Route path="/kitchen/tasks" element={<Suspense fallback={<PageLoader />}><CookStation /></Suspense>} />
+                  {/* Cook Station merged into the KDS board (2026-07-29). Kept as a
+                      redirect: the stocktake review page and any bookmark still
+                      point here. */}
+                  <Route path="/kitchen/tasks" element={<Navigate to="/kitchen/schedule?tab=cook" replace />} />
                 </Route>
 
                 {/* ── Staff floor (cook) — all authenticated roles ── */}
