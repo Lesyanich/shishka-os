@@ -24,7 +24,34 @@ export async function manageSuppliers(args: ManageSuppliersArgs) {
       return { ok: false, error: "Supplier name is required" };
     }
 
-    // Check for duplicate
+    // Same resolver the receipt importer uses (fn_resolve_supplier, migration
+    // 386): tax_id → name → alias → normalized name → normalized alias, with
+    // p_create = false so this only reports. A substring search on `name` alone
+    // cannot see that "SIAM MAKRO" is Makro — that blind spot is how Makro
+    // ended up as three suppliers.
+    const { data: resolvedId } = await sb.rpc("fn_resolve_supplier", {
+      p_name: args.name,
+      p_tax_id: null,
+      p_create: false,
+    });
+
+    if (resolvedId) {
+      const { data: resolved } = await sb
+        .from("suppliers")
+        .select("id, name")
+        .eq("id", resolvedId)
+        .single();
+
+      return {
+        ok: false,
+        warning: "This name already resolves to an existing supplier",
+        matches: resolved ? [resolved] : [],
+        hint: `Use supplier_id ${resolvedId}. Creating a second row splits its spend, Price Book and WAC.`,
+      };
+    }
+
+    // Substring net for near-misses the resolver deliberately refuses to guess
+    // at (two suppliers normalizing the same, partial trading names).
     const { data: existing } = await sb
       .from("suppliers")
       .select("id, name")
