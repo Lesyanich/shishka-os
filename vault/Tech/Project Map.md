@@ -190,5 +190,5 @@ There is **no knowledge-graph shortcut** — use **grep + targeted `Read`** (or 
 
 ---
 <!-- AUTO:stamp START -->
-_Auto sections regenerated from the repo at commit `726c4f6a`. Re-run: `node scripts/gen-project-map.mjs`._
+_Auto sections regenerated from the repo at commit `dc992e19`. Re-run: `node scripts/gen-project-map.mjs`._
 <!-- AUTO:stamp END -->
