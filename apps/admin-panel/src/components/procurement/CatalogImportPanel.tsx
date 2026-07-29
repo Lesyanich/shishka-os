@@ -16,7 +16,7 @@ import {
 } from '../../types/catalogImport'
 
 /**
- * Import a supplier's price list into supplier_catalog (mig 393).
+ * Import a supplier's price list into supplier_catalog (mig 394).
  *
  * Preview and commit are the same RPC with `p_dry_run` flipped, so what the
  * preview promises is exactly what commit does. The preview deliberately states

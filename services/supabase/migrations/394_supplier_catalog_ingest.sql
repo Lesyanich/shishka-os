@@ -1,4 +1,4 @@
--- 393_supplier_catalog_ingest.sql
+-- 394_supplier_catalog_ingest.sql
 -- W2 of the procurement epic sequencing (MC 31c5715e).
 -- MC task: c3289714-3933-46a8-8fe5-3358786d47a5
 -- Spec: docs/projects/admin/plans/spec-supplier-catalog-ingest.md
@@ -97,12 +97,12 @@ ALTER TABLE public.supplier_catalog
 COMMENT ON COLUMN public.supplier_catalog.source_detail IS
   'Free-form provenance: "laadthai_pricelist_2026-07-29", "tops_sweep_2026-07-29". '
   'The `source` column is a 5-value classification; anything more specific '
-  'belongs here. Mig 393.';
+  'belongs here. Mig 394.';
 
 COMMENT ON COLUMN public.supplier_catalog.source IS
   'How we learned this price: quote | receipt | scrape | pricelist | manual. '
   'Constrained by supplier_catalog_source_check. Free text goes in '
-  'source_detail. Mig 393 (was 41 free-text values).';
+  'source_detail. Mig 394 (was 41 free-text values).';
 
 -- ---------------------------------------------------------------------------
 -- 2. Backfill, then constrain
@@ -511,7 +511,7 @@ COMMENT ON FUNCTION public.fn_import_supplier_catalog(uuid, text, text, text, js
   'nomenclature_id is NULLABLE so an item we have never bought still lands as a row. '
   'Never invents a conversion_factor, never forks a supplier (calls fn_resolve_supplier '
   'with p_create tied to p_dry_run), never clears a human-set pack size, link or '
-  'match_reviewed_at. Mig 393, MC c3289714.';
+  'match_reviewed_at. Mig 394, MC c3289714.';
 
 -- ---------------------------------------------------------------------------
 -- 4. v_price_comparison.source_family — vocabulary wins, ladder stays as fallback
@@ -558,7 +558,7 @@ SELECT
     WHEN r.conversion_factor IS NULL OR r.conversion_factor = 0 THEN NULL
     ELSE ROUND(r.last_seen_price / r.conversion_factor, 4)
   END AS unit_cost,
-  -- Mig 393: `source` is now a constrained vocabulary, so it IS the family.
+  -- Mig 394: `source` is now a constrained vocabulary, so it IS the family.
   -- The mig 388 ILIKE ladder is preserved verbatim as the fallback for any row
   -- that predates or escapes the constraint.
   CASE
@@ -590,11 +590,11 @@ COMMENT ON VIEW public.v_price_comparison IS
   'the pack size is unknown — it is never derived from an assumed factor of 1. '
   'Check pack_known before presenting a comparison. source_family reads the '
   'constrained source vocabulary, falling back to the mig 388 ILIKE ladder. '
-  'Mig 388 + 393, MC 4275cd89 + c3289714.';
+  'Mig 388 + 394, MC 4275cd89 + c3289714.';
 
 -- Self-register (RULE-MIGRATION-TRACKING).
 INSERT INTO public.migration_log (filename, applied_by, status, notes)
-VALUES ('393_supplier_catalog_ingest.sql', 'claude-opus-session-9f66ebd8', 'success',
+VALUES ('394_supplier_catalog_ingest.sql', 'claude-opus-session-9f66ebd8', 'success',
         'W2: fn_import_supplier_catalog — the single bulk write path for supplier price lists. nomenclature_id nullable, merge semantics, never invents a conversion_factor, resolves suppliers via fn_resolve_supplier with p_create tied to dry-run. source constrained to 5 values (was 41) with free text moved to source_detail. MC c3289714.')
 ON CONFLICT DO NOTHING;
 

@@ -14,7 +14,7 @@
  * when the barcode already maps to one of our products (via supplier_catalog),
  * otherwise left null (still a useful price-book entry).
  *
- * Writes go through `fn_import_supplier_catalog` (mig 393) — the single sink.
+ * Writes go through `fn_import_supplier_catalog` (mig 394) — the single sink.
  * This tool used to delete-then-insert its own rows and insert its own supplier
  * row. Both were wrong once migrations 388/389 shipped: the delete discarded
  * pack sizes entered by a human via fn_set_catalog_pack and "not ours" verdicts
@@ -200,7 +200,7 @@ export async function updateTopsPrices(args: {
     linked: !!r.nomenclature_id,
   }));
 
-  // 6. One sink for every catalog write (mig 393). p_dry_run maps straight
+  // 6. One sink for every catalog write (mig 394). p_dry_run maps straight
   //    through, so the preview runs the same classification the commit will.
   //    The supplier is resolved by name, not created here — with p_create tied
   //    to dry-run inside the RPC, a preview cannot fork "Tops".

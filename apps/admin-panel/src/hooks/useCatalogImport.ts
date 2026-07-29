@@ -7,7 +7,7 @@ import type {
 } from '../types/catalogImport'
 
 /**
- * Data layer for supplier catalog import (mig 393).
+ * Data layer for supplier catalog import (mig 394).
  *
  * All parsing lives in `types/catalogImport.ts` and is DB-free; this hook only
  * calls `fn_import_supplier_catalog`. Preview and commit are the SAME call with

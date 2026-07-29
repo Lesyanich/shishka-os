@@ -1,5 +1,5 @@
 /**
- * Supplier catalog import — types and the pure parser (mig 393).
+ * Supplier catalog import — types and the pure parser (mig 394).
  *
  * A supplier price list arrives as a paste out of LINE/WhatsApp/Sheets or as a
  * CSV. Everything in this file is pure and DB-free so the parsing can be tested

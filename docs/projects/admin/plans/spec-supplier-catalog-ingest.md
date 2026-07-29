@@ -374,11 +374,18 @@ Noted as a deliberate deviation from the packet's DS line.
 
 ## 8. Migration
 
-**Number: `393_supplier_catalog_ingest.sql`.** Prod `migration_log` max is 392
-(390 is claimed twice, by `390_rls_role_gating_mc_tables` and
-`390_mango_canonicalization_and_peanut_removal`, then 391 and 392) — the packet's
-387 and the addendum's 390 are both stale. Re-verified immediately before the
-file is written.
+**Number: `394_supplier_catalog_ingest.sql`.** The packet said 387, the addendum
+said 390, this spec first said 393, and by the time the migration was ready to
+apply `393_resolve_allergen_blockers_from_brands` had claimed 393 too. 390 is
+registered **twice** (`390_rls_role_gating_mc_tables` and
+`390_mango_canonicalization_and_peanut_removal`). The number is only true at the
+moment you read it — re-verify against `migration_log` immediately before
+applying, not before writing:
+
+```sql
+SELECT filename FROM migration_log WHERE filename ~ '^[0-9]{3}'
+ ORDER BY substring(filename from '^[0-9]+')::int DESC LIMIT 5;
+```
 
 Contents, in order:
 
@@ -422,7 +429,7 @@ From the packet (1–10) and the addendum (11–13), plus two this spec adds.
 8. Parser tests: Thai + English headers, `฿`/comma numbers, blank rows,
    duplicate SKUs — green.
 9. PR carries a live Vercel preview link + what to click.
-10. `migration_log` row for 393 with `status='success'`; `vault/Database/Migrations.md` updated.
+10. `migration_log` row for 394 with `status='success'`; `vault/Database/Migrations.md` updated.
 11. A pack-less fixture row appears in `v_catalog_pack_missing`, and
     `SELECT count(*) FROM v_price_comparison WHERE unit_cost IS NOT NULL AND pack_known = false` is still **0**.
 12. An unmatched fixture row appears in `v_catalog_match_queue`; no `RAW-AUTO`
