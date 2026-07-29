@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { SupplierManager } from '../components/procurement/SupplierManager'
 import { PurchaseOrderForm } from '../components/procurement/PurchaseOrderForm'
 import { POHistory } from '../components/procurement/POHistory'
@@ -30,14 +30,38 @@ const TAB_LABELS: Record<Tab, string> = {
 
 export function Procurement() {
   const [activeTab, setActiveTab] = useTabParam(TABS, 'orders')
-  const [screen, setScreen] = useState<Screen>('list')
-  // Hold the ID, not the row. The detail screen must follow the live order —
-  // if the other side confirms or ships it while it is open, the status,
-  // totals and the edit gate have to move with it.
-  const [selectedPOId, setSelectedPOId] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  // The open order lives in the URL (`?tab=orders&po=<uuid>`), not in state, so
+  // an order can be bookmarked, shared with the other side and reopened by the
+  // back button. It also stays reachable once archived, which is the whole
+  // difference between "hidden" and "lost".
+  // Still the ID and not the row: the detail screen must follow the live order,
+  // so a confirm or ship by the other side moves the status, totals and edit
+  // gate while it is open.
+  const selectedPOId = searchParams.get('po')
+  // Reconcile is a sub-screen of an open order, so it is the only screen state
+  // left — 'list' vs 'detail' is now a function of the URL.
+  const [reconciling, setReconciling] = useState(false)
+  const screen: Screen = selectedPOId ? (reconciling ? 'reconcile' : 'detail') : 'list'
   // Last known copy, so the screen survives the row dropping out of the list
   // (status filter, the 100-row window) instead of blanking mid-edit.
   const [selectedPOFallback, setSelectedPOFallback] = useState<PurchaseOrder | null>(null)
+
+  /** Open/close the detail screen by writing the id into the URL. */
+  const setSelectedPOId = useCallback(
+    (next: string | null) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev)
+          if (next) params.set('po', next)
+          else params.delete('po')
+          return params
+        },
+        { replace: false },
+      )
+    },
+    [setSearchParams],
+  )
   const [poPrefill, setPoPrefill] = useState<{ lines: PrefillLine[]; notes: string } | null>(null)
   const [seenIds, setSeenIds] = useState<Set<string>>(() => loadSeenPOs())
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -49,9 +73,9 @@ export function Procurement() {
     (lines: PrefillLine[], notes: string) => {
       setPoPrefill({ lines, notes })
       setActiveTab('orders')
-      setScreen('list')
+      setSelectedPOId(null)
     },
-    [setActiveTab],
+    [setActiveTab, setSelectedPOId],
   )
 
   const {
@@ -61,6 +85,11 @@ export function Procurement() {
     isCreating,
     updateStatus,
     updatePO,
+    deletePO,
+    archivePO,
+    fetchOrderById,
+    showArchived,
+    setShowArchived,
     fetchLines,
     fetchLinkedReceipts,
     parseLinkedReceipt,
@@ -78,6 +107,24 @@ export function Procurement() {
     [orders, selectedPOId, selectedPOFallback],
   )
 
+  // Deep link: `?po=<uuid>` for an order the list does not carry — older than
+  // the 100-row window, or archived. Without this the URL resolves to a blank
+  // screen and a shared link is worthless.
+  useEffect(() => {
+    if (!selectedPOId || selectedPO || isLoading) return
+    let cancelled = false
+    fetchOrderById(selectedPOId).then((po) => {
+      if (cancelled) return
+      // Still nothing: the order was deleted, or the id is junk. Drop the param
+      // rather than leaving the user on an empty detail screen.
+      if (po) setSelectedPOFallback(po)
+      else setSelectedPOId(null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedPOId, selectedPO, isLoading, fetchOrderById, setSelectedPOId])
+
   const handlePOCreated = useCallback(() => {
     // Brand-new row with joined fields we cannot build locally — refetch, but
     // silently: the list is already on screen and a spinner over populated
@@ -85,36 +132,42 @@ export function Procurement() {
     refetch({ silent: true })
   }, [refetch])
 
-  const handleSelectPO = useCallback((po: PurchaseOrder) => {
-    // Opening an order clears its NEW badge for this browser.
-    setSeenIds(markPOSeen(po.id))
-    setSelectedPOId(po.id)
-    setSelectedPOFallback(po)
-    setScreen('detail')
-  }, [])
+  const handleSelectPO = useCallback(
+    (po: PurchaseOrder) => {
+      // Opening an order clears its NEW badge for this browser.
+      setSeenIds(markPOSeen(po.id))
+      setReconciling(false)
+      setSelectedPOFallback(po)
+      setSelectedPOId(po.id)
+    },
+    [setSelectedPOId],
+  )
 
   const handleBackToList = useCallback(() => {
-    setSelectedPOId(null)
+    setReconciling(false)
     setSelectedPOFallback(null)
-    setScreen('list')
+    setSelectedPOId(null)
     // The row was already patched by updatePO/updateStatus and the coalesced
     // realtime subscription reconciles the rest — this is a belt-and-braces
     // reconcile, so it must not flash a spinner.
     refetch({ silent: true })
-  }, [refetch])
+  }, [refetch, setSelectedPOId])
 
-  const handleReconcile = useCallback((po: PurchaseOrder) => {
-    setSelectedPOId(po.id)
-    setSelectedPOFallback(po)
-    setScreen('reconcile')
-  }, [])
+  const handleReconcile = useCallback(
+    (po: PurchaseOrder) => {
+      setSelectedPOFallback(po)
+      setSelectedPOId(po.id)
+      setReconciling(true)
+    },
+    [setSelectedPOId],
+  )
 
   const handleReconciled = useCallback(() => {
-    setSelectedPOId(null)
+    setReconciling(false)
     setSelectedPOFallback(null)
-    setScreen('list')
+    setSelectedPOId(null)
     refetch({ silent: true })
-  }, [refetch])
+  }, [refetch, setSelectedPOId])
 
   /** Hand a draft over to the other side straight from the desk. */
   const handleSubmitDraft = useCallback(
@@ -137,10 +190,36 @@ export function Procurement() {
     [navigate],
   )
 
+  /** Draft deleted → the order no longer exists, so leave the detail screen. */
+  const handleDeletePO = useCallback(
+    async (poId: string) => {
+      const result = await deletePO(poId)
+      if (!result.ok) return result
+      setSelectedPOFallback(null)
+      setSelectedPOId(null)
+      return result
+    },
+    [deletePO, setSelectedPOId],
+  )
+
+  /** Archiving only hides the card; stay put so the result is visible. */
+  const handleArchivePO = useCallback(
+    async (poId: string, archived: boolean) => {
+      const result = await archivePO(poId, archived)
+      if (result.ok) setSelectedPOFallback((prev) =>
+        prev && prev.id === poId
+          ? { ...prev, archived_at: archived ? new Date().toISOString() : null }
+          : prev,
+      )
+      return result
+    },
+    [archivePO],
+  )
+
   /** Supplier's digitized catalog = Price Book filtered to them (Phase C adds the filter UI). */
   const handleOpenSupplierCatalog = useCallback(
     (supplierId: string) => {
-      setScreen('list')
+      setReconciling(false)
       setActiveTab('pricebook')
       navigate(`/procurement?tab=pricebook&supplier=${supplierId}`)
     },
@@ -149,7 +228,7 @@ export function Procurement() {
 
   const handleOpenSupplierCard = useCallback(
     (supplierId: string) => {
-      setScreen('list')
+      setReconciling(false)
       setActiveTab('suppliers')
       navigate(`/procurement?tab=suppliers&supplier=${supplierId}`)
     },
@@ -204,6 +283,18 @@ export function Procurement() {
       )}
 
       {activeTab === 'orders' && screen === 'list' && (
+        <label className="flex items-center gap-2 text-[11px] text-cream/45">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="h-3.5 w-3.5 accent-gold"
+          />
+          Show archived orders
+        </label>
+      )}
+
+      {activeTab === 'orders' && screen === 'list' && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,0.58fr)_minmax(0,0.42fr)]">
           <POHistory
             orders={orders}
@@ -243,6 +334,8 @@ export function Procurement() {
           onReceive={handleReceive}
           onOpenSupplierCatalog={handleOpenSupplierCatalog}
           onOpenSupplierCard={handleOpenSupplierCard}
+          onDelete={handleDeletePO}
+          onArchive={handleArchivePO}
         />
       )}
 
@@ -251,7 +344,7 @@ export function Procurement() {
         <ReconciliationPanel
           order={selectedPO}
           onBack={() => {
-            setScreen('detail')
+            setReconciling(false)
           }}
           onReconciled={handleReconciled}
           fetchLinkedReceipts={fetchLinkedReceipts}
