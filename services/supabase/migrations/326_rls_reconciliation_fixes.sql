@@ -4,9 +4,11 @@
 -- Supersedes the relevant parts of 109_rls_audit_fixes.sql (already applied).
 -- Reconciliation: docs/security/rls-reconciliation-2026-06-29.md
 --
--- ⚠ STATUS: PREPARED — NOT APPLIED. Apply is CEO-gated (Phase 4.1/4.2).
---   Do NOT run from an automated session. This file is committed so the fix is
---   reviewable; it self-registers in migration_log only when actually executed.
+-- ✅ STATUS: APPLIED. Header corrected 2026-07-29 — it still said "PREPARED —
+--   NOT APPLIED" long after the fix had landed, which reads as an open task.
+--   Confirmed against live pg_policies (not the ledger): recipe_feedback now
+--   has anon INSERT-only + authenticated ALL + the anon/auth SELECT policy,
+--   and production_log has no anon UPDATE. That is exactly this file's intent.
 --
 -- SCOPE (deliberately narrow = the safe subset):
 --   Removes anon's ability to UPDATE/DELETE *arbitrary rows* on two tables where
