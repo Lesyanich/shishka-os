@@ -139,4 +139,23 @@ describe('pasting a price list', () => {
     const commit = screen.getByRole('button', { name: /^Import 2 rows$/i }) as HTMLButtonElement
     expect(commit.disabled).toBe(true)
   })
+
+  it('commits the same rows it previewed, with the dry run flipped off', async () => {
+    await pasteAndPreview()
+    await waitFor(() => expect(rpc).toHaveBeenCalledTimes(1))
+    const previewArgs = rpc.mock.calls[0][1] as Record<string, unknown>
+
+    const commit = await screen.findByRole('button', { name: /^Import 2 rows$/i })
+    await waitFor(() => expect((commit as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(commit)
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledTimes(2))
+    const commitArgs = rpc.mock.calls[1][1] as Record<string, unknown>
+    expect(commitArgs.p_dry_run).toBe(false)
+    // Same payload both times — a preview that disagreed with the commit would
+    // be worse than no preview.
+    expect(commitArgs.p_rows).toEqual(previewArgs.p_rows)
+    expect(commitArgs.p_supplier_id).toBe(previewArgs.p_supplier_id)
+    expect(commitArgs.p_source).toBe(previewArgs.p_source)
+  })
 })
