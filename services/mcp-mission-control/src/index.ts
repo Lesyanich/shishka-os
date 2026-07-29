@@ -162,6 +162,17 @@ server.tool(
       .describe("Scoped context: array of file paths relative to repo root for agent context loading"),
     parent_task_id: z.string().uuid().nullable().optional()
       .describe("Link to parent task (for backlinking children to initiatives). Pass null to detach."),
+    initiative_id: z.string().uuid().nullable().optional()
+      .describe(
+        "Re-file the task under a different business_initiative (epic). Verified to exist before writing. " +
+        "Pass null to detach — per RULE-EPIC-ON-CREATE a detached task should also carry a 'kind:standalone' tag. " +
+        "When set, the response includes the resulting initiative."
+      ),
+    assigned_to: z.string().optional()
+      .describe(
+        "Set the assignee — a session ID for agent claims ('claude-opus-session-xxxx') or a person ('lesia', 'bas'). " +
+        "The claim protocol in CLAUDE.md § Session Start depends on this field."
+      ),
     related_ids: jsonRecord(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional()
       .describe("MERGE into existing related_ids. Keys passed here add/replace; unrelated keys are preserved. Use {} to no-op."),
   },
