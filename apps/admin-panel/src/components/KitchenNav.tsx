@@ -4,7 +4,6 @@ import {
   ListTodo,
   Tag,
   Trash2,
-  CalendarClock,
   CalendarDays,
   PackageOpen,
 } from 'lucide-react'
@@ -23,7 +22,6 @@ const COOK_PAGES = [
 const MANAGER_PAGES = [
   { path: '/kitchen/my-tasks', label: 'Tasks', icon: ListTodo },
   { path: '/kitchen/recipes', label: 'Recipes', icon: ChefHat },
-  { path: '/planner/batch', label: 'Planner', icon: CalendarClock },
   { path: '/kitchen/schedule', label: 'Schedule', icon: CalendarDays },
   { path: '/receive', label: 'Receiving', icon: PackageOpen },
 ] as const

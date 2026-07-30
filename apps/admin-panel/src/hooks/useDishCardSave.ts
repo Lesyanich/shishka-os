@@ -16,6 +16,11 @@ export interface DishCardSavePayload {
   /** Customer-facing photo. Single source of truth for menu display —
    * persisted to nomenclature.image_url (not via the RPC). `null` clears it. */
   image_url?: string | null
+  /** Shelf life in days (mig 307). Lives on nomenclature and drives the HACCP
+   * label and batch expiry, so it is persisted the same direct way image_url is
+   * — fn_dish_card_save does not touch it. `null` clears it. PF items go
+   * through fn_pf_pack_card_save instead, which rejects non-PF codes. */
+  shelf_life_days?: number | null
   assembler_note?: string
   merrychef_program?: MerrychefProgram | null
   ttc_source_url?: string
@@ -69,6 +74,24 @@ export interface UseDishCardSaveResult {
   isSaving: boolean
 }
 
+/**
+ * The subset of a dish-card payload that lands on `nomenclature` rather than in
+ * the RPC. Returns null when there is nothing to write, so a plain card save
+ * does not fire a pointless UPDATE. `undefined` means "not supplied"; `null`
+ * means "clear it" and is written.
+ *
+ * Exported for testing — this is the branch that decides whether a shelf life
+ * reaches the DB at all, and it is silent when it gets it wrong.
+ */
+export function buildNomenclaturePatch(
+  payload: Pick<DishCardSavePayload, 'image_url' | 'shelf_life_days'>,
+): Record<string, unknown> | null {
+  const patch: Record<string, unknown> = {}
+  if (payload.image_url !== undefined) patch.image_url = payload.image_url
+  if (payload.shelf_life_days !== undefined) patch.shelf_life_days = payload.shelf_life_days
+  return Object.keys(patch).length > 0 ? patch : null
+}
+
 export function useDishCardSave(): UseDishCardSaveResult {
   const [isSaving, setIsSaving] = useState(false)
 
@@ -94,17 +117,19 @@ export function useDishCardSave(): UseDishCardSaveResult {
         if (result.conflict) return { ok: false, conflict: result.conflict }
         return { ok: false, error: result.error ?? 'Save failed' }
       }
-      // Persist the customer photo to nomenclature.image_url directly — the
-      // menu grid + drawer hero read image_url, and the RPC doesn't touch it.
-      // Done after the version-bumped card save succeeds so the two stay in sync.
-      if (payload.image_url !== undefined) {
-        const { error: imgErr } = await supabase
+      // Persist the nomenclature-level fields the RPC doesn't touch: the
+      // customer photo (menu grid + drawer hero read image_url) and the shelf
+      // life (mig 307 — the HACCP label and batch expiry both read it). Done
+      // after the version-bumped card save succeeds so the two stay in sync.
+      const nomenPatch = buildNomenclaturePatch(payload)
+      if (nomenPatch) {
+        const { error: nomenErr } = await supabase
           .from('nomenclature')
-          .update({ image_url: payload.image_url })
+          .update(nomenPatch)
           .eq('id', dishId)
-        if (imgErr) {
+        if (nomenErr) {
           setIsSaving(false)
-          return { ok: false, error: imgErr.message }
+          return { ok: false, error: nomenErr.message }
         }
       }
       setIsSaving(false)

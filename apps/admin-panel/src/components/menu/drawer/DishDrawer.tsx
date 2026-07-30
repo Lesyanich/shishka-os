@@ -15,7 +15,7 @@ import { usePfPackCard } from '../../../hooks/usePfPackCard'
 import { DrawerHero } from '../owner/DrawerHero'
 import { CustomerTab } from './tabs/CustomerTab'
 import { L1CookTab } from './tabs/L1CookTab'
-import { L2AssemblerTab } from './tabs/L2AssemblerTab'
+import { L2AssemblerTab, shelfLifeValid } from './tabs/L2AssemblerTab'
 import { OwnerTab } from './tabs/OwnerTab'
 
 type DrawerTab = 'customer' | 'l1-cook' | 'l2-assembler' | 'owner'
@@ -75,6 +75,7 @@ export function DishDrawer({
   const [formNomen, setFormNomen] = useState<{
     image_url?: string | null
     merrychef_program?: MerrychefProgram | null
+    shelf_life_days?: number | null
   } | null>(null)
 
   // Reset form when item changes
@@ -93,6 +94,7 @@ export function DishDrawer({
     (patch: {
       image_url?: string | null
       merrychef_program?: MerrychefProgram | null
+      shelf_life_days?: number | null
     }) => {
       setFormNomen((prev) => ({ ...(prev ?? {}), ...patch }))
     },
@@ -118,6 +120,18 @@ export function DishDrawer({
       setTimeout(() => setToast(null), 4000)
       return
     }
+    // A bad shelf life becomes a printed use-by date, so it is refused rather
+    // than saved with a warning nobody reads.
+    if (
+      formNomen != null &&
+      'shelf_life_days' in formNomen &&
+      !shelfLifeValid(formNomen.shelf_life_days ?? null)
+    ) {
+      setActiveTab('l2-assembler')
+      setToast({ type: 'error', text: 'Срок хранения — целое число 1–365 дней.' })
+      setTimeout(() => setToast(null), 4000)
+      return
+    }
     const result = await saveDishCard(item.id, {
       expected_version: item.card_version,
       image_url:
@@ -127,6 +141,10 @@ export function DishDrawer({
       merrychef_program:
         formNomen != null && 'merrychef_program' in formNomen
           ? formNomen.merrychef_program
+          : undefined,
+      shelf_life_days:
+        formNomen != null && 'shelf_life_days' in formNomen
+          ? formNomen.shelf_life_days
           : undefined,
       dish_card: {
         container_l2: mergedCard.container_l2 ?? undefined,
@@ -321,6 +339,12 @@ export function DishDrawer({
                 onMerrychefChange={(program) =>
                   onNomenChange({ merrychef_program: program })
                 }
+                shelfLifeDays={
+                  formNomen != null && 'shelf_life_days' in formNomen
+                    ? (formNomen.shelf_life_days ?? null)
+                    : (item.shelf_life_days ?? null)
+                }
+                onShelfLifeChange={(days) => onNomenChange({ shelf_life_days: days })}
                 packaging={dishCard.packaging}
                 packagingCatalog={dishCard.packagingCatalog}
                 onAddPackaging={dishCard.addPackaging}

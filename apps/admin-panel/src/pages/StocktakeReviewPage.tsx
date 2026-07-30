@@ -479,7 +479,7 @@ export function StocktakeReviewPage() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/kitchen/tasks')}
+              onClick={() => navigate('/kitchen/schedule?tab=cook')}
               className="text-xs text-honey-300 hover:underline"
             >
               Open Production →

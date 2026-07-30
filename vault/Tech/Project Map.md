@@ -70,13 +70,11 @@ The owner UI (`apps/admin-panel/`, React + Vite → Vercel at shishka-os.vercel.
 |---|---|
 | `ApiCostPage` | `apps/admin-panel/src/pages/ApiCostPage.tsx` |
 | `AttendancePage` | `apps/admin-panel/src/pages/hr/AttendancePage.tsx` |
-| `BatchPlanner` | `apps/admin-panel/src/pages/BatchPlanner.tsx` |
 | `BOMHub` | `apps/admin-panel/src/pages/BOMHub.tsx` |
 | `BrainDriveMapPage` | `apps/admin-panel/src/pages/brain/BrainDriveMapPage.tsx` |
 | `BrainPage` | `apps/admin-panel/src/pages/brain/BrainPage.tsx` |
 | `BrainWikiPage` | `apps/admin-panel/src/pages/brain/BrainWikiPage.tsx` |
 | `CashierPage` | `apps/admin-panel/src/pages/cashier/CashierPage.tsx` |
-| `CookStation` | `apps/admin-panel/src/pages/CookStation.tsx` |
 | `CookTasksPage` | `apps/admin-panel/src/pages/CookTasksPage.tsx` |
 | `FinanceAnalytics` | `apps/admin-panel/src/pages/FinanceAnalytics.tsx` |
 | `FinanceDashboard` | `apps/admin-panel/src/pages/FinanceDashboard.tsx` |
@@ -91,14 +89,11 @@ The owner UI (`apps/admin-panel/`, React + Vite → Vercel at shishka-os.vercel.
 | `KDSBoard` | `apps/admin-panel/src/pages/KDSBoard.tsx` |
 | `KitchenLabels` | `apps/admin-panel/src/pages/KitchenLabels.tsx` |
 | `KitchenRecipesPage` | `apps/admin-panel/src/pages/KitchenRecipesPage.tsx` |
-| `MasterPlanner` | `apps/admin-panel/src/pages/MasterPlanner.tsx` |
 | `MenuPage` | `apps/admin-panel/src/pages/menu/MenuPage.tsx` |
 | `MissionControl` | `apps/admin-panel/src/pages/MissionControl.tsx` |
 | `ModifiersPage` | `apps/admin-panel/src/pages/menu/ModifiersPage.tsx` |
 | `PayrollPage` | `apps/admin-panel/src/pages/hr/PayrollPage.tsx` |
 | `Procurement` | `apps/admin-panel/src/pages/Procurement.tsx` |
-| `ProductionOrdersPage` | `apps/admin-panel/src/pages/ProductionOrdersPage.tsx` |
-| `ProductionTargets` | `apps/admin-panel/src/pages/ProductionTargets.tsx` |
 | `PunctualityPage` | `apps/admin-panel/src/pages/hr/PunctualityPage.tsx` |
 | `ReceiptInbox` | `apps/admin-panel/src/pages/ReceiptInbox.tsx` |
 | `ReceivingStation` | `apps/admin-panel/src/pages/ReceivingStation.tsx` |
@@ -135,9 +130,7 @@ The address bar map, grouped by top-level area:
 - **/menu** — `/menu/modifiers`, `/menu/*`
 - **/mission** — `/mission`
 - **/nomenclature** — `/nomenclature/:productCode`, `/nomenclature`
-- **/planner** — `/planner`, `/planner/batch`
 - **/procurement** — `/procurement`
-- **/production** — `/production`
 - **/receipts** — `/receipts`
 - **/receive** — `/receive`
 - **/salad-bar** — `/salad-bar`
@@ -148,7 +141,6 @@ The address bar map, grouped by top-level area:
 - **/staff** — `/staff/schedule`
 - **/staff-tasks** — `/staff-tasks`
 - **/stock** — `/stock`
-- **/targets** — `/targets`
 - **/thaw** — `/thaw`
 <!-- AUTO:routes END -->
 
@@ -190,5 +182,5 @@ There is **no knowledge-graph shortcut** — use **grep + targeted `Read`** (or 
 
 ---
 <!-- AUTO:stamp START -->
-_Auto sections regenerated from the repo at commit `94170186`. Re-run: `node scripts/gen-project-map.mjs`._
+_Auto sections regenerated from the repo at commit `858fe7ec`. Re-run: `node scripts/gen-project-map.mjs`._
 <!-- AUTO:stamp END -->

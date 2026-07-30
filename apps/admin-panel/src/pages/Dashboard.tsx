@@ -335,11 +335,11 @@ export function Dashboard() {
             {/* Quick links */}
             <div className="grid grid-cols-2 gap-3">
               <Link
-                to="/planner/batch"
+                to="/kitchen/schedule?tab=cook"
                 className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 transition hover:border-emerald-500/30"
               >
                 <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                <span className="text-sm font-medium text-slate-200">Plan Production</span>
+                <span className="text-sm font-medium text-slate-200">Cook Station</span>
               </Link>
               <Link
                 to="/live"

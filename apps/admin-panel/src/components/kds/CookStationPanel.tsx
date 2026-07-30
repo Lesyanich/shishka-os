@@ -1,14 +1,22 @@
 import { useCallback, useState } from 'react'
-import { useCookTasks, type CookTask } from '../hooks/useCookTasks'
-import { useBatches } from '../hooks/useBatches'
-import { useRecipeSteps, type RecipeStep } from '../hooks/useRecipeSteps'
-import { TaskExecutionCard } from '../components/kds/TaskExecutionCard'
-import { RecipeStepCard } from '../components/kds/RecipeStepCard'
-import { BatchCompleteModal } from '../components/kds/BatchCompleteModal'
-import { KitchenNav } from '../components/KitchenNav'
+import { useCookTasks, type CookTask } from '../../hooks/useCookTasks'
+import { useBatches } from '../../hooks/useBatches'
+import { useRecipeSteps, type RecipeStep } from '../../hooks/useRecipeSteps'
+import { TaskExecutionCard } from './TaskExecutionCard'
+import { RecipeStepCard } from './RecipeStepCard'
+import { BatchCompleteModal } from './BatchCompleteModal'
 import { ChefHat, ArrowLeft } from 'lucide-react'
 
-export function CookStation() {
+/**
+ * The execution half of the kitchen board: start a production task, walk its
+ * recipe steps, close it out into batches. Was the standalone `/kitchen/tasks`
+ * page until 2026-07-29; it now lives inside `/kitchen/schedule` as the "Cook"
+ * view, because the Gantt board and this read the same `production_tasks` and
+ * two nav entries for one table sent people to the wrong one.
+ *
+ * The page chrome (KitchenNav) is the board's job now, not this panel's.
+ */
+export function CookStationPanel() {
   const { tasks, isLoading, error, startTask } = useCookTasks()
   const { createBatchesFromTask } = useBatches()
   const { steps: _steps, isLoading: stepsLoading, fetchSteps } = useRecipeSteps()
@@ -130,7 +138,6 @@ export function CookStation() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <KitchenNav />
       {/* Header */}
       <div className="text-center">
         <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
