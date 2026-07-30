@@ -2,7 +2,10 @@
 
 > Maintained by `/lawyer` agent.
 > Last updated: 2026-07-29
-> Physical files: Google Drive — `Shishka healthy kitchen/00_Legal/`
+> Physical files: Google Drive **Shared drive** `Shishka healthy kitchen/00_Legal/`
+> Locally mounted (Drive for Desktop) at
+> `~/Library/CloudStorage/GoogleDrive-lesia@shishka.health/Общие диски/Shishka healthy kitchen/00_Legal/`
+> → file PDFs with `cp`. Never base64-upload originals through the GDrive MCP (see `agents/lawyer/AGENT.md` §Push step 5).
 > Source of truth for "what doc exists, where, expiry, purpose"
 > Phase 1 entries. Will grow with each document intake via `/lawyer`.
 
