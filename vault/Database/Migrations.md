@@ -17,6 +17,6 @@ related:
 
 - The numbered SQL files there are the only allowed way to change the schema; `ls | sort | tail -1` shows the current head.
 - ⚠️ Lettered sub-migrations (`352a`, `353b`, …) DO exist, so the "strictly sequential, no letters" rule this page once claimed is false.
-- ⚠️ **The folder and prod can disagree.** As of 2026-07-29 prod's head is `387_po_delete_draft_and_archive.sql`, while `main` carries only up to 384 — 385/386 ride unmerged branches, and 375–383 drifted (MC `9c51c5ed`). Check `SELECT filename FROM migration_log ORDER BY substring(filename from '^[0-9]+')::int DESC LIMIT 5` before claiming a number, not just `ls | tail -1`.
+- ⚠️ **The folder and prod can disagree, and two branches can claim the same number.** As of 2026-07-29 `migration_log` runs to **392**, and **390 is registered twice** — `390_rls_role_gating_mc_tables` and `390_mango_canonicalization_and_peanut_removal`, from two in-flight branches. `main`'s folder ends at 389. Always check `SELECT filename FROM migration_log WHERE filename ~ '^[0-9]{3}' ORDER BY substring(filename from '^[0-9]+')::int DESC LIMIT 5` immediately before claiming a number — not `ls | tail -1`, and not a number quoted in a handoff packet written hours ago. Older drift (375–386) is tracked in MC `9c51c5ed`.
 
 _See also:_ [[Database/Schema]] · [[Database/RPC Catalog]] · [[Database/RLS Policies]]
