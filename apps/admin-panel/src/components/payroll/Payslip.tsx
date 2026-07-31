@@ -4,45 +4,68 @@ import { pdf } from '@react-pdf/renderer'
 import type { PayslipData } from '../../hooks/use-payroll'
 import { PayslipPdf } from './PayslipPdf'
 import {
+  COMPANY_ADDRESS,
   COMPANY_NAME,
+  COMPANY_SSO_ACCOUNT,
+  COMPANY_TAX_ID,
   derivePayslip,
   formatDate,
+  isCallNameOnly,
+  legalName,
+  orMissing,
   periodLabel,
   periodSlug,
   safeName,
   thb,
 } from './payslip-helpers'
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({
+  label,
+  value,
+  muted,
+}: {
+  label: string
+  value: string
+  muted?: boolean
+}) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="text-sm text-slate-200">{value}</p>
+      <p className={`text-sm ${muted ? 'text-slate-500 italic' : 'text-slate-200'}`}>
+        {value}
+      </p>
     </div>
   )
 }
 
 function LineRow({
   label,
+  sub,
   value,
   strong,
   border,
+  tone,
 }: {
   label: string
+  sub?: string
   value: string
   strong?: boolean
   border?: boolean
+  tone?: 'default' | 'muted'
 }) {
   return (
     <div
       className={[
-        'flex items-center justify-between py-1 text-sm',
+        'flex items-start justify-between py-1 text-sm',
         border ? 'border-t border-slate-700 pt-1.5' : '',
         strong ? 'font-semibold text-slate-100' : 'text-slate-300',
       ].join(' ')}
     >
-      <span>{label}</span>
-      <span>{value}</span>
+      <span className="pr-3">
+        {label}
+        {sub && <span className="block text-[10px] text-slate-500">{sub}</span>}
+      </span>
+      <span className={tone === 'muted' ? 'text-slate-500' : ''}>{value}</span>
     </div>
   )
 }
@@ -54,7 +77,7 @@ export function Payslip({
   data: PayslipData
   onClose: () => void
 }) {
-  const { line, staff, period } = data
+  const { line, staff, period, payments } = data
   const d = derivePayslip(data)
   const [downloading, setDownloading] = useState(false)
 
@@ -65,7 +88,7 @@ export function Payslip({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `payslip_${safeName(staff.name)}_${periodSlug(period.period_start)}.pdf`
+      a.download = `payslip_${safeName(legalName(staff))}_${periodSlug(period.period_start)}.pdf`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -74,6 +97,8 @@ export function Payslip({
       setDownloading(false)
     }
   }
+
+  const dailyRate = staff.monthly_salary ? staff.monthly_salary / 30 : 0
 
   return (
     <div
@@ -87,7 +112,7 @@ export function Payslip({
         {/* Toolbar */}
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
           <h2 className="text-sm font-semibold text-slate-200">
-            Payslip — {staff.name} · {periodLabel(period.period_start)}
+            Payslip — {legalName(staff)} · {periodLabel(period.period_start)}
           </h2>
           <div className="flex items-center gap-2">
             <button
@@ -114,11 +139,16 @@ export function Payslip({
 
         {/* Document body */}
         <div className="space-y-5 p-6">
-          {/* Header */}
+          {/* Employer */}
           <div className="border-b-2 border-emerald-700 pb-3">
             <p className="text-base font-bold text-emerald-400">{COMPANY_NAME}</p>
-            <p className="text-xs text-slate-400">Payslip / Расчётный листок</p>
-            <div className="mt-1.5 flex justify-between text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-500">
+              Tax ID: {orMissing(COMPANY_TAX_ID)} · SSO acct:{' '}
+              {orMissing(COMPANY_SSO_ACCOUNT)}
+            </p>
+            <p className="text-[11px] text-slate-500">{orMissing(COMPANY_ADDRESS)}</p>
+            <p className="mt-1.5 text-xs text-slate-400">Payslip / Salary Statement</p>
+            <div className="mt-1 flex justify-between text-[11px] text-slate-500">
               <span>
                 Pay period: {periodLabel(period.period_start)} (
                 {formatDate(period.period_start)} – {formatDate(period.period_end)})
@@ -134,21 +164,47 @@ export function Payslip({
             </p>
             <div className="grid grid-cols-2 gap-3">
               <Field
-                label="Name"
-                value={`${staff.name}${staff.name_th ? ` (${staff.name_th})` : ''}`}
+                label="Full name"
+                value={legalName(staff)}
+                muted={isCallNameOnly(staff)}
               />
-              <Field label="Role" value={staff.role} />
-              <Field label="Nationality" value={staff.nationality ?? '—'} />
-              <Field label="Hire date" value={formatDate(staff.hire_date)} />
+              <Field label="Name (Thai)" value={staff.name_th ?? 'Not on file'} muted={!staff.name_th} />
+              <Field label="Position" value={staff.role} />
+              <Field label="Nationality" value={staff.nationality ?? 'Not on file'} muted={!staff.nationality} />
               <Field
-                label="Employment type"
-                value={staff.employment_type ?? '—'}
+                label="Date of birth"
+                value={staff.date_of_birth ? formatDate(staff.date_of_birth) : 'Not on file'}
+                muted={!staff.date_of_birth}
               />
+              <Field label="Employment start" value={formatDate(staff.hire_date)} />
+              <Field label="Employment type" value={staff.employment_type ?? '—'} />
               <Field
                 label="Social Security No."
-                value={staff.sso_number ?? 'Not enrolled'}
+                value={staff.sso_number ?? 'Pending enrolment'}
+                muted={!staff.sso_number}
               />
+              <Field label="Tax ID" value={staff.tax_id ?? 'Not on file'} muted={!staff.tax_id} />
+              <Field
+                label="Address"
+                value={staff.address ?? 'Not on file'}
+                muted={!staff.address}
+              />
+              {staff.work_permit_number && (
+                <Field
+                  label="Work permit"
+                  value={`${staff.work_permit_number}${
+                    staff.work_permit_expiry
+                      ? ` (exp. ${formatDate(staff.work_permit_expiry)})`
+                      : ''
+                  }`}
+                />
+              )}
             </div>
+            {isCallNameOnly(staff) && (
+              <p className="mt-2 rounded bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300/80">
+                Showing the call-name — the legal name has not been collected yet.
+              </p>
+            )}
           </div>
 
           {/* Earnings + Deductions */}
@@ -157,24 +213,66 @@ export function Payslip({
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
                 Earnings
               </p>
-              <LineRow label="Base salary" value={thb(line.base_salary)} />
+              <LineRow
+                label="Base salary"
+                sub={
+                  staff.monthly_salary
+                    ? `contract ${thb(staff.monthly_salary)}/month`
+                    : undefined
+                }
+                value={thb(line.base_salary)}
+              />
               <LineRow label="Overtime" value={thb(line.overtime_pay)} />
+              <LineRow
+                label="Bonus"
+                sub={line.bonus_note ?? undefined}
+                value={thb(line.bonus_pay)}
+              />
               <LineRow label="Gross" value={thb(d.gross)} strong border />
             </div>
             <div>
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
                 Deductions
               </p>
-              <LineRow label="Absence" value={thb(line.absence_deduction)} />
+              <LineRow
+                label="Unpaid absence"
+                sub={
+                  line.days_absent > 0
+                    ? `${line.days_absent} day(s) × ${thb(dailyRate)} (monthly ÷ 30)`
+                    : undefined
+                }
+                value={thb(line.absence_deduction)}
+              />
+              <LineRow
+                label="Late arrivals"
+                sub={
+                  line.late_days > 0
+                    ? `${line.late_days} day(s), ${line.late_minutes} min unworked`
+                    : undefined
+                }
+                value={thb(line.late_deduction)}
+              />
               <LineRow
                 label="Social Security (5%)"
+                sub={
+                  line.sso_employee > 0
+                    ? 'on the capped base'
+                    : 'not enrolled — nothing withheld'
+                }
                 value={thb(line.sso_employee)}
               />
               <LineRow
                 label="Withholding tax"
+                sub={
+                  line.withholding_tax === 0
+                    ? 'below the taxable threshold'
+                    : 'monthly slice of the annual liability'
+                }
                 value={thb(line.withholding_tax)}
               />
-              <LineRow label="Other" value={thb(line.other_deductions)} />
+              {d.otherBeyondLate > 0 && (
+                <LineRow label="Other" value={thb(d.otherBeyondLate)} />
+              )}
               <LineRow
                 label="Total deductions"
                 value={thb(d.totalDeductions)}
@@ -189,47 +287,74 @@ export function Payslip({
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
               Attendance
             </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <Field label="Calendar days" value={String(d.calendarDays)} />
               <Field label="Days worked" value={String(line.days_worked)} />
               <Field label="Unpaid absences" value={String(line.days_absent)} />
               <Field label="Paid leave" value={String(line.days_leave_paid)} />
+              <Field
+                label="Late days"
+                value={
+                  line.late_days > 0
+                    ? `${line.late_days} (${line.late_minutes} min)`
+                    : '0'
+                }
+              />
             </div>
           </div>
 
-          {/* Employer-paid (not deducted) */}
+          {/* Employer-paid (not deducted) — SSO match only. */}
           {d.hasEmployerPaid && (
             <div>
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
-                Employer-paid · not deducted
+                Employer contribution
               </p>
-              {d.workPermitAnnual > 0 && (
-                <LineRow
-                  label="Work permit & visa (annual)"
-                  value={thb(d.workPermitAnnual)}
-                />
-              )}
-              {d.employerSso > 0 && (
-                <LineRow
-                  label="Social Security — employer 5%"
-                  value={thb(d.employerSso)}
-                />
-              )}
-              <p className="mt-1 text-[10px] text-slate-500">
-                Paid by the employer. Does not reduce your net pay.
-              </p>
+              <LineRow
+                label="Social Security — employer 5%"
+                value={thb(d.employerSso)}
+                tone="muted"
+              />
             </div>
           )}
 
-          {/* Net */}
-          <div className="flex items-center justify-between rounded-lg border border-emerald-700 bg-emerald-500/10 px-4 py-3">
-            <span className="text-sm font-bold uppercase tracking-wide text-emerald-300">
-              Net pay
-            </span>
-            <span className="text-2xl font-bold text-emerald-300">
-              {thb(d.net)}
-            </span>
+          {/* Net + payments */}
+          <div className="rounded-lg border border-emerald-700 bg-emerald-500/10 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold uppercase tracking-wide text-emerald-300">
+                Net pay
+              </span>
+              <span className="text-2xl font-bold text-emerald-300">{thb(d.net)}</span>
+            </div>
+            {payments.length > 0 && (
+              <div className="mt-2 border-t border-emerald-700/40 pt-2">
+                {payments.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between text-xs text-emerald-200/70"
+                  >
+                    <span>
+                      less: {p.kind} paid {formatDate(p.paid_on)}
+                      {p.note ? ` — ${p.note}` : ''}
+                    </span>
+                    <span>−{thb(p.amount)}</span>
+                  </div>
+                ))}
+                <div className="mt-1.5 flex items-center justify-between border-t border-emerald-700/40 pt-1.5 text-sm font-semibold text-emerald-300">
+                  <span>Balance due</span>
+                  <span>{thb(d.balanceDue)}</span>
+                </div>
+              </div>
+            )}
+            <p className="mt-2 text-[10px] text-emerald-200/50">
+              Paid in cash. Daily rate = monthly salary ÷ 30 (LPA §68).
+            </p>
           </div>
+
+          {line.notes && (
+            <p className="rounded bg-slate-800/60 px-3 py-2 text-[11px] text-slate-400">
+              {line.notes}
+            </p>
+          )}
 
           {/* Signatures */}
           <div className="flex justify-between gap-6 pt-6">
