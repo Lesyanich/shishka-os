@@ -21,6 +21,9 @@ Observed on the July 2026 period (`4ad08d26`, status `calculated`, total ฿53,8
 | 5 | Any recalculation silently destroys manual adjustments | `fn_calculate_payroll`'s `ON CONFLICT … DO UPDATE` overwrites every money column. `notes` is *not* in the update list, so a stale note survives and describes numbers that no longer exist. | High — data integrity |
 | 6 | Payslip identity block is thin | Short call-names only ("Mint", "Hein"), `name_th` / `sso_number` / `tax_id` / work-permit fields are NULL for everyone; no DOB or address columns exist. | Medium — the ask |
 | 7 | "Work permit & visa (annual) ฿15,000 / Paid by the employer. Does not reduce your net pay." | Rendered from `staff.work_permit_annual_thb`. | Remove — CEO decision, see § 2.3 |
+| 8 | **`fn_approve_payroll` double-books overtime and bonuses into the expense ledger** | `net_pay` already contains `overtime_pay` (`net := base + overtime − deductions`). The function then writes a *second*, separate `2604 Overtime pay` expense for the period total. | **Critical — confirmed, not latent.** April 2026 is overstated by ฿4,000: `Salary: Alex 17,000` + `Salary: Hein 17,000` (each already carrying a ฿2,000 holiday bonus) **plus** a standalone `Overtime pay 4,000` row. And since bonuses live in `overtime_pay` today, every future bonus doubles too |
+| 9 | Approved salaries book as `payment_method='transfer'` | Hardcoded in `fn_approve_payroll`. Salaries are paid **cash**. Feb and Mar rows say `transfer`; Apr and May were corrected by hand to `cash`. | Low, but it makes cash reconciliation lie |
+| 10 | No way to pay an advance or split a salary | No advance/payout table exists anywhere in the schema. `payroll_lines` models one payment per person per month, full stop. | High — CEO-blocking, § 6 |
 
 **Live hazard, unrelated to code:** the July period is `calculated` with an active **Approve & Create Expenses** button, and its numbers are known-wrong — Alex carries ฿3,500 the CEO decided not to pay, Nono is missing her agreed +฿1,200 offset, and SSO is ฿0 for all. Approving books all of that to the expense ledger. **Do not approve July until this spec lands.**
 
@@ -131,10 +134,10 @@ Break-even: monthly gross above ~฿26,000 starts producing a non-zero PIT. Mint
 
 | **D** | Thai public-holiday calendar — reference table, attendance auto-fill, admin highlighting | `kind:feature` | fresh session, can run parallel to B |
 
-### 4.1 Design decisions needed before B starts
+### 4.1 Design decisions — SETTLED by CEO 2026-07-31
 
-1. **`days_worked` source — the schedule is the default.** CEO 2026-07-31: *"по умолчанию в графике должна стоять полный рабочий день"*. So `days_worked` derives from `shifts` (104 already exist for July), not from hand-typed `staff_attendance` rows: a scheduled shift counts as a full worked day unless an absence, leave, holiday or day-off row overrides it. This kills the empty `Days` column without asking anyone to log attendance daily, and it makes the schedule the single input it was always meant to be.
-2. **Lateness deduction must actually run.** `v_shift_punctuality` (222 rows) → owner approval → `unworked_time_adjustments` → `other_deductions` is fully built and has never fired. Decide the trigger: monthly review as part of closing a period, or approve-as-you-go. Per LEG-004 only **unworked minutes** may be deducted — fines are illegal — so the deducted value is always `late_minutes × (daily_rate / 8 / 60)`, never a flat penalty.
+1. **`days_worked` comes from the schedule. DECIDED.** CEO: *"по умолчанию в графике должна стоять полный рабочий день"*. `days_worked` derives from `shifts` (104 rows already exist for July), not from hand-typed `staff_attendance` rows: **a scheduled shift counts as a full worked day** unless an absence, leave, holiday or day-off row overrides it. This kills the empty `Days` column without asking anyone to log attendance daily, and makes the schedule the single input it was always meant to be. `staff_attendance` becomes the exception log, not the primary record.
+2. **Lateness is approved when the period is closed. DECIDED.** CEO: *"опоздания одобряем при закрытии периода"*. So closing a period gains a mandatory step: review `v_shift_punctuality` for the month → owner approves → rows land in `unworked_time_adjustments` → `fn_calculate_payroll` picks them up as `other_deductions`. The period must not reach `approved` with unreviewed late minutes still sitting in the view. Per LEG-004 only **unworked minutes** may be deducted — fines are illegal — so the value is always `late_minutes × (daily_rate / 8 / 60)`, never a flat penalty.
 3. **Manual-edit preservation.** Add `is_manual_override` (or per-column `*_manual` flags) so recalculation refuses to clobber a hand-entered bonus or zeroed line, instead of the current silent overwrite.
 4. **SSO enrolment date.** `sso_number` presence is currently the switch. It should be a date (`sso_enrolled_from`), because June is retroactive — flipping the flag today must not silently restate May.
 
@@ -148,6 +151,62 @@ No holiday reference exists in the schema. Needed:
 - Pay treatment: LPA §29 entitles employees to at least 13 paid public holidays a year; §62 sets the premium for working on one. `payroll_config` already carries `ot_multiplier_holiday` and `ot_multiplier_holiday_ot`, so the rates exist — the calendar to trigger them does not.
 
 **Open for July 2026:** 28 July has passed with no record. Whoever worked it is owed either a substitute day off or holiday-rate pay. Resolve before the July period is approved.
+
+---
+
+## 6. Advance payments and split salaries
+
+CEO 2026-07-31: *"хочу вносить досрочные выплаты сотрудникам (например разбивать ЗП на 2 части) или если кому-то нужно денег досрочно выплатить"*.
+
+Nothing in the schema supports this — `payroll_lines` models exactly one payment per person per month.
+
+### 6.1 Legal position
+
+Clean, with one boundary to respect. LPA §70 requires wages **at least** once a month; paying more often — twice monthly, or an advance on request — is always permitted. An advance against wages already earned is not a §76 "deduction" and is not subject to the §77 10%/20% caps: it is the same wage, paid earlier.
+
+The boundary: it must stay a **wage advance**, not a loan. No interest, no fee, no repayment schedule that outlives the employment. Advancing *unearned* future wages turns into a debt the employee owes, and recovering that from later wages does hit §76 — which is the same trap already flagged on Alex's visa cost. **Rule: never advance more than the wage accrued to date in the current period.**
+
+### 6.2 Model
+
+A new table, one row per cash-out event:
+
+```
+staff_payments (
+  id, staff_id, payroll_period_id,
+  paid_on date, amount numeric,
+  kind text,           -- 'advance' | 'final' | 'correction'
+  payment_method text, -- 'cash'
+  note text, expense_ledger_id uuid,
+  created_by, created_at
+)
+```
+
+`payroll_lines.net_pay` stays the **entitlement** for the month. What changes is that it is no longer assumed to equal a single payment.
+
+### 6.3 Payslip presentation
+
+The advance is **not** a deduction. It must not touch gross, and must not touch the SSO or tax base. It appears below net pay:
+
+```
+Net pay                        12,000
+  less: advance paid 15 Jul    −6,000
+  ─────────────────────────────────────
+  Balance due                   6,000
+```
+
+### 6.4 The trap this must avoid
+
+`fn_approve_payroll` currently books one expense per line at `net_pay`. If advances are paid during the month and also booked as expenses, approving the period **double-counts** them — the identical bug already confirmed on overtime (§ 1 #8). So:
+
+- Each `staff_payments` row books its own `expense_ledger` entry when it is paid.
+- `fn_approve_payroll` must book only `net_pay − sum(advances already booked for this period)`, and must stop emitting the separate `2604 Overtime pay` row entirely.
+- A period cannot be approved while `sum(staff_payments) > net_pay` for anyone.
+
+### 6.5 Acceptance for this piece
+
+- Pay Mint ฿10,000 on the 15th; the July payslip shows net ฿25,000, less advance ฿10,000, balance ฿15,000.
+- The expense ledger holds ฿10,000 on the 15th and ฿15,000 at month end — ฿25,000 total, not ฿35,000.
+- Attempting an advance larger than the wage accrued to date is refused.
 
 ---
 
