@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, Loader2, X } from 'lucide-react'
+import { Check, Download, Link2, Loader2, X } from 'lucide-react'
 import { pdf } from '@react-pdf/renderer'
 import type { PayslipData } from '../../hooks/use-payroll'
 import { PayslipPdf } from './PayslipPdf'
@@ -80,6 +80,14 @@ export function Payslip({
   const { line, staff, period, payments } = data
   const d = derivePayslip(data)
   const [downloading, setDownloading] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  /** This payslip's own address — ?period= and ?payslip= are already in the URL. */
+  async function copyLink() {
+    await navigator.clipboard.writeText(window.location.href)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   async function handleDownload() {
     setDownloading(true)
@@ -115,6 +123,18 @@ export function Payslip({
             Payslip — {legalName(staff)} · {periodLabel(period.period_start)}
           </h2>
           <div className="flex items-center gap-2">
+            <button
+              onClick={copyLink}
+              className="flex items-center gap-1.5 rounded-md bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-700"
+              title="Copy this payslip's link"
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-emerald-400" />
+              ) : (
+                <Link2 className="h-3.5 w-3.5" />
+              )}
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
             <button
               onClick={handleDownload}
               disabled={downloading}
