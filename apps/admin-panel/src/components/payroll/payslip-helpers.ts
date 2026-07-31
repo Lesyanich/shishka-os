@@ -64,8 +64,9 @@ export function isCallNameOnly(staff: PayslipData['staff']): boolean {
  * a missing statutory field should be visible, not invisible.
  */
 export const COMPANY_NAME = 'Shishka Healthy Food Company Limited'
-export const COMPANY_TAX_ID: string | null = null
-export const COMPANY_ADDRESS: string | null = null
+/** In Thailand the 13-digit company registration number IS the tax ID (LEG-001). */
+export const COMPANY_TAX_ID: string | null = '0835568025951'
+export const COMPANY_ADDRESS: string | null = '86/139 Moo 7, Rawai'
 export const COMPANY_SSO_ACCOUNT: string | null = '8330006310'
 
 /** Renders a value that may not have been collected yet. */
