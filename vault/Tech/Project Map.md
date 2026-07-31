@@ -83,6 +83,7 @@ The owner UI (`apps/admin-panel/`, React + Vite → Vercel at shishka-os.vercel.
 | `HandbookHome` | `apps/admin-panel/src/pages/handbook/HandbookHome.tsx` |
 | `HandbookLayout` | `apps/admin-panel/src/pages/handbook/HandbookLayout.tsx` |
 | `HandbookPage` | `apps/admin-panel/src/pages/handbook/HandbookPage.tsx` |
+| `HolidaysPage` | `apps/admin-panel/src/pages/hr/HolidaysPage.tsx` |
 | `HRLayout` | `apps/admin-panel/src/pages/hr/HRLayout.tsx` |
 | `KbEditor` | `apps/admin-panel/src/pages/handbook/KbEditor.tsx` |
 | `KbRegistry` | `apps/admin-panel/src/pages/handbook/KbRegistry.tsx` |
@@ -124,7 +125,7 @@ The address bar map, grouped by top-level area:
 - **/count** — `/count/session/:id`, `/count/:code`
 - **/finance** — `/finance`, `dashboard`, `ledger`, `analytics`
 - **/handbook** — `/handbook`, `:slug`, `registry`, `new`, `:slug/edit`, `*`
-- **/hr** — `/hr`, `attendance`, `punctuality`, `payroll`, `staff`
+- **/hr** — `/hr`, `attendance`, `punctuality`, `holidays`, `payroll`, `staff`
 - **/kitchen** — `/kitchen/waste`, `/kitchen/schedule`, `/kitchen/tasks`, `/kitchen/my-tasks`, `/kitchen/labels`, `/kitchen/recipes`
 - **/login** — `/login`
 - **/menu** — `/menu/modifiers`, `/menu/*`
@@ -182,5 +183,5 @@ There is **no knowledge-graph shortcut** — use **grep + targeted `Read`** (or 
 
 ---
 <!-- AUTO:stamp START -->
-_Auto sections regenerated from the repo at commit `858fe7ec`. Re-run: `node scripts/gen-project-map.mjs`._
+_Auto sections regenerated from the repo at commit `b0baa05f`. Re-run: `node scripts/gen-project-map.mjs`._
 <!-- AUTO:stamp END -->
