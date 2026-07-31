@@ -90,6 +90,8 @@ export interface PayslipData {
   period: PayrollPeriod
   payments: StaffPayment[]
   advancesPaid: number
+  /** Substitute days off still owed for public holidays worked (LPA §29). */
+  substituteDaysOwed: number
 }
 
 const STAFF_PAYSLIP_COLUMNS =
@@ -325,7 +327,7 @@ export function usePayroll() {
 
   const getPayslip = useCallback(
     async (periodId: string, staffId: string): Promise<PayslipData | null> => {
-      const [lineRes, staffRes, periodRes, paymentsRes] = await Promise.all([
+      const [lineRes, staffRes, periodRes, paymentsRes, creditsRes] = await Promise.all([
         supabase
           .from('payroll_lines')
           .select('*')
@@ -348,6 +350,13 @@ export function usePayroll() {
           .eq('payroll_period_id', periodId)
           .eq('staff_id', staffId)
           .order('paid_on'),
+        // A running balance, not a per-period figure — it is what the person is
+        // still owed for holidays worked, whenever they were worked.
+        supabase
+          .from('holiday_credits')
+          .select('id', { count: 'exact', head: true })
+          .eq('staff_id', staffId)
+          .eq('status', 'owed'),
       ])
 
       if (!lineRes.data || !staffRes.data || !periodRes.data) return null
@@ -360,6 +369,7 @@ export function usePayroll() {
         period: periodRes.data as unknown as PayrollPeriod,
         payments,
         advancesPaid: payments.reduce((s, p) => s + p.amount, 0),
+        substituteDaysOwed: creditsRes.count ?? 0,
       }
     },
     [],

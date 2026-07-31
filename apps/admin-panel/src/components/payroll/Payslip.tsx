@@ -301,6 +301,12 @@ export function Payslip({
                 }
               />
             </div>
+            {data.substituteDaysOwed > 0 && (
+              <p className="mt-2 rounded bg-sky-500/10 px-2 py-1 text-[11px] text-sky-300/80">
+                {data.substituteDaysOwed} substitute day(s) off still owed for public holidays
+                worked (LPA §29).
+              </p>
+            )}
           </div>
 
           {/* Employer-paid (not deducted) — SSO match only. */}

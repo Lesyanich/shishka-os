@@ -62,6 +62,7 @@ function makeData(): PayslipData {
       updated_at: '2026-05-30T00:00:00Z',
     },
     payments: [],
+    substituteDaysOwed: 0,
     advancesPaid: 0,
   }
 }

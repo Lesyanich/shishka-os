@@ -81,6 +81,7 @@ function makeData(
     },
     payments,
     advancesPaid: payments.reduce((s, p) => s + p.amount, 0),
+    substituteDaysOwed: 0,
   }
 }
 

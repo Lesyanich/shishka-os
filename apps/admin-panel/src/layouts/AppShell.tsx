@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   AlarmClock,
+  PartyPopper,
   BarChart3,
   BookOpen,
   CalendarDays,
@@ -117,6 +118,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { path: '/hr/attendance', icon: CalendarCheck, label: 'Attendance', minRole: 'owner' },
       { path: '/hr/punctuality', icon: AlarmClock, label: 'Punctuality', minRole: 'owner' },
+      { path: '/hr/holidays', icon: PartyPopper, label: 'Holidays', minRole: 'owner' },
       { path: '/hr/payroll', icon: Banknote, label: 'Payroll', minRole: 'owner' },
       { path: '/hr/staff', icon: Users, label: 'Staff', minRole: 'owner' },
     ],

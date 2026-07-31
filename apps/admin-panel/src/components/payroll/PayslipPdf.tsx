@@ -336,6 +336,12 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
             </Text>
           </View>
         </View>
+        {data.substituteDaysOwed > 0 ? (
+          <Text style={styles.subLabel}>
+            {data.substituteDaysOwed} substitute day(s) off still owed for public holidays worked
+            (LPA s.29).
+          </Text>
+        ) : null}
 
         {/* Employer contribution — SSO match only. The work-permit figure is
             deliberately absent: it is an HR cost, not part of this wage. */}
