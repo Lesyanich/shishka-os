@@ -9,6 +9,7 @@ import {
   Plus,
   Loader2,
 } from 'lucide-react'
+import { PaymentQrCard } from '../../components/hr/PaymentQrCard'
 import {
   useStaffCards,
   type StaffCard,
@@ -63,10 +64,13 @@ function StaffCardView({
   card,
   leaves,
   onUpdate,
+  onChanged,
 }: {
   card: StaffCard
   leaves: LeaveBalance[]
   onUpdate: (id: string, patch: StaffPatch) => Promise<void>
+  /** Refetch after a write that bypasses onUpdate — the QR upload writes storage + the row. */
+  onChanged: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<StaffPatch>({})
@@ -201,6 +205,15 @@ function StaffCardView({
           <EditField label="Tax ID" value={draft.tax_id ?? ''} onChange={(v) => setDraft({ ...draft, tax_id: v || null })} />
         </div>
       )}
+
+      {/* Payment QR — how this person actually gets paid on a transfer. */}
+      <PaymentQrCard
+        staffId={card.id}
+        staffName={card.name}
+        qrPath={card.payment_qr_path}
+        note={card.payment_note}
+        onChanged={onChanged}
+      />
 
       {/* Leave balances */}
       {leaves.length > 0 && (
@@ -360,7 +373,7 @@ function AddStaffForm({
 }
 
 export function StaffPage() {
-  const { staff, leaveBalances, isLoading, updateStaff, createStaff } = useStaffCards()
+  const { staff, leaveBalances, isLoading, updateStaff, createStaff, refetch } = useStaffCards()
   const [showAddForm, setShowAddForm] = useState(false)
 
   if (isLoading) {
@@ -397,6 +410,7 @@ export function StaffPage() {
             card={s}
             leaves={leaveBalances.filter((l) => l.staff_id === s.id)}
             onUpdate={updateStaff}
+            onChanged={refetch}
           />
         ))}
       </div>
