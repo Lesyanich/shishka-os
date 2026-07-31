@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Plus,
   Calculator,
@@ -35,6 +36,24 @@ function formatDate(d: string) {
 
 function thb(n: number) {
   return `฿${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
+
+/**
+ * Merge deep-link params without disturbing anything else already in the URL.
+ * `null` removes a param, `undefined` leaves it exactly as it was — the
+ * distinction matters: closing a payslip must not also close its period.
+ * Pure, so the linking rules are testable without a router.
+ */
+export function mergePayrollParams(
+  prev: URLSearchParams,
+  next: { period?: string | null; payslip?: string | null },
+): URLSearchParams {
+  const params = new URLSearchParams(prev)
+  for (const [key, value] of Object.entries(next)) {
+    if (value === null) params.delete(key)
+    else if (value !== undefined) params.set(key, value)
+  }
+  return params
 }
 
 function NewPeriodForm({ onCreate }: { onCreate: (start: string, end: string) => Promise<void> }) {
@@ -262,6 +281,11 @@ function PaymentEditor({
 
 function PeriodRow({
   period,
+  isExpanded,
+  onToggleExpand,
+  payslipStaffId,
+  onOpenPayslip,
+  onClosePayslip,
   onCalculate,
   onReopen,
   onApprove,
@@ -274,6 +298,13 @@ function PeriodRow({
   getPayslip,
 }: {
   period: PayrollPeriod
+  /** Driven by ?period= so the open period is linkable and survives a refresh. */
+  isExpanded: boolean
+  onToggleExpand: () => void
+  /** Driven by ?payslip= — the staff whose payslip is open, if it is this period's. */
+  payslipStaffId: string | null
+  onOpenPayslip: (staffId: string) => void
+  onClosePayslip: () => void
   onCalculate: (id: string) => Promise<void>
   onReopen: (id: string) => Promise<void>
   onApprove: (id: string) => Promise<string | null>
@@ -291,37 +322,47 @@ function PeriodRow({
   deletePayment: (id: string) => Promise<void>
   getPayslip: (periodId: string, staffId: string) => Promise<PayslipData | null>
 }) {
-  const [expanded, setExpanded] = useState(false)
   const [lines, setLines] = useState<PayrollLine[]>([])
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [payslip, setPayslip] = useState<PayslipData | null>(null)
-  const [payslipLoadingId, setPayslipLoadingId] = useState<string | null>(null)
   const [bonusFor, setBonusFor] = useState<string | null>(null)
   const [paymentFor, setPaymentFor] = useState<string | null>(null)
   const [paymentRows, setPaymentRows] = useState<StaffPayment[]>([])
   const [approveError, setApproveError] = useState<string | null>(null)
 
-  async function refreshLines() {
+  const refreshLines = useCallback(async () => {
     const data = await getLines(period.id)
     setLines(data)
-  }
+  }, [getLines, period.id])
 
-  async function openPayslip(staffId: string) {
-    setPayslipLoadingId(staffId)
-    const data = await getPayslip(period.id, staffId)
-    setPayslipLoadingId(null)
-    if (data) setPayslip(data)
-  }
+  // Expanding is a URL change, so the lines load in response to the URL rather
+  // than inside the click handler — that is what makes a pasted link work.
+  useEffect(() => {
+    if (!isExpanded) return
+    let cancelled = false
+    setLoading(true)
+    getLines(period.id).then((data) => {
+      if (!cancelled) {
+        setLines(data)
+        setLoading(false)
+      }
+    })
+    return () => { cancelled = true }
+  }, [isExpanded, getLines, period.id])
 
-  async function toggleExpand() {
-    if (!expanded) {
-      setLoading(true)
-      await refreshLines()
-      setLoading(false)
+  // Same for the payslip: ?payslip=<staffId> opens it, wherever the URL came from.
+  useEffect(() => {
+    if (!payslipStaffId) {
+      setPayslip(null)
+      return
     }
-    setExpanded(!expanded)
-  }
+    let cancelled = false
+    getPayslip(period.id, payslipStaffId).then((data) => {
+      if (!cancelled && data) setPayslip(data)
+    })
+    return () => { cancelled = true }
+  }, [payslipStaffId, getPayslip, period.id])
 
   async function handleCalculate() {
     setActionLoading(true)
@@ -357,11 +398,11 @@ function PeriodRow({
     <div className="rounded-lg ring-1 ring-slate-800 overflow-hidden">
       {/* Period header */}
       <button
-        onClick={toggleExpand}
+        onClick={onToggleExpand}
         className="flex w-full items-center justify-between bg-slate-900/50 px-4 py-3 text-left hover:bg-slate-900/70 transition"
       >
         <div className="flex items-center gap-3">
-          {expanded ? (
+          {isExpanded ? (
             <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
           ) : (
             <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
@@ -379,7 +420,7 @@ function PeriodRow({
       </button>
 
       {/* Expanded detail */}
-      {expanded && (
+      {isExpanded && (
         <div className="border-t border-slate-800 bg-slate-950/50 p-4 space-y-3">
           {/* Close-period checklist */}
           {(period.status === 'draft' || period.status === 'calculated') && (
@@ -570,12 +611,12 @@ function PeriodRow({
                               </>
                             )}
                             <button
-                              onClick={() => openPayslip(l.staff_id)}
-                              disabled={payslipLoadingId === l.staff_id}
+                              onClick={() => onOpenPayslip(l.staff_id)}
+                              disabled={payslipStaffId === l.staff_id && !payslip}
                               className="rounded p-1 text-slate-400 transition hover:bg-slate-800 hover:text-emerald-300 disabled:opacity-50"
-                              title="View payslip"
+                              title="View payslip — opens at its own link"
                             >
-                              {payslipLoadingId === l.staff_id ? (
+                              {payslipStaffId === l.staff_id && !payslip ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
                               ) : (
                                 <FileText className="h-3 w-3" />
@@ -647,9 +688,7 @@ function PeriodRow({
         </div>
       )}
 
-      {payslip && (
-        <Payslip data={payslip} onClose={() => setPayslip(null)} />
-      )}
+      {payslip && <Payslip data={payslip} onClose={onClosePayslip} />}
     </div>
   )
 }
@@ -671,6 +710,20 @@ export function PayrollPage() {
     getPayslip,
   } = usePayroll()
   const [showForm, setShowForm] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Deep links. `?period=` opens a period, `?payslip=` opens one person's slip
+  // inside it — so a payslip has its own address that survives a refresh, the
+  // back button, and being pasted to somebody else.
+  const openPeriodId = searchParams.get('period')
+  const payslipStaffId = searchParams.get('payslip')
+
+  const setParams = useCallback(
+    (next: { period?: string | null; payslip?: string | null }) => {
+      setSearchParams((prev) => mergePayrollParams(prev, next), { replace: false })
+    },
+    [setSearchParams],
+  )
 
   if (isLoading) {
     return (
@@ -709,6 +762,15 @@ export function PayrollPage() {
           <PeriodRow
             key={p.id}
             period={p}
+            isExpanded={p.id === openPeriodId}
+            onToggleExpand={() =>
+              p.id === openPeriodId
+                ? setParams({ period: null, payslip: null })
+                : setParams({ period: p.id, payslip: null })
+            }
+            payslipStaffId={p.id === openPeriodId ? payslipStaffId : null}
+            onOpenPayslip={(staffId) => setParams({ period: p.id, payslip: staffId })}
+            onClosePayslip={() => setParams({ payslip: null })}
             onCalculate={async (id) => { await calculatePayroll(id) }}
             onReopen={async (id) => { await reopenPeriod(id) }}
             onApprove={async (id) => {
