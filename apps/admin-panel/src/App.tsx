@@ -46,6 +46,7 @@ const HRLayout = lazyWithReload(() => import('./pages/hr/HRLayout').then(m => ({
 const AttendancePage = lazyWithReload(() => import('./pages/hr/AttendancePage').then(m => ({ default: m.AttendancePage })))
 const PunctualityPage = lazyWithReload(() => import('./pages/hr/PunctualityPage').then(m => ({ default: m.PunctualityPage })))
 const PayrollPage = lazyWithReload(() => import('./pages/hr/PayrollPage').then(m => ({ default: m.PayrollPage })))
+const HolidaysPage = lazyWithReload(() => import('./pages/hr/HolidaysPage').then(m => ({ default: m.HolidaysPage })))
 const StaffPage = lazyWithReload(() => import('./pages/hr/StaffPage').then(m => ({ default: m.StaffPage })))
 const SchedulePage = lazyWithReload(() => import('./pages/hr/SchedulePage').then(m => ({ default: m.SchedulePage })))
 const StaffTasksPage = lazyWithReload(() => import('./pages/StaffTasksPage').then(m => ({ default: m.StaffTasksPage })))
@@ -140,6 +141,7 @@ function App() {
                     <Route index element={<Navigate to="attendance" replace />} />
                     <Route path="attendance" element={<AttendancePage />} />
                     <Route path="punctuality" element={<PunctualityPage />} />
+                    <Route path="holidays" element={<HolidaysPage />} />
                     <Route path="payroll" element={<PayrollPage />} />
                     <Route path="staff" element={<StaffPage />} />
                   </Route>
