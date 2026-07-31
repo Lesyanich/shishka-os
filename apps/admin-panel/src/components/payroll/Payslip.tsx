@@ -8,6 +8,7 @@ import {
   COMPANY_NAME,
   COMPANY_SSO_ACCOUNT,
   COMPANY_TAX_ID,
+  buildPayslipStatement,
   derivePayslip,
   formatDate,
   isCallNameOnly,
@@ -16,8 +17,53 @@ import {
   periodLabel,
   periodSlug,
   safeName,
+  signedThb,
   thb,
 } from './payslip-helpers'
+
+/**
+ * One line in the running money column.
+ *
+ * Right-aligned tabular numerals so the digits stack — the whole point of the
+ * single-column layout (CEO rule 1, MC b4876c65) is that the employee can run
+ * a finger down it and check the subtraction. A two-column Earnings|Deductions
+ * layout is traditional but the eye cannot subtract across a gutter.
+ */
+function MoneyLine({
+  label,
+  sub,
+  amount,
+  dim,
+  unsigned,
+}: {
+  label: string
+  sub?: string
+  amount: number
+  dim?: boolean
+  unsigned?: boolean
+}) {
+  const tone = dim
+    ? 'text-slate-500'
+    : amount < 0
+      ? 'text-rose-300'
+      : 'text-slate-200'
+
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-slate-800 py-1.5">
+      <span className={`text-sm ${dim ? 'text-slate-500' : 'text-slate-300'}`}>
+        {label}
+        {sub && (
+          <span className="mt-0.5 block text-[10px] leading-snug text-slate-500">
+            {sub}
+          </span>
+        )}
+      </span>
+      <span className={`shrink-0 text-sm tabular-nums ${tone}`}>
+        {unsigned ? thb(amount) : signedThb(amount)}
+      </span>
+    </div>
+  )
+}
 
 function Field({
   label,
@@ -38,38 +84,6 @@ function Field({
   )
 }
 
-function LineRow({
-  label,
-  sub,
-  value,
-  strong,
-  border,
-  tone,
-}: {
-  label: string
-  sub?: string
-  value: string
-  strong?: boolean
-  border?: boolean
-  tone?: 'default' | 'muted'
-}) {
-  return (
-    <div
-      className={[
-        'flex items-start justify-between py-1 text-sm',
-        border ? 'border-t border-slate-700 pt-1.5' : '',
-        strong ? 'font-semibold text-slate-100' : 'text-slate-300',
-      ].join(' ')}
-    >
-      <span className="pr-3">
-        {label}
-        {sub && <span className="block text-[10px] text-slate-500">{sub}</span>}
-      </span>
-      <span className={tone === 'muted' ? 'text-slate-500' : ''}>{value}</span>
-    </div>
-  )
-}
-
 export function Payslip({
   data,
   onClose,
@@ -77,7 +91,7 @@ export function Payslip({
   data: PayslipData
   onClose: () => void
 }) {
-  const { line, staff, period, payments } = data
+  const { line, staff, period } = data
   const d = derivePayslip(data)
   const [downloading, setDownloading] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -106,7 +120,7 @@ export function Payslip({
     }
   }
 
-  const dailyRate = staff.monthly_salary ? staff.monthly_salary / 30 : 0
+  const st = buildPayslipStatement(data)
 
   return (
     <div
@@ -198,82 +212,58 @@ export function Payslip({
             )}
           </div>
 
-          {/* Earnings + Deductions */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
-                Earnings
-              </p>
-              <LineRow
-                label="Base salary"
-                sub={
-                  staff.monthly_salary
-                    ? `contract ${thb(staff.monthly_salary)}/month`
-                    : undefined
-                }
-                value={thb(line.base_salary)}
+          {/* The money — one running column, no GROSS subtotal, bonus last.
+              CEO decision 2026-07-31 (MC b4876c65). The wage base still exists
+              in derivePayslip().gross for the payroll register and สปส.1-10;
+              it is deliberately not printed here. */}
+          <div>
+            {st.rows.map((r) => (
+              <MoneyLine
+                key={r.key}
+                label={r.label}
+                sub={r.sub}
+                amount={r.amount}
+                dim={r.dim}
+                unsigned={r.unsigned}
               />
-              <LineRow label="Overtime" value={thb(line.overtime_pay)} />
-              <LineRow
-                label="Bonus"
-                sub={line.bonus_note ?? undefined}
-                value={thb(line.bonus_pay)}
-              />
-              <LineRow label="Gross" value={thb(d.gross)} strong border />
-            </div>
-            <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
-                Deductions
-              </p>
-              <LineRow
-                label="Unpaid absence"
-                sub={
-                  line.days_absent > 0
-                    ? `${line.days_absent} day(s) × ${thb(dailyRate)} (monthly ÷ 30)`
-                    : undefined
-                }
-                value={thb(line.absence_deduction)}
-              />
-              <LineRow
-                label="Late arrivals"
-                sub={
-                  line.late_days > 0
-                    ? `${line.late_days} day(s), ${line.late_minutes} min unworked`
-                    : undefined
-                }
-                value={thb(line.late_deduction)}
-              />
-              <LineRow
-                label="Social Security (5%)"
-                sub={
-                  line.sso_employee > 0
-                    ? 'on the capped base, ฿17,500 max (LPA §76(1))'
-                    : 'not enrolled for this period — nothing withheld'
-                }
-                value={thb(line.sso_employee)}
-              />
-              <LineRow
-                label="Withholding tax"
-                sub={
-                  line.withholding_tax === 0
-                    ? 'below the taxable threshold'
-                    : 'monthly slice of the annual liability'
-                }
-                value={thb(line.withholding_tax)}
-              />
-              {d.otherBeyondLate > 0 && (
-                <LineRow label="Other" value={thb(d.otherBeyondLate)} />
-              )}
-              <LineRow
-                label="Total deductions"
-                value={thb(d.totalDeductions)}
-                strong
-                border
-              />
-            </div>
+            ))}
+
+            {/* Checkpoint 1 — the month's entitlement. Shown only when
+                something has already been handed over; with no advance it
+                would just repeat the figure below it. */}
+            {st.hasSettlements && (
+              <div className="flex items-center justify-between gap-4 border-t-2 border-slate-600 py-2">
+                <span className="text-sm font-semibold text-slate-100">
+                  {st.totalLabel}
+                </span>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-100">
+                  {thb(st.total)}
+                </span>
+              </div>
+            )}
+
+            {st.settlements.map((s) => (
+              <MoneyLine key={s.key} label={s.label} sub={s.sub} amount={s.amount} />
+            ))}
           </div>
 
-          {/* Attendance */}
+          {/* Checkpoint 2 — the figure being acknowledged by the signature. */}
+          <div className="rounded-lg border border-emerald-700 bg-emerald-500/10 px-4 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm font-bold uppercase tracking-wide text-emerald-300">
+                Paid to you today
+              </span>
+              <span className="shrink-0 text-2xl font-bold tabular-nums text-emerald-300">
+                {thb(st.paidToday)}
+              </span>
+            </div>
+            <p className="mt-2 text-[10px] text-emerald-200/50">
+              Paid in cash. Daily rate = monthly salary ÷ 30 (LPA §68).
+            </p>
+          </div>
+
+          {/* Attendance — context, never arithmetic. It sits below the money so
+              it cannot be read as part of the calculation (CEO rule 7). */}
           <div>
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
               Attendance
@@ -300,52 +290,16 @@ export function Payslip({
             )}
           </div>
 
-          {/* Employer-paid (not deducted) — SSO match only. */}
+          {/* Employer-paid — information only, never in the deduction column.
+              LPA §76 and the Royal Decree on the Management of Foreign Workers
+              forbid recovering these from wages, so the slip must not let them
+              read as something taken off the employee. */}
           {d.hasEmployerPaid && (
-            <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
-                Employer contribution
-              </p>
-              <LineRow
-                label="Social Security — employer 5%"
-                value={thb(d.employerSso)}
-                tone="muted"
-              />
-            </div>
-          )}
-
-          {/* Net + payments */}
-          <div className="rounded-lg border border-emerald-700 bg-emerald-500/10 px-4 py-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold uppercase tracking-wide text-emerald-300">
-                Net pay
-              </span>
-              <span className="text-2xl font-bold text-emerald-300">{thb(d.net)}</span>
-            </div>
-            {payments.length > 0 && (
-              <div className="mt-2 border-t border-emerald-700/40 pt-2">
-                {payments.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between text-xs text-emerald-200/70"
-                  >
-                    <span>
-                      less: {p.kind} paid {formatDate(p.paid_on)}
-                      {p.note ? ` — ${p.note}` : ''}
-                    </span>
-                    <span>−{thb(p.amount)}</span>
-                  </div>
-                ))}
-                <div className="mt-1.5 flex items-center justify-between border-t border-emerald-700/40 pt-1.5 text-sm font-semibold text-emerald-300">
-                  <span>Balance due</span>
-                  <span>{thb(d.balanceDue)}</span>
-                </div>
-              </div>
-            )}
-            <p className="mt-2 text-[10px] text-emerald-200/50">
-              Paid in cash. Daily rate = monthly salary ÷ 30 (LPA §68).
+            <p className="rounded bg-slate-800/60 px-3 py-2 text-[11px] text-slate-400">
+              Employer-paid, not deducted from your pay: social security{' '}
+              {thb(d.employerSso)}.
             </p>
-          </div>
+          )}
 
           {line.notes && (
             <p className="rounded bg-slate-800/60 px-3 py-2 text-[11px] text-slate-400">

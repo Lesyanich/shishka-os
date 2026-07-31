@@ -30,12 +30,22 @@ Every absent day is recorded in `staff_attendance.status` as exactly one of:
 | Family member sick / personal errand | `personal_leave` (≤3/yr) else `absent` | First **3 days/yr paid**, thereafter **unpaid** | Prior notice + reason | LPA §34, §57 |
 | No notice, no justifiable reason (no-show) | `absent` | **Unpaid** | — | — |
 | Approved annual leave (after 1 yr service) | `annual_leave` | **Paid** | Pre-approved | LPA §30 |
+| Day off taken back for a public holiday worked | `substitute_day_off` | **Paid** | A `holiday_credits` row marked `used` on that date | LPA §29 |
 
 **Deduction mechanism.** Unpaid `absent` days are deducted at the 30-day daily
 rate (`monthly_salary / 30`) by `fn_calculate_payroll`. `sick_leave`,
-`personal_leave`, `annual_leave` are **never** deducted. Not paying for an
-unpaid `absent` day is "no wage earned for a day not worked," **not** a wage
-deduction under LPA §76.
+`personal_leave`, `annual_leave`, `substitute_day_off` are **never** deducted.
+Not paying for an unpaid `absent` day is "no wage earned for a day not worked,"
+**not** a wage deduction under LPA §76.
+
+**Substitute days (LPA §29).** Working a public holiday earns a day off to be
+taken later, tracked in `holiday_credits`. Spending it is a *day*, not money:
+set the attendance status to `substitute_day_off` and mark the credit `used` on
+the same date. Both halves are required — an unmatched paid day has no basis,
+and an unspent credit keeps showing on the payslip as still owed. Introduced by
+migration 399 (CEO decision 2026-07-31, MC b4876c65); before it, a day taken
+back was recorded as `absent` and deducted, charging the employee for a day the
+employer already owed them.
 
 ## 2. The one line we do not cross
 

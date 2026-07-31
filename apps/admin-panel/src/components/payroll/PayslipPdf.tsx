@@ -11,11 +11,13 @@ import {
   COMPANY_NAME,
   COMPANY_SSO_ACCOUNT,
   COMPANY_TAX_ID,
+  buildPayslipStatement,
   derivePayslip,
   formatDate,
   legalName,
   orMissing,
   periodLabel,
+  signedThbPdf,
   thbPdf,
 } from './payslip-helpers'
 
@@ -59,17 +61,22 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2,
+    paddingVertical: 3,
+    borderBottom: '0.5 solid #e2e8f0',
   },
   rowLabel: { flex: 1, paddingRight: 8 },
   subLabel: { fontSize: 7, color: '#94a3b8' },
-  cols: { flexDirection: 'row', gap: 16 },
-  col: { flex: 1 },
+  amount: { textAlign: 'right' },
+  amountMinus: { textAlign: 'right', color: '#be123c' },
+  amountDim: { textAlign: 'right', color: '#94a3b8' },
+  labelDim: { color: '#94a3b8' },
+  // No `cols`/`col` any more: the Earnings|Deductions gutter is gone. The slip
+  // is one running column so the subtraction can be checked by eye.
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
-    borderTop: '1 solid #cbd5e1',
+    paddingVertical: 5,
+    borderTop: '1.5 solid #64748b',
     marginTop: 2,
   },
   bold: { fontFamily: 'Helvetica-Bold' },
@@ -87,20 +94,6 @@ const styles = StyleSheet.create({
   },
   netLabel: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#0f766e' },
   netValue: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: '#0f766e' },
-  advRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    fontSize: 8,
-    color: '#0f766e',
-    marginTop: 3,
-  },
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTop: '1 solid #99f6e4',
-    marginTop: 4,
-    paddingTop: 4,
-  },
   attRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 },
   attCell: { width: '20%', marginBottom: 3 },
   noteBox: {
@@ -129,32 +122,45 @@ const styles = StyleSheet.create({
   },
 })
 
+/**
+ * One line in the running money column — the PDF twin of MoneyLine in
+ * Payslip.tsx. Both are driven by buildPayslipStatement so the printed slip and
+ * the screen can never disagree about what was paid.
+ */
 function MoneyRow({
   label,
   sub,
-  value,
-  strong,
+  amount,
+  dim,
+  unsigned,
 }: {
   label: string
   sub?: string
-  value: string
-  strong?: boolean
+  amount: number
+  dim?: boolean
+  unsigned?: boolean
 }) {
+  const amountStyle = dim
+    ? styles.amountDim
+    : amount < 0
+      ? styles.amountMinus
+      : styles.amount
+
   return (
-    <View style={strong ? styles.totalRow : styles.row}>
+    <View style={styles.row}>
       <View style={styles.rowLabel}>
-        <Text style={strong ? styles.bold : undefined}>{label}</Text>
+        <Text style={dim ? styles.labelDim : undefined}>{label}</Text>
         {sub ? <Text style={styles.subLabel}>{sub}</Text> : null}
       </View>
-      <Text style={strong ? styles.bold : undefined}>{value}</Text>
+      <Text style={amountStyle}>{unsigned ? thbPdf(amount) : signedThbPdf(amount)}</Text>
     </View>
   )
 }
 
 export function PayslipPdf({ data }: { data: PayslipData }) {
-  const { line, staff, period, payments } = data
+  const { line, staff, period } = data
   const d = derivePayslip(data)
-  const dailyRate = staff.monthly_salary ? staff.monthly_salary / 30 : 0
+  const st = buildPayslipStatement(data, { pdf: true })
 
   return (
     <Document>
@@ -186,78 +192,46 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
           </View>
         </View>
 
-        {/* Earnings + Deductions side by side */}
-        <View style={styles.cols}>
-          <View style={styles.col}>
-            <Text style={styles.sectionTitle}>Earnings</Text>
+        {/* The money — one running column, no GROSS subtotal, bonus last.
+            CEO decision 2026-07-31 (MC b4876c65). */}
+        <View style={{ marginTop: 8 }}>
+          {st.rows.map((r) => (
             <MoneyRow
-              label="Base salary"
-              sub={
-                staff.monthly_salary
-                  ? `contract ${thbPdf(staff.monthly_salary)}/month`
-                  : undefined
-              }
-              value={thbPdf(line.base_salary)}
+              key={r.key}
+              label={r.label}
+              sub={r.sub}
+              amount={r.amount}
+              dim={r.dim}
+              unsigned={r.unsigned}
             />
-            <MoneyRow label="Overtime" value={thbPdf(line.overtime_pay)} />
-            <MoneyRow
-              label="Bonus"
-              sub={line.bonus_note ?? undefined}
-              value={thbPdf(line.bonus_pay)}
-            />
-            <MoneyRow label="Gross" value={thbPdf(d.gross)} strong />
-          </View>
+          ))}
 
-          <View style={styles.col}>
-            <Text style={styles.sectionTitle}>Deductions</Text>
-            <MoneyRow
-              label="Unpaid absence"
-              sub={
-                line.days_absent > 0
-                  ? `${line.days_absent} day(s) x ${thbPdf(dailyRate)} (monthly / 30)`
-                  : undefined
-              }
-              value={thbPdf(line.absence_deduction)}
-            />
-            <MoneyRow
-              label="Late arrivals"
-              sub={
-                line.late_days > 0
-                  ? `${line.late_days} day(s), ${line.late_minutes} min unworked`
-                  : undefined
-              }
-              value={thbPdf(line.late_deduction)}
-            />
-            <MoneyRow
-              label="Social Security (5%)"
-              sub={
-                line.sso_employee > 0
-                  ? 'on the capped base, THB 17,500 max (LPA s.76(1))'
-                  : 'not enrolled for this period - nothing withheld'
-              }
-              value={thbPdf(line.sso_employee)}
-            />
-            <MoneyRow
-              label="Withholding tax"
-              sub={
-                line.withholding_tax === 0
-                  ? 'below the taxable threshold'
-                  : 'monthly slice of the annual liability'
-              }
-              value={thbPdf(line.withholding_tax)}
-            />
-            {d.otherBeyondLate > 0 ? (
-              <MoneyRow label="Other" value={thbPdf(d.otherBeyondLate)} />
-            ) : null}
-            <MoneyRow
-              label="Total deductions"
-              value={thbPdf(d.totalDeductions)}
-              strong
-            />
-          </View>
+          {/* Checkpoint 1 — the month's entitlement. Only when something has
+              already been handed over; otherwise it repeats the figure below. */}
+          {st.hasSettlements ? (
+            <View style={styles.totalRow}>
+              <Text style={styles.bold}>{st.totalLabel}</Text>
+              <Text style={[styles.bold, styles.amount]}>{thbPdf(st.total)}</Text>
+            </View>
+          ) : null}
+
+          {st.settlements.map((s) => (
+            <MoneyRow key={s.key} label={s.label} sub={s.sub} amount={s.amount} />
+          ))}
         </View>
 
-        {/* Attendance */}
+        {/* Checkpoint 2 — the figure the signature acknowledges. */}
+        <View style={styles.netBox}>
+          <View style={styles.netTop}>
+            <Text style={styles.netLabel}>PAID TO YOU TODAY</Text>
+            <Text style={styles.netValue}>{thbPdf(st.paidToday)}</Text>
+          </View>
+          <Text style={[styles.subLabel, { marginTop: 4 }]}>
+            Paid in cash. Daily rate = monthly salary / 30 (LPA s.68).
+          </Text>
+        </View>
+
+        {/* Attendance — context, never arithmetic (CEO rule 7). */}
         <Text style={styles.sectionTitle}>Attendance</Text>
         <View style={styles.attRow}>
           <View style={styles.attCell}>
@@ -290,45 +264,17 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
           </Text>
         ) : null}
 
-        {/* Employer contribution — SSO match only. The work-permit figure is
-            deliberately absent: it is an HR cost, not part of this wage. */}
+        {/* Employer-paid — information only, never in the deduction column.
+            LPA s.76 and the Royal Decree on the Management of Foreign Workers
+            forbid recovering these from wages. The work-permit figure is
+            deliberately absent for the same reason: it is an HR cost, not part
+            of this wage, and printing it beside a net invites the set-off. */}
         {d.hasEmployerPaid ? (
-          <View>
-            <Text style={styles.sectionTitle}>Employer contribution</Text>
-            <MoneyRow
-              label="Social Security - employer 5%"
-              value={thbPdf(d.employerSso)}
-            />
-          </View>
-        ) : null}
-
-        {/* Net + advances */}
-        <View style={styles.netBox}>
-          <View style={styles.netTop}>
-            <Text style={styles.netLabel}>NET PAY</Text>
-            <Text style={styles.netValue}>{thbPdf(d.net)}</Text>
-          </View>
-          {payments.length > 0 ? (
-            <View>
-              {payments.map((p) => (
-                <View key={p.id} style={styles.advRow}>
-                  <Text>
-                    less: {p.kind} paid {formatDate(p.paid_on)}
-                    {p.note ? ` - ${p.note}` : ''}
-                  </Text>
-                  <Text>-{thbPdf(p.amount)}</Text>
-                </View>
-              ))}
-              <View style={styles.balanceRow}>
-                <Text style={styles.bold}>Balance due</Text>
-                <Text style={styles.bold}>{thbPdf(d.balanceDue)}</Text>
-              </View>
-            </View>
-          ) : null}
-          <Text style={[styles.subLabel, { marginTop: 4 }]}>
-            Paid in cash. Daily rate = monthly salary / 30 (LPA s.68).
+          <Text style={styles.noteBox}>
+            Employer-paid, not deducted from your pay: social security{' '}
+            {thbPdf(d.employerSso)}.
           </Text>
-        </View>
+        ) : null}
 
         {line.notes ? (
           <Text style={styles.noteBox}>{line.notes}</Text>
