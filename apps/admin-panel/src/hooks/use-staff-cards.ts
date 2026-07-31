@@ -19,6 +19,10 @@ export interface StaffCard {
   sso_number: string | null
   tax_id: string | null
   probation_end_date: string | null
+  /** Bare path in the private staff-payment-qr bucket. Never a URL — see lib/signedStorage.ts. */
+  payment_qr_path: string | null
+  /** Human-readable payee detail shown beside the QR. */
+  payment_note: string | null
   created_at: string
 }
 
@@ -131,5 +135,5 @@ export function useStaffCards() {
     [fetchData],
   )
 
-  return { staff, leaveBalances, isLoading, updateStaff, createStaff }
+  return { staff, leaveBalances, isLoading, updateStaff, createStaff, refetch: fetchData }
 }
