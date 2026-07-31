@@ -11,6 +11,9 @@ import {
   orMissing,
   derivePayslip,
   COMPANY_NAME,
+  COMPANY_TAX_ID,
+  COMPANY_ADDRESS,
+  COMPANY_SSO_ACCOUNT,
 } from './payslip-helpers'
 import type { PayslipData, StaffPayment } from '../../hooks/use-payroll'
 
@@ -211,5 +214,18 @@ describe('payslip-helpers', () => {
 
   it('exposes company name', () => {
     expect(COMPANY_NAME).toMatch(/Shishka/)
+  })
+})
+
+describe('company constants — required on every payslip (LPA §115)', () => {
+  it('carries the 13-digit registration number as the tax ID', () => {
+    // In Thailand the company registration number IS the tax ID (LEG-001).
+    expect(COMPANY_TAX_ID).toBe('0835568025951')
+    expect(COMPANY_TAX_ID).toHaveLength(13)
+  })
+
+  it('carries the registered address and the SSO employer account', () => {
+    expect(COMPANY_ADDRESS).toMatch(/Rawai/)
+    expect(COMPANY_SSO_ACCOUNT).toBe('8330006310')
   })
 })

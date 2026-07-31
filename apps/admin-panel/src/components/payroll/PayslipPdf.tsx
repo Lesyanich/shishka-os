@@ -176,67 +176,14 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
           </View>
         </View>
 
-        {/* Employee */}
+        {/* Employee — name only. CEO decision 2026-07-31 (MC b4876c65 §B).
+            Latin script only: built-in Helvetica cannot render name_th. */}
         <Text style={styles.sectionTitle}>Employee</Text>
         <View style={styles.empGrid}>
-          {/* Latin script only — built-in Helvetica cannot render name_th. */}
           <View style={styles.empCell}>
-            <Text style={styles.label}>Full name</Text>
+            <Text style={styles.label}>Name</Text>
             <Text style={styles.value}>{legalName(staff)}</Text>
           </View>
-          <View style={styles.empCell}>
-            <Text style={styles.label}>Position</Text>
-            <Text style={styles.value}>{staff.role}</Text>
-          </View>
-          <View style={styles.empCell}>
-            <Text style={styles.label}>Nationality</Text>
-            <Text style={staff.nationality ? styles.value : styles.valueMuted}>
-              {staff.nationality ?? 'Not on file'}
-            </Text>
-          </View>
-          <View style={styles.empCell}>
-            <Text style={styles.label}>Date of birth</Text>
-            <Text style={staff.date_of_birth ? styles.value : styles.valueMuted}>
-              {staff.date_of_birth ? formatDate(staff.date_of_birth) : 'Not on file'}
-            </Text>
-          </View>
-          <View style={styles.empCell}>
-            <Text style={styles.label}>Employment start</Text>
-            <Text style={styles.value}>{formatDate(staff.hire_date)}</Text>
-          </View>
-          <View style={styles.empCell}>
-            <Text style={styles.label}>Employment type</Text>
-            <Text style={styles.value}>{staff.employment_type ?? '—'}</Text>
-          </View>
-          <View style={styles.empCell}>
-            <Text style={styles.label}>Social Security No.</Text>
-            <Text style={staff.sso_number ? styles.value : styles.valueMuted}>
-              {staff.sso_number ?? 'Pending enrolment'}
-            </Text>
-          </View>
-          <View style={styles.empCell}>
-            <Text style={styles.label}>Tax ID</Text>
-            <Text style={staff.tax_id ? styles.value : styles.valueMuted}>
-              {staff.tax_id ?? 'Not on file'}
-            </Text>
-          </View>
-          <View style={styles.empCell}>
-            <Text style={styles.label}>Address</Text>
-            <Text style={staff.address ? styles.value : styles.valueMuted}>
-              {staff.address ?? 'Not on file'}
-            </Text>
-          </View>
-          {staff.work_permit_number ? (
-            <View style={styles.empCell}>
-              <Text style={styles.label}>Work permit</Text>
-              <Text style={styles.value}>
-                {staff.work_permit_number}
-                {staff.work_permit_expiry
-                  ? ` (exp. ${formatDate(staff.work_permit_expiry)})`
-                  : ''}
-              </Text>
-            </View>
-          ) : null}
         </View>
 
         {/* Earnings + Deductions side by side */}
@@ -285,8 +232,8 @@ export function PayslipPdf({ data }: { data: PayslipData }) {
               label="Social Security (5%)"
               sub={
                 line.sso_employee > 0
-                  ? 'on the capped base'
-                  : 'not enrolled - nothing withheld'
+                  ? 'on the capped base, THB 17,500 max (LPA s.76(1))'
+                  : 'not enrolled for this period - nothing withheld'
               }
               value={thbPdf(line.sso_employee)}
             />

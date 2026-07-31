@@ -177,49 +177,20 @@ export function Payslip({
             </div>
           </div>
 
-          {/* Employee */}
+          {/* Employee — name only. CEO decision 2026-07-31 (MC b4876c65 §B):
+              nationality, DOB, position, start date, employment type, SSO number,
+              tax ID and address were all removed as noise on a monthly wage slip. */}
           <div>
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
               Employee
             </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Field
-                label="Full name"
-                value={legalName(staff)}
-                muted={isCallNameOnly(staff)}
-              />
-              <Field label="Name (Thai)" value={staff.name_th ?? 'Not on file'} muted={!staff.name_th} />
-              <Field label="Position" value={staff.role} />
-              <Field label="Nationality" value={staff.nationality ?? 'Not on file'} muted={!staff.nationality} />
-              <Field
-                label="Date of birth"
-                value={staff.date_of_birth ? formatDate(staff.date_of_birth) : 'Not on file'}
-                muted={!staff.date_of_birth}
-              />
-              <Field label="Employment start" value={formatDate(staff.hire_date)} />
-              <Field label="Employment type" value={staff.employment_type ?? '—'} />
-              <Field
-                label="Social Security No."
-                value={staff.sso_number ?? 'Pending enrolment'}
-                muted={!staff.sso_number}
-              />
-              <Field label="Tax ID" value={staff.tax_id ?? 'Not on file'} muted={!staff.tax_id} />
-              <Field
-                label="Address"
-                value={staff.address ?? 'Not on file'}
-                muted={!staff.address}
-              />
-              {staff.work_permit_number && (
-                <Field
-                  label="Work permit"
-                  value={`${staff.work_permit_number}${
-                    staff.work_permit_expiry
-                      ? ` (exp. ${formatDate(staff.work_permit_expiry)})`
-                      : ''
-                  }`}
-                />
-              )}
-            </div>
+            <Field
+              label="Name"
+              value={
+                legalName(staff) + (staff.name_th ? ` · ${staff.name_th}` : '')
+              }
+              muted={isCallNameOnly(staff)}
+            />
             {isCallNameOnly(staff) && (
               <p className="mt-2 rounded bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300/80">
                 Showing the call-name — the legal name has not been collected yet.
@@ -276,8 +247,8 @@ export function Payslip({
                 label="Social Security (5%)"
                 sub={
                   line.sso_employee > 0
-                    ? 'on the capped base'
-                    : 'not enrolled — nothing withheld'
+                    ? 'on the capped base, ฿17,500 max (LPA §76(1))'
+                    : 'not enrolled for this period — nothing withheld'
                 }
                 value={thb(line.sso_employee)}
               />
