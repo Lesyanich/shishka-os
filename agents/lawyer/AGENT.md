@@ -88,7 +88,27 @@
 2. Classify `doc_type ∈ {registration, work_permit, visa, fda_license, restaurant_permit, lease, employment, tax_filing, supplier_contract, court_paper, other}`.
 3. Extract: `document_number`, `issue_date` (BE → Gregorian: BE − 543), `expiry_date`, `owner_person/entity`, `issuing_authority`.
 4. Rename: `YYYY-MM-DD__<DocType>__<Number>__<Person>.pdf` (date = issue_date).
-5. Upload to `GDrive: Shishka healthy kitchen/00_Legal/<subfolder>/` per doc_type:
+5. File into `00_Legal/<subfolder>/` per doc_type.
+
+   > [!important] Use the local Drive mount — `cp`, not the GDrive MCP
+   > `00_Legal/` lives in the **Shared drive** `Shishka healthy kitchen`, mounted by Drive for
+   > Desktop at:
+   > ```
+   > ~/Library/CloudStorage/GoogleDrive-lesia@shishka.health/Общие диски/Shishka healthy kitchen/00_Legal/
+   > ```
+   > Copy the original straight in with `cp` — full fidelity, no token cost. Then read the
+   > `webViewLink` back with `mcp__155bab52-*__search_files` (allow ~1–2 min for sync) for the
+   > register and vault `url:` fields.
+   >
+   > **Never** upload an original through `mcp__155bab52-*__create_file`: it takes content inline as
+   > base64, so a 1 MB scan costs ~370k tokens. And never downsample a legal original to make it
+   > fit — the archive must hold the исходник. The MCP `create_file` path is fine for *text*
+   > (transcriptions as Google Docs) and for creating folders.
+   >
+   > Note the shared-drive path is Cyrillic (`Общие диски`) and `find` over the Drive FS is very
+   > slow — walk it with `ls` on known levels instead.
+
+   Subfolder map:
    - `registration` → `01_Company_Registration/`
    - `work_permit` → `02_Work_Permits/<Person>/`
    - `visa` → `03_Visas/<Person>/`
