@@ -1,91 +1,125 @@
 # Data Health Sheriff Report
-**Date:** 2026-07-12  
-**Run type:** Scheduled weekly audit  
-**Status:** ⛔ BLOCKED — No database credentials available (2nd consecutive missed run)
+**Date:** 2026-08-02
+**Run type:** Scheduled weekly audit
+**Status:** BLOCKED — All DB connection paths unavailable (Run #4)
 
 ---
 
-## ⚠️ URGENT: Audit Has Now Missed 2 Consecutive Weeks
+## Progress vs. Prior Runs
 
-Previous blocked run: **2026-06-21**  
-This run: **2026-07-12**  
-Total weeks without data quality checks: **3 weeks**
+| Credential / Connection | 2026-06-21 | 2026-07-12 | 2026-08-02 |
+|------------------------|-----------|-----------|-----------|
+| `DATABASE_URL` env var | Not set | Not set | **SET** ✓ |
+| Port 5432 (pooler) | — | — | Blocked (timeout) |
+| Port 6543 (session pooler) | — | — | Blocked (timeout) |
+| Supabase HTTPS REST | — | — | Blocked (403 from egress proxy) |
+| `SUPABASE_URL` env var | Not set | Not set | Not set |
+| `SUPABASE_SERVICE_ROLE_KEY` | Not set | Not set | Empty (set but blank) |
+| MCP tools (shishka-chef, etc.) | — | — | Error: missing SUPABASE_URL |
 
-The audit **cannot run** until `DATABASE_URL` is added to the scheduled routine's environment variables.
-
----
-
-## Root Cause
-
-| Method | Result |
-|--------|--------|
-| `DATABASE_URL` env var | Not set |
-| `SUPABASE_SERVICE_ROLE_KEY` env var | Not set |
-| `SUPABASE_URL` env var | Not set |
-| `POSTGRES_URL` env var | Not set |
-| macOS Keychain `shishka-database-url` | Unavailable (Linux, no `security` CLI) |
-| `.env` files in repo | Gitignored — not present in clone |
+**Good news:** `DATABASE_URL` is now configured. One blocker removed.
+**Remaining blockers:** 2 independent issues (see below).
 
 ---
 
-## Fix Required (One Time)
+## Root Cause Analysis
 
-Add to the **scheduled routine environment** in Claude Code web settings:
+### Blocker 1 — Egress Policy (network)
+
+The scheduled routine runs in a remote cloud environment with a restrictive egress proxy at `http://127.0.0.1:43913`. All outbound TCP goes through it. Supabase infrastructure is **not on the allowlist**:
+
+- `aws-0-ap-south-1.pooler.supabase.com:5432` → timeout
+- `aws-0-ap-south-1.pooler.supabase.com:6543` → timeout
+- `https://qcqgtcsjoacuktcewpvo.supabase.co` → `403 CONNECT tunnel failed`
+
+This blocks all direct `psycopg2` connections regardless of credentials.
+
+### Blocker 2 — Missing MCP credentials (environment)
+
+The MCP servers (`shishka-chef`, `shishka-finance`, `shishka-mission-control`) connect independently of the egress proxy — but they require:
+
+- `SUPABASE_URL` = `https://qcqgtcsjoacuktcewpvo.supabase.co` → **not set**
+- `SUPABASE_SERVICE_ROLE_KEY` = `<service role JWT>` → **set but empty**
+
+Without these, all MCP tools return: `"Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"`.
+
+---
+
+## Two-Step Fix (complete both)
+
+### Step 1 — Add MCP credentials to scheduled routine environment
+
+In Claude Code web → Environment settings for this scheduled routine, add:
 
 ```
-DATABASE_URL=postgresql://postgres.[project-id]:[password]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+SUPABASE_URL=https://qcqgtcsjoacuktcewpvo.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<your service role key from Supabase dashboard>
 ```
 
-Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
+The service role key is in: **Supabase Dashboard → Project Settings → API → service_role (secret)**
 
-Instructions: https://code.claude.com/docs/en/claude-code-on-the-web (Environment configuration section)
+This will unblock MCP tools (`/chef`, `/finance`, data health rules via MCP), even without fixing the egress policy.
 
----
+### Step 2 (optional) — Allow Supabase in egress policy
 
-## Phases Blocked
+If direct `psycopg2` connection is also needed (for the audit script), additionally allow:
 
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 1: data_health_rules (all active rules) | ⛔ BLOCKED | Needs DB |
-| Phase 2: Smart duplicate detection | ⛔ BLOCKED | Needs DB |
-| Phase 3: Full Makro barcode audit (~222 barcodes) | ⛔ BLOCKED | Needs DB + Makro API |
-| Phase 4: Price drift + conversion sanity | ⛔ BLOCKED | Needs DB |
-| Phase 5: Report | ⚠ PARTIAL | This file only |
+```
+aws-0-ap-south-1.pooler.supabase.com:5432
+aws-0-ap-south-1.pooler.supabase.com:6543
+*.supabase.co:443
+```
+
+Reference: https://code.claude.com/docs/en/claude-code-on-the-web
 
 ---
 
 ## What Is Accumulating Without Checks
 
-Based on learned patterns, the following issues are growing undetected:
+4 consecutive weeks without data quality validation. Based on learned patterns:
 
-### High-Risk: OCR Duplicate Accumulation
-Every week Makro receipts are processed, OCR creates new name variants for the same physical product.  
-- Pattern: same supplier + similar price (±20%) + overlapping purchase dates → duplicate RAW items  
-- Known example: lamb shoulder/leg/minced lamb all barcode 831436  
-- **Without weekly dedup, the catalog grows noisier each week**
+### High Risk — OCR Duplicate Accumulation
+Every week Makro receipts are OCR-processed, creating name variants of the same physical product.
+- Pattern: same supplier + similar price (±20%) + overlapping dates → duplicate RAW items
+- Known case: lamb shoulder / leg / minced lamb all mapped to barcode 831436
+- **Catalog grows noisier each unaudited week**
 
-### Medium-Risk: Zero-Cost Items With Purchases
-Items that had cost_per_unit = 0 but now have purchase_logs with real prices — WAC should be recalculated automatically (auto_apply rule). This has not run in 3 weeks.
+### Medium Risk — Zero-Cost Items With Purchases
+Items with `cost_per_unit = 0` that now have real `purchase_logs` prices. WAC auto-recalc has not run in 4+ weeks. Dish costs computed from these items are understated.
 
-### Medium-Risk: Price Drift
-Supplier prices change; if conversion_factor is wrong, cost_per_unit may be wildly off (>1000% drift pattern from Olive Oil case). Undetected for 3 weeks.
+### Medium Risk — Price Drift / Broken Conversions
+Supplier prices change. If `conversion_factor` is wrong, `cost_per_unit` can be >1000% off.
+Known pattern: Olive Oil WAC=440/L, `last_seen_price`=2200 (for 5L bottle) → 400% drift.
 
-### Low-Risk: Unlinked Makro Barcodes
-New purchases may have barcodes not yet linked to nomenclature. Makro barcode audit would catch these.
+### Low Risk — Unlinked Barcodes
+New Makro purchases may have barcodes never linked to nomenclature. Spend not tracked.
 
 ---
 
 ## Health Score
-**N/A** — unable to compute (no DB access)
+**N/A** — unable to compute (no DB access; 4 consecutive blocked runs)
 
-Last successful audit: **never** (all runs blocked since this routine started)
+Last successful full audit: **never**
 
 ---
 
-## Action Required
+## Recommended Manual Workaround (until fixed)
 
-1. **Add `DATABASE_URL` to scheduled routine environment** (see fix above) — this unblocks everything
-2. Re-run the audit after credentials are configured
-3. Consider also running a manual `/techlead` session to catch up on 3 weeks of unaudited procurement data
+From any interactive Claude Code session with working DB credentials, run:
 
-_Report generated: 2026-07-12 | Session: claude-opus-session-85e8f658 | Consecutive blocked runs: 2_
+```
+/techlead
+→ Run full data health audit:
+   1. SELECT rule_code, detect_sql FROM data_health_rules WHERE is_active
+   2. Execute each detect_sql, report counts
+   3. Run WAC recalc for zero-cost items
+   4. Run duplicate similarity check on RAW items
+   5. Report price drift from supplier_catalog vs nomenclature
+```
+
+Or `/chef` → check for items with cost_per_unit = 0 or duplicate names.
+
+---
+
+_Report generated: 2026-08-02 | Session: claude-opus-session-6ee1a1e1 | Consecutive blocked runs: 4_
+_`DATABASE_URL` is set. Add `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` to unblock MCP audit path._
