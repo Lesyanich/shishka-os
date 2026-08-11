@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SHISHKA — NO SEED OIL · constructivist manifesto poster · A3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800;900&family=Noto+Sans:wght@400;600;700;800;900&family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* SHISHKA — "NO SEED OIL" manifesto poster · A3 297 × 420 mm
+     Russian-constructivist / agitprop treatment: raised fist, sunburst, heavy uppercase.
+     Artwork is 100% hand-authored vector (no stock, no licence exposure, prints crisp).
+     Palette is brand, not generic agitprop red:
+       spice-red #B62A23 (brand accent) · cream #FBF8F0 · royal-green ink #14260A · gold #F0CE83
+
+     CLAIM VERIFIED 2026-08-11 against the live catalogue before printing:
+       RAW-OIL-SUNFLOWER (sunflower/canola) .. is_deleted, 0 BOMs
+       RAW-RICE_BRAN_OIL ................... active in catalogue, 0 BOMs
+       RAW-CHILI-OIL ....................... 0 BOMs
+       RAW-MAYONNAISE-HEALTHY .............. is_deleted, 0 BOMs
+       RAW-OIL-SESAME ...................... 0 live BOMs. Its only consumer was
+                                             PF-SAUCE_PEANUT_LIME -> SALE-SAUCE_PEANUT,
+                                             archived on CEO instruction 2026-08-11 by
+                                             migration 404_retire_peanut_lime_sauce.sql,
+                                             which asserts this claim as a hard gate.
+     The claim is now unconditional: no seed oil reaches any sellable product.
+     Kitchen fats in actual use: olive oil, coconut oil, MCT, butter. */
+  :root{
+    --red:#B62A23; --red-deep:#8E1F19; --cream:#FBF8F0; --ink:#14260A;
+    --gold:#F0CE83; --green:#1E3903;
+    --font:'Albert Sans','Noto Sans','Noto Sans Thai',system-ui,sans-serif;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box;
+     -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{ background:#6b6b6b; font-family:var(--font); display:flex;
+        flex-direction:column; align-items:center; gap:20mm; padding:20mm 0; }
+
+  .poster{ position:relative; width:297mm; height:420mm; background:var(--cream);
+           padding:8mm; overflow:hidden; }
+  .frame{ position:relative; width:100%; height:100%; background:var(--red-deep);
+          border:2.4mm solid var(--ink); overflow:hidden;
+          display:flex; flex-direction:column; align-items:center; }
+
+  /* --- sunburst, true vector --- */
+  .rays{ position:absolute; inset:0; width:100%; height:100%; }
+
+  /* --- type --- */
+  .top{ position:relative; z-index:2; width:100%; padding:9mm 8mm 0; text-align:center; }
+  .eyebrow{ font-size:3.6mm; font-weight:800; letter-spacing:4.2px; text-transform:uppercase;
+            color:var(--gold); }
+  .rule{ width:34mm; height:1mm; background:var(--gold); margin:3mm auto 0; }
+
+  .headline{ margin-top:5mm; font-weight:900; text-transform:uppercase; color:var(--cream);
+             font-size:33mm; line-height:.86; letter-spacing:-.9mm;
+             text-shadow:1.6mm 1.6mm 0 var(--ink); }
+  .headline-ru{ margin-top:4.5mm; font-weight:900; text-transform:uppercase; color:var(--gold);
+                font-size:10.4mm; line-height:1; letter-spacing:.2mm; }
+  .headline-th{ margin-top:2.6mm; font-weight:700; color:var(--cream); font-size:7mm;
+                line-height:1.25; opacity:.95; }
+
+  /* --- disc behind the hand: stops the sunburst from chewing up the fist's
+         silhouette, and gives the classic agitprop roundel --- */
+  .disc{ position:absolute; z-index:1; left:50%; top:200mm;
+         transform:translate(-50%,-50%); width:176mm; height:176mm;
+         border-radius:50%; background:var(--ink);
+         box-shadow:0 0 0 3mm var(--gold); }
+
+  /* --- fist --- */
+  .fist{ position:absolute; z-index:2; left:50%; transform:translateX(-50%);
+         bottom:29mm; height:268mm;
+         filter:drop-shadow(2.2mm 2.2mm 0 rgba(20,38,10,.55)); }
+
+  /* --- bottom manifesto band --- */
+  .band{ position:absolute; z-index:3; left:0; right:0; bottom:0; background:var(--ink);
+         color:var(--cream); padding:6mm 9mm 6.5mm;
+         display:flex; align-items:center; justify-content:space-between; gap:7mm; }
+  .band .oils{ font-size:5.1mm; font-weight:900; text-transform:uppercase;
+               letter-spacing:.2px; line-height:1.25; }
+  .band .oils .y{ color:var(--gold); }
+  .band .oils .n{ color:#F09A94; }
+  .band .sub{ margin-top:2mm; font-size:3.3mm; font-weight:500; line-height:1.45;
+              color:rgba(251,248,240,.72); }
+  .band .sub .ru{ display:block; }
+  .band .logo{ width:56mm; flex:none; }
+
+  @media print{
+    @page{ size:297mm 420mm; margin:0; }
+    body{ background:#fff; padding:0; gap:0; }
+    .poster{ page-break-after:always; }
+    .poster:last-child{ page-break-after:auto; }
+  }
+</style>
+</head>
+<body>
+
+<section class="poster">
+ <div class="frame">
+
+  <!-- ================= SUNBURST ================= -->
+  <svg class="rays" viewBox="0 0 1000 1400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g fill="#B62A23">
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(0 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(20 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(40 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(60 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(80 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(100 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(120 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(140 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(160 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(180 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(200 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(220 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(240 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(260 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(280 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(300 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(320 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(340 500 700)"/>
+    </g>
+  </svg>
+
+  <div class="disc"></div>
+
+  <!-- ================= TYPE ================= -->
+  <div class="top">
+    <div class="eyebrow">Shishka Kitchen Manifesto · No.1</div>
+    <div class="rule"></div>
+    <h1 class="headline">No Seed Oil</h1>
+    <div class="headline-ru">Нет семенным маслам</div>
+    <div class="headline-th">ไม่ใช้น้ำมันเมล็ดพืช</div>
+  </div>
+
+  <!-- ================= RAISED FIST — hand-authored vector ================= -->
+  <svg class="fist" viewBox="0 0 400 620" aria-label="Raised fist">
+   <g transform="rotate(-4 200 340)">
+    <g fill="var(--cream)" stroke="var(--ink)" stroke-width="10"
+       stroke-linejoin="round" stroke-linecap="round">
+
+      <!-- forearm -->
+      <path d="M112,620 L106,452 C104,414 122,384 148,368 L252,368
+               C278,384 296,414 294,452 L288,620 Z"/>
+
+      <!-- back of the hand, below the folded fingers -->
+      <path d="M58,200 L58,292 C58,334 86,362 126,368 L274,368
+               C314,362 342,334 342,292 L342,200 Z"/>
+
+      <!-- the four folded fingers, drawn over the hand so their rounded
+           ends read as knuckles-toward-you: middle highest, pinky lowest.
+           They stop short so the thumb can cross over their tips. -->
+      <rect x="62"  y="100" width="78" height="175" rx="38"/>
+      <rect x="136" y="82"  width="78" height="193" rx="38"/>
+      <rect x="212" y="94"  width="74" height="181" rx="36"/>
+      <rect x="282" y="120" width="64" height="155" rx="32"/>
+
+      <!-- joint crease across each folded finger -->
+      <g fill="none" stroke-width="8">
+        <path d="M72,196  Q101,213 130,196"/>
+        <path d="M146,178 Q175,195 204,178"/>
+        <path d="M222,190 Q249,207 276,190"/>
+        <path d="M290,214 Q318,229 344,214"/>
+      </g>
+
+      <!-- thumb folded across the front, tip rounded over the index -->
+      <g transform="rotate(-13 150 286)">
+        <path d="M52,250 L212,246 C246,246 266,264 266,286
+                 C266,308 245,326 212,326 L52,322 Z"/>
+        <path d="M210,258 Q229,286 210,314" fill="none" stroke-width="8"/>
+      </g>
+
+      <!-- wrist crease -->
+      <path d="M126,398 Q200,416 276,398" fill="none" stroke-width="8"/>
+
+      <!-- rolled sleeve cuff, anchors the arm into the manifesto band -->
+      <path d="M96,510 L304,510 L308,620 L92,620 Z" fill="#14260A"/>
+    </g>
+   </g>
+  </svg>
+
+  <!-- ================= MANIFESTO BAND ================= -->
+  <div class="band">
+    <div>
+      <div class="oils">
+        <span class="y">Olive · Coconut · Butter</span><br>
+        <span class="n">Never canola · sunflower · soybean · rice bran</span>
+      </div>
+      <div class="sub">
+        We cook with fats you can name. Nothing refined, bleached or deodorised.
+        <span class="ru">Готовим на оливковом, кокосовом масле и сливочном масле. Никаких рафинированных семенных масел.</span>
+      </div>
+    </div>
+    <img class="logo" src="_assets/logo-full-white.png" alt="Shishka Healthy Kitchen">
+  </div>
+
+ </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SHISHKA — REAL FOOD · constructivist manifesto poster · A3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800;900&family=Noto+Sans:wght@400;600;700;800;900&family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* SHISHKA — "REAL FOOD" manifesto poster · A3 297 × 420 mm · MANIFESTO No.2
+     Sister sheet to no-seed-oil-a3.html: same frame, sunburst, roundel and band,
+     so the two hang together as a series. Hero is a fist gripping a fork.
+     Artwork is 100% hand-authored vector — the CEO's reference images were
+     watermarked stock (Adobe Stock / Dreamstime) and cannot be traced or embedded.
+     The raised fist is a public-domain agitprop idiom; those files are not.
+
+     CLAIM VERIFIED 2026-08-11 against the live catalogue before printing:
+       Every web-visible sauce is produced in-house (has a BOM):
+         SALE-SAUCE_HUMMUS ........... 2 BOM lines
+         SALE-SAUCE_MANGO ............ 3 BOM lines
+         SALE-SAUCE_TAHINI_TAMARIND .. 2 BOM lines
+         SALE-SAUCE_YOGURT_TAHINI .... 2 BOM lines
+       Bought-in jarred products reach NO web-visible dish:
+         RAW-NUTELLA... ...... 0 BOMs anywhere
+         RAW-SOY-SAUCE ....... only PF-SAUCE_PEANUT_LIME -> SALE-SAUCE_PEANUT
+                               (is_web_visible=false, retiring under MC 3a11032b)
+         RAW-TRUFFLE-SAUCE ... only [ARCHIVED] SALE-MANAISH_TRUFFLE_LAMB_GF */
+  :root{
+    --red:#B62A23; --red-deep:#8E1F19; --cream:#FBF8F0; --ink:#14260A;
+    --gold:#F0CE83; --green:#1E3903;
+    --font:'Albert Sans','Noto Sans','Noto Sans Thai',system-ui,sans-serif;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box;
+     -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{ background:#6b6b6b; font-family:var(--font); display:flex;
+        flex-direction:column; align-items:center; gap:20mm; padding:20mm 0; }
+
+  .poster{ position:relative; width:297mm; height:420mm; background:var(--cream);
+           padding:8mm; overflow:hidden; }
+  .frame{ position:relative; width:100%; height:100%; background:var(--red-deep);
+          border:2.4mm solid var(--ink); overflow:hidden;
+          display:flex; flex-direction:column; align-items:center; }
+
+  /* --- sunburst, true vector --- */
+  .rays{ position:absolute; inset:0; width:100%; height:100%; }
+
+  /* --- type --- */
+  .top{ position:relative; z-index:2; width:100%; padding:9mm 8mm 0; text-align:center; }
+  .eyebrow{ font-size:3.6mm; font-weight:800; letter-spacing:4.2px; text-transform:uppercase;
+            color:var(--gold); }
+  .rule{ width:34mm; height:1mm; background:var(--gold); margin:3mm auto 0; }
+
+  .headline{ margin-top:5mm; font-weight:900; text-transform:uppercase; color:var(--cream);
+             font-size:33mm; line-height:.86; letter-spacing:-.9mm;
+             text-shadow:1.6mm 1.6mm 0 var(--ink); }
+  .headline-ru{ margin-top:4.5mm; font-weight:900; text-transform:uppercase; color:var(--gold);
+                font-size:10.4mm; line-height:1; letter-spacing:.2mm; }
+  .headline-th{ margin-top:2.6mm; font-weight:700; color:var(--cream); font-size:7mm;
+                line-height:1.25; opacity:.95; }
+
+  /* --- disc behind the hand: stops the sunburst from chewing up the
+         silhouette, and gives the classic agitprop roundel --- */
+  .disc{ position:absolute; z-index:1; left:50%; top:206mm;
+         transform:translate(-50%,-50%); width:176mm; height:176mm;
+         border-radius:50%; background:var(--ink);
+         box-shadow:0 0 0 3mm var(--gold); }
+
+  /* --- fist + fork --- */
+  .fist{ position:absolute; z-index:2; left:50%; transform:translateX(-50%);
+         bottom:29mm; height:250mm;
+         filter:drop-shadow(2.2mm 2.2mm 0 rgba(20,38,10,.55)); }
+
+  /* --- bottom manifesto band --- */
+  .band{ position:absolute; z-index:3; left:0; right:0; bottom:0; background:var(--ink);
+         color:var(--cream); padding:6mm 9mm 6.5mm;
+         display:flex; align-items:center; justify-content:space-between; gap:7mm; }
+  .band .oils{ font-size:5.1mm; font-weight:900; text-transform:uppercase;
+               letter-spacing:.2px; line-height:1.25; }
+  .band .oils .y{ color:var(--gold); }
+  .band .oils .n{ color:#F09A94; }
+  .band .sub{ margin-top:2mm; font-size:3.3mm; font-weight:500; line-height:1.45;
+              color:rgba(251,248,240,.72); }
+  .band .sub .ru{ display:block; }
+  .band .logo{ width:56mm; flex:none; }
+
+  @media print{
+    @page{ size:297mm 420mm; margin:0; }
+    body{ background:#fff; padding:0; gap:0; }
+    .poster{ page-break-after:always; }
+    .poster:last-child{ page-break-after:auto; }
+  }
+</style>
+</head>
+<body>
+
+<section class="poster">
+ <div class="frame">
+
+  <!-- ================= SUNBURST ================= -->
+  <svg class="rays" viewBox="0 0 1000 1400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g fill="#B62A23">
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(0 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(20 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(40 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(60 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(80 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(100 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(120 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(140 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(160 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(180 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(200 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(220 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(240 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(260 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(280 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(300 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(320 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(340 500 700)"/>
+    </g>
+  </svg>
+
+  <div class="disc"></div>
+
+  <!-- ================= TYPE ================= -->
+  <div class="top">
+    <div class="eyebrow">Shishka Kitchen Manifesto · No.2</div>
+    <div class="rule"></div>
+    <h1 class="headline">Real Food</h1>
+    <div class="headline-ru">Настоящая еда</div>
+    <div class="headline-th">อาหารแท้</div>
+  </div>
+
+  <!-- ============ FIST GRIPPING A FORK — hand-authored vector ============ -->
+  <svg class="fist" viewBox="0 0 400 620" aria-label="Raised fist gripping a fork">
+   <g transform="rotate(-4 200 340)">
+
+    <!-- ---- fork, drawn first so the fingers wrap in front of the handle ---- -->
+    <g fill="var(--gold)" stroke="var(--ink)" stroke-width="8"
+       stroke-linejoin="round" stroke-linecap="round">
+      <!-- head, neck and handle in one piece. The head is deliberately narrow
+           (~a third of the fist): any wider and it reads as a crown. -->
+      <path d="M144,120 L256,120
+               C256,146 246,164 226,182
+               L226,384 C226,400 214,410 200,410
+               C186,410 174,400 174,384
+               L174,182 C154,164 144,146 144,120 Z"/>
+      <!-- four tines -->
+      <rect x="144" y="16" width="16" height="110" rx="8"/>
+      <rect x="176" y="16" width="16" height="110" rx="8"/>
+      <rect x="208" y="16" width="16" height="110" rx="8"/>
+      <rect x="240" y="16" width="16" height="110" rx="8"/>
+    </g>
+
+    <!-- ---- the gripping hand ---- -->
+    <g fill="var(--cream)" stroke="var(--ink)" stroke-width="10"
+       stroke-linejoin="round" stroke-linecap="round">
+
+      <!-- forearm -->
+      <path d="M120,620 L116,470 C114,436 132,410 156,398 L244,398
+               C268,410 286,436 284,470 L280,620 Z"/>
+
+      <!-- back of the hand, behind the wrapped fingers -->
+      <path d="M104,232 L104,360 C104,392 128,412 160,412 L244,412
+               C276,412 300,392 300,360 L300,232 Z"/>
+
+      <!-- knuckles: bumps that break the left edge so the wrapped fingers
+           don't read as a stack of plain logs -->
+      <circle cx="120" cy="237" r="32"/>
+      <circle cx="124" cy="289" r="32"/>
+      <circle cx="132" cy="339" r="30"/>
+      <circle cx="144" cy="385" r="28"/>
+
+      <!-- the four fingers wrapped around the handle, tapering to the pinky -->
+      <rect x="104" y="210" width="200" height="54" rx="27"/>
+      <rect x="108" y="262" width="198" height="54" rx="27"/>
+      <rect x="116" y="314" width="186" height="50" rx="25"/>
+      <rect x="128" y="362" width="168" height="46" rx="23"/>
+
+      <!-- thumb clamped diagonally across the fingers, tip against the handle -->
+      <rect x="118" y="270" width="150" height="66" rx="33"
+            transform="rotate(-42 193 303)"/>
+      <path d="M232,266 Q248,286 234,306" fill="none" stroke-width="8"/>
+
+      <!-- wrist crease -->
+      <path d="M132,436 Q200,454 268,436" fill="none" stroke-width="8"/>
+
+      <!-- rolled sleeve cuff, anchors the arm into the manifesto band -->
+      <path d="M96,510 L304,510 L308,620 L92,620 Z" fill="#14260A"/>
+    </g>
+   </g>
+  </svg>
+
+  <!-- ================= MANIFESTO BAND ================= -->
+  <div class="band">
+    <div>
+      <div class="oils">
+        <span class="y">Every sauce made in our kitchen</span><br>
+        <span class="n">Never a jar · never a premix · never a powder</span>
+      </div>
+      <div class="sub">
+        Hummus, mango, tahini, yoghurt — blended here from ingredients you can name.
+        <span class="ru">Хумус, манго, тахини, йогурт — всё готовим сами из понятных ингредиентов.</span>
+      </div>
+    </div>
+    <img class="logo" src="_assets/logo-full-white.png" alt="Shishka Healthy Kitchen">
+  </div>
+
+ </div>
+</section>
+
+</body>
+</html>
