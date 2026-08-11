@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SHISHKA — NO SEED OIL · constructivist manifesto poster · A3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800;900&family=Noto+Sans:wght@400;600;700;800;900&family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* SHISHKA — "NO SEED OIL" manifesto poster · A3 297 × 420 mm
+     Russian-constructivist / agitprop treatment: raised fist, sunburst, heavy uppercase.
+
+     CEO 2026-08-11: "i need it with the hand i gave you and dont write anything
+     down only logo". So this revision (a) rebuilds the fist to the anatomy of the
+     reference — knuckle domes breaking the top silhouette, curled finger backs,
+     the thumb clamped diagonally across them, and solid red form-shading instead
+     of a flat cream shape — and (b) strips the bottom band to the logo alone.
+     The headline stays: it is the poster.
+
+     LICENCE. The reference the CEO sent is a watermarked Adobe Stock file. The
+     raised fist is a public-domain agitprop idiom, that particular artwork is not,
+     so nothing here is traced, auto-traced or embedded — every path below is
+     hand-authored. That also means it is true vector and prints crisp at any size.
+
+     Palette is brand, not generic agitprop red:
+       spice-red #B62A23 (brand accent) · cream #FBF8F0 · royal-green ink #14260A · gold #F0CE83
+
+     CLAIM VERIFIED 2026-08-11 against the live catalogue before printing:
+       RAW-OIL-SUNFLOWER (sunflower/canola) .. is_deleted, 0 BOMs
+       RAW-RICE_BRAN_OIL ................... active in catalogue, 0 BOMs
+       RAW-CHILI-OIL ....................... 0 BOMs
+       RAW-MAYONNAISE-HEALTHY .............. is_deleted, 0 BOMs
+       RAW-OIL-SESAME ...................... 0 live BOMs. Its only consumer was
+                                             PF-SAUCE_PEANUT_LIME -> SALE-SAUCE_PEANUT,
+                                             archived on CEO instruction 2026-08-11 by
+                                             migration 404_retire_peanut_lime_sauce.sql,
+                                             which asserts this claim as a hard gate.
+     The claim is unconditional: no seed oil reaches any sellable product.
+     Kitchen fats in actual use: olive oil, coconut oil, MCT, butter.
+
+     NOTE: the fats / never-canola copy that used to sit in the bottom band is gone
+     on CEO instruction. The verification above is still what the headline rests on
+     — if the catalogue ever drifts, this sheet has to come off the wall. */
+  :root{
+    --red:#B62A23; --red-deep:#8E1F19; --cream:#FBF8F0; --ink:#14260A;
+    --gold:#F0CE83; --green:#1E3903;
+    --font:'Albert Sans','Noto Sans','Noto Sans Thai',system-ui,sans-serif;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box;
+     -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{ background:#6b6b6b; font-family:var(--font); display:flex;
+        flex-direction:column; align-items:center; gap:20mm; padding:20mm 0; }
+
+  .poster{ position:relative; width:297mm; height:420mm; background:var(--cream);
+           padding:8mm; overflow:hidden; }
+  .frame{ position:relative; width:100%; height:100%; background:var(--red-deep);
+          border:2.4mm solid var(--ink); overflow:hidden;
+          display:flex; flex-direction:column; align-items:center; }
+
+  /* --- sunburst, true vector --- */
+  .rays{ position:absolute; inset:0; width:100%; height:100%; }
+
+  /* --- type --- */
+  .top{ position:relative; z-index:3; width:100%; padding:13mm 8mm 0; text-align:center; }
+  .headline{ font-weight:900; text-transform:uppercase; color:var(--cream);
+             font-size:34mm; line-height:.86; letter-spacing:-.9mm;
+             text-shadow:1.6mm 1.6mm 0 var(--ink); }
+  .headline-ru{ margin-top:5mm; font-weight:900; text-transform:uppercase; color:var(--gold);
+                font-size:10.8mm; line-height:1; letter-spacing:.2mm; }
+  .headline-th{ margin-top:2.6mm; font-weight:700; color:var(--cream); font-size:7mm;
+                line-height:1.25; opacity:.95; }
+
+  /* --- disc behind the hand: stops the sunburst from chewing up the fist's
+         silhouette, and gives the classic agitprop roundel --- */
+  .disc{ position:absolute; z-index:1; left:50%; top:206mm;
+         transform:translate(-50%,-50%); width:182mm; height:182mm;
+         border-radius:50%; background:var(--ink);
+         box-shadow:0 0 0 3mm var(--gold); }
+
+  /* --- fist --- */
+  .fist{ position:absolute; z-index:2; left:50%; transform:translateX(-50%);
+         bottom:30mm; height:276mm;
+         filter:drop-shadow(2.2mm 2.2mm 0 rgba(20,38,10,.55)); }
+
+  /* --- bottom band: logo only, per CEO --- */
+  .band{ position:absolute; z-index:3; left:0; right:0; bottom:0; height:30mm;
+         background:var(--ink); display:flex; align-items:center; justify-content:center; }
+  .band .logo{ height:16mm; width:auto; }
+
+  @media print{
+    @page{ size:297mm 420mm; margin:0; }
+    body{ background:#fff; padding:0; gap:0; }
+    .poster{ page-break-after:always; }
+    .poster:last-child{ page-break-after:auto; }
+  }
+</style>
+</head>
+<body>
+
+<section class="poster">
+ <div class="frame">
+
+  <!-- ================= SUNBURST ================= -->
+  <svg class="rays" viewBox="0 0 1000 1400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g fill="#B62A23">
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(0 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(20 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(40 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(60 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(80 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(100 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(120 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(140 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(160 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(180 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(200 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(220 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(240 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(260 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(280 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(300 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(320 500 700)"/>
+      <polygon points="500,700 308.3,-1491.6 691.7,-1491.6" transform="rotate(340 500 700)"/>
+    </g>
+  </svg>
+
+  <div class="disc"></div>
+
+  <!-- ================= TYPE ================= -->
+  <div class="top">
+    <h1 class="headline">No Seed Oil</h1>
+    <div class="headline-ru">Нет семенным маслам</div>
+    <div class="headline-th">ไม่ใช้น้ำมันเมล็ดพืช</div>
+  </div>
+
+  <!-- ================= RAISED FIST — hand-authored vector =================
+       Build order matters: base masses first, then the red form-shading clipped
+       inside them, then the thumb on top with its own shading, then the ink
+       creases. Shading is clipped rather than hand-fitted, so the shadow shapes
+       can be drawn loose and still stop exactly at the silhouette. -->
+  <svg class="fist" viewBox="0 0 400 640" aria-label="Raised fist">
+   <defs>
+     <!-- One clip per form. Clipping each shadow to its OWN finger is the whole
+          trick: a single shared clip lets a sliver spill past a finger's right
+          edge onto the neighbour's left edge, and the fist reads as stripes. -->
+     <clipPath id="cf1"><rect x="58"  y="98"  width="84" height="165" rx="42"/></clipPath>
+     <clipPath id="cf2"><rect x="138" y="80"  width="82" height="183" rx="41"/></clipPath>
+     <clipPath id="cf3"><rect x="216" y="94"  width="76" height="169" rx="38"/></clipPath>
+     <clipPath id="cf4"><rect x="288" y="122" width="64" height="141" rx="32"/></clipPath>
+     <clipPath id="ch">
+       <path d="M58,210 L58,310 C58,360 92,392 140,396 L268,396
+                C316,392 350,360 350,310 L350,210 Z"/>
+     </clipPath>
+     <clipPath id="ca">
+       <path d="M116,644 L110,478 C108,442 128,412 156,396 L252,396
+                C280,412 298,442 296,478 L290,644 Z"/>
+     </clipPath>
+     <clipPath id="ct">
+       <path d="M42,270 L186,258 C232,254 264,274 264,304
+                C264,334 234,352 186,348 L42,340 Z"/>
+     </clipPath>
+   </defs>
+
+   <g transform="rotate(-5 200 350)">
+
+    <!-- ---------- base masses ---------- -->
+    <g fill="var(--cream)" stroke="var(--ink)" stroke-width="11"
+       stroke-linejoin="round" stroke-linecap="round">
+      <!-- forearm -->
+      <path d="M116,644 L110,478 C108,442 128,412 156,396 L252,396
+               C280,412 298,442 296,478 L290,644 Z"/>
+      <!-- back of the hand / heel, below the folded fingers -->
+      <path d="M58,210 L58,310 C58,360 92,392 140,396 L268,396
+               C316,392 350,360 350,310 L350,210 Z"/>
+      <!-- the four folded fingers. Each top is a full half-round, so the domes
+           break the silhouette as knuckles-toward-you: middle highest, pinky
+           lowest. They stop at y=263 to leave the lower third for the thumb. -->
+      <rect x="58"  y="98"  width="84" height="165" rx="42"/>
+      <rect x="138" y="80"  width="82" height="183" rx="41"/>
+      <rect x="216" y="94"  width="76" height="169" rx="38"/>
+      <rect x="288" y="122" width="64" height="141" rx="32"/>
+    </g>
+
+    <!-- ---------- red form-shading ----------
+         Light from the upper left, so each form carries its shadow on the right.
+         Deliberately restrained: cream has to stay the dominant value or the
+         silhouette stops reading from across the room. -->
+    <g fill="var(--red-deep)">
+      <!-- Tapered, not parallel bars. A constant-width bar down a finger reads as
+           a stripe; a shadow that pinches at the knuckle and widens at the base
+           reads as a round form. Kept to ~20% of each finger's width. -->
+      <g clip-path="url(#cf1)"><path d="M124,118 C136,168 136,223 128,263 L148,263 L148,88 Z"/></g>
+      <g clip-path="url(#cf2)"><path d="M202,100 C214,150 214,223 206,263 L226,263 L226,70 Z"/></g>
+      <g clip-path="url(#cf3)"><path d="M275,114 C286,162 286,225 279,263 L298,263 L298,84 Z"/></g>
+      <g clip-path="url(#cf4)"><path d="M337,142 C346,182 346,232 340,263 L358,263 L358,112 Z"/></g>
+      <!-- pinky side of the heel turns away from the light -->
+      <g clip-path="url(#ch)"><path d="M322,240 C338,290 338,350 326,400 L364,400 L364,240 Z"/></g>
+      <!-- outer edge of the forearm -->
+      <g clip-path="url(#ca)"><path d="M276,404 C292,450 292,560 288,652 L320,652 L320,404 Z"/></g>
+    </g>
+
+    <!-- ---------- thumb, clamped across the folded fingers ---------- -->
+    <path d="M42,270 L186,258 C232,254 264,274 264,304
+             C264,334 234,352 186,348 L42,340 Z"
+          fill="var(--cream)" stroke="var(--ink)" stroke-width="11"
+          stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- underside of the thumb turns away from the light -->
+    <g clip-path="url(#ct)" fill="var(--red-deep)">
+      <path d="M36,326 L200,338 C244,340 262,318 264,300 L280,304
+               C278,342 246,362 198,358 L36,348 Z"/>
+    </g>
+
+    <!-- ---------- ink detail on top ---------- -->
+    <g fill="none" stroke="var(--ink)" stroke-width="8"
+       stroke-linejoin="round" stroke-linecap="round">
+      <!-- joint crease across each folded finger -->
+      <path d="M68,188  Q100,206 132,188"/>
+      <path d="M148,170 Q179,188 210,170"/>
+      <path d="M226,184 Q254,202 282,184"/>
+      <path d="M296,208 Q320,224 344,208"/>
+      <!-- thumb knuckle -->
+      <path d="M212,272 Q232,304 214,334"/>
+      <!-- wrist -->
+      <path d="M132,424 Q200,442 268,424"/>
+    </g>
+
+    <!-- rolled sleeve cuff, anchors the arm into the band -->
+    <path d="M96,524 L308,524 L302,648 L102,648 Z" fill="#14260A"/>
+   </g>
+  </svg>
+
+  <!-- ================= LOGO ONLY ================= -->
+  <div class="band">
+    <img class="logo" src="_assets/logo-full-white.png" alt="Shishka Healthy Kitchen">
+  </div>
+
+ </div>
+</section>
+
+</body>
+</html>
