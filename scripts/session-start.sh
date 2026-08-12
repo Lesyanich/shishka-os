@@ -84,7 +84,8 @@ fi
 MC_TASKS=""
 MC_ERROR=""
 SUPABASE_URL="https://qcqgtcsjoacuktcewpvo.supabase.co"
-SERVICE_KEY=$(security find-generic-password -s "SUPABASE_SERVICE_ROLE_KEY" -w 2>/dev/null || true)
+# Env var takes priority (CI/Linux); macOS keychain is local-dev fallback
+SERVICE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-$(security find-generic-password -s "SUPABASE_SERVICE_ROLE_KEY" -w 2>/dev/null || true)}"
 
 if [ -n "$SERVICE_KEY" ] && command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
   MC_RAW=$(curl -fsS --max-time 5 \

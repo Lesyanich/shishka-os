@@ -19,6 +19,7 @@ Usage:
 import csv
 import json
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -43,11 +44,18 @@ REPORT_PATH = "tools/reconcile-unmatched/audit_report.csv"
 
 
 def get_db_url() -> str:
+    # Env var takes priority (CI/Linux environments)
+    if os.environ.get("DATABASE_URL"):
+        return os.environ["DATABASE_URL"]
+    # macOS keychain fallback (local dev)
     result = subprocess.run(
         ["security", "find-generic-password", "-s", "shishka-database-url", "-w"],
         capture_output=True, text=True,
     )
-    return result.stdout.strip()
+    url = result.stdout.strip()
+    if not url:
+        raise RuntimeError("No DB URL: set DATABASE_URL env var or add 'shishka-database-url' to macOS keychain")
+    return url
 
 
 def fetch_all_makro_barcodes(cur) -> list[dict]:
