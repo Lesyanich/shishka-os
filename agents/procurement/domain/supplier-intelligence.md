@@ -19,6 +19,24 @@
 - **MCP Tool:** `search_makro_catalog` — real-time prices, barcodes, ST166 Rawai stock. Use `format: "pdf"` to generate a PDF shopping list with product photos, barcodes, and prices
 - **MCP Tool:** `makro_shopping_list` — full ingredient list from active SALE menu BOM trees. Use `format: "pdf"` for a printable PDF
 
+### Cubic Bread (LINE @rsp7183n)
+
+- **Type:** Preservative-free whole-wheat bakery, direct-to-buyer via LINE MyShop
+- **Supabase ID:** `9267c86c-87a0-48a6-8766-2a6bbf3bce8a` · LINE shop id `122454`
+- **Range:** 21 SKUs (verified 2026-07-29) — whole-wheat loaves 120/360 g, square sandwich loaves 360 g, plus sourdough, rye+nuts, organic pumpkin (oat milk, dairy-free), vegan seed loaf, Nama Shokupan, French bread by the 10-case
+- **Spec:** 100% unrefined wheat flour, fresh butter + fresh yeast, no trans fat, no bleaching agent, **no preservatives**
+- **Shelf life:** 5 days ambient, 3 weeks frozen (thaw 15-20 min at room temp) — the whole commercial trade-off
+- **Slice counts (matters more than weight):** 360 g loaf = 9 slices × 1.9 cm, 360 g *sandwich* loaf = 7 slices × 1.6 cm, 120 g = 6 slices × 1.3 cm, 200 g soft = 5 slices
+- **Lead time:** bakes to order. Dispatch rounds Mon/Tue/Wed/Fri/Sat, 14:00 cut-off; parcel lands 1-2 days after dispatch ⇒ ~3 days to Phuket
+- **Delivery fee / MOQ:** NOT published on the storefront — must be asked in LINE chat. **Open question.**
+- **Brand total = 24 SKUs across 4 channels** (LINE 21 / Gourmet Market 15 / Tops 11 / Makro 5). Three exist at retail only, never on LINE: Dark Cocoa 120 g, Banana & Honey 195 g, Original Big Slice.
+- **"Sweet" line = flavoured bread, not confectionery.** Red Velvet (beetroot juice), Dark Cocoa, Banana & Honey. No cookies/cakes/brownies exist under this brand.
+- **Price parity, with one exception:** the 360 g / 300 g range is ฿69/79/99/109 on every channel. The **120 g "Cubic Fit" line is ฿4-10 cheaper at Gourmet Market** than on the brand's own LINE shop (Original ฿33 vs ฿39, Red Velvet ฿35 vs ฿45).
+- **Best Phuket channel = Tops**, not Makro: 11 SKUs at 7-10 units each vs Makro's 5 SKUs at 1-4 units, same prices. Makro price is branch-verified (ST166); the Tops figure is tops.co.th online and the site warns branch prices differ.
+- **Composition:** no channel publishes a label-level ingredient list — Tops, Gourmet Market and Big C all render an empty "Ingredients" field, and `cubicbread.com` is offline (resolves to 127.0.0.1). Only marketing-level attributes are available. Read the ส่วนประกอบ off the physical pack.
+- **Allergens (from Big C spec):** contains wheat gluten + **milk and real butter**; NO eggs, no bleached sugar, 0% cholesterol. Dairy-free exceptions: the "JAE/vegetarian" Multi-Grain Sandwich, Vegan Precious Seed, and Organic Pumpkin (oat milk).
+- **Ruling:** buy the core whole-wheat SKUs at Tops or Makro; LINE is only worth the wait for the LINE-exclusive specialty loaves (sourdough / mixed-nuts rye / organic pumpkin) or for volume the shelf cannot cover.
+
 ### Sangdamrong
 
 - **Type:** Kitchenware / packaging / supplies wholesaler
@@ -88,7 +106,9 @@
 
 > Add new rulings here as they are discovered. Format: `YYYY-MM-DD: ruling`
 
-_No rulings yet. Will accumulate from procurement research sessions._
+2026-07-29: **A LINE-shop brand may sit on the Makro shelf at the identical price.** CUBIC bread — same 4 core SKUs, same ฿69/฿99, ~3-day wait vs instant pickup. Always run `search_makro_catalog` on the BRAND name (Thai transliteration too, e.g. `คิวบิก`) before treating a LINE storefront as the only channel; the English brand query returned PC cases and a fridge, the Thai one returned the bread.
+
+2026-07-29: **Receipt OCR truncates Thai product names into misleading English.** "ขนมปังคราฟคอร์น" (ARO GOLD *Kraftkorn*) became nomenclature "Kraft Bread 330g x1". Before asserting *which* product we bought, verify against the receipt image, not the parsed name.
 
 ---
 
