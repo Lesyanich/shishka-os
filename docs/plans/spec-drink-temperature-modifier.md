@@ -80,7 +80,22 @@ The paid list must be created: `Temperature +10`, options `Hot` 0 / `Iced` 10. T
 create path (`POST /modifiers`, `loyverse-sync/index.ts:563-577`), so this is scriptable — no
 manual Back Office work.
 
-### 4.4 Retirement is a soft delete
+### 4.4 "Required" lives on the Loyverse list, not on our attachment — both lists need it
+
+`dish_modifier_groups.min_select` / `max_select` are **our-side metadata only**. The push path
+sends the item a flat `modifier_ids` array and nothing else
+(`reattachAllDishes`, `loyverse-sync/index.ts:704-719`; same shape in `push_dish_modifiers`).
+`min_select` is a property of the **modifier list** in Loyverse, set when the list is created.
+
+This is load-bearing: §4.2 deducts packaging only when a temperature option fires. If the cashier
+can skip the group, the drink is rung with **no cup, no lid, no ice deducted at all**.
+
+The mirror shows `min_select = NULL` on every list including the existing free `Temperature`. So
+the free list must be **updated to `min_select = 1, max_select = 1`** as well — `POST /modifiers`
+with an existing `id` updates the list in place (the pattern `handleAddModifierOption` already uses
+at `index.ts:596-600`). Creating `Temperature +10` alone would leave Americano unenforced.
+
+### 4.5 Retirement is a soft delete
 
 `handleDeleteDish` calls Loyverse `DELETE /items/{id}` and resets the row to `pos_status='draft'`,
 `loyverse_item_id=null` (`loyverse-sync/index.ts:160-184`). Loyverse soft-deletes, so historical
@@ -91,10 +106,15 @@ on `pos_status='synced' AND is_available=true`
 ## 5. Steps
 
 1. **Precondition** — PR #575 merged and pushed to Loyverse, till verified. Do not start before this.
-2. **Precondition** — the `Temperature +10` list exists in Loyverse (`Hot` ฿0 / `Iced` ฿10, required,
-   max 1) and the mirror is refreshed via `loyverse-sync?action=pull_modifiers`. The migration
-   resolves both lists by name and its §0 guard aborts if this list or its ฿10 `Iced` option is
-   missing, so it cannot be applied early.
+2. **Precondition** — both Loyverse lists are in place, then the mirror is refreshed via
+   `loyverse-sync?action=pull_modifiers`:
+   - create `Temperature +10` — `Hot` ฿0 / `Iced` ฿10, `min_select 1`, `max_select 1`
+   - update the existing `Temperature` (`9238fecb-…`) to `min_select 1`, `max_select 1` (§4.4)
+
+   The migration resolves both lists by name and its §0 guard aborts if the paid list or its ฿10
+   `Iced` option is missing, so it cannot be applied early. The guard deliberately does **not**
+   assert `min_select`, because Loyverse omits the field from some list responses and a false
+   positive would block a correct apply — verify it at the till instead (§7).
 3. Migration `406_drink_temperature_modifier.sql`:
    - give `MOD-TEMP_HOT` + `MOD-TEMP_ICED` the BOMs in §4.2 (the nomenclature rows already exist)
    - strip the 2 packaging lines from each of the 5 surviving dish BOMs
@@ -117,7 +137,9 @@ other four. A barista who wants the old strength adds `MOD-ESPRESSO_EXTRA` from 
 
 ## 7. Acceptance
 
-- Each of the 5 drinks shows Temperature (required, first), then Milk, then Coffee Boosters.
+- Each of the 5 drinks shows Temperature, then Milk, then Coffee Boosters.
+- **Temperature cannot be skipped on any of the 5** — including Americano, which rides the free
+  list. This is the §4.4 check and the one that silently breaks stock if it is wrong.
 - Ringing Latte + Iced totals 85; Americano + Iced totals 65.
 - One iced order deducts exactly one PP cup, one dome lid, one straw, ice — and zero paper cups.
 - The 5 iced items are gone from the till and from shishka.health; Loyverse sales history intact.

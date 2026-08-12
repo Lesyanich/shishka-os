@@ -12,9 +12,18 @@
 -- fires per order and packaging is deducted exactly once — fn_deduct_order_bom
 -- already explodes the BOM of any bound order_item_modifiers row (mig 200).
 --
--- PRECONDITION: "Temperature +10" (Hot ฿0 / Iced ฿10, required, max 1) must exist
--- in Loyverse and the mirror must be refreshed via loyverse-sync?action=pull_modifiers.
+-- PRECONDITION: "Temperature +10" (Hot ฿0 / Iced ฿10, min_select 1, max_select 1)
+-- must exist in Loyverse AND the existing free "Temperature" list must be updated to
+-- min_select 1 / max_select 1, then loyverse-sync?action=pull_modifiers.
 -- Both lists are resolved BY NAME below and the guard raises if either is missing.
+--
+-- "Required" is a property of the LIST in Loyverse. dish_modifier_groups.min_select
+-- below is our-side metadata that the push path never sends — it pushes a flat
+-- modifier_ids array (reattachAllDishes, loyverse-sync/index.ts:704-719). If a list
+-- is skippable at the till the drink rings with NO packaging deducted at all, so both
+-- lists must carry min_select = 1. The guard deliberately does not assert it: Loyverse
+-- omits the field from some list responses and a false positive would block a correct
+-- apply. Verify at the till instead. See spec §4.4.
 --
 -- NOT in this migration: retiring the 5 iced items. They stay live until the CEO
 -- has verified the toggle at the till, so there is a rollback path.
