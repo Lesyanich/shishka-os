@@ -49,6 +49,9 @@ Run A1–A4 in any order; none needs the decision packet. A5 is gated on § 2.
   logged-in Chrome (iframe upload technique: `~/shishka-assets/menu-photos/photo-mapping.json`,
   key `gbp_upload_technique`; photo cache in the same dir) with the CEO present, or hand her the checklist.
   *Acceptance:* GBP item count/names/prices match the D1 truth set; screenshot audit posted to `a91c473a`.
+  **NOT STARTED 2026-07-27** — double-gated: revamp `abe7301a` is still `in_progress`
+  (`applying-migration`, session `7385e9c3`), and the diff needs D1 to know what "orderable" means.
+  Running it early would push stale names onto a customer surface twice.
 - **A2 — Review replies + ask asset.** Draft EN replies in the CEO's voice for ALL unanswered
   Google reviews (2 at Jul-15 audit + ≥1 newer — re-check live), naturally restating dish +
   dietary terms. Plus a 1-line review-ask for a table/bag QR (never incentivized). CEO posts, or
@@ -56,15 +59,49 @@ Run A1–A4 in any order; none needs the decision packet. A5 is gated on § 2.
   AI answer prose with ~5 reviews; we sit at 5.0★ with 2–3. ⚠ Do not solicit from affiliated
   parties (reviewer "Mazen H" may be creditor Mazen — CEO to confirm).
   *Acceptance:* drafts delivered; replies live within 48 h.
+  **DRAFTS DELIVERED 2026-07-27** → [`review-replies-2026-07.md`](review-replies-2026-07.md).
+  Live count re-checked: still **2 reviews, 5.0★, both unanswered** (reply rate 0% vs WP-2's
+  100%/24 h target) — no third review has landed. Nothing posted. Two blockers are CEO-only:
+  posting itself, and the Mazen affiliation question (Google prohibits conflict-of-interest
+  reviews — reply 1 is held until she answers).
 - **A3 — AI-bot crawl-log harness** (closes the open half of WP-8). Via Vercel MCP: document a
   runnable weekly query for UA `GPTBot|ClaudeBot|PerplexityBot|OAI-SearchBot|Google-Extended`
   per path on `shishka-web`; run once; post numbers as a **comment** on WP-8 `6bb7b218` —
   do **not** claim WP-8 (owned by session `7cddafd2`; its access-blocker note is obsolete).
   *Acceptance:* query doc committed + first weekly numbers on the task.
+  **DONE 2026-07-27 with a negative result** → [`ai-bot-crawl-harness.md`](ai-bot-crawl-harness.md).
+  Vercel access works; the logs do not exist. `shishka-web` is a static build with zero functions,
+  so it emits zero runtime logs (8 live bot-UA requests → 0 log lines in a 1 h window), and Web
+  Analytics is off *and* useless for bots (JS beacon). The plan's log query is **not runnable as
+  written**; a working substitute (edge middleware → Supabase sink, ~40 lines, rides in the WP-4
+  branch) is designed in that doc § 4. Do not read this as "0 bot hits" — there is no instrument.
 - **A4 — Bot 200-check** (WP-0 leftover). `curl -A "<bot UA>" https://shishka.health/` for
   GPTBot, ClaudeBot, PerplexityBot, OAI-SearchBot → all HTTP 200, no Vercel Firewall challenge.
-  *Acceptance:* four 200s recorded below. ✍
+  *Acceptance:* four 200s recorded below. **PASS 2026-07-27** (Phuket IP, production):
+
+  | Bot UA | `GET /` | Body | Notes |
+  |---|---|---|---|
+  | GPTBot/1.2 | **200** | 677 B | `x-vercel-cache: HIT`, no challenge |
+  | ClaudeBot/1.0 | **200** | 677 B | |
+  | PerplexityBot/1.0 | **200** | 677 B | |
+  | OAI-SearchBot/1.0 | **200** | 677 B | |
+  | Google-Extended | **200** | 677 B | extra, beyond the required four |
+
+  Two findings from the same pass, both for WP-4: (1) **677 B is the empty SPA shell** — `/menu`
+  returns the identical bytes, so every bot got a 200 and learned nothing; reachability ≠ visibility.
+  (2) **`/robots.txt`, `/sitemap.xml`, `/llms.txt` do not exist** — `public/` holds only `assets/`,
+  and the `/(.*) → /index.html` catch-all serves the SPA for each, as `text/html` **soft-200s**.
+  The PR #33 keepers were never shipped anywhere. A soft-200 at `/sitemap.xml` is worse than a 404;
+  fix is dropping real files into `public/` (Vercel serves static before rewrites) inside WP-4.
 - **A5 — WP-4 scaffold** (only if § 2 answered): see § 4.
+  **NOT STARTED 2026-07-27** — § 2 is unanswered (`cfd30575` still `inbox`, zero comments), so the
+  gate holds. WP-4 task `47b6ef32` left unclaimed and uncommented-on beyond this pointer.
+
+**Sprint A run log — 2026-07-27** (session `70efbc72`, branch `feature/marketing/aeo-sprint-a`):
+A2 ✅ drafts · A3 ✅ documented, negative result · A4 ✅ pass · **A1 not started** (gated on revamp
+`abe7301a`, still `in_progress` at `applying-migration`, *and* on D1) · **A5 not started** (gated
+on § 2). Nothing was posted, uploaded or deployed; every remaining step is a CEO decision or a
+CEO-present action.
 
 ## 4. Sprint B — WP-4 prerendered pages (MC `47b6ef32`, gated on D1+D3+D4)
 
