@@ -1,8 +1,8 @@
 # Spec — Hot/Iced as a POS modifier, replacing twin iced SKUs
 
 > MC Task: 93da602a-a99b-4ae6-b281-310cf4d8b9d6
-> Status: migration written and dry-run verified; blocked on the CEO creating the `Temperature +10` list in Loyverse
-> Blocked by: task d8d35bf6 / PR #575 (Milk + Coffee Boosters) — same tables, same dishes
+> Status: **LIVE 2026-08-12** — list created, migration 406 applied, 5 dishes pushed to Loyverse.
+> Remaining: CEO verifies at the till, then the 5 iced twins are retired (§5 step 5).
 
 ## 1. Problem
 
@@ -152,3 +152,34 @@ other four. A barista who wants the old strength adds `MOD-ESPRESSO_EXTRA` from 
   explicitly picks "Cow Milk", stock deducts twice. Pre-existing, unrelated to this change.
 - `MOD-ESPRESSO_EXTRA` and the syrup MODs have no BOM, so paid boosters deduct no stock.
 - Whether shishka.health actually renders the `menu_modifiers` view is a HEALTH-repo question.
+
+## 9. Go-live log — 2026-08-12
+
+Executed end-to-end from SQL, using the `pg_net` + vault path the push-queue cron already uses
+(`vault.decrypted_secrets` → `loyverse_push_url` + `loyverse_internal_secret` → `x-internal-secret`).
+No browser session and no Back Office work were needed after all.
+
+1. `action=create_modifier` → `Temperature +10` created, id `24eb8a9e-b8ef-4765-8134-549d63ea9e8b`,
+   options `Hot` ฿0 (`6e81e9c2-…`) / `Iced` ฿10 (`091e5db0-…`). The handler auto-pulls, so the
+   mirror refreshed in the same call.
+2. Migration `406` applied. All §0 guards and §6 post-conditions passed.
+3. `action=push_modifiers&dry_run=true` → 0 price changes, 40 dishes to reattach. The real run
+   then failed 502 (see below), so the 5 dishes were pushed individually with
+   `action=push_dish_modifiers&dish_id=…` — all 5 returned 200.
+
+`SALE-COFFEE_CARAMEL_LATTE` had **no modifier lists at all** in Loyverse before this push
+(`"before": []`) — the same drift that started the task, on a dish nobody had noticed yet.
+
+### Loyverse does not expose `min_select`
+
+The `POST /modifiers` response omits `min_select` / `max_select` entirely, and the pull stores
+NULL for every list including the two Temperature ones. So §4.4 cannot be verified — or fixed —
+through the API: **whether the Hot/Iced prompt can be skipped has to be checked at the till.** If
+it can be skipped, packaging silently stops deducting, and the fix is a Back Office edit.
+
+### Global push is broken by unrelated data
+
+`push_modifiers` aborts on `SALE-BUNDLE_MANAKISH_4/8/12`, which hold 15 `dish_modifier_groups`
+rows pointing at modifier lists deleted from Loyverse. The loop has no per-dish try/catch, so one
+bad dish kills the run and `attachments_dirty` can never clear. Logged as MC `3ccfee28`. This is
+why step 3 above used the per-dish action instead.
