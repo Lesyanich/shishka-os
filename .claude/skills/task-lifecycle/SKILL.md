@@ -245,6 +245,17 @@ Write clear, actionable notes:
 update_task(task_id=ID, notes="Done: [what was completed]. Remaining: [what's left]. Blockers: [any blockers, or 'none']. Branch: [name]. Last commit: [hash].")
 ```
 
+**`notes` is capped at 500 chars — by design, not an oversight.** It is a terse, structured status line for triage (done / remaining / blockers / branch / commit), NOT a prose journal. Keep it a status line and it always fits. Pick the right field:
+
+| Field | Cap | Role |
+|-------|-----|------|
+| `title` | 200 | headline |
+| `description` | 4000 | the task body — details, findings, why blocked |
+| `notes` | 500 | short triage status line (this section) |
+| `add_comment` body | 32000 (many allowed) | running log + long closing summaries |
+
+If a closing write-up won't fit in 500, it belongs in a **comment** (`add_comment`, timestamped, up to 32000 each) or in `description` — do not fight the `notes` cap.
+
 ### Commit WIP code
 
 ```bash
