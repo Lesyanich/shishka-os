@@ -1,4 +1,4 @@
--- 402_drink_temperature_modifier.sql
+-- 406_drink_temperature_modifier.sql
 -- Spec: docs/plans/spec-drink-temperature-modifier.md  |  MC task 93da602a
 --
 -- Replaces the twin hot/iced items with ONE item per drink plus a required
@@ -220,7 +220,7 @@ END $$;
 UPDATE modifier_sync_state SET attachments_dirty = true, updated_at = now() WHERE id = 1;
 
 INSERT INTO migration_log (filename, notes)
-VALUES ('402_drink_temperature_modifier.sql',
+VALUES ('406_drink_temperature_modifier.sql',
         'Temperature (Hot/Iced) modifier on 5 drinks: Americano on the free list, 4 milk drinks on Temperature +10. Packaging moved from dish BOMs into MOD-TEMP_HOT/MOD-TEMP_ICED. Iced twin items not yet retired.');
 
 COMMIT;

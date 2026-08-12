@@ -58,7 +58,7 @@ Hot and iced differ by more than ice:
 | Ice | — | RAW-ICE_CUBES 0.25 kg |
 
 A MOD cannot subtract a component, so packaging cannot stay in the dish BOM. It moves **out** of
-the 5 surviving dish BOMs and **into** two new MOD items. Because the Temperature group is
+the 5 surviving dish BOMs and **into** two MOD items. Because the Temperature group is
 required (`min_select = 1`), exactly one of them fires on every order, so packaging is deducted
 exactly once.
 
@@ -95,7 +95,7 @@ on `pos_status='synced' AND is_available=true`
    max 1) and the mirror is refreshed via `loyverse-sync?action=pull_modifiers`. The migration
    resolves both lists by name and its §0 guard aborts if this list or its ฿10 `Iced` option is
    missing, so it cannot be applied early.
-3. Migration `402_drink_temperature_modifier.sql`:
+3. Migration `406_drink_temperature_modifier.sql`:
    - give `MOD-TEMP_HOT` + `MOD-TEMP_ICED` the BOMs in §4.2 (the nomenclature rows already exist)
    - strip the 2 packaging lines from each of the 5 surviving dish BOMs
    - wire `modifier_option_cost` for the 4 Temperature options → the 2 MODs
