@@ -62,7 +62,7 @@ Classic (lime, honey) · Ginger · Mint · Passionfruit
 ## ⚡ Shots  (all 60)
 Ginger (ginger, lime, honey) · Beetroot Energy (beetroot, apple, lime, ginger) · Turmeric Immunity (orange, ginger, turmeric, lime)
 
-## 🥫 Sauces & Dressings  (all 39)
+## 🥫 Sauces & Dressings  (all 30)
 Hummus · Mango · Tahini Tamarind · Yogurt Tahini
 
 ## 🍫 Chocolate  (100g bars, all 197)
