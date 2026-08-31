@@ -1,0 +1,112 @@
+import type { PayslipData } from '../../../hooks/use-payroll'
+
+const STAFF_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+
+/** Sample payslip used by the receipt render tests. */
+export function fixture(overrides: Partial<PayslipData> = {}): PayslipData {
+  return {
+    line: {
+      id: 'line-1',
+      payroll_period_id: 'per-1',
+      staff_id: STAFF_ID,
+      days_worked: 26,
+      days_absent: 1,
+      days_leave_paid: 0,
+      late_days: 2,
+      late_minutes: 35,
+      late_deduction: 120,
+      base_salary: 15000,
+      overtime_pay: 0,
+      bonus_pay: 0,
+      bonus_note: null,
+      absence_deduction: 500,
+      sso_employee: 348,
+      sso_employer: 348,
+      withholding_tax: 0,
+      other_deductions: 120,
+      net_pay: 14032,
+      is_manual_override: false,
+      expense_ledger_id: null,
+      notes: null,
+    },
+    staff: {
+      id: STAFF_ID,
+      name: 'Mint',
+      name_th: 'มิ้นท์',
+      legal_name_first: 'Chanyapat',
+      legal_name_last: 'Suwannachai',
+      role: 'cook',
+      nationality: 'TH',
+      date_of_birth: null,
+      address: null,
+      hire_date: '2025-03-01',
+      employment_type: 'full_time',
+      sso_number: null,
+      sso_enrolled_from: null,
+      tax_id: null,
+      work_permit_number: null,
+      work_permit_expiry: null,
+      monthly_salary: 15000,
+    },
+    period: {
+      id: 'per-1',
+      period_start: '2026-08-01',
+      period_end: '2026-08-31',
+      status: 'approved',
+      approved_by: null,
+      approved_at: null,
+      paid_at: null,
+      notes: null,
+      punctuality_reviewed_at: null,
+      punctuality_reviewed_by: null,
+      created_at: '2026-08-01',
+      updated_at: '2026-08-31',
+    },
+    payments: [],
+    advancesPaid: 0,
+    substituteDaysOwed: 0,
+    ...overrides,
+  }
+}
+
+/** Two advances plus an already-recorded final payment. */
+export function advancePayments(): PayslipData['payments'] {
+  return [
+    {
+      id: 'p1',
+      staff_id: STAFF_ID,
+      payroll_period_id: 'per-1',
+      paid_on: '2026-08-12',
+      amount: 4000,
+      kind: 'advance',
+      payment_method: 'cash',
+      note: 'rent',
+      expense_ledger_id: null,
+      created_at: '2026-08-12',
+    },
+    {
+      id: 'p2',
+      staff_id: STAFF_ID,
+      payroll_period_id: 'per-1',
+      paid_on: '2026-08-20',
+      amount: 1500,
+      kind: 'advance',
+      payment_method: 'cash',
+      note: null,
+      expense_ledger_id: null,
+      created_at: '2026-08-20',
+    },
+    {
+      id: 'p3',
+      staff_id: STAFF_ID,
+      payroll_period_id: 'per-1',
+      paid_on: '2026-08-31',
+      amount: 8532,
+      kind: 'final',
+      payment_method: 'cash',
+      note: null,
+      expense_ledger_id: null,
+      created_at: '2026-08-31',
+    },
+  ]
+}
