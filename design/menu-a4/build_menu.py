@@ -215,6 +215,7 @@ def fetch_sauces(key, warnings):
     codes = [c for _, c, _, _ in SAUCES if c] + [p for _, _, _, p in SAUCES if p]
     rows = {r["product_code"]: r for r in get(
         "nomenclature?select=product_code,name,customer_short_name,price,calories,"
+        "protein,carbs,fat,"
         "portion_size,allergens,customer_ingredients,customer_description"
         f"&product_code=in.({','.join(codes)})", key)}
     missing = sorted(set(codes) - set(rows))
@@ -275,6 +276,25 @@ def fetch_sauces(key, warnings):
         else:
             warnings.append(f"sauce has no energy figure anywhere, cell prints "
                             f"none: {s['_label']} ({f})")
+
+        # Protein / carbs / fat, read from the SAME row the energy came from and
+        # scaled the same way. Never mixed: a cell showing a sale row's calories
+        # over a prep row's macros would be four figures that do not describe
+        # one thing, and nothing on the page would say so.
+        #
+        # All three or none. A rail with two numbers and a gap invites the
+        # reader to assume the gap is a zero, and "Fat: —" on a mayonnaise is
+        # the kind of blank that misleads rather than merely disappoints.
+        s["_macros"] = None
+        if s["_kcal"] is not None:
+            src = rows[s["_prep"]] if s.get("_prep") else s
+            scale = SAUCE_PORTION_G / 1000 if s.get("_prep") else 1.0
+            vals = [src.get(k) for k in ("protein", "carbs", "fat")]
+            if all(v is not None for v in vals):
+                s["_macros"] = [round(float(v) * scale, 1) for v in vals]
+            else:
+                warnings.append(f"sauce has energy but no full P/C/F set, cell "
+                                f"prints the calories alone: {s['_label']} ({f})")
         out.append(s)
 
     # Two cells that share a photograph, or share the recipe their figures come
@@ -816,14 +836,37 @@ def sauce_html(s):
     contains = ("" if not al else
                 '<p class="contains"><b>Contains</b>'
                 + "".join(f"<em>{esc(a)}</em>" for a in al) + "</p>")
-    # The line is held even when there is no figure, so the CONTAINS warnings of
-    # the twelve cells still land on one line across each row.
-    kcal = (f'<div class="kcal">{s["_kcal"]} kcal</div>'
-            if s["_kcal"] is not None else '<div class="kcal">&nbsp;</div>')
+    # Both blocks hold their height even when there is no figure to print, so
+    # the twelve cells stay on the same four lines across each row. A cell that
+    # collapses drags its neighbours' CONTAINS warnings out of alignment, and a
+    # row that nearly lines up reads worse than one that does not try.
+    kcal = (f'<div class="stat stat--kcal"><span class="v">{s["_kcal"]}</span>'
+            f'<span class="k">kcal</span></div>'
+            if s["_kcal"] is not None else '<div class="stat stat--none">&nbsp;</div>')
+
+    # The macro rail is the dish rows' component at cell scale — same box, same
+    # hairlines, same value-over-label. A sauce is chosen on its colour, so
+    # these stay quiet; they are here to be checked, not shopped on.
+    if s["_macros"]:
+        p, c, fat = s["_macros"]
+        macros = ('<div class="macros">'
+                  + "".join(f'<div class="cell"><span class="v">{num(v)}</span>'
+                            f'<span class="k">{k}</span></div>'
+                            for v, k in ((p, "Protein"), (c, "Carbs"), (fat, "Fat")))
+                  + "</div>")
+    else:
+        # Held open, not filled in. Five of the twelve have no recipe in the
+        # system at all, and an empty rail is the honest shape of that: the
+        # figures are missing because the sauce is, and inventing a plausible
+        # 2 / 3 / 1 to make the sheet look finished would put a number on a
+        # menu that nothing in the kitchen stands behind.
+        macros = '<div class="macros macros--empty"></div>'
+
     return f'''          <figure class="sauce">
             <img src="{esc(s["_file"])}" alt="{esc(s["_label"])}">
             <figcaption class="name">{esc(s["_label"])}</figcaption>
             {kcal}
+            {macros}
             {contains}
           </figure>
 '''

@@ -337,11 +337,36 @@
      one that doesn't try. The page has the height to spend. */
   .sauce .name{ margin-top:3.2mm; min-height:8mm; font-size:3.5mm; font-weight:800;
                 line-height:1.14; letter-spacing:-0.1px; }
-  /* Energy sits under the name in the muted weight the macro labels use: it is a
-     figure you check, not one you shop on. The pour it is quoted over is stated
-     once in the line above, which is what keeps this to a single number. */
-  .sauce .kcal{ margin-top:0.7mm; font-family:var(--font-mono); font-size:2.7mm;
-                font-weight:600; color:var(--ink-muted); font-variant-numeric:tabular-nums; }
+  /* Energy and macros, the dish row's own two components shrunk to cell scale.
+     Not a new pair of widgets: a guest who has read 60 dishes already knows the
+     mint chip is the calories and the ruled box is protein/carbs/fat, and a
+     sauce is the last place on the sheet to teach them a second vocabulary.
+
+     The pour these are quoted over — 50 g — is stated once in the lede above,
+     which is what keeps every cell to four figures instead of five. */
+  .sauce .stat{ margin-top:1mm; padding:0.7mm 2.2mm; }
+  .sauce .stat .v{ font-size:4.4mm; }
+  .sauce .stat .k{ font-size:2.2mm; letter-spacing:1px; }
+  /* An empty chip, not a missing one — see .macros--empty. */
+  .sauce .stat--none{ min-height:6.1mm; }
+  .sauce .macros{ width:100%; margin-top:1.6mm; margin-bottom:0; }
+  .sauce .macros .cell{ padding:0.8mm 0.4mm; }
+  .sauce .macros .v{ font-size:2.7mm; }
+  /* The label is the word, not the word plus a unit. At a third of 38.7mm
+     "PROTEIN G" wraps and "CARBS G" does not, so the three cells stopped being
+     one rail. Grams are what a macro is; the g is the least of what is said. */
+  .sauce .macros .k{ font-size:1.6mm; letter-spacing:0.5px; margin-top:0.6mm; }
+  /* Five of the twelve sauces have no recipe in the system, so there are no
+     figures to print. The rail keeps its height and loses its border: the row
+     stays on one line, and the cell simply says nothing.
+
+     It was hatched here for one draft, to mark the gap as unfinished rather
+     than empty. On screen that read as honest; on the sheet it read as a
+     printing fault — a guest has no way to tell a deliberate hatch from a
+     misprint, and the one thing a menu must never look is broken. The gap is
+     reported where it can be acted on: build_menu.py warns on every one of the
+     five, and they are open in MC. The page is not the bug tracker. */
+  .sauce .macros--empty{ min-height:8.2mm; border-color:transparent; }
   .sauce .contains{ align-self:center; margin-left:0; margin-top:1.2mm;
                     justify-content:center; gap:0 1mm; }
   .sauce .contains b{ font-size:1.9mm; }
