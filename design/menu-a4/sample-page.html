@@ -56,24 +56,33 @@
 
   /* ── header ───────────────────────────────────────────── */
   .head{ display:flex; align-items:flex-end; justify-content:space-between;
-         padding-bottom:2mm; border-bottom:0.5mm solid var(--ink); }
-  .head img{ height:15mm; width:auto; display:block; }
-  .head .title{ display:flex; flex-direction:column; align-items:flex-end; gap:1.4mm;
+         gap:5mm; padding-bottom:2mm; border-bottom:0.5mm solid var(--ink); }
+  .head img{ height:15mm; width:auto; display:block; flex:0 0 auto; }
+  /* The title is the only part that can wrap ("SAUCES & DRESSINGS"), so it gets
+     a reserved column and the claims shrink instead. Without this the two
+     collide on any section whose name runs to a second line. Two lines still
+     cost no extra header height — the pair sets to 15.1mm against the logo's
+     15mm, so every page's rule line lands on the same millimetre.
+     A drawn mark used to sit beside the words. It was cut on the CEO's call:
+     the word already names the section, and a second-guess icon of a salad
+     bowl next to the word SALADS is decoration, which this page does not do. */
+  .head .title{ flex:0 0 auto; max-width:58mm; text-align:right;
          font-size:7.4mm; font-weight:800; letter-spacing:-0.3px;
-         line-height:1; text-transform:uppercase; }
-  .head .title svg{ width:8.4mm; height:8.4mm; fill:none; stroke:currentColor;
-         stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+         line-height:1.02; text-transform:uppercase; }
 
-  /* Kitchen-wide claims, true of every dish, so they live in the header rather
-     than repeating per row. Left = what we leave out (red, wording from
-     site_content.rule.items); right = what we stand for (green, condensed from
-     the live site_content.hero line "fresh, unprocessed, real food, made daily").
-     Marks are the site's own: struck droplet + shaker for the denials, sprout
-     and heart for the affirmations, drawn in the column's colour. */
-  .rule{ flex:1; display:flex; justify-content:center; align-items:center; gap:9mm; }
-  .rule__col{ display:flex; flex-direction:column; gap:1.9mm; }
-  .rule__col--yes{ padding-left:9mm; border-left:0.25mm solid var(--rule); color:var(--green-700); }
-  .rule__col:not(.rule__col--yes){ color:var(--red-700); }
+  /* Kitchen-wide denials, true of every dish, so they live in the header rather
+     than repeating per row. Wording from site_content.rule.items, marks the
+     site's own: struck droplet and shaker, in red.
+     The matching green column ("Fresh daily", "Nutrition over calories") was
+     cut on the CEO's call — rule 7 says the page warns and never promises, and
+     those two were the only affirmations on the sheet. */
+  .rule{ flex:1 1 auto; min-width:0; display:flex; justify-content:center;
+         align-items:center; }
+  /* One line, not two stacked. They are a single short sentence about the
+     kitchen — set as a column they read as a list of two policies and took the
+     full height of the logo to say ten words. Side by side they sit on the rule
+     line where a strapline belongs, and the header keeps its 66px either way. */
+  .rule__pair{ display:flex; align-items:center; gap:6mm; color:var(--red-700); }
   .rule__item{ display:flex; align-items:center; gap:1.6mm;
                font-size:3mm; font-weight:800; letter-spacing:0.3px;
                text-transform:uppercase; white-space:nowrap; }
@@ -84,7 +93,7 @@
   .body{ flex:1; min-height:0; display:flex; }
 
   /* ── dish rows ────────────────────────────────────────── */
-  .dishes{ flex:1; min-height:0; min-width:0; display:flex; flex-direction:column; gap:2.4mm; }
+  .dishes{ flex:1; min-height:0; min-width:0; display:flex; flex-direction:column; gap:1.8mm; }
   /* flex:1 1 auto, not flex:1 — the basis is each row's own content, so a dish
      with a three-line description keeps the height it needs and the leftover on
      the page is shared out evenly on top. Forcing equal thirds instead makes the
@@ -93,7 +102,10 @@
   .dish{ flex:1 1 auto; display:flex; gap:7mm; align-items:center; min-height:0; }
   .dish + .dish{ border-top:0.25mm solid var(--rule); padding-top:2.5mm; }
 
-  .photo{ flex:0 0 auto; height:100%; max-height:64mm; aspect-ratio:1/1;
+  /* A fixed square, not a percentage of the row. A row only stretches when the
+     page is underfilled, and a photo sized off that stretch collapses to
+     nothing on the pages where it does not. */
+  .photo{ flex:0 0 auto; width:64mm; height:64mm;
           display:grid; place-items:center; }
   /* Every cutout is a square canvas, but they are not cropped alike: the food
      occupies 78% of the Tabbouleh and Fattoush frames and 93% of the Caesar
@@ -112,14 +124,67 @@
      English so the page reads the same in any language. Albert Sans carries
      neither Cyrillic nor Thai, so each line names its own face; without this
      they fall back silently, the way the baht glyph does. */
-  .loc{ font-size:2.45mm; line-height:1.5; color:var(--ink-muted); margin-top:1.6mm; }
+  .loc{ font-size:2.45mm; line-height:1.5; color:var(--ink-muted); margin-top:1.2mm; }
   .loc--ru{ font-family:'Noto Sans', var(--font-sans); }
   .loc--th{ font-family:'Noto Sans Thai', var(--font-sans); line-height:1.62; }
   /* The copy block and the figures below it are two different kinds of reading —
      prose you scan once, numbers you come back to. They need a visible seam, not
      just a line break, so the spacer has a floor: it grows to eat any slack in a
      short row, but never collapses below this on the tallest one. */
-  .spacer{ flex:1; min-height:4.5mm; }
+  .spacer{ flex:1; min-height:3.6mm; }
+
+  /* Dense variant — four dishes on a sheet instead of three, for a family that
+     has to be read together (the dips). It buys the fourth row by trading photo
+     width for text width: a narrower cutout hands the info column the ~20mm it
+     needs to keep the benefit pills on one line, and one pill line instead of
+     two is most of what the extra row costs. Nothing is dropped, only resized —
+     a dish on a dense page still prints every figure a dish on a normal one does. */
+  .dishes--dense{ gap:0.8mm; }
+  .dishes--dense .photo{ width:44mm; height:44mm; }
+  .dishes--dense .name{ font-size:5.6mm; }
+  .dishes--dense .copy{ margin-top:1.2mm; }
+  /* The prose/figures seam narrows but does not close: on a dense page the four
+     rows are tall enough that no spacer is doing any growing anyway, so this
+     floor is the whole of it, and it is what the last few millimetres come from. */
+  .dishes--dense .spacer{ min-height:1.3mm; }
+  /* The two translations are the only block on the row that is set larger than
+     it needs to be — they are read once, unlike the figures, and at four rows
+     they are also the block that costs the most. Tightening the leading buys
+     the fourth row without dropping a language. */
+  .dishes--dense .loc{ font-size:2.3mm; line-height:1.38; margin-top:0.7mm; }
+  .dishes--dense .loc--th{ line-height:1.5; }
+  .dishes--dense .dish{ gap:5.5mm; }
+  .dishes--dense .dish + .dish{ padding-top:1.1mm; }
+  /* The two gaps inside the info column, tightened for the fourth row. At three
+     dishes the sheet has slack and these can breathe; at four it did not, and
+     the last row's kcal chip was printing THROUGH the footer rule. Taken off
+     the seams between blocks rather than off any block itself — nothing gets
+     smaller or harder to read, the pills just sit closer to the strip. */
+  .dishes--dense .boosts{ margin-bottom:1.2mm; }
+  .dishes--dense .macros{ margin-bottom:1.9mm; }
+  .dishes--dense .macros .cell{ padding:0.8mm 1mm; }
+
+  /* ── one price for the whole sheet ────────────────────
+     Same argument as the sauce sheet, one section later: when every dish on a
+     page costs the same, the price is one fact about the page and not four
+     facts about four dishes. Printed per row it was the identical red chip
+     four times down the right margin, which is the loudest thing on a sheet
+     whose point is that you may pick any of them for the same money — and the
+     fourth repetition told the guest nothing the first had not.
+
+     Said once it can be said properly, at a dish's size, and it is the line
+     that finally names the family in print: the page title is the section
+     ("All-Day Breakfast") and there are no subheadings, so without this the
+     seven tacos print as seven unrelated rows.
+
+     The note is what the price buys, not what the dishes are called — "any
+     vege taco" tells a guest the choice is free, which is the whole offer. */
+  .dishes__lede{ flex:0 0 auto; padding-bottom:1.8mm; }
+  /* Tighter than the sauce sheet's: that page is a centred block with slack to
+     spare, this one is four full dish rows and every millimetre here comes out
+     of a row below. The chip keeps the sauce sheet's size — shrinking it would
+     make the one price quieter than the twelve kcal figures under it. */
+  .dishes--dense .dishes__lede{ padding-bottom:1.4mm; }
 
   /* ── nutrition boosts (website parity) ────────────────── */
   .boosts{ margin-bottom:2.6mm; }
@@ -208,6 +273,80 @@
                 letter-spacing:0.4px; text-transform:uppercase;
                 color:var(--red-700); border-bottom:0.4mm solid var(--red-bd); }
 
+  /* ── sauce sheet ──────────────────────────────────────
+     Twelve sauces on one sheet, not two pages of dish rows.
+
+     A sauce is not chosen the way a dish is. Nobody reads twelve descriptions
+     and picks one; they look at twelve colours and point. So the unit here is
+     the whole set seen at once — split it across a spread and the comparison
+     the guest is actually making stops working. The shots are all top-view
+     bowls at the same distance, which is what makes a grid of them legible.
+
+     What each cell keeps is what a sauce is chosen on: the colour, the name,
+     the energy and the warning. What it drops is the prose and the macro strip
+     — a 50 g pour is not where a guest's protein comes from, and twelve copies
+     of that strip would be the loudest thing on the page. */
+  /* The price line and the grid are centred together as one block. Pinned to the
+     top instead, the line was left stranded 35mm above the first bowl by the
+     white the smaller photos freed, and a price floating on its own in a field
+     of nothing reads as an orphan rather than a heading. */
+  .sauces{ flex:1; min-height:0; display:flex; flex-direction:column;
+           justify-content:center; }
+  /* The price is said once, at the top, because it is one fact about the section
+     and not twelve facts about twelve sauces. Printed per cell it was the same
+     red chip repeated twelve times — the loudest thing on a page whose whole
+     argument is the colours, and the twelfth repetition told the guest nothing
+     the first had not. Said once it can be said properly, at a dish's size.
+     The pour rides with it for the same reason: every figure below is per 50 g,
+     so the cells carry the kcal alone and this line carries the gramme. */
+  .sauces__lede,
+  .dishes__lede{ display:flex; align-items:center; justify-content:center; gap:3mm; }
+  /* The sauce sheet can afford the full gutter; the dish sheets set their own,
+     up in § dish rows, because every millimetre there comes out of a row. */
+  .sauces__lede{ padding-bottom:7mm; }
+  .sauces__lede .price,
+  .dishes__lede .price{ display:inline-flex; align-items:baseline; gap:1.2mm;
+                        background:var(--red-100); color:var(--red-700);
+                        border-radius:1.8mm; padding:1.3mm 2.8mm; }
+  .sauces__lede .price .v,
+  .dishes__lede .price .v{ font-family:var(--font-mono); font-weight:700; font-size:5.6mm;
+                           line-height:0.9; letter-spacing:-0.4px; font-variant-numeric:tabular-nums; }
+  .sauces__lede .price .k,
+  .dishes__lede .price .k{ font-size:2.5mm; font-weight:800; letter-spacing:1.2px;
+                           text-transform:uppercase; }
+  .sauces__lede .note,
+  .dishes__lede .note{ font-size:3mm; font-weight:700; letter-spacing:0.4px;
+                       text-transform:uppercase; color:var(--ink-muted); }
+  /* The cells are packed, not spread. The first cut of this sheet spread the
+     three rows down the full page and the bands of white between them read as
+     three separate lists; the guest is meant to see one field of twelve colours.
+     So the gaps are smaller than the bowls are wide and the block is centred as
+     a unit under its price line. */
+  .sauces__grid{ flex:0 0 auto; display:grid; grid-template-columns:repeat(4, 1fr);
+                 gap:7mm 3mm; }
+  .sauce{ display:flex; flex-direction:column; align-items:center; text-align:center; }
+  /* No negative margin under the bowl. It was there to claw back the slack the
+     square canvas leaves around a round photo — but these bowls are cropped to
+     their own alpha, so there is no slack, and the name was sitting hard against
+     the rim. A cell needs the name to read as a caption below a picture, not as
+     a word printed on it. */
+  .sauce img{ width:100%; max-width:38.7mm; aspect-ratio:1/1; object-fit:contain; display:block; }
+  /* Two lines are always reserved for the name, even for the ten that need one.
+     "Sumac, Lime & Pomegranate" wraps, and without the reserve its kcal figure
+     dropped 4mm below its neighbours' — a row that nearly lines up is worse than
+     one that doesn't try. The page has the height to spend. */
+  .sauce .name{ margin-top:3.2mm; min-height:8mm; font-size:3.5mm; font-weight:800;
+                line-height:1.14; letter-spacing:-0.1px; }
+  /* Energy sits under the name in the muted weight the macro labels use: it is a
+     figure you check, not one you shop on. The pour it is quoted over is stated
+     once in the line above, which is what keeps this to a single number. */
+  .sauce .kcal{ margin-top:0.7mm; font-family:var(--font-mono); font-size:2.7mm;
+                font-weight:600; color:var(--ink-muted); font-variant-numeric:tabular-nums; }
+  .sauce .contains{ align-self:center; margin-left:0; margin-top:1.2mm;
+                    justify-content:center; gap:0 1mm; }
+  .sauce .contains b{ font-size:1.9mm; }
+  .sauce .contains em{ font-size:2.3mm; }
+
   /* ── footer ───────────────────────────────────────────── */
   .foot{ display:flex; justify-content:space-between; align-items:center;
          border-top:0.5mm solid var(--ink); padding-top:2.5mm; }
@@ -235,8 +374,6 @@
   <!-- Kitchen claims. Denials are verbatim from shishka-health BrandRule.jsx,
        strike included; the affirmations are Sprout/Heart from Icons.jsx.
        Symbols, not groups, so each keeps its own viewBox. -->
-  <!-- section mark: lucide's salad bowl, same family as the boost icons -->
-  <symbol id="s-salad" viewBox="0 0 24 24"><path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/><path d="M11.38 12a2.4 2.4 0 0 1-.4-4.77 2.4 2.4 0 0 1 3.2-2.77 2.4 2.4 0 0 1 3.47-.63 2.4 2.4 0 0 1 3.37 3.37 2.4 2.4 0 0 1-1.1 3.7 2.51 2.51 0 0 1 .03 1.1"/><path d="m13 12 4-4"/><path d="M10.9 7.25A3.99 3.99 0 0 0 4 10c0 .73.2 1.41.54 2"/></symbol>
   <symbol id="r-oil" viewBox="13 11 22 25"><path d="M24 14c4.5 6 7 9.5 7 13.5a7 7 0 0 1-14 0c0-4 2.5-7.5 7-13.5z"/><path d="M16 16 32 32"/></symbol>
   <symbol id="r-msg" viewBox="13 11 22 25"><rect x="19" y="13.5" width="10" height="4.5" rx="1.5"/><path d="M20 18h8v12a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3z"/><path d="M22 15.7h.01M24 15.7h.01M26 15.7h.01"/><path d="M16 16 32 32"/></symbol>
   <symbol id="r-sprout" viewBox="0 0 24 24"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></symbol>
@@ -246,16 +383,12 @@
     <header class="head">
       <img src="../labels/shishka-logo-color.png" alt="Shishka Healthy Kitchen">
       <div class="rule">
-        <div class="rule__col">
+        <div class="rule__pair">
           <span class="rule__item"><svg class="rule__ico"><use href="#r-oil"/></svg>No seed oils</span>
           <span class="rule__item"><svg class="rule__ico"><use href="#r-msg"/></svg>No MSG</span>
         </div>
-        <div class="rule__col rule__col--yes">
-          <span class="rule__item"><svg class="rule__ico"><use href="#r-sprout"/></svg>Fresh daily</span>
-          <span class="rule__item"><svg class="rule__ico"><use href="#r-heart"/></svg>Nutrition over calories</span>
-        </div>
       </div>
-      <div class="title"><svg><use href="#s-salad"/></svg><span>Salads</span></div>
+      <div class="title"><span>Salads</span></div>
     </header>
 
 
