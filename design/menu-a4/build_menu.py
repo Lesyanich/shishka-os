@@ -133,6 +133,50 @@ SAUCE_PRICE = 30
 # all quoted over the same 50 g, which is why the cell prints the gramme too.
 SAUCE_PORTION_G = 50
 
+# ── PROVISIONAL FIGURES — --provisional only, NEVER a print run ───────────────
+#
+# The five sauces above with no row anywhere. The CEO asked to see the sheet
+# with a figure on every bowl, so this is what each one WOULD read if the
+# assumption beside it were adopted. It is a proposal rendered as a page, not a
+# measurement, and that is the whole reason it sits behind a flag: run the build
+# normally and these cells stay blank, exactly as before.
+#
+# Each entry states the row it is derived from and the assumption that is not in
+# evidence. The assumption is the thing to argue with. Once the chef rules on
+# them the answer belongs in nomenclature as a real PF row with a real BOM, and
+# this table gets deleted -- it must never become the place the numbers live.
+#
+# Scaled to the 50 g pour from per-kilo prep figures, same arithmetic as a real
+# _prep sauce. Values are kcal, protein, carbs, fat.
+SAUCE_PROVISIONAL = {
+    # House mayo profile, PF-COCONUT_MAYO (4908 kcal/kg, 0.8/6.2/566.9).
+    # ASSUMPTION: the bowl is the house mayo. Note the kitchen's mayo is made on
+    # COCONUT oil and this cell is named "Olive Oil Mayo" -- for energy that is
+    # immaterial (both oils are ~9 kcal/g, so the number holds either way), but
+    # the NAME is a claim about an ingredient the kitchen does not use. That is
+    # a copy problem to settle before print, not a nutrition one.
+    "olive-oil-mayo.webp":      (245, 0.0, 0.3, 28.3),
+    # RAW-MUSTARD-DIJON (660 kcal/kg) + honey (~3040 kcal/kg), blended 2:1 by
+    # weight. ASSUMPTION: that ratio, and that there is no mayo in it. Both are
+    # guesses -- a honey mustard cut with mayo would land near three times this.
+    # This is the weakest figure of the five.
+    "honey-mustard.webp":       (73,  1.5, 15.9, 1.1),
+    # A bought bottle. ASSUMPTION: a standard Thai sweet chilli sauce label,
+    # ~230 kcal/100 g, nearly all sugar. No such product exists in nomenclature,
+    # so there is no label to read -- somebody has to photograph the bottle the
+    # kitchen actually pours from.
+    "sweet-chili.webp":         (115, 0.3, 28.0, 0.1),
+    # PF-AQUAFABA_MAYO (5201 kcal/kg, 2.0/7.0/599.4), the mayo the kitchen
+    # already builds SALE-BEETROOT_WALNUT's "garlic mayo" on -- so this is the
+    # best evidenced of the five. ASSUMPTION: garlic at a few per cent, which
+    # moves the energy by ~2 kcal and is lost in the rounding.
+    "garlic-mayo.webp":         (260, 0.1, 0.4, 30.0),
+    # PF-AQUAFABA_MAYO + sriracha (~930 kcal/kg), blended 3:1 by weight.
+    # ASSUMPTION: that ratio, and a sriracha with no added sugar. RAW-SRIRACHA
+    # exists but is soft-deleted and carries no nutrition at all.
+    "dynamite-sriracha.webp":   (207, 0.3, 2.6, 22.5),
+}
+
 
 # ─────────────────────────────────────────────────────────── data ────────────
 
@@ -205,12 +249,15 @@ def sort_key_for(rows):
     return key
 
 
-def fetch_sauces(key, warnings):
+def fetch_sauces(key, warnings, provisional=False):
     """The sauce sheet reads nomenclature directly, not menu_public.
 
     Only half the twelve are web-visible, so the public view would hand back six
     and the sheet would quietly become a sheet of six. Reading nomenclature by
     product_code is what makes the missing ones visible as missing.
+
+    provisional=True additionally fills the cells nothing in the database can
+    fill, from SAUCE_PROVISIONAL. For showing a proposal, never for printing.
     """
     codes = [c for _, c, _, _ in SAUCES if c] + [p for _, _, _, p in SAUCES if p]
     rows = {r["product_code"]: r for r in get(
@@ -295,6 +342,16 @@ def fetch_sauces(key, warnings):
             else:
                 warnings.append(f"sauce has energy but no full P/C/F set, cell "
                                 f"prints the calories alone: {s['_label']} ({f})")
+
+        # Last resort, and only when asked for. Fills the cells that nothing in
+        # the database can fill, so the CEO can see the finished shape of the
+        # sheet. Never reached on a normal build -- see SAUCE_PROVISIONAL.
+        if s["_kcal"] is None and provisional and f in SAUCE_PROVISIONAL:
+            kcal, *macros = SAUCE_PROVISIONAL[f]
+            s["_kcal"], s["_macros"], s["_provisional"] = kcal, macros, True
+            warnings.append(f"PROVISIONAL figure, not from the database, DO NOT "
+                            f"PRINT: {s['_label']} = {kcal} kcal / "
+                            f"{SAUCE_PORTION_G} g ({f})")
         out.append(s)
 
     # Two cells that share a photograph, or share the recipe their figures come
@@ -933,6 +990,9 @@ def main():
                     help="replace the Sauces & Dressings dish pages with the 12-up sheet")
     ap.add_argument("--only-sauces", action="store_true",
                     help="emit the sauce sheet alone (proof page)")
+    ap.add_argument("--provisional", action="store_true",
+                    help="fill the five dataless sauce cells from SAUCE_PROVISIONAL "
+                         "-- a proposal to look at, NOT for print")
     ap.add_argument("-o", "--out", default="menu-print.html")
     args = ap.parse_args()
 
@@ -942,7 +1002,7 @@ def main():
     if args.only_sauces:
         style, defs, fontlink = read_style()
         write_html(HERE / args.out, style, defs, fontlink,
-                   sauce_page_html(fetch_sauces(key, warnings), 1))
+                   sauce_page_html(fetch_sauces(key, warnings, args.provisional), 1))
         print(f"sauce sheet -> {args.out}")
         report(warnings)
         return
@@ -971,7 +1031,7 @@ def main():
         if not order or order[-1][0] != d["section_name"]:
             order.append((d["section_name"], []))
         order[-1][1].append(d)
-    sauces = fetch_sauces(key, warnings) if args.sauce_sheet else None
+    sauces = fetch_sauces(key, warnings, args.provisional) if args.sauce_sheet else None
     for section, ds in order:
         # The sauce sheet stands in for the whole section, dish rows and all —
         # it carries four sauces the section has never been able to show.
