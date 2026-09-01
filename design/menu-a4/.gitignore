@@ -1,0 +1,25 @@
+# Downloaded dish photography, keyed by image_url. 40+ MB, and every byte of it
+# is reproducible from Supabase on the next build — build_menu.py refills it.
+_cache/
+
+# render.sh's per-page temporaries. Namespaced by pid so two renders can run at
+# once; they are deleted on a clean exit and left behind on a killed one.
+_pg*
+_shot*
+_overflow-probe.html
+
+# Generated. The HTML is the build's intermediate and the PDF is its output —
+# both are rebuilt by `bash render.sh` from what IS tracked here.
+menu-print*.html
+sauce-sheet.html
+*.pdf
+
+# Written by build_menu.py as a by-product, for a human to sign off allergens.
+allergen-review.tsv
+
+# The repo root ignores *.png wholesale (line 80). photos/ is the one place that
+# must not be: these are hand-composited artwork, not screenshots. The four
+# rolls-*-x2.png each stage TWO rolls in one frame because the dish is sold as a
+# pair, and no such image exists in Supabase — image_url points at a single
+# roll. Lose these and the rows lose their photos with no way to rebuild them.
+!photos/**/*.png

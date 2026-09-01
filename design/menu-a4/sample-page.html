@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Shishka — A4 Menu · sample page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Geist+Mono:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════════════════════════════════
+     SHISHKA — A4 menu page · "CLEAN STYLE" (the named house layout)
+     ═══════════════════════════════════════════════════════════════════════
+     This file is the reference implementation. "Apply clean style" means:
+     rebuild the artwork to these rules, reading this file, not from memory.
+
+     The seven rules that make it this style:
+
+       1. White print canvas, royal-green ink. Every length in mm, @page A4,
+          print-color-adjust:exact. Nothing sized in px.
+       2. One dish = photo left, everything else right. Transparent PNG
+          cutout, object-fit:contain — a dish is never cropped.
+       3. Each photo is rescaled to a common alpha fill via --fit, so bowls
+          shot at different crops still look the same size on the page.
+       4. Rows size to their own content (flex:1 1 auto) and share the
+          page's leftover space. Never force equal thirds.
+       5. A hard seam between prose and figures: .spacer has a min-height
+          floor so copy and numbers never touch.
+       6. Figures are quiet, kcal and price are loud and equal, price in red.
+          The macro strip ends in a one-word verdict, not a measurement.
+       7. The page warns, it never promises. Allergens appear only as
+          CONTAINS; no "free from" claim is printed without a signed review.
+
+     Nutrition-boost pills mirror the website 1:1 — labels/icons/tones come from
+     shishka-health/src/lib/benefits.js (source of truth). No invented figures. */
+  :root{
+    --ink:#1E3903;          /* royal green */
+    --ink-body:#3A4A2A;
+    --ink-muted:#7A8570;
+    --mint:#CCDAAE;
+    --rule:#DCE3D0;
+    /* benefit tones — verbatim from shishka-health components.css */
+    --green-700:#3A4A1C; --green-100:#E7EFD6; --green-bd:rgba(92,113,41,.45);
+    --red-700:#9E211D;   --red-100:#F8DAD5;   --red-bd:#EC9389;
+    --purple-700:#511A52;--purple-soft:#F1E2F0;--purple-bd:rgba(106,33,104,.40);
+    --honey-600:#C8901F; --honey-soft:#FBEFD2;--honey-bd:#F0CE83;
+    --page-w:210mm; --page-h:297mm; --margin:12mm;
+    --font-sans:'Albert Sans', -apple-system, 'SF Pro Text', system-ui, sans-serif;
+    --font-mono:'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{ background:#c9ccd1; font-family:var(--font-sans); padding:24px; }
+
+  .page{ width:var(--page-w); height:var(--page-h); margin:0 auto; background:#fff; color:var(--ink);
+         padding:10mm var(--margin); display:flex; flex-direction:column; overflow:hidden; position:relative; }
+  .defs{ position:absolute; width:0; height:0; overflow:hidden; }
+
+  /* ── header ───────────────────────────────────────────── */
+  .head{ display:flex; align-items:flex-end; justify-content:space-between;
+         gap:5mm; padding-bottom:2mm; border-bottom:0.5mm solid var(--ink); }
+  .head img{ height:15mm; width:auto; display:block; flex:0 0 auto; }
+  /* The title is the only part that can wrap ("SAUCES & DRESSINGS"), so it gets
+     a reserved column and the claims shrink instead. Without this the two
+     collide on any section whose name runs to a second line. Two lines still
+     cost no extra header height — the pair sets to 15.1mm against the logo's
+     15mm, so every page's rule line lands on the same millimetre.
+     A drawn mark used to sit beside the words. It was cut on the CEO's call:
+     the word already names the section, and a second-guess icon of a salad
+     bowl next to the word SALADS is decoration, which this page does not do. */
+  .head .title{ flex:0 0 auto; max-width:58mm; text-align:right;
+         font-size:7.4mm; font-weight:800; letter-spacing:-0.3px;
+         line-height:1.02; text-transform:uppercase; }
+
+  /* Kitchen-wide denials, true of every dish, so they live in the header rather
+     than repeating per row. Wording from site_content.rule.items, marks the
+     site's own: struck droplet and shaker, in red.
+     The matching green column ("Fresh daily", "Nutrition over calories") was
+     cut on the CEO's call — rule 7 says the page warns and never promises, and
+     those two were the only affirmations on the sheet. */
+  .rule{ flex:1 1 auto; min-width:0; display:flex; justify-content:center;
+         align-items:center; }
+  /* One line, not two stacked. They are a single short sentence about the
+     kitchen — set as a column they read as a list of two policies and took the
+     full height of the logo to say ten words. Side by side they sit on the rule
+     line where a strapline belongs, and the header keeps its 66px either way. */
+  .rule__pair{ display:flex; align-items:center; gap:6mm; color:var(--red-700); }
+  .rule__item{ display:flex; align-items:center; gap:1.6mm;
+               font-size:3mm; font-weight:800; letter-spacing:0.3px;
+               text-transform:uppercase; white-space:nowrap; }
+  .rule__ico{ width:4.8mm; height:4.8mm; flex:none;
+              fill:none; stroke:currentColor; stroke-width:2;
+              stroke-linecap:round; stroke-linejoin:round; }
+
+  .body{ flex:1; min-height:0; display:flex; }
+
+  /* ── dish rows ────────────────────────────────────────── */
+  .dishes{ flex:1; min-height:0; min-width:0; display:flex; flex-direction:column; gap:1.8mm; }
+  /* flex:1 1 auto, not flex:1 — the basis is each row's own content, so a dish
+     with a three-line description keeps the height it needs and the leftover on
+     the page is shared out evenly on top. Forcing equal thirds instead makes the
+     longest dish on a page overflow while its neighbours sit half empty, which
+     is a real failure mode once the generator runs all 87. */
+  .dish{ flex:1 1 auto; display:flex; gap:7mm; align-items:center; min-height:0; }
+  .dish + .dish{ border-top:0.25mm solid var(--rule); padding-top:2.5mm; }
+
+  /* A fixed square, not a percentage of the row. A row only stretches when the
+     page is underfilled, and a photo sized off that stretch collapses to
+     nothing on the pages where it does not. */
+  .photo{ flex:0 0 auto; width:64mm; height:64mm;
+          display:grid; place-items:center; }
+  /* Every cutout is a square canvas, but they are not cropped alike: the food
+     occupies 78% of the Tabbouleh and Fattoush frames and 93% of the Caesar
+     one, so object-fit alone renders that bowl a fifth larger than its
+     neighbours. --fit rescales each photo to a common 78% so the row looks
+     evenly shot. The value is (target fill / this image's fill), which the
+     generator reads straight off the PNG's alpha bounding box. */
+  .photo img{ width:100%; height:100%; object-fit:contain; display:block;
+              transform:scale(var(--fit, 1)); }
+
+  .info{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  .name{ font-size:6.2mm; font-weight:800; line-height:1.06; letter-spacing:-0.3px; }
+  .copy{ font-size:2.9mm; line-height:1.55; color:var(--ink-body); margin-top:2.2mm; }
+
+  /* Translations of the dish description only — names, figures and claims stay
+     English so the page reads the same in any language. Albert Sans carries
+     neither Cyrillic nor Thai, so each line names its own face; without this
+     they fall back silently, the way the baht glyph does. */
+  .loc{ font-size:2.45mm; line-height:1.5; color:var(--ink-muted); margin-top:1.2mm; }
+  .loc--ru{ font-family:'Noto Sans', var(--font-sans); }
+  .loc--th{ font-family:'Noto Sans Thai', var(--font-sans); line-height:1.62; }
+  /* The copy block and the figures below it are two different kinds of reading —
+     prose you scan once, numbers you come back to. They need a visible seam, not
+     just a line break, so the spacer has a floor: it grows to eat any slack in a
+     short row, but never collapses below this on the tallest one. */
+  .spacer{ flex:1; min-height:3.6mm; }
+
+  /* Dense variant — four dishes on a sheet instead of three, for a family that
+     has to be read together (the dips). It buys the fourth row by trading photo
+     width for text width: a narrower cutout hands the info column the ~20mm it
+     needs to keep the benefit pills on one line, and one pill line instead of
+     two is most of what the extra row costs. Nothing is dropped, only resized —
+     a dish on a dense page still prints every figure a dish on a normal one does. */
+  .dishes--dense{ gap:0.8mm; }
+  .dishes--dense .photo{ width:44mm; height:44mm; }
+  .dishes--dense .name{ font-size:5.6mm; }
+  .dishes--dense .copy{ margin-top:1.2mm; }
+  /* The prose/figures seam narrows but does not close: on a dense page the four
+     rows are tall enough that no spacer is doing any growing anyway, so this
+     floor is the whole of it, and it is what the last few millimetres come from. */
+  .dishes--dense .spacer{ min-height:1.3mm; }
+  /* The two translations are the only block on the row that is set larger than
+     it needs to be — they are read once, unlike the figures, and at four rows
+     they are also the block that costs the most. Tightening the leading buys
+     the fourth row without dropping a language. */
+  .dishes--dense .loc{ font-size:2.3mm; line-height:1.38; margin-top:0.7mm; }
+  .dishes--dense .loc--th{ line-height:1.5; }
+  .dishes--dense .dish{ gap:5.5mm; }
+  .dishes--dense .dish + .dish{ padding-top:1.1mm; }
+  /* The two gaps inside the info column, tightened for the fourth row. At three
+     dishes the sheet has slack and these can breathe; at four it did not, and
+     the last row's kcal chip was printing THROUGH the footer rule. Taken off
+     the seams between blocks rather than off any block itself — nothing gets
+     smaller or harder to read, the pills just sit closer to the strip. */
+  .dishes--dense .boosts{ margin-bottom:1.2mm; }
+  .dishes--dense .macros{ margin-bottom:1.9mm; }
+  .dishes--dense .macros .cell{ padding:0.8mm 1mm; }
+
+  /* ── one price for the whole sheet ────────────────────
+     Same argument as the sauce sheet, one section later: when every dish on a
+     page costs the same, the price is one fact about the page and not four
+     facts about four dishes. Printed per row it was the identical red chip
+     four times down the right margin, which is the loudest thing on a sheet
+     whose point is that you may pick any of them for the same money — and the
+     fourth repetition told the guest nothing the first had not.
+
+     Said once it can be said properly, at a dish's size, and it is the line
+     that finally names the family in print: the page title is the section
+     ("All-Day Breakfast") and there are no subheadings, so without this the
+     seven tacos print as seven unrelated rows.
+
+     The note is what the price buys, not what the dishes are called — "any
+     vege taco" tells a guest the choice is free, which is the whole offer. */
+  .dishes__lede{ flex:0 0 auto; padding-bottom:1.8mm; }
+  /* Tighter than the sauce sheet's: that page is a centred block with slack to
+     spare, this one is four full dish rows and every millimetre here comes out
+     of a row below. The chip keeps the sauce sheet's size — shrinking it would
+     make the one price quieter than the twelve kcal figures under it. */
+  .dishes--dense .dishes__lede{ padding-bottom:1.4mm; }
+
+  /* ── nutrition boosts (website parity) ────────────────── */
+  .boosts{ margin-bottom:2.6mm; }
+  .pills{ display:flex; flex-wrap:wrap; gap:1.4mm; }
+  .boost{ display:inline-flex; align-items:center; gap:1.4mm; background:#fff;
+          border:0.35mm solid var(--_bd); border-radius:99px;
+          padding:0.55mm 2.1mm 0.55mm 0.55mm; color:var(--_fg);
+          font-size:2.5mm; font-weight:600; white-space:nowrap; }
+  .boost__icon{ flex:none; width:4.2mm; height:4.2mm; border-radius:99px;
+          display:grid; place-items:center; background:var(--_soft); color:var(--_fg); }
+  .boost__icon svg{ width:2.8mm; height:2.8mm; }
+  .boost__val{ font-family:var(--font-mono); font-size:2.2mm; font-weight:500; color:var(--ink-muted); }
+  .boost--green { --_bd:var(--green-bd);  --_soft:var(--green-100);  --_fg:var(--green-700); }
+  .boost--red   { --_bd:var(--red-bd);    --_soft:var(--red-100);    --_fg:var(--red-700); }
+  .boost--purple{ --_bd:var(--purple-bd); --_soft:var(--purple-soft);--_fg:var(--purple-700); }
+  .boost--honey { --_bd:var(--honey-bd);  --_soft:var(--honey-soft); --_fg:var(--honey-600); }
+
+  /* ── macro strip ──────────────────────────────────────── */
+  /* Portion + P/C/F as an even 4-cell rail: value over a tiny caps label,
+     hairline dividers. Quiet, scannable, never competes with kcal/price. */
+  .macros{ display:flex; border:0.3mm solid var(--rule); border-radius:1.5mm;
+           overflow:hidden; margin-bottom:2.8mm; }
+  .macros .cell{ flex:1; padding:1.1mm 1mm; text-align:center;
+                 border-right:0.3mm solid var(--rule); }
+  .macros .cell:last-child{ border-right:0; }
+  .macros .cell--portion{ background:#F6F8F1; }
+  /* The fifth cell is a verdict, not a measurement — how the dish eats, in one
+     word, so the strip ends with something a guest can act on.
+
+       BODYBUILDER   protein >= 20 g
+       NUTRITIOUS +  4 or more nutrition boosts
+       LIGHT         everything else, at or under 350 kcal
+
+     Read in that order, first match wins. "Nutritious" is deliberately tied to
+     the boost count rather than being the leftover bucket: if it just meant
+     "not light and not high-protein" it would end up praising a 629 kcal dish
+     with 0.1 g of protein, which is on this menu. Sized to its own content so
+     "NUTRITIOUS +" stays legible; the four figure cells share what is left. */
+  .macros .cell--profile{ flex:0 0 auto; display:grid; place-items:center;
+                          padding-left:2.6mm; padding-right:2.6mm; }
+  .macros .cell--profile .v{ font-family:var(--font-sans); font-size:2.5mm;
+                             font-weight:800; letter-spacing:0.6px;
+                             text-transform:uppercase; white-space:nowrap; }
+  .cell--light      { background:var(--green-100); }
+  .cell--light .v   { color:var(--green-700); }
+  .cell--nutri      { background:var(--honey-soft); }
+  .cell--nutri .v   { color:var(--honey-600); }
+  .cell--body       { background:var(--red-100); }
+  .cell--body .v    { color:var(--red-700); }
+
+  .macros .v{ display:block; font-family:var(--font-mono); font-weight:700; font-size:3.1mm;
+              line-height:1; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .macros .k{ display:block; font-size:1.9mm; font-weight:700; letter-spacing:1.1px;
+              text-transform:uppercase; color:var(--ink-muted); margin-top:0.9mm; }
+
+  /* ── kcal + price · deliberately equal weight ─────────── */
+  .meta{ display:flex; align-items:flex-start; gap:2.2mm; }
+  .stat{ display:flex; align-items:baseline; gap:1.3mm; border-radius:2mm; padding:1.7mm 3mm; }
+
+  .stat .v{ font-family:var(--font-mono); font-weight:700; font-size:7.4mm; line-height:0.9;
+            font-variant-numeric:tabular-nums; letter-spacing:-0.4px; }
+  .stat .k{ font-size:2.7mm; font-weight:800; letter-spacing:1.3px; text-transform:uppercase; }
+  .stat--kcal{ background:var(--mint); color:var(--ink); }
+  .stat--price{ margin-left:auto; background:var(--red-100); color:var(--red-700); }
+
+  /* ── allergens ────────────────────────────────────────
+     The page makes no "free from" claim. It only ever warns.
+
+     That is a deliberate asymmetry: a warning that is wrong sends a guest to
+     ask a question, while a promise that is wrong sends them to hospital. We
+     have no signed-off allergen review to back a promise — 86 of 87 dishes are
+     unreviewed — so we do not make one.
+
+     The warning itself is printed loud, because it is the one line on the page
+     that can put somebody in hospital if it is missed.
+
+     Only three are ever named here: gluten, milk, peanuts. That is narrower
+     than the regulated set, so this line is NOT a complete allergen statement
+     and must never be allowed to read like one — which is why the footer names
+     the three in words. Everything outside them is a counter conversation. */
+  .contains{ align-self:center; margin-left:3mm; display:flex;
+             align-items:baseline; flex-wrap:wrap; gap:0 1.5mm; }
+  .contains b{ font-size:2.2mm; font-weight:700; letter-spacing:0.8px;
+               text-transform:uppercase; color:var(--ink-muted); }
+  .contains em{ font-style:normal; font-size:2.7mm; font-weight:800;
+                letter-spacing:0.4px; text-transform:uppercase;
+                color:var(--red-700); border-bottom:0.4mm solid var(--red-bd); }
+
+  /* ── sauce sheet ──────────────────────────────────────
+     Twelve sauces on one sheet, not two pages of dish rows.
+
+     A sauce is not chosen the way a dish is. Nobody reads twelve descriptions
+     and picks one; they look at twelve colours and point. So the unit here is
+     the whole set seen at once — split it across a spread and the comparison
+     the guest is actually making stops working. The shots are all top-view
+     bowls at the same distance, which is what makes a grid of them legible.
+
+     What each cell keeps is what a sauce is chosen on: the colour, the name,
+     the energy and the warning. What it drops is the prose and the macro strip
+     — a 50 g pour is not where a guest's protein comes from, and twelve copies
+     of that strip would be the loudest thing on the page. */
+  /* The price line and the grid are centred together as one block. Pinned to the
+     top instead, the line was left stranded 35mm above the first bowl by the
+     white the smaller photos freed, and a price floating on its own in a field
+     of nothing reads as an orphan rather than a heading. */
+  .sauces{ flex:1; min-height:0; display:flex; flex-direction:column;
+           justify-content:center; }
+  /* The price is said once, at the top, because it is one fact about the section
+     and not twelve facts about twelve sauces. Printed per cell it was the same
+     red chip repeated twelve times — the loudest thing on a page whose whole
+     argument is the colours, and the twelfth repetition told the guest nothing
+     the first had not. Said once it can be said properly, at a dish's size.
+     The pour rides with it for the same reason: every figure below is per 50 g,
+     so the cells carry the kcal alone and this line carries the gramme. */
+  .sauces__lede,
+  .dishes__lede{ display:flex; align-items:center; justify-content:center; gap:3mm; }
+  /* The sauce sheet can afford the full gutter; the dish sheets set their own,
+     up in § dish rows, because every millimetre there comes out of a row. */
+  .sauces__lede{ padding-bottom:7mm; }
+  .sauces__lede .price,
+  .dishes__lede .price{ display:inline-flex; align-items:baseline; gap:1.2mm;
+                        background:var(--red-100); color:var(--red-700);
+                        border-radius:1.8mm; padding:1.3mm 2.8mm; }
+  .sauces__lede .price .v,
+  .dishes__lede .price .v{ font-family:var(--font-mono); font-weight:700; font-size:5.6mm;
+                           line-height:0.9; letter-spacing:-0.4px; font-variant-numeric:tabular-nums; }
+  .sauces__lede .price .k,
+  .dishes__lede .price .k{ font-size:2.5mm; font-weight:800; letter-spacing:1.2px;
+                           text-transform:uppercase; }
+  .sauces__lede .note,
+  .dishes__lede .note{ font-size:3mm; font-weight:700; letter-spacing:0.4px;
+                       text-transform:uppercase; color:var(--ink-muted); }
+  /* The cells are packed, not spread. The first cut of this sheet spread the
+     three rows down the full page and the bands of white between them read as
+     three separate lists; the guest is meant to see one field of twelve colours.
+     So the gaps are smaller than the bowls are wide and the block is centred as
+     a unit under its price line. */
+  .sauces__grid{ flex:0 0 auto; display:grid; grid-template-columns:repeat(4, 1fr);
+                 gap:7mm 3mm; }
+  .sauce{ display:flex; flex-direction:column; align-items:center; text-align:center; }
+  /* No negative margin under the bowl. It was there to claw back the slack the
+     square canvas leaves around a round photo — but these bowls are cropped to
+     their own alpha, so there is no slack, and the name was sitting hard against
+     the rim. A cell needs the name to read as a caption below a picture, not as
+     a word printed on it. */
+  .sauce img{ width:100%; max-width:38.7mm; aspect-ratio:1/1; object-fit:contain; display:block; }
+  /* Two lines are always reserved for the name, even for the ten that need one.
+     "Sumac, Lime & Pomegranate" wraps, and without the reserve its kcal figure
+     dropped 4mm below its neighbours' — a row that nearly lines up is worse than
+     one that doesn't try. The page has the height to spend. */
+  .sauce .name{ margin-top:3.2mm; min-height:8mm; font-size:3.5mm; font-weight:800;
+                line-height:1.14; letter-spacing:-0.1px; }
+  /* Energy and macros, the dish row's own two components shrunk to cell scale.
+     Not a new pair of widgets: a guest who has read 60 dishes already knows the
+     mint chip is the calories and the ruled box is protein/carbs/fat, and a
+     sauce is the last place on the sheet to teach them a second vocabulary.
+
+     The pour these are quoted over — 50 g — is stated once in the lede above,
+     which is what keeps every cell to four figures instead of five. */
+  .sauce .stat{ margin-top:1mm; padding:0.7mm 2.2mm; }
+  .sauce .stat .v{ font-size:4.4mm; }
+  .sauce .stat .k{ font-size:2.2mm; letter-spacing:1px; }
+  /* An empty chip, not a missing one — see .macros--empty. */
+  .sauce .stat--none{ min-height:6.1mm; }
+  .sauce .macros{ width:100%; margin-top:1.6mm; margin-bottom:0; }
+  .sauce .macros .cell{ padding:0.8mm 0.4mm; }
+  .sauce .macros .v{ font-size:2.7mm; }
+  /* The label is the word, not the word plus a unit. At a third of 38.7mm
+     "PROTEIN G" wraps and "CARBS G" does not, so the three cells stopped being
+     one rail. Grams are what a macro is; the g is the least of what is said. */
+  .sauce .macros .k{ font-size:1.6mm; letter-spacing:0.5px; margin-top:0.6mm; }
+  /* Five of the twelve sauces have no recipe in the system, so there are no
+     figures to print. The rail keeps its height and loses its border: the row
+     stays on one line, and the cell simply says nothing.
+
+     It was hatched here for one draft, to mark the gap as unfinished rather
+     than empty. On screen that read as honest; on the sheet it read as a
+     printing fault — a guest has no way to tell a deliberate hatch from a
+     misprint, and the one thing a menu must never look is broken. The gap is
+     reported where it can be acted on: build_menu.py warns on every one of the
+     five, and they are open in MC. The page is not the bug tracker. */
+  .sauce .macros--empty{ min-height:8.2mm; border-color:transparent; }
+  .sauce .contains{ align-self:center; margin-left:0; margin-top:1.2mm;
+                    justify-content:center; gap:0 1mm; }
+  .sauce .contains b{ font-size:1.9mm; }
+  .sauce .contains em{ font-size:2.3mm; }
+
+  /* ── footer ───────────────────────────────────────────── */
+  .foot{ display:flex; justify-content:space-between; align-items:center;
+         border-top:0.5mm solid var(--ink); padding-top:2.5mm; }
+  .foot .brand{ font-size:2.6mm; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; }
+  .foot .note{ font-size:2.4mm; color:var(--ink-muted); }
+  .foot .pg{ font-family:var(--font-mono); font-size:2.6mm; font-weight:600; }
+
+  @media print{ @page{ size:A4; margin:0; } body{ background:#fff; padding:0; } }
+</style>
+</head>
+<body>
+  <div class="page">
+<svg class="defs" aria-hidden="true"><defs>
+  <g id="i-shield"><path d="M12 2.5 4.5 5.5v6c0 4.6 3.2 7.9 7.5 9.5 4.3-1.6 7.5-4.9 7.5-9.5v-6Z"/><path d="m9 12 2 2 4-4"/></g>
+  <g id="i-sparkle"><path d="M12 3c.5 3.8 1.7 5 5.5 5.5-3.8.5-5 1.7-5.5 5.5-.5-3.8-1.7-5-5.5-5.5C10.3 8 11.5 6.8 12 3Z"/><path d="M18.5 14c.3 1.9.9 2.5 2.8 2.8-1.9.3-2.5.9-2.8 2.8-.3-1.9-.9-2.5-2.8-2.8 1.9-.3 2.5-.9 2.8-2.8Z"/></g>
+  <g id="i-wheat"><path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M20 2h2v2a4 4 0 0 1-4 4h-2V6a4 4 0 0 1 4-4Z"/><path d="M11.47 17.47 13 19l-1.53 1.53a3.5 3.5 0 0 1-4.94 0L5 19l1.53-1.53a3.5 3.5 0 0 1 4.94 0Z"/><path d="M15.47 13.47 17 15l-1.53 1.53a3.5 3.5 0 0 1-4.94 0L9 15l1.53-1.53a3.5 3.5 0 0 1 4.94 0Z"/><path d="M19.47 9.47 21 11l-1.53 1.53a3.5 3.5 0 0 1-4.94 0L13 11l1.53-1.53a3.5 3.5 0 0 1 4.94 0Z"/></g>
+  <g id="i-nut"><path d="M10.165 6.598C9.954 7.478 9.64 8.36 9 9c-.64.64-1.521.954-2.402 1.165A6 6 0 0 0 8 22c7.732 0 14-6.268 14-14a6 6 0 0 0-11.835-1.402Z"/><path d="M5.341 10.62a4 4 0 1 0 5.279-5.28"/></g>
+  <g id="i-droplet"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></g>
+  <g id="i-bolt"><path d="M13 2 4.5 13.5a.7.7 0 0 0 .56 1.12H11l-1 7.38 8.5-11.5a.7.7 0 0 0-.56-1.12H12Z"/></g>
+  <!-- training marks: an atom for the amino-acid profile, a dumbbell for creatine -->
+  <g id="i-atom"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></g>
+  <g id="i-dumbbell"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></g>
+  <g id="i-bone"><path d="M17 10c1.5 0 3-1 3-3a2.5 2.5 0 0 0-4.6-1.4A2.5 2.5 0 0 0 11 7c0 .7.3 1.3.7 1.8L8.8 11.7C8.3 11.3 7.7 11 7 11a2.5 2.5 0 0 0-2.4 3.4A2.5 2.5 0 0 0 7 19c2 0 3-1.5 3-3 0-.7-.3-1.3-.7-1.8l2.9-2.9c.5.4 1.1.7 1.8.7Z"/></g>
+
+  <!-- Kitchen claims. Denials are verbatim from shishka-health BrandRule.jsx,
+       strike included; the affirmations are Sprout/Heart from Icons.jsx.
+       Symbols, not groups, so each keeps its own viewBox. -->
+  <symbol id="r-oil" viewBox="13 11 22 25"><path d="M24 14c4.5 6 7 9.5 7 13.5a7 7 0 0 1-14 0c0-4 2.5-7.5 7-13.5z"/><path d="M16 16 32 32"/></symbol>
+  <symbol id="r-msg" viewBox="13 11 22 25"><rect x="19" y="13.5" width="10" height="4.5" rx="1.5"/><path d="M20 18h8v12a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3z"/><path d="M22 15.7h.01M24 15.7h.01M26 15.7h.01"/><path d="M16 16 32 32"/></symbol>
+  <symbol id="r-sprout" viewBox="0 0 24 24"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></symbol>
+  <symbol id="r-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+</defs></svg>
+
+    <header class="head">
+      <img src="../labels/shishka-logo-color.png" alt="Shishka Healthy Kitchen">
+      <div class="rule">
+        <div class="rule__pair">
+          <span class="rule__item"><svg class="rule__ico"><use href="#r-oil"/></svg>No seed oils</span>
+          <span class="rule__item"><svg class="rule__ico"><use href="#r-msg"/></svg>No MSG</span>
+        </div>
+      </div>
+      <div class="title"><span>Salads</span></div>
+    </header>
+
+
+    <div class="body">
+      <main class="dishes">
+
+      <article class="dish">
+        <div class="photo">
+          <img src="https://qcqgtcsjoacuktcewpvo.supabase.co/storage/v1/object/public/nomenclature-photos/cb75a0e0-9ab1-496d-9b99-6c40d35c8c93/menu-tabbouleh.png?v=1600" alt="Tabbouleh Herb Energy">
+        </div>
+        <div class="info">
+          <h2 class="name">Tabbouleh Herb Energy</h2>
+          <p class="copy">A fresh, herb-forward parsley and quinoa salad with tomato, pomegranate and sumac dressing — bright, zesty and naturally gluten-free.</p>
+          <p class="loc loc--ru">Свежий салат из петрушки и киноа с томатами, гранатом и заправкой из сумаха — яркий, освежающий и без глютена.</p>
+          <p class="loc loc--th">สลัดพาร์สลีย์และควินัวสดใหม่ กับมะเขือเทศ ทับทิม และน้ำสลัดซูแมค รสสดชื่นเปรี้ยวสดใส ปราศจากกลูเตน</p>
+          <div class="spacer"></div>
+          <div class="boosts">
+            <div class="pills">
+              <span class="boost boost--honey"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-shield"/></svg></span>Vitamin C</span>
+              <span class="boost boost--purple"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sparkle"/></svg></span>Antioxidants</span>
+            <span class="boost boost--red"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-atom"/></svg></span>Complete protein<span class="boost__val">9 EAA</span></span></div>
+          </div>
+          <div class="macros">
+            <div class="cell cell--portion"><span class="v">340</span><span class="k">Portion g</span></div>
+            <div class="cell"><span class="v">5.9</span><span class="k">Protein g</span></div>
+            <div class="cell"><span class="v">30.4</span><span class="k">Carbs g</span></div>
+            <div class="cell"><span class="v">20.2</span><span class="k">Fat g</span></div><div class="cell cell--profile cell--light"><span class="v">Light</span></div>
+          </div>
+          <div class="meta">
+            <div class="stat stat--kcal"><span class="v">308</span><span class="k">kcal</span></div>
+            <div class="stat stat--price"><span class="v">160</span><span class="k">THB</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="dish">
+        <div class="photo">
+          <img src="https://qcqgtcsjoacuktcewpvo.supabase.co/storage/v1/object/public/nomenclature-photos/c6146cac-6a05-41fb-a559-4cffdc5fc41b/menu-fattoush.webp?v=1785294288930" alt="Fattoush Green Crunch">
+        </div>
+        <div class="info">
+          <h2 class="name">Fattoush Green Crunch</h2>
+          <p class="copy">The Levantine garden classic — crisp lettuce, cucumber, tomato and radish with sumac dressing and crunchy seed crackers. Fresh, tangy and herby.</p>
+          <p class="loc loc--ru">Классика Леванта — хрустящий салат, огурец, томат и редис с заправкой из сумаха и хрустящими крекерами из семян. Свежо, пикантно, ароматно.</p>
+          <p class="loc loc--th">สลัดคลาสสิกแบบเลแวนต์ — ผักกาดกรอบ แตงกวา มะเขือเทศ และแรดิช ราดน้ำสลัดซูแมค เสิร์ฟพร้อมแครกเกอร์ธัญพืชกรอบ สดชื่นและหอมสมุนไพร</p>
+          <div class="spacer"></div>
+          <div class="boosts">
+            <div class="pills">
+              <span class="boost boost--honey"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-shield"/></svg></span>Vitamin C</span>
+              <span class="boost boost--green"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-wheat"/></svg></span>Fibre</span>
+              <span class="boost boost--green"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-nut"/></svg></span>Healthy Fats</span>
+              <span class="boost boost--purple"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sparkle"/></svg></span>Antioxidants</span>
+            </div>
+          </div>
+          <div class="macros">
+            <div class="cell cell--portion"><span class="v">340</span><span class="k">Portion g</span></div>
+            <div class="cell"><span class="v">6.1</span><span class="k">Protein g</span></div>
+            <div class="cell"><span class="v">28.1</span><span class="k">Carbs g</span></div>
+            <div class="cell"><span class="v">24.1</span><span class="k">Fat g</span></div><div class="cell cell--profile cell--nutri"><span class="v">Nutritious +</span></div>
+          </div>
+          <div class="meta">
+            <div class="stat stat--kcal"><span class="v">333</span><span class="k">kcal</span></div>
+            <div class="stat stat--price"><span class="v">140</span><span class="k">THB</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="dish">
+        <div class="photo">
+          <img style="--fit:0.84" src="https://qcqgtcsjoacuktcewpvo.supabase.co/storage/v1/object/public/nomenclature-photos/90f521cf-4064-409a-84a5-abe47b3bc46c/customer.png?v=20260809d" alt="Chicken Caesar">
+        </div>
+        <div class="info">
+          <h2 class="name">Chicken Caesar</h2>
+          <p class="copy">Crisp iceberg and sweet cherry tomatoes with grilled chicken shish tawook, creamy Caesar dressing, parmesan and herb croutons — a lighter, protein-packed take on the classic.</p>
+          <p class="loc loc--ru">Хрустящий айсберг и черри с курицей шиш-таук на гриле, соусом «Цезарь», пармезаном и гренками — лёгкая классика, богатая белком.</p>
+          <p class="loc loc--th">ผักกาดแก้วกรอบและมะเขือเทศเชอรี่ กับไก่ย่างชิชทาวุก น้ำสลัดซีซาร์เข้มข้น พาร์เมซาน และครูตองสมุนไพร — เวอร์ชันเบาที่อัดแน่นด้วยโปรตีน</p>
+          <div class="spacer"></div>
+          <div class="boosts">
+            <div class="pills">
+              <span class="boost boost--red"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-droplet"/></svg></span>High Protein<span class="boost__val">43 g</span></span>
+              <span class="boost boost--honey"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bolt"/></svg></span>Vitamin B12</span>
+              <span class="boost boost--green"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-wheat"/></svg></span>Fibre</span>
+              <span class="boost boost--purple"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bone"/></svg></span>Calcium</span>
+            <span class="boost boost--red"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-atom"/></svg></span>Complete protein<span class="boost__val">9 EAA</span></span><span class="boost boost--red"><span class="boost__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-dumbbell"/></svg></span>Natural creatine</span></div>
+          </div>
+          <div class="macros">
+            <div class="cell cell--portion"><span class="v">415</span><span class="k">Portion g</span></div>
+            <div class="cell"><span class="v">43.1</span><span class="k">Protein g</span></div>
+            <div class="cell"><span class="v">22.5</span><span class="k">Carbs g</span></div>
+            <div class="cell"><span class="v">22.1</span><span class="k">Fat g</span></div><div class="cell cell--profile cell--body"><span class="v">Bodybuilder</span></div>
+          </div>
+          <div class="meta">
+            <div class="stat stat--kcal"><span class="v">458</span><span class="k">kcal</span></div>
+            <p class="contains"><b>Contains</b><em>gluten</em><em>milk</em></p>
+            <div class="stat stat--price"><span class="v">170</span><span class="k">THB</span></div>
+          </div>
+        </div>
+      </article>
+
+      </main>
+    </div>
+
+    <footer class="foot">
+      <div class="brand">shishka.health</div>
+      <div class="note">We flag gluten, milk &amp; peanuts — for any other allergy please ask our team before ordering</div>
+      <div class="pg">01</div>
+    </footer>
+
+  </div>
+</body>
+</html>
