@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import path from 'node:path'
 import fs from 'node:fs'
 import { Font, renderToBuffer } from '@react-pdf/renderer'
-import { CashReceiptPdf } from '../CashReceiptPdf'
+import { CashReceiptBatchPdf, CashReceiptPdf } from '../CashReceiptPdf'
 import { advancePayments, fixture } from './receipt-fixture'
 import { extractPdfText, normalizeThai } from './pdf-text'
 
@@ -85,6 +85,30 @@ describe('CashReceiptPdf', () => {
     // 'final' payment is that very hand-over and must not be counted twice.
     expect(text).toContain('THB 8,532')
     expect(text).toContain('ยอดคงเหลือที่จ่ายเป็นเงินสดวันนี้')
+  }, 60_000)
+
+  // One file for the whole payday, still one sheet per employee once printed.
+  it('puts each employee on their own page in the batch', async () => {
+    const a = fixture()
+    const b = fixture()
+    b.line.id = 'line-2'
+    b.line.net_pay = 11_250
+    b.staff = {
+      ...b.staff,
+      id: '0000feed-0000-0000-0000-000000000002',
+      name: 'Noe Noe',
+      legal_name_first: 'Nwe',
+      legal_name_last: 'Oo',
+    }
+
+    const buf = await renderToBuffer(<CashReceiptBatchPdf rows={[a, b]} />)
+    const text = normalizeThai(extractPdfText(buf))
+
+    expect(buf.toString('latin1')).toContain('/Count 2')
+    expect(text).toContain('Chanyapat Suwannachai')
+    expect(text).toContain('Nwe Oo')
+    expect(text).toContain('THB 14,032')
+    expect(text).toContain('THB 11,250')
   }, 60_000)
 
   it('drops the breakdown and the advance clause when there are no advances', async () => {
