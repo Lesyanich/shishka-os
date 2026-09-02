@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Check, Download, Link2, Loader2, X } from 'lucide-react'
+import { Check, Download, Link2, Loader2, Receipt, X } from 'lucide-react'
 import { pdf } from '@react-pdf/renderer'
 import type { PayslipData } from '../../hooks/use-payroll'
+import { CashReceiptPdf } from './CashReceiptPdf'
 import { PayslipPdf } from './PayslipPdf'
 import {
   COMPANY_ADDRESS,
@@ -79,7 +80,7 @@ export function Payslip({
 }) {
   const { line, staff, period, payments } = data
   const d = derivePayslip(data)
-  const [downloading, setDownloading] = useState(false)
+  const [downloading, setDownloading] = useState<'payslip' | 'receipt' | null>(null)
   const [copied, setCopied] = useState(false)
 
   /** This payslip's own address — ?period= and ?payslip= are already in the URL. */
@@ -89,20 +90,23 @@ export function Payslip({
     setTimeout(() => setCopied(false), 2000)
   }
 
-  async function handleDownload() {
-    setDownloading(true)
+  async function handleDownload(kind: 'payslip' | 'receipt') {
+    setDownloading(kind)
     try {
-      const blob = await pdf(<PayslipPdf data={data} />).toBlob()
+      const doc =
+        kind === 'payslip' ? <PayslipPdf data={data} /> : <CashReceiptPdf data={data} />
+      const prefix = kind === 'payslip' ? 'payslip' : 'cash_receipt'
+      const blob = await pdf(doc).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `payslip_${safeName(legalName(staff))}_${periodSlug(period.period_start)}.pdf`
+      a.download = `${prefix}_${safeName(legalName(staff))}_${periodSlug(period.period_start)}.pdf`
       document.body.appendChild(a)
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
     } finally {
-      setDownloading(false)
+      setDownloading(null)
     }
   }
 
@@ -136,11 +140,24 @@ export function Payslip({
               {copied ? 'Copied' : 'Copy link'}
             </button>
             <button
-              onClick={handleDownload}
-              disabled={downloading}
+              onClick={() => handleDownload('receipt')}
+              disabled={downloading !== null}
+              className="flex items-center gap-1.5 rounded-md bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-700 disabled:opacity-50"
+              title="A4 sheet the employee signs when the cash is handed over"
+            >
+              {downloading === 'receipt' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Receipt className="h-3.5 w-3.5" />
+              )}
+              Cash receipt
+            </button>
+            <button
+              onClick={() => handleDownload('payslip')}
+              disabled={downloading !== null}
               className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
             >
-              {downloading ? (
+              {downloading === 'payslip' ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Download className="h-3.5 w-3.5" />
