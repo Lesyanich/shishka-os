@@ -66,15 +66,31 @@ describe('CashReceiptPdf', () => {
     expect(text).toContain('หนึ่งหมื่นสี่พันสามสิบสองบาทถ้วน')
   }, 60_000)
 
-  it('nets off advances but not the final payment', async () => {
+  it('signs for the whole wage and shows advances as a breakdown', async () => {
     const data = fixture({ payments: advancePayments(), advancesPaid: 14032 })
     const text = await render(data, 'advances')
-    // 14,032 net − 4,000 − 1,500 advances = 8,532. The recorded 8,532 'final'
-    // payment is the hand-over this receipt documents and must not be deducted.
+
+    // The signed amount stays the full period wage: the advance carries its own
+    // signature on its own slip, so deducting it here would leave two papers
+    // that no longer reconcile to one wage.
+    expect(text).toContain('THB 14,032')
+    expect(text).toContain('Fourteen thousand and thirty-two baht only')
+
+    // ...and the advance appears below as a breakdown of when it was received.
+    expect(text).toContain('THB 4,000')
+    expect(text).toContain('THB 1,500')
+    expect(text).toContain('เงินเบิกล่วงหน้าที่รับและลงชื่อไว้แล้ว')
+
+    // 14,032 − 4,000 − 1,500 = 8,532 handed over today. The recorded 8,532
+    // 'final' payment is that very hand-over and must not be counted twice.
     expect(text).toContain('THB 8,532')
-    expect(text).toContain('Eight thousand five hundred and thirty-two baht only')
-    expect(text).toContain('ค่าจ้างสุทธิประจำงวด')
-    expect(text).toContain('เงินเบิกล่วงหน้า')
+    expect(text).toContain('ยอดคงเหลือที่จ่ายเป็นเงินสดวันนี้')
+  }, 60_000)
+
+  it('drops the breakdown and the advance clause when there are no advances', async () => {
+    const text = await render(fixture(), 'simple')
+    expect(text).not.toContain('ประกอบด้วย')
+    expect(text).not.toContain('โดยบางส่วนได้รับล่วงหน้าระหว่างงวดตามรายการข้างต้น')
   }, 60_000)
 
   // เจ็ด and เก้า are the two Thai numerals starting with sara e, so any amount

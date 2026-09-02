@@ -100,6 +100,9 @@ const styles = StyleSheet.create({
   // carry the emphasis instead.
   wordsTh: { fontSize: 11, color: '#0f766e', marginTop: 2 },
 
+  breakdown: { marginTop: 10 },
+  breakdownTitle: { fontSize: 9, color: '#475569', marginBottom: 2 },
+
   declaration: {
     marginTop: 16,
     backgroundColor: '#f8fafc',
@@ -141,7 +144,11 @@ function ReconRow({
     <View style={styles.reconRow}>
       <View style={styles.reconLabel}>
         <Text>
-          {en} <Text style={styles.reconSub}>/ {th}</Text>
+          {/* The Thai is one interpolated string, not a "/ " sibling followed by
+              {th}: each JSX child starts its own shaping run, and a Thai
+              pre-posed vowel (เ, แ, โ) that opens a run comes back from the
+              shaper without a code point, dropping out of /ToUnicode. */}
+          {en} <Text style={styles.reconSub}>{`/ ${th}`}</Text>
         </Text>
         {sub ? <Text style={styles.reconSub}>{sub}</Text> : null}
       </View>
@@ -164,17 +171,22 @@ export function CashReceiptPdf({ data }: { data: PayslipData }) {
   const { line, staff, period, payments } = data
 
   /**
-   * Only kind='advance' reduces the amount on this receipt.
+   * The employee signs for the WHOLE wage of the period, not the month-end
+   * balance (CEO decision, 2026-09-01).
    *
-   * `advancesPaid` in PayslipData sums EVERY staff_payments row, so once the
-   * final hand-over is recorded it would drive the receipt to THB 0 — the
-   * receipt would zero itself out the moment it became true. Advances are money
-   * the employee already holds; the final payment is the very event this sheet
-   * documents, so it must not be netted off.
+   * An advance is receipted on its own slip when the cash is handed over. If
+   * this sheet also deducted it, the employer would hold two signatures for one
+   * wage that no longer add up to it. So the advance is printed below as a
+   * breakdown of *when* the money was received — never as a subtraction — and
+   * the two papers reconcile to a single figure.
+   *
+   * Only kind='advance' is listed. `advancesPaid` on PayslipData sums EVERY
+   * staff_payments row, including the final hand-over this very sheet documents,
+   * so using it would report that payment as if it had been taken early.
    */
   const advances = payments.filter((p) => p.kind === 'advance')
-  const advancesTotal = advances.reduce((sum, p) => sum + p.amount, 0)
-  const cashDue = line.net_pay - advancesTotal
+  const advancedTotal = advances.reduce((sum, p) => sum + p.amount, 0)
+  const balanceToday = line.net_pay - advancedTotal
 
   const issuedOn = formatDate(period.period_end)
   const receiptRef = `CR-${period.period_start.slice(0, 7)}-${staff.id.slice(0, 8)}`
@@ -216,45 +228,47 @@ export function CashReceiptPdf({ data }: { data: PayslipData }) {
           </View>
         </View>
 
-        {/* Only shown when advances exist — otherwise net pay and the cash
-            handed over are the same figure and repeating it invites confusion. */}
-        {advances.length > 0 ? (
-          <View>
-            <ReconRow
-              en="Net wages for the period"
-              th={thai('ค่าจ้างสุทธิประจำงวด')}
-              value={thbPdf(line.net_pay)}
-            />
-            {advances.map((p) => (
-              <ReconRow
-                key={p.id}
-                en="Less: advance already received"
-                th={thai('หัก เงินเบิกล่วงหน้า')}
-                sub={`paid ${formatDate(p.paid_on)}${p.note ? ` — ${p.note}` : ''}`}
-                value={`-${thbPdf(p.amount)}`}
-              />
-            ))}
-          </View>
-        ) : null}
-
+        {/* The signed figure is the full wage for the period. */}
         <View style={styles.amountBox}>
           <View style={styles.amountTop}>
             <View>
               <Text style={styles.amountLabel}>AMOUNT RECEIVED IN CASH</Text>
               <Text style={styles.amountLabelTh}>{thai('จำนวนเงินที่รับเป็นเงินสด')}</Text>
             </View>
-            <Text style={styles.amountValue}>{thbPdf(cashDue)}</Text>
+            <Text style={styles.amountValue}>{thbPdf(line.net_pay)}</Text>
           </View>
           <View style={styles.wordsRow}>
             <Text style={styles.label}>In words / {thai('ตัวอักษร')}</Text>
-            <Text style={styles.words}>{bahtTextEnglish(cashDue)}</Text>
+            <Text style={styles.words}>{bahtTextEnglish(line.net_pay)}</Text>
             {/* One string, not three JSX children: a child boundary starts a new
                 shaping run, and a Thai pre-posed vowel that opens a run comes back
                 from the shaper with no code point, so it drops out of /ToUnicode
                 and the receipt stops being text-searchable. */}
-            <Text style={styles.wordsTh}>{thai(`(${bahtTextThai(cashDue)})`)}</Text>
+            <Text style={styles.wordsTh}>{thai(`(${bahtTextThai(line.net_pay)})`)}</Text>
           </View>
         </View>
+
+        {/* Only when advances exist. Without them the breakdown would restate
+            the amount above and invite the reader to add the two together. */}
+        {advances.length > 0 ? (
+          <View style={styles.breakdown}>
+            <Text style={styles.breakdownTitle}>{thai('Made up of / ประกอบด้วย')}</Text>
+            {advances.map((p) => (
+              <ReconRow
+                key={p.id}
+                en="Advance received earlier, signed for separately"
+                th={thai('เงินเบิกล่วงหน้าที่รับและลงชื่อไว้แล้ว')}
+                sub={`paid ${formatDate(p.paid_on)}${p.note ? ` — ${p.note}` : ''}`}
+                value={thbPdf(p.amount)}
+              />
+            ))}
+            <ReconRow
+              en="Balance handed over today"
+              th={thai('ยอดคงเหลือที่จ่ายเป็นเงินสดวันนี้')}
+              value={thbPdf(balanceToday)}
+            />
+          </View>
+        ) : null}
 
         {/* Deliberately a statement of fact and nothing more. A clause waiving
             further claims would be unenforceable against the statutory minimum
@@ -262,12 +276,18 @@ export function CashReceiptPdf({ data }: { data: PayslipData }) {
             kind of pressure a labour inspector reads badly. */}
         <View style={styles.declaration}>
           <Text style={styles.declText}>
-            I confirm that I have received the amount stated above, in cash and in full,
-            as wages for the period shown.
+            {'I confirm that I have received the amount stated above, in cash and in full, ' +
+              'as wages for the period shown.' +
+              (advances.length > 0
+                ? ' Part of it was paid to me in advance during the period, as broken down above.'
+                : '')}
           </Text>
           <Text style={styles.declTextTh}>
             {thai(
-              'ข้าพเจ้าได้รับเงินจำนวนดังกล่าวข้างต้นเป็นเงินสดไว้ถูกต้องครบถ้วนแล้ว',
+              'ข้าพเจ้าได้รับเงินจำนวนดังกล่าวข้างต้นเป็นเงินสดไว้ถูกต้องครบถ้วนแล้ว' +
+                (advances.length > 0
+                  ? ' โดยบางส่วนได้รับล่วงหน้าระหว่างงวดตามรายการข้างต้น'
+                  : ''),
             )}
           </Text>
         </View>
