@@ -507,6 +507,7 @@ erDiagram
 | `supplier_files` | `id` UUID | kind CHECK (pdf/image/link), title, storage_path (`supplier-files` bucket), url, supplier_name_raw (new-supplier uploads, find-or-create at digitize time), ingest_status CHECK (library/new/to_digitize/digitized/rejected), reviewed_at, digitized_at, digitized_rows, review_note | supplier_id -> suppliers (NULLABLE) | 379 |
 | `receiving_records` | `id` UUID | source (receiving_source), received_by, received_at, status ('received'/'reconciled') | po_id -> purchase_orders, expense_id -> expense_ledger | 062 |
 | `receiving_lines` | `id` UUID | qty_expected, qty_received, qty_rejected, reject_reason (reject_reason), unit_price_actual | receiving_id -> receiving_records (CASCADE), po_line_id -> po_lines, nomenclature_id -> nomenclature, sku_id -> sku | 062 |
+| `content_translations` | `id` UUID | entity (dish/category/tag/modifier_group/modifier_option/price_tier/site_content), entity_key, field, lang (2-letter, never `en`), value JSONB (string, or partial object for site_content), source_hash (md5 of the EN at translation time — mismatch = stale), reviewed_at/by, UNIQUE(entity,entity_key,field,lang). RLS: read = authenticated, write = fn_is_owner(); no anon grant. Two-way mirrored with nomenclature.customer_description_ru/_th | -- (soft keys, see mig 446 header) | 446 |
 
 ### Columns added by mig 379 to tables documented elsewhere
 
@@ -568,6 +569,8 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `fn_approve_po(JSONB)` | RPC | Financial reconciliation → expense_ledger + purchase_logs + sku_balances + WAC | 064 |
 | `fn_pending_deliveries()` | RPC | Pending POs for /receive screen. No prices. Includes partial delivery aggregation | 064 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
+| `fn_translation_source(text,text,text)` | UTIL FN | Current EN text behind a content_translations key; NULL = orphan | 446 |
+| `fn_mirror_translation_to_nomenclature()` / `fn_mirror_nomenclature_description_translations()` | TRIGGER FN | Keep content_translations (dish/description/ru,th) and nomenclature.customer_description_ru/_th in sync both ways; pg_trigger_depth() guard stops the ping-pong. Retire once the A4 generator reads menu_translations | 446 |
 
 ## Views
 
@@ -575,6 +578,8 @@ rows for. Listed here so the migration's full footprint is greppable:
 |---|---|---|---|
 | `v_inventory_by_nomenclature` | `sku_balances` | Aggregated inventory by nomenclature (SUM quantity, MAX last_counted_at). Drop-in replacement for inventory_balances. Used by WAC trigger, MRP, procurement. | 057 |
 | `v_order_builder` | `supplier_catalog` ⋈ `suppliers` ⋈ `nomenclature` ⋈ `product_categories` | Order Builder / add-item source: per-supplier catalog rows with `unit_cost_base` (last_seen_price ÷ conversion_factor), `verified_at` for price-freshness dots, image_url, min_order_thb, resolved product category. `security_invoker = true` | 379 |
+| `menu_translations` | `content_translations` | Anon-facing: FRESH translations of public content only (stale → hidden → site falls back to EN; dish rows only for menu_public dishes). `security_invoker = false` (reads nomenclature) | 446 |
+| `v_translation_worklist` | `menu_public`, categories, tags, `menu_modifiers`, `price_tiers`, `site_content` × (ru, th, ar) | Every public guest-facing string with status missing/stale/fresh/reviewed — drives offline translation + phase-2 admin editor. `security_invoker = true`, authenticated only | 446 |
 
 ## Storage Buckets
 
