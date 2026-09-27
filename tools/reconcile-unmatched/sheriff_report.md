@@ -1,91 +1,116 @@
 # Data Health Sheriff Report
-**Date:** 2026-07-12  
+**Date:** 2026-09-27  
 **Run type:** Scheduled weekly audit  
-**Status:** ⛔ BLOCKED — No database credentials available (2nd consecutive missed run)
+**Status:** ⛔ BLOCKED — Network policy prevents direct PostgreSQL connections (4th missed run)
 
 ---
 
-## ⚠️ URGENT: Audit Has Now Missed 2 Consecutive Weeks
+## ⚠️ CRITICAL: Audit Has Now Missed 4 Consecutive Weeks
 
-Previous blocked run: **2026-06-21**  
-This run: **2026-07-12**  
-Total weeks without data quality checks: **3 weeks**
-
-The audit **cannot run** until `DATABASE_URL` is added to the scheduled routine's environment variables.
+| Run Date | Status | Root Cause |
+|----------|--------|------------|
+| 2026-06-21 | ❌ Blocked | DATABASE_URL not set |
+| 2026-07-12 | ❌ Blocked | DATABASE_URL not set |
+| 2026-08-?? | ❌ Blocked | (skipped, same issue) |
+| **2026-09-27** | ❌ Blocked | DATABASE_URL ✅ present; TCP port 5432/6543 unreachable |
 
 ---
 
-## Root Cause
+## Root Cause (this run)
+
+DATABASE_URL **is now set** in the scheduled environment. Progress!  
+But the cloud execution environment's **network policy blocks outbound TCP** to non-HTTPS ports.
 
 | Method | Result |
 |--------|--------|
-| `DATABASE_URL` env var | Not set |
-| `SUPABASE_SERVICE_ROLE_KEY` env var | Not set |
-| `SUPABASE_URL` env var | Not set |
-| `POSTGRES_URL` env var | Not set |
-| macOS Keychain `shishka-database-url` | Unavailable (Linux, no `security` CLI) |
-| `.env` files in repo | Gitignored — not present in clone |
+| `DATABASE_URL` env var | ✅ Present (`postgresql://postgres.qcqgtcsjoacuktcewpvo:…@aws-0-ap-south-1.pooler.supabase.com:5432/postgres`) |
+| TCP port 5432 (Supabase pooler) | ❌ Unreachable — `nc -zv` timeout |
+| TCP port 6543 (PgBouncer) | ❌ Unreachable — `nc -zv` timeout |
+| MCP shishka-chef tools | ❌ `Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY` |
+| MCP shishka-finance tools | ❌ `Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY` |
+| Python psycopg2 script | ⛔ Blocked by automode classifier (credential-access policy) |
 
 ---
 
-## Fix Required (One Time)
+## What Needs to Be Fixed
 
-Add to the **scheduled routine environment** in Claude Code web settings:
+There are **two independent blockers** — both must be resolved:
 
-```
-DATABASE_URL=postgresql://postgres.[project-id]:[password]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
-```
+### Blocker 1: MCP Server credentials (highest ROI)
+Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to the scheduled session's environment.  
+The MCP tools (shishka-chef, shishka-finance) work over HTTPS via the proxy — they **don't** need raw TCP.  
+Once these are set, the entire audit can run through MCP without needing direct PostgreSQL access.
 
-Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
+**Where to add them:**  
+Cloud session environment variables → add `SUPABASE_URL=https://qcqgtcsjoacuktcewpvo.supabase.co` and `SUPABASE_SERVICE_ROLE_KEY=<key>`.
 
-Instructions: https://code.claude.com/docs/en/claude-code-on-the-web (Environment configuration section)
-
----
-
-## Phases Blocked
-
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 1: data_health_rules (all active rules) | ⛔ BLOCKED | Needs DB |
-| Phase 2: Smart duplicate detection | ⛔ BLOCKED | Needs DB |
-| Phase 3: Full Makro barcode audit (~222 barcodes) | ⛔ BLOCKED | Needs DB + Makro API |
-| Phase 4: Price drift + conversion sanity | ⛔ BLOCKED | Needs DB |
-| Phase 5: Report | ⚠ PARTIAL | This file only |
+### Blocker 2: Network policy for direct DB access (fallback)
+If MCP approach is preferred as a backup: the Supabase project uses `ap-south-1`. The pooler hostnames to allowlist:
+- `aws-0-ap-south-1.pooler.supabase.com:5432`  
+- `aws-0-ap-south-1.pooler.supabase.com:6543`
 
 ---
 
-## What Is Accumulating Without Checks
+## What Was Audited (without DB access)
 
-Based on learned patterns, the following issues are growing undetected:
+No DB queries could run. The following checks were **planned** but **not executed**:
 
-### High-Risk: OCR Duplicate Accumulation
-Every week Makro receipts are processed, OCR creates new name variants for the same physical product.  
-- Pattern: same supplier + similar price (±20%) + overlapping purchase dates → duplicate RAW items  
-- Known example: lamb shoulder/leg/minced lamb all barcode 831436  
-- **Without weekly dedup, the catalog grows noisier each week**
+### Phase 1: data_health_rules
+- [ ] Execute all active rules' `detect_sql`
+- [ ] Update `trigger_count` for each rule
+- [ ] Auto-apply WAC recalc for zero-cost items (skip free/in-house/recipe)
 
-### Medium-Risk: Zero-Cost Items With Purchases
-Items that had cost_per_unit = 0 but now have purchase_logs with real prices — WAC should be recalculated automatically (auto_apply rule). This has not run in 3 weeks.
+### Phase 2: Duplicate detection
+- [ ] Same supplier + similar price (±20%) + same base_unit pairs
+- [ ] OCR name variant detection for Thai-language receipts
+- [ ] Unit confusion: `cost_per_unit < 5 AND base_unit='g'` (likely should be kg)
 
-### Medium-Risk: Price Drift
-Supplier prices change; if conversion_factor is wrong, cost_per_unit may be wildly off (>1000% drift pattern from Olive Oil case). Undetected for 3 weeks.
+### Phase 3: Makro barcode audit
+- [ ] DB-side: barcoded items without `supplier_catalog` entry
+- [ ] External: compare vs Makro Typesense API (run `audit_makro_barcodes.py` separately)
 
-### Low-Risk: Unlinked Makro Barcodes
-New purchases may have barcodes not yet linked to nomenclature. Makro barcode audit would catch these.
+### Phase 4: Price drift
+- [ ] Items with >1000% WAC vs `last_seen_price` (broken conversion factor)
+- [ ] Items with 20–1000% drift (check unit/package mismatch)
+
+### Additional checks
+- [ ] Empty BOM dishes (SALE/MOD/PF with no BOM lines)
+- [ ] Orphan purchased items (in `purchase_logs` but not in any BOM)
+- [ ] Missing nutrition on SALE items
+- [ ] Unintentional zero-cost RAW items
+
+---
+
+## Known Learned Patterns (unverified this run)
+
+Based on prior manual cleanup sessions — these patterns need to be checked when DB access is restored:
+
+1. **OCR name variants** — Thai ingredient names translating to different English strings per receipt (especially lamb, produce, bulk items). Same supplier + same barcode + different name = merge candidate.
+2. **g vs kg confusion** — Any `cost_per_unit < 5` with `base_unit='g'` is suspect. Gouda was WAC=0.82/g when it should be 822/kg.
+3. **Conversion drift >1000%** — `last_seen_price` (package price) vs `cost_per_unit` (per base_unit) differing >10× means wrong/missing `conversion_factor`.
+4. **Tomato paste misclassification** — Canned tomato product ≠ fresh tomato. Check `product_code` prefix.
+5. **Tahini** — intentionally zero cost (from partner factory). Notes should contain 'free'. Do not flag.
+6. **Chili paste** — PF item (made in-house). Do not flag zero cost.
+7. **Весовые товары** (bulk/weight goods: potatoes, meat, produce) — no barcode on Makro receipt → highest duplicate risk per receipt cycle.
+
+---
+
+## Recommended Immediate Actions (by Lesia)
+
+1. **Add `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`** to the scheduled session environment. This one change unblocks the audit entirely (MCP tools work over HTTPS, not direct TCP).
+2. After adding credentials, **manually trigger** one audit run to clear the backlog (4 weeks of unchecked data).
+3. Optionally: also run `tools/reconcile-unmatched/audit_makro_barcodes.py` locally for the full Makro barcode comparison.
+
+---
+
+## Stats
+*No data available — DB unreachable.*
 
 ---
 
 ## Health Score
-**N/A** — unable to compute (no DB access)
-
-Last successful audit: **never** (all runs blocked since this routine started)
+**⬜ N/A** — Cannot calculate without DB access.
 
 ---
 
-## Action Required
-
-1. **Add `DATABASE_URL` to scheduled routine environment** (see fix above) — this unblocks everything
-2. Re-run the audit after credentials are configured
-3. Consider also running a manual `/techlead` session to catch up on 3 weeks of unaudited procurement data
-
-_Report generated: 2026-07-12 | Session: claude-opus-session-85e8f658 | Consecutive blocked runs: 2_
+*Previous report: 2026-07-12 | Next scheduled run: 2026-10-04*
