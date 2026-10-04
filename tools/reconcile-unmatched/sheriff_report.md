@@ -1,91 +1,97 @@
 # Data Health Sheriff Report
-**Date:** 2026-07-12  
-**Run type:** Scheduled weekly audit  
-**Status:** ⛔ BLOCKED — No database credentials available (2nd consecutive missed run)
+*Generated: 2026-10-04T00:00:00Z (automated weekly run)*
+
+## ⚠️ Health Score: UNKNOWN — Audit Blocked by Environment
 
 ---
 
-## ⚠️ URGENT: Audit Has Now Missed 2 Consecutive Weeks
+## Environment Issue: DB Unreachable
 
-Previous blocked run: **2026-06-21**  
-This run: **2026-07-12**  
-Total weeks without data quality checks: **3 weeks**
+This scheduled audit could **not execute** due to missing credentials in the remote execution environment.
 
-The audit **cannot run** until `DATABASE_URL` is added to the scheduled routine's environment variables.
+### Root Cause
 
----
+| Access Path | Status | Reason |
+|-------------|--------|--------|
+| Direct PostgreSQL (port 5432) | ❌ Blocked | Network policy blocks raw TCP to `aws-0-ap-south-1.pooler.supabase.com:5432` |
+| Supabase transaction pooler (port 6543) | ❌ Blocked | Same network policy |
+| MCP tools (shishka-chef / shishka-finance) | ❌ Error | `Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables` |
+| Supabase REST API | ❌ No key | `SUPABASE_SERVICE_ROLE_KEY` not present in session environment |
 
-## Root Cause
+Only `DATABASE_URL` (PostgreSQL connection string) is available, but it requires direct TCP access which is blocked.
 
-| Method | Result |
-|--------|--------|
-| `DATABASE_URL` env var | Not set |
-| `SUPABASE_SERVICE_ROLE_KEY` env var | Not set |
-| `SUPABASE_URL` env var | Not set |
-| `POSTGRES_URL` env var | Not set |
-| macOS Keychain `shishka-database-url` | Unavailable (Linux, no `security` CLI) |
-| `.env` files in repo | Gitignored — not present in clone |
+### Fix Required
 
----
+Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to the session environment in Claude Code settings.
+Without these, **all scheduled DB audits fail silently** in cloud sessions.
 
-## Fix Required (One Time)
+The MCP servers (shishka-chef, shishka-finance, shishka-mission-control) also fail every tool call.
 
-Add to the **scheduled routine environment** in Claude Code web settings:
-
-```
-DATABASE_URL=postgresql://postgres.[project-id]:[password]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
-```
-
-Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
-
-Instructions: https://code.claude.com/docs/en/claude-code-on-the-web (Environment configuration section)
+**Action needed:** Configure `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in the cloud session env vars at `https://code.claude.com`.
 
 ---
 
-## Phases Blocked
+## What This Audit Would Have Checked
 
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 1: data_health_rules (all active rules) | ⛔ BLOCKED | Needs DB |
-| Phase 2: Smart duplicate detection | ⛔ BLOCKED | Needs DB |
-| Phase 3: Full Makro barcode audit (~222 barcodes) | ⛔ BLOCKED | Needs DB + Makro API |
-| Phase 4: Price drift + conversion sanity | ⛔ BLOCKED | Needs DB |
-| Phase 5: Report | ⚠ PARTIAL | This file only |
+### Phase 1: data_health_rules (all active rules)
+- Zero-cost items with purchase history → auto-apply WAC recalc
+- Missing base_unit on RAW items
+- Items with no supplier link
+- Negative quantities in purchase_logs
+- Stale items (>180 days no purchase, still available)
 
----
+### Phase 2: Duplicate detection
+- RAW items: same supplier + price ±20% + name similarity >0.5 (pg_trgm)
+- OCR variant detection (Thai receipt names → multiple product codes per physical item)
+- Known patterns: lamb variants (barcode 831436), frozen produce duplicates
 
-## What Is Accumulating Without Checks
+### Phase 2b: Unit confusion g vs kg
+- Items with `base_unit='g'` and `cost_per_unit < 5` → likely stored in wrong unit
+- Known case: Gouda cheese (WAC=0.82/g should be 822/kg)
 
-Based on learned patterns, the following issues are growing undetected:
+### Phase 3: Makro barcode audit
+- `audit_makro_barcodes.py --limit 30` → compare DB names vs live Makro catalog
+- Flags: NAME_DIFF, WEIGHT_DIFF, NOT_FOUND, BARCODE_ERROR
 
-### High-Risk: OCR Duplicate Accumulation
-Every week Makro receipts are processed, OCR creates new name variants for the same physical product.  
-- Pattern: same supplier + similar price (±20%) + overlapping purchase dates → duplicate RAW items  
-- Known example: lamb shoulder/leg/minced lamb all barcode 831436  
-- **Without weekly dedup, the catalog grows noisier each week**
+### Phase 4: Price drift & conversion sanity
+- WAC vs `supplier_catalog.last_seen_price` drift >20%
+- Drift >1000% = broken conversion_factor (known: Olive Oil 5L bottle)
 
-### Medium-Risk: Zero-Cost Items With Purchases
-Items that had cost_per_unit = 0 but now have purchase_logs with real prices — WAC should be recalculated automatically (auto_apply rule). This has not run in 3 weeks.
-
-### Medium-Risk: Price Drift
-Supplier prices change; if conversion_factor is wrong, cost_per_unit may be wildly off (>1000% drift pattern from Olive Oil case). Undetected for 3 weeks.
-
-### Low-Risk: Unlinked Makro Barcodes
-New purchases may have barcodes not yet linked to nomenclature. Makro barcode audit would catch these.
-
----
-
-## Health Score
-**N/A** — unable to compute (no DB access)
-
-Last successful audit: **never** (all runs blocked since this routine started)
+### Phase 5: Orphans, empty BOM, nutrition
+- RAW items purchased but not referenced in any BOM line
+- SALE items with zero BOM lines (need /chef)
+- SALE items missing calories
 
 ---
 
-## Action Required
+## Known Issues from Previous Sessions (reference only)
 
-1. **Add `DATABASE_URL` to scheduled routine environment** (see fix above) — this unblocks everything
-2. Re-run the audit after credentials are configured
-3. Consider also running a manual `/techlead` session to catch up on 3 weeks of unaudited procurement data
+These were identified in prior manual sessions and may or may not be resolved:
 
-_Report generated: 2026-07-12 | Session: claude-opus-session-85e8f658 | Consecutive blocked runs: 2_
+1. **Lamb variants** — `RAW_AU_LAMB_SHOULDER`, `RAW_AU_LAMB_LEG`, `RAW_FROZEN_MINCED_LAMB` — possible duplicates, all mapped to barcode 831436. Check if merged.
+2. **Olive Oil conversion** — 5L bottle: WAC may still reflect per-litre cost vs per-bottle last_seen_price → ~500% drift expected.
+3. **Chili paste** — `product_code LIKE 'PF%'`, made in-house. Zero cost is intentional. notes should contain 'recipe'.
+4. **Tahini** — Zero cost, free from supplier. notes should contain 'free'.
+
+---
+
+## Auto-Fixes Applied
+_None — audit did not run._
+
+## Errors
+- ❌ Phase 1 skipped: no DB access
+- ❌ Phase 2 skipped: no DB access
+- ❌ Phase 3 skipped: no DB access
+- ❌ Phase 4 skipped: no DB access
+- ❌ Phase 5 skipped: no DB access
+
+---
+
+## Next Steps
+
+1. **Immediate**: Add `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` to the cloud session environment via https://code.claude.com/docs/en/claude-code-on-the-web
+2. **Re-run**: After credentials are available, re-trigger this scheduled task
+3. **Alternative**: Run `python3 tools/reconcile-unmatched/run_sheriff_audit.py` locally from a machine with DB access
+
+---
+*Data Health Sheriff — automated weekly run | Shishka OS v6.0*
