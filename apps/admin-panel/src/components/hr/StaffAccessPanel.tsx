@@ -83,32 +83,38 @@ export function StaffAccessPanel({
       </p>
 
       <div className="space-y-1.5 text-xs">
-        {/* Tier */}
-        <div className="flex items-center gap-2">
-          <span className="w-12 shrink-0 text-slate-500">Level</span>
+        {/* Tier — short option labels; the hint goes on its own line so the
+            select never outgrows a narrow card. */}
+        <div className="flex items-start gap-2">
+          <span className="w-12 shrink-0 pt-0.5 text-slate-500">Level</span>
           {isOwner ? (
             <span className="text-amber-300">Owner</span>
           ) : !isActive ? (
             <span className="text-slate-400">{ASSIGNABLE_ROLES.find((r) => r.value === appRole)?.label ?? appRole}</span>
           ) : (
-            <select
-              aria-label="Access level"
-              value={appRole}
-              disabled={busy}
-              onChange={(e) =>
-                void run(
-                  () => onSetRole(staffId, e.target.value as Exclude<AppRole, 'owner'>),
-                  () => onChanged(),
-                )
-              }
-              className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-700 focus:ring-emerald-500/50 focus:outline-none disabled:opacity-50"
-            >
-              {ASSIGNABLE_ROLES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label} — {r.hint}
-                </option>
-              ))}
-            </select>
+            <div className="min-w-0 flex-1">
+              <select
+                aria-label="Access level"
+                value={appRole}
+                disabled={busy}
+                onChange={(e) =>
+                  void run(
+                    () => onSetRole(staffId, e.target.value as Exclude<AppRole, 'owner'>),
+                    () => onChanged(),
+                  )
+                }
+                className="max-w-full rounded bg-slate-800 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-700 focus:ring-emerald-500/50 focus:outline-none disabled:opacity-50"
+              >
+                {ASSIGNABLE_ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-0.5 text-[10px] text-slate-500">
+                {ASSIGNABLE_ROLES.find((r) => r.value === appRole)?.hint}
+              </p>
+            </div>
           )}
         </div>
 

@@ -126,3 +126,14 @@ describe('StaffAccessPanel', () => {
     expect(screen.queryByText('Show PIN')).not.toBeInTheDocument()
   })
 })
+
+describe('StaffAccessPanel layout', () => {
+  afterEach(cleanup)
+
+  it('keeps tier options short and shows the hint for the current tier underneath', () => {
+    setup({ appRole: 'task_manager' })
+    const select = screen.getByLabelText('Access level') as HTMLSelectElement
+    expect([...select.options].map((o) => o.textContent)).toEqual(['Manager', 'Kitchen'])
+    expect(screen.getByText(/receipts, procurement, schedule/)).toBeInTheDocument()
+  })
+})
