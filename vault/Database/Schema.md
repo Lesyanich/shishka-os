@@ -568,6 +568,14 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `fn_approve_po(JSONB)` | RPC | Financial reconciliation → expense_ledger + purchase_logs + sku_balances + WAC | 064 |
 | `fn_pending_deliveries()` | RPC | Pending POs for /receive screen. No prices. Includes partial delivery aggregation | 064 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
+| `fn_bkk_today()` | UTIL FN | `(now() AT TIME ZONE 'Asia/Bangkok')::date` — the one definition of "today" for business rules (UTC midnight is 07:00 here) | 454 |
+| `fn_staff_login_revoke_sessions(UUID)` | UTIL FN | Deletes every `auth.sessions` + `auth.refresh_tokens` row of one auth user. Internal (EXECUTE revoked from authenticated) | 454 |
+| `fn_staff_login_set_allowed(UUID, BOOLEAN)` | UTIL FN | Ban (`banned_until = now()+100y` + revoke sessions) or unban one auth user. Internal | 454 |
+| `fn_staff_employment_guard()` | TRIGGER FN | BEFORE INS/UPD/DEL on `staff` (`trg_staff_employment_guard`), SECURITY DEFINER. A past `fire_date` is final: cannot be cleared or moved to today/future, and the row cannot be reactivated (rehire = new row); any write to an active row with a past `fire_date` forces `is_active=false`; the last active owner cannot be deactivated, demoted or deleted | 454 |
+| `fn_staff_sync_login_access()` | TRIGGER FN | AFTER INS/UPD/DEL on `staff` (`trg_staff_sync_login_access_{ins,upd,del}`; UPD fires when `is_active`, `auth_user_id` or `fire_date` changes). The login follows `is_active` (ban/unban); a login no row points at any more is banned; while inactive, the row's `staff_schedule_templates` are turned off and `scheduled` shifts after `fire_date` (or today) are deleted | 454 |
+| `fn_set_staff_pin(UUID, TEXT, TEXT DEFAULT NULL)` | RPC | Owner-only. Sets the real Supabase Auth password (= the 4-digit PIN) and the login name (`^[a-z0-9]{3,20}$` → `<login>@staff.shishka.local`, unique across `auth.users` and `staff.email`); creates the auth user + identity if missing; refuses inactive rows and owners; a PIN change revokes the sessions already open. Returns the login. Replaces the 2-arg form from mig 314 (a 2-arg call still resolves) | 314, 454 |
+| `fn_staff_login_status()` | RPC | Owner-only (zero rows otherwise): `(staff_id, login_email, last_sign_in_at, is_blocked)` for every staff row with a login. Feeds the Access block on `/hr/staff`; `auth.users` is not readable from the client | 454 |
+| `fn_staff_retire_expired()` | RPC | Per-row `UPDATE staff SET is_active=false` for active rows with `fire_date < fn_bkk_today()`, each in its own exception block so one refused row (last-owner guard) does not stop the rest. Run by pg_cron `staff-fire-date-expiry` at `5 17 * * *` UTC = 00:05 Bangkok | 454 |
 
 ## Views
 

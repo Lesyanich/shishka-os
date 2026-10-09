@@ -2,7 +2,7 @@
 
 > MC Task: `8ee6783a-15c3-4a10-a2cf-44eeada457fe`
 > Branch: `feature/admin/staff-access-offboarding`
-> Status: **decisions closed 2026-10-09** (§ 7) — migration drafted (`454_staff_access_follows_employment.sql`), not applied; apply is CEO-gated
+> Status: **decisions closed 2026-10-09** (§ 7) — migration drafted (`454_staff_access_follows_employment.sql`), reviewed (`/code-review high`, 10 findings, all folded in), **not applied**; apply is CEO-gated
 > Origin: CEO 2026-10-02: "есть ли у нас страница для управления ролями и доступами? У Минт был доступ как админа, она уволилась, теперь у нас есть Нук и Ни Ни, и они должны загружать и проверять чеки." Follow-up, same day: "Запись Минт не надо было переименовывать — просто оставить со статусом уволена, и при получении такого статуса лишать её всех доступов." Answers 2026-10-09: § 7.
 
 ---
@@ -45,12 +45,15 @@ One gap behind #2, #4, #5. **Employment status and login access are not connecte
 
 | Event on a `staff` row | Effect on its login |
 |---|---|
-| `is_active` → false (owner fires someone in the UI) | **Immediately:** auth user banned (`banned_until = now() + 100 years`), all sessions and refresh tokens deleted, schedule template turned off, planned shifts after the last working day removed |
-| `fire_date` passes (it is the *last working day*) | Daily cron at **00:05 Bangkok** sets `is_active = false`, which bans as above. Any other write to such a row also flips it inactive. |
-| `is_active` → true on a row whose `fire_date` is in the past (old or new value, so clearing the date in the same edit does not help) | **Refused:** "X left on DATE — a rehire gets a new staff record" (P5). This exact edit resurrected Mint's row. |
+| `is_active` → false | **Immediately:** auth user banned (`banned_until = now() + 100 years`), all sessions and refresh tokens deleted, schedule template turned off, planned shifts after the last working day removed |
+| `fire_date` passes (it is the *last working day*) | Daily job at **00:05 Bangkok** (`fn_staff_retire_expired()`, one row per exception block so one refused row never blocks the rest) sets `is_active = false`, which bans as above. Any other write to such a row also flips it inactive. |
+| `fire_date` is in the past and someone clears it or moves it to today/future | **Refused:** "X left on DATE — that date cannot be cleared; a rehire gets a new staff record". Correcting it to another past date is allowed. This closes the two-step bypass (clear the date, then reactivate). |
+| `is_active` → true on a row whose `fire_date` is in the past | **Refused:** "X left on DATE — a rehire gets a new staff record" (P5). This exact edit resurrected Mint's row. |
 | `is_active` → true with no past `fire_date` (e.g. undoing a same-day mistake) | Ban lifted |
+| `fire_date` set or moved on a row that is already inactive | Shift cleanup re-runs against the new date, so a date recorded after the fact still clears the right shifts |
+| Owner changes a PIN or login | Sessions already open on that login are revoked; the person signs in again with the new PIN |
 | A login is detached from its row (re-pointed or row deleted) and no other row claims it | That login is banned. No orphan logins. |
-| Deactivating or demoting the **last active owner** | Refused, so nobody locks the company out |
+| Deactivating, demoting or **deleting** the **last active owner** | Refused, so nobody locks the company out. The guard is SECURITY DEFINER, so its "another active owner?" lookup does not depend on what RLS lets the caller read |
 
 **Residual window:** an access token already issued stays valid until it expires (1 h JWT lifetime). Deleting the sessions stops it from being refreshed. Acceptable.
 
@@ -70,7 +73,8 @@ Pages: Receipt Inbox, Procurement, Shopping List, Schedule, Staff Tasks, Kitchen
 │                            PIN   [_ _ _ _] [Save] │
 │         Give her: login "nuk" + the PIN you chose │
 │ [ Fire… ]  → last working day [2026-10-09] [Confirm]│
-│            "Every login is blocked immediately."  │
+│            past/today: "Login is blocked now."    │
+│            future: "Access ends the day after."   │
 └───────────────────────────────────────────────────┘
 Inactive card: "Fired 2026-09-04 · login blocked" (red), no controls.
 ```
@@ -79,7 +83,7 @@ Inactive card: "Fired 2026-09-04 · login blocked" (red), no controls.
 - **Login status:** comes from a new owner-only RPC, because `auth.users` is not readable from the client. Four states: *no login yet* · *never used* · *last sign-in DATE* · *blocked*.
 - **Create login / Change PIN:** the owner types the login (3–20 Latin letters or digits, prefilled from the name) and a 4-digit PIN, then hands both over (P6). Calls `fn_set_staff_pin(staff, pin, login)`. Hidden for owners and inactive rows.
 - **Login screen:** the staff field label changes from "Имя" to "Логин", since the login no longer has to equal the name.
-- **Fire:** sets `fire_date` (the last working day) + `is_active = false` in one update. The trigger does the rest. There is no "reactivate" control for a fired row (P5).
+- **Fire:** always writes `fire_date` (the last working day). If that day is **before today**, the same update also sets `is_active = false`, so access ends now. If it is **today or later** (notice period), `is_active` stays true and the daily job retires the row the morning after the last day: the person keeps the KDS, tasks and schedule until then. There is no "reactivate" control for a fired row (P5).
 - Copy is English, matching the rest of the admin. Styling follows the existing slate card (`PaymentQrCard` pattern) until the brand re-skin (RULE-DESIGN-SYSTEM).
 
 ---
@@ -90,25 +94,29 @@ Inactive card: "Fired 2026-09-04 · login blocked" (red), no controls.
 
 | Object | Kind | Purpose |
 |---|---|---|
-| `fn_staff_login_set_allowed(uuid, boolean)` | function, SECURITY DEFINER, no client grant | Ban or unban one auth user; on ban, delete its `auth.sessions` and `auth.refresh_tokens` |
-| `fn_staff_employment_guard()` + `trg_staff_employment_guard` | BEFORE INSERT/UPDATE | Past `fire_date` forces the row inactive; refuses reactivation; protects the last owner |
-| `fn_staff_sync_login_access()` + 3 triggers `trg_staff_sync_login_access_{ins,upd,del}` | AFTER, SECURITY DEFINER | The login follows `is_active`; detached logins are banned; on deactivation the schedule template is turned off and `scheduled` shifts after `fire_date` are deleted (all 206 shifts in the table are `scheduled`; payroll reads `staff_attendance`, not `shifts`). The UPDATE trigger uses `WHEN (OLD.is_active IS DISTINCT FROM NEW.is_active OR OLD.auth_user_id IS DISTINCT FROM NEW.auth_user_id)`, **not** `UPDATE OF is_active`: a column list ignores changes made by BEFORE triggers, and the guard flips `is_active` on its own. |
-| `fn_set_staff_pin(uuid, text)` → `fn_set_staff_pin(p_staff_id, p_pin, p_login DEFAULT NULL)` returns the login | replace (mig 314; no caller in code) | The owner chooses the login (P6): `^[a-z0-9]{3,20}$`, unique across `auth.users`; omitted = keep the current staff login, else derive from the name. Refuses inactive rows and owners. Creates the auth user + identity if missing, otherwise rewrites email + password (fixes #7) |
+| `fn_bkk_today()` | STABLE util, `GRANT authenticated` | `(now() AT TIME ZONE 'Asia/Bangkok')::date` — the single definition of "today" used by the guard, the sync trigger and the daily job (UTC midnight is 07:00 here) |
+| `fn_staff_login_revoke_sessions(uuid)` | function, SECURITY DEFINER, no client grant | Delete every `auth.sessions` + `auth.refresh_tokens` row of one auth user. Used by the ban path and by a PIN change |
+| `fn_staff_login_set_allowed(uuid, boolean)` | function, SECURITY DEFINER, no client grant | Ban (`banned_until`, then revoke sessions) or unban one auth user |
+| `fn_staff_employment_guard()` + `trg_staff_employment_guard` | BEFORE INSERT/UPDATE/DELETE, SECURITY DEFINER | A past `fire_date` is immutable except towards another past date; an active row with a past `fire_date` is forced inactive; reactivation refused; the last active owner cannot be deactivated, demoted or deleted |
+| `fn_staff_sync_login_access()` + 3 triggers `trg_staff_sync_login_access_{ins,upd,del}` | AFTER, SECURITY DEFINER | The login follows `is_active`; detached logins are banned; on deactivation the schedule template is turned off and `scheduled` shifts after `fire_date` are deleted (all 206 shifts in the table are `scheduled`; payroll reads `staff_attendance`, not `shifts`). The UPDATE trigger fires `WHEN` `is_active`, `auth_user_id` **or `fire_date`** changes (so a date recorded later re-runs the shift cleanup), **not** `UPDATE OF is_active`: a column list ignores changes made by BEFORE triggers, and the guard flips `is_active` on its own. |
+| `fn_set_staff_pin(uuid, text)` → `fn_set_staff_pin(p_staff_id, p_pin, p_login DEFAULT NULL)` returns the login | replace (mig 314; no caller in code or in other DB functions — verified in `pg_proc`) | The owner chooses the login (P6): `^[a-z0-9]{3,20}$`, unique across `auth.users` **and `staff.email`** (the `staff_email_unique` index would otherwise surface as a raw 23505); omitted = keep the current staff login, else derive from the name. Refuses inactive rows and owners. Creates the auth user + identity if missing, otherwise rewrites email + password **and revokes the open sessions** (fixes #7) |
 | `fn_staff_login_status()` | new RPC, SECURITY DEFINER, `GRANT authenticated` | Returns `(staff_id, login_email, last_sign_in_at, is_blocked)`; zero rows unless `fn_is_owner()` |
-| cron `staff-fire-date-expiry` | `5 17 * * *` (UTC) = 00:05 Bangkok | `UPDATE staff SET is_active=false WHERE is_active AND fire_date < today_bkk` |
+| `fn_staff_retire_expired()` | function, SECURITY DEFINER, no client grant | Loops over active rows with `fire_date < fn_bkk_today()` and deactivates each in its own exception block (`RAISE WARNING` on refusal), returns the count. A single refused row (an owner with a date and no second owner) must not stop everyone else |
+| cron `staff-fire-date-expiry` | `5 17 * * *` (UTC) = 00:05 Bangkok | `SELECT fn_staff_retire_expired()` |
 
 Constraints this must respect, verified live: `staff_role_credential_check` (a task_manager with a login needs `email`; a cook with a login needs `pin_hash`); unique `auth_user_id`; unique `lower(email)`.
 
-### 4.1 Data repair (same migration, each statement guarded so a replay is a no-op)
+### 4.1 Data repair (same migration; a replay is a no-op, a drifted row is an error)
 
 | Row | Before | After |
 |---|---|---|
-| `af85ba68` | "Nook", active, login `nook@shishka.health`, plaintext PIN | **"Mint"**, inactive, `fire_date` 2026-09-04 kept, her own login `mint@staff.shishka.local` re-linked **and banned**, `pin_code`/`pin_hash`/`pin_set_at` cleared |
+| `af85ba68` | "Nook", active, login `nook@shishka.health`, plaintext PIN | **"Mint"**, inactive, `fire_date` 2026-09-04 kept, her own login `mint@staff.shishka.local` re-linked **and banned**, `pin_code`/`pin_hash`/`pin_set_at` cleared. Runs in a `DO` block that **raises unless exactly one row changed** (already repaired = skip), so the migration cannot log success while her login is still live |
 | `nook@shishka.health` | made by hand 2026-10-02, never used, given to no one (CEO) | detached from Mint's row, so the trigger **bans** it |
 | `b4d9512d` Nuk | cook, no login | **task_manager**. No login: the CEO creates it in the UI (P6) |
 | `15f13b0b` NeNe | cook, no login | **task_manager**. No login: the CEO creates it in the UI (P6) |
 | `b1fb72db` Noe Noe | active, login live (never used), template on | **fire_date 2026-09-08, inactive**, login banned, template off. No shifts or attendance after 2026-09-08 to clean up |
-| Alex, Hein | inactive, logins live | logins **banned**, templates off (backfill over every inactive row) |
+| Alex, Hein | inactive, logins live | logins **banned**, templates off |
+| **Every `auth.users` row without an active staff row** | — | **banned** (one-time backfill = the rule itself; today every auth user is a staff login, so a future non-staff account must be created after this pass) |
 
 ---
 
@@ -116,7 +124,7 @@ Constraints this must respect, verified live: `staff_role_credential_check` (a t
 
 | File | Change |
 |---|---|
-| `hooks/use-staff-access.ts` (new) | `loginStatus` (rpc `fn_staff_login_status`), `setAppRole`, `setPin` (rpc `fn_set_staff_pin`), `fire(staffId, lastDay)`. All Supabase calls live here, per admin-panel convention. Surface DB errors verbatim: the trigger messages are written for humans. |
+| `hooks/use-staff-access.ts` (new) | `loginStatus` (rpc `fn_staff_login_status`), `setAppRole`, `setPin` (rpc `fn_set_staff_pin`), `fire(staffId, lastDay)` → `{ fire_date: lastDay, ...(lastDay < todayBkk ? { is_active: false } : {}) }`. All Supabase calls live here, per admin-panel convention. Surface DB errors verbatim: the trigger messages are written for humans. |
 | `components/hr/StaffAccessPanel.tsx` (new) | The § 3.3 block |
 | `pages/hr/StaffPage.tsx` | Render the panel in `StaffCardView`; refetch after writes |
 | tests | `use-staff-access` unit tests (error surfacing, `fire` payload); panel render states (owner row, inactive row, no-login row) |
@@ -130,12 +138,12 @@ Out of this PR: deleting the dead `components/schedule/StaffForm.tsx` (it writes
 1. **Dry run, CEO-gated.** Run the full migration inside `BEGIN … ROLLBACK` with probes, and show the CEO the resulting `staff` + login table before any real apply. (The 2026-10-02 dry run was declined at the permission prompt; it contains `DELETE FROM auth.sessions`.)
 2. **Apply**, then check against live tables, not the ledger:
    - `staff`: Mint inactive + banned; Noe Noe inactive (fire 2026-09-08) + banned; Nuk and NeNe task_manager with no login; Alex + Hein banned; the only orphan login is `nook@shishka.health`, banned; zero active rows with a past `fire_date`; zero active templates on inactive rows.
-   - Guards, inside a rolled-back txn: reactivating Mint (even with `fire_date = NULL` in the same edit) raises; deactivating both owners raises on the second; `fn_set_staff_pin` refuses a fired row and a taken login.
+   - Guards, inside a rolled-back txn: reactivating Mint raises; clearing Mint's `fire_date` raises (two-step bypass closed); correcting it to another past date is allowed; deactivating both owners raises on the second; deleting the last owner raises; `fn_set_staff_pin` refuses a fired row, a taken login (via `auth.users` and via `staff.email`), and a PIN change leaves zero sessions for that uid; `fn_staff_retire_expired()` retires an expired cook even when an expired last-owner row is refused in the same run.
    - Per-tier, as mig 390 did (inside a rolled-back txn with `set_config('request.jwt.claims', …)`): as owner, create Nuk's login; as that new uid, `fn_get_my_role()` = task_manager, `fn_has_app_role(owner, task_manager)` = true (the `receipt_inbox` gate), `fn_staff_login_status()` = 0 rows.
    - The 2026-10-02 and 2026-10-09 dry runs were both declined at the permission prompt (they contain `DELETE FROM auth.sessions` and `INSERT INTO auth.users`, rolled back). Alternative: the CEO runs the dry-run file in the Supabase SQL editor.
-   - `cron.job` contains `staff-fire-date-expiry`.
+   - `cron.job` contains `staff-fire-date-expiry` with command `SELECT public.fn_staff_retire_expired()`.
 3. **UI:** build + lint + tests green; preview link for the CEO with what to click (memory `feedback_preview_before_pr`). An agent cannot log in (the PIN is the Auth password), so the CEO checks: create NeNe's login, sign in with it, reach `/receipts`.
-4. **Docs:** `vault/Database/Schema.md` (RPCs & triggers table, RULE-DB-SCHEMA-DOCS); memory `project_admin_auth_model` (firing now revokes the login; PIN setting is in the UI).
+4. **Docs:** `vault/Database/Schema.md` RPCs & Triggers table — **done in the migration commit** (RULE-DB-SCHEMA-DOCS); memory `project_admin_auth_model` (firing now revokes the login; PIN setting is in the UI) — at close.
 
 ---
 
