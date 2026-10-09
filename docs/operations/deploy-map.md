@@ -9,7 +9,7 @@
 | What | Domain(s) | Vercel project | Builds from |
 |---|---|---|---|
 | **LIVE customer site** (brand + menu) | `shishka.health`, `www.shishka.health` | `shishka-web` (`prj_OsHKcipkh7ZYIp3ta8i5lYh1IpY2`) | GitHub `Lesyanich/shishka-health` → `main`, auto-deploy on push. Local checkout: `~/code/shishka-health` |
-| **Admin panel** | `shishka-os.vercel.app` | `shishka-os` (`prj_jqAkqZhSKUecsYlAXYNtNaJqmIfL`) | GitHub `Lesyanich/shishka-os` → `main`, root dir `apps/admin-panel` (own `vercel.json`: chef api functions, SPA rewrites) |
+| **Admin panel** | `shishka-os.vercel.app`; staff link `team.shishka.health` (CNAME at Namecheap → `cname.vercel-dns.com`, added 2026-10-09) | `shishka-os` (`prj_jqAkqZhSKUecsYlAXYNtNaJqmIfL`) | GitHub `Lesyanich/shishka-os` → `main`, root dir `apps/admin-panel` (own `vercel.json`: chef api functions, SPA rewrites) |
 | QR order-intake app (`apps/web`) | — none yet | — no project yet | **Not deployed.** Ships with initiative `52efcf1e`; when the time comes it needs its OWN Vercel project — never `shishka-web` |
 
 The standalone KDS app (`apps/kds`) was removed on 2026-10-09 (never deployed; its role lives in the admin panel at `/kitchen/schedule`).

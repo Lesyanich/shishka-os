@@ -38,7 +38,7 @@ export function LoginPage() {
 
     const { error: err } = await signIn(creds.email, creds.password)
     if (err) {
-      setError(mode === 'staff' ? 'Неверный логин или PIN' : 'Неверный email или пароль')
+      setError(mode === 'staff' ? 'Wrong login or PIN' : 'Wrong email or password')
       setSubmitting(false)
     }
   }
@@ -53,7 +53,7 @@ export function LoginPage() {
           </span>
           <h1 className="text-xl font-semibold text-slate-100">Shishka OS</h1>
           <p className="text-sm text-slate-500">
-            {mode === 'staff' ? 'Вход для сотрудника' : 'Вход для владельца'}
+            {mode === 'staff' ? 'Staff sign-in' : 'Owner sign-in'}
           </p>
         </div>
 
@@ -63,7 +63,7 @@ export function LoginPage() {
             <>
               <div>
                 <label htmlFor="name" className="mb-1 block text-xs font-medium text-slate-400">
-                  Логин
+                  Login
                 </label>
                 <input
                   id="name"
@@ -76,7 +76,7 @@ export function LoginPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-base text-slate-100 placeholder-slate-600 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  placeholder="напр. alex"
+                  placeholder="e.g. alex"
                 />
               </div>
 
@@ -93,7 +93,7 @@ export function LoginPage() {
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-base tracking-widest text-slate-100 placeholder-slate-600 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  placeholder="••••••"
+                  placeholder="••••"
                 />
               </div>
             </>
@@ -117,7 +117,7 @@ export function LoginPage() {
 
               <div>
                 <label htmlFor="password" className="mb-1 block text-xs font-medium text-slate-400">
-                  Пароль
+                  Password
                 </label>
                 <input
                   id="password"
@@ -142,7 +142,7 @@ export function LoginPage() {
             {submitting ? (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
             ) : (
-              'Войти'
+              'Sign in'
             )}
           </button>
         </form>
@@ -156,7 +156,7 @@ export function LoginPage() {
           }}
           className="mx-auto block text-xs text-slate-500 underline-offset-2 hover:text-slate-300 hover:underline"
         >
-          {mode === 'staff' ? 'Вход для владельца (email)' : 'Вход для сотрудника (имя + PIN)'}
+          {mode === 'staff' ? 'Owner sign-in (email)' : 'Staff sign-in (login + PIN)'}
         </button>
       </div>
     </div>
