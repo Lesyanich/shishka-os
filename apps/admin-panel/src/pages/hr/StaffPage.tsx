@@ -88,6 +88,7 @@ function StaffCardView({
 
   function startEdit() {
     setDraft({
+      name: card.name,
       monthly_salary: card.monthly_salary,
       employment_type: card.employment_type,
       nationality: card.nationality,
@@ -102,7 +103,9 @@ function StaffCardView({
   }
 
   async function save() {
-    await onUpdate(card.id, draft)
+    const name = draft.name?.trim()
+    if (!name) return // a staff member always has a name
+    await onUpdate(card.id, { ...draft, name })
     setEditing(false)
   }
 
@@ -139,6 +142,7 @@ function StaffCardView({
         {card.is_active && !editing && (
           <button
             onClick={startEdit}
+            aria-label={`Edit ${card.name}`}
             className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300 transition"
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -148,12 +152,14 @@ function StaffCardView({
           <div className="flex gap-1">
             <button
               onClick={save}
+              aria-label="Save"
               className="rounded p-1 text-emerald-400 hover:bg-emerald-500/15 transition"
             >
               <Check className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => setEditing(false)}
+              aria-label="Cancel"
               className="rounded p-1 text-slate-500 hover:bg-slate-800 transition"
             >
               <X className="h-3.5 w-3.5" />
@@ -191,6 +197,16 @@ function StaffCardView({
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <div className="col-span-2">
+            <EditField
+              label="Name"
+              value={draft.name ?? ''}
+              onChange={(v) => setDraft({ ...draft, name: v })}
+            />
+            <p className="mt-0.5 text-[9px] text-slate-600">
+              Changing the name does not change the login. A new person gets a new record.
+            </p>
+          </div>
           <EditField
             label="Salary (THB)"
             type="number"

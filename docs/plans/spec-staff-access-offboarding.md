@@ -30,7 +30,7 @@ One gap behind #2, #4, #5. **Employment status and login access are not connecte
 
 ## 2. Principles (CEO decisions, 2026-10-02)
 
-- **P1. One row = one person, forever.** A staff row is never renamed, recycled or handed to another person. A new hire gets a new row. Payroll, attendance and shifts hang off `staff.id`, so reuse rewrites history.
+- **P1. One row = one person, forever.** A staff row is never recycled or handed to another person; a new hire gets a new row. Renaming the *same* person is fine (CEO 2026-10-09: "Nuk → Nookie") — the Name field on the `/hr/staff` card edits it, and the login is separate and does not change. Payroll, attendance and shifts hang off `staff.id`, so reuse rewrites history.
 - **P2. Fired = keep the row, mark it, strip access.** Firing sets `fire_date` (last working day) and `is_active = false`. The row stays for payroll and legal history.
 - **P3. Access follows employment, enforced in the database.** Hiding a nav item is not access control (see memory `gotcha_rls_authenticated_not_role_gated`). The rule lives in a DB trigger, so it holds no matter who edits the row: the UI, an agent, SQL, or a cron.
 - **P4. Nuk and NeNe become `task_manager`.** This is the tier `/receipts` requires (CEO confirmed the wider scope in § 3.2, 2026-10-09).
