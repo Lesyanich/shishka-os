@@ -45,6 +45,4 @@ link_if_missing() {
 # Targets: node_modules and .env.local for each app + repo root.
 link_if_missing "apps/admin-panel/node_modules"
 link_if_missing "apps/admin-panel/.env.local"
-link_if_missing "apps/kds/node_modules"
-link_if_missing "apps/kds/.env.local"
 link_if_missing "node_modules"

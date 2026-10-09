@@ -11,7 +11,8 @@
 | **LIVE customer site** (brand + menu) | `shishka.health`, `www.shishka.health` | `shishka-web` (`prj_OsHKcipkh7ZYIp3ta8i5lYh1IpY2`) | GitHub `Lesyanich/shishka-health` → `main`, auto-deploy on push. Local checkout: `~/code/shishka-health` |
 | **Admin panel** | `shishka-os.vercel.app` | `shishka-os` (`prj_jqAkqZhSKUecsYlAXYNtNaJqmIfL`) | GitHub `Lesyanich/shishka-os` → `main`, root dir `apps/admin-panel` (own `vercel.json`: chef api functions, SPA rewrites) |
 | QR order-intake app (`apps/web`) | — none yet | — no project yet | **Not deployed.** Ships with initiative `52efcf1e`; when the time comes it needs its OWN Vercel project — never `shishka-web` |
-| KDS (`apps/kds`) | — | — | Not deployed to Vercel |
+
+The standalone KDS app (`apps/kds`) was removed on 2026-10-09 (never deployed; its role lives in the admin panel at `/kitchen/schedule`).
 
 Team: `lesyanichs-projects` (`team_qrm1fZ0EMm7XnL3wfxV5rQxQ`). The Vercel MCP is
 authorized on the CEO's claude.ai account — `get_project` / `list_deployments` work by

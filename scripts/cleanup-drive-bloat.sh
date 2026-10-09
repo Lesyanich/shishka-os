@@ -55,7 +55,6 @@ TARGETS=(
   # JS dependencies (npm install regenerates)
   "node_modules"
   "apps/admin-panel/node_modules"
-  "apps/kds/node_modules"
   "services/mcp-mission-control/node_modules"
   "services/mcp-finance/node_modules"
   "services/mcp-chef/node_modules"
@@ -69,7 +68,6 @@ TARGETS=(
   # Build output (npm run build regenerates)
   "apps/admin-panel/dist"
   "apps/admin-panel/.vite"
-  "apps/kds/dist"
   "services/mcp-chef/dist"
   "services/mcp-finance/dist"
   "services/mcp-mission-control/dist"
