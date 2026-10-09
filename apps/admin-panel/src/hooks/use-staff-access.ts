@@ -17,6 +17,8 @@ export interface LoginStatus {
   login_email: string
   last_sign_in_at: string | null
   is_blocked: boolean
+  /** A PIN is stored in Vault and an owner can reveal it (migration 455). */
+  has_pin: boolean
 }
 
 /** Tiers an owner can hand out from the UI. Owner stays SQL-only on purpose. */
@@ -142,5 +144,15 @@ export function useStaffAccess() {
     [refetchStatus],
   )
 
-  return { loginStatus, isLoadingStatus, refetchStatus, setAppRole, setLogin, fire }
+  // The PIN is never on the staff row (every logged-in user can read that
+  // table). It sits in Vault; this owner-only RPC is the one way to it, and it
+  // raises for anyone else. Fetched on demand, never cached in hook state.
+  const revealPin = useCallback(async (staffId: string): Promise<AccessResult & { pin?: string }> => {
+    const { data, error } = await supabase.rpc('fn_staff_pin_reveal', { p_staff_id: staffId })
+    if (error) return { ok: false, error: message(error, 'Could not show the PIN') }
+    if (!data) return { ok: false, error: 'No PIN stored — set a new one' }
+    return { ok: true, pin: data as string }
+  }, [])
+
+  return { loginStatus, isLoadingStatus, refetchStatus, setAppRole, setLogin, fire, revealPin }
 }

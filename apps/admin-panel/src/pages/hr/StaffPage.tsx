@@ -76,7 +76,7 @@ function StaffCardView({
   leaves: LeaveBalance[]
   /** From fn_staff_login_status — undefined when the person has no login. */
   loginStatus: LoginStatus | undefined
-  access: Pick<StaffAccess, 'setAppRole' | 'setLogin' | 'fire'>
+  access: Pick<StaffAccess, 'setAppRole' | 'setLogin' | 'fire' | 'revealPin'>
   onUpdate: (id: string, patch: StaffPatch) => Promise<void>
   /** Refetch after a write that bypasses onUpdate — the QR upload writes storage + the row. */
   onChanged: () => void
@@ -229,6 +229,7 @@ function StaffCardView({
         onSetRole={access.setAppRole}
         onSetLogin={access.setLogin}
         onFire={access.fire}
+        onRevealPin={access.revealPin}
         onChanged={onChanged}
       />
 

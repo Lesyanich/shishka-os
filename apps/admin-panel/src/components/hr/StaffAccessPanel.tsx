@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { KeyRound, Loader2, LogOut, ShieldCheck } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, Loader2, LogOut, ShieldCheck } from 'lucide-react'
 import {
   ASSIGNABLE_ROLES,
   bangkokToday,
@@ -17,8 +17,9 @@ import type { AppRole } from '../../contexts/AppRoleContext'
  * anyway (fn_set_staff_pin, staff_write_owner_only).
  *
  * The owner invents the login and the 4-digit PIN and hands both over
- * (spec P6). The PIN is never shown back: it is the person's Supabase Auth
- * password, and the server stores only its hash.
+ * (spec P6). The PIN is stored encrypted in Vault, never on the staff row;
+ * "Show PIN" asks the owner-only fn_staff_pin_reveal for it on demand and
+ * keeps it only in this component's state until hidden.
  */
 export function StaffAccessPanel({
   staffId,
@@ -30,6 +31,7 @@ export function StaffAccessPanel({
   onSetRole,
   onSetLogin,
   onFire,
+  onRevealPin,
   onChanged,
 }: {
   staffId: string
@@ -41,6 +43,7 @@ export function StaffAccessPanel({
   onSetRole: (staffId: string, role: Exclude<AppRole, 'owner'>) => Promise<AccessResult>
   onSetLogin: (staffId: string, login: string, pin: string) => Promise<AccessResult>
   onFire: (staffId: string, lastDay: string) => Promise<AccessResult>
+  onRevealPin: (staffId: string) => Promise<AccessResult & { pin?: string }>
   /** Refetch the card after a write that changes the row (role, fire). */
   onChanged: () => void
 }) {
@@ -51,6 +54,8 @@ export function StaffAccessPanel({
   const [login, setLogin] = useState(status ? loginFromEmail(status.login_email) : suggestLogin(staffName))
   const [pin, setPin] = useState('')
   const [issued, setIssued] = useState<string | null>(null)
+
+  const [shownPin, setShownPin] = useState<string | null>(null)
 
   const [fireOpen, setFireOpen] = useState(false)
   const [lastDay, setLastDay] = useState(bangkokToday())
@@ -137,6 +142,29 @@ export function StaffAccessPanel({
                   {status ? 'Change PIN' : 'Create login'}
                 </button>
               )}
+              {isActive && !isOwner && status?.has_pin && !loginOpen && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    shownPin
+                      ? setShownPin(null)
+                      : void run(
+                          () => onRevealPin(staffId),
+                          (r) => setShownPin((r as AccessResult & { pin?: string }).pin ?? null),
+                        )
+                  }
+                  className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-slate-400 transition hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {shownPin ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  {shownPin ? 'Hide PIN' : 'Show PIN'}
+                </button>
+              )}
+              {shownPin && (
+                <span aria-label="PIN" className="font-mono tracking-widest text-amber-300">
+                  {shownPin}
+                </span>
+              )}
             </div>
 
             {loginOpen && (
@@ -148,6 +176,7 @@ export function StaffAccessPanel({
                     () => onSetLogin(staffId, login, pin),
                     (r) => {
                       setIssued(r.login ?? login)
+                      setShownPin(null)
                       setPin('')
                       setLoginOpen(false)
                     },

@@ -22,6 +22,7 @@ function setup(over: Partial<Parameters<typeof StaffAccessPanel>[0]> = {}) {
     onSetRole: noop,
     onSetLogin: vi.fn(async () => ({ ok: true, login: 'nuk' })),
     onFire: noop,
+    onRevealPin: vi.fn(async () => ({ ok: true, pin: '4821' })),
     onChanged: vi.fn(),
     ...over,
   }
@@ -45,7 +46,7 @@ describe('StaffAccessPanel', () => {
       isActive: false,
       fireDate: '2026-09-04',
       staffName: 'Mint',
-      status: { staff_id: 's1', login_email: 'mint@staff.shishka.local', last_sign_in_at: '2026-09-29T06:17:39Z', is_blocked: true },
+      status: { staff_id: 's1', login_email: 'mint@staff.shishka.local', last_sign_in_at: '2026-09-29T06:17:39Z', is_blocked: true, has_pin: false },
     })
     expect(screen.getByText('mint')).toBeInTheDocument()
     expect(screen.getByText('Login blocked')).toBeInTheDocument()
@@ -95,5 +96,33 @@ describe('StaffAccessPanel', () => {
     fireEvent.change(screen.getByLabelText('Access level'), { target: { value: 'cook' } })
     await waitFor(() => expect(props.onSetRole).toHaveBeenCalledWith('s1', 'cook'))
     await waitFor(() => expect(props.onChanged).toHaveBeenCalled())
+  })
+
+  it('shows and hides a stored PIN on demand', async () => {
+    const props = setup({
+      status: { staff_id: 's1', login_email: 'nuk@staff.shishka.local', last_sign_in_at: null, is_blocked: false, has_pin: true },
+    })
+    expect(screen.queryByLabelText('PIN')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Show PIN'))
+    await waitFor(() => expect(props.onRevealPin).toHaveBeenCalledWith('s1'))
+    expect((await screen.findByLabelText('PIN')).textContent).toBe('4821')
+
+    fireEvent.click(screen.getByText('Hide PIN'))
+    expect(screen.queryByLabelText('PIN')).not.toBeInTheDocument()
+  })
+
+  it('offers no Show PIN when nothing is stored, nor on owner or fired rows', () => {
+    setup({
+      status: { staff_id: 's1', login_email: 'nuk@staff.shishka.local', last_sign_in_at: null, is_blocked: false, has_pin: false },
+    })
+    expect(screen.queryByText('Show PIN')).not.toBeInTheDocument()
+    cleanup()
+    setup({
+      isActive: false,
+      fireDate: '2026-09-04',
+      status: { staff_id: 's1', login_email: 'mint@staff.shishka.local', last_sign_in_at: null, is_blocked: true, has_pin: true },
+    })
+    expect(screen.queryByText('Show PIN')).not.toBeInTheDocument()
   })
 })

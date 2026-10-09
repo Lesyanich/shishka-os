@@ -49,7 +49,7 @@ describe('login helpers', () => {
 
   it('labels the four login states', async () => {
     const { loginStatusLabel } = await import('./use-staff-access')
-    const base = { staff_id: 's', login_email: 'nuk@staff.shishka.local' }
+    const base = { staff_id: 's', login_email: 'nuk@staff.shishka.local', has_pin: true }
     expect(loginStatusLabel(undefined).kind).toBe('none')
     expect(loginStatusLabel({ ...base, last_sign_in_at: null, is_blocked: true }).kind).toBe('blocked')
     expect(loginStatusLabel({ ...base, last_sign_in_at: null, is_blocked: false }).kind).toBe('never')
@@ -67,7 +67,7 @@ describe('login helpers', () => {
 describe('useStaffAccess', () => {
   it('loads login status keyed by staff id', async () => {
     rpc.mockResolvedValueOnce({
-      data: [{ staff_id: 'a', login_email: 'a@staff.shishka.local', last_sign_in_at: null, is_blocked: false }],
+      data: [{ staff_id: 'a', login_email: 'a@staff.shishka.local', last_sign_in_at: null, is_blocked: false, has_pin: true }],
       error: null,
     })
     const { useStaffAccess } = await import('./use-staff-access')
@@ -122,5 +122,21 @@ describe('useStaffAccess', () => {
     })
     expect(update).toHaveBeenCalledWith({ fire_date: '2026-01-01', is_active: false })
     expect(eq).toHaveBeenCalledWith('id', 's')
+  })
+
+  it('reveals a PIN only through the owner RPC and surfaces its refusal', async () => {
+    const { useStaffAccess } = await import('./use-staff-access')
+    const { result } = renderHook(() => useStaffAccess())
+    await waitFor(() => expect(result.current.isLoadingStatus).toBe(false))
+
+    rpc.mockResolvedValueOnce({ data: '4821', error: null })
+    expect(await result.current.revealPin('s')).toEqual({ ok: true, pin: '4821' })
+    expect(rpc).toHaveBeenLastCalledWith('fn_staff_pin_reveal', { p_staff_id: 's' })
+
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'Only owners can see staff PINs' } })
+    expect(await result.current.revealPin('s')).toEqual({ ok: false, error: 'Only owners can see staff PINs' })
+
+    rpc.mockResolvedValueOnce({ data: null, error: null })
+    expect(await result.current.revealPin('s')).toMatchObject({ ok: false })
   })
 })

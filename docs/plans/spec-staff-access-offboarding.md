@@ -172,3 +172,26 @@ Out of this PR: deleting the dead `components/schedule/StaffForm.tsx` (it writes
 - **Noe Noe's final pay.** She left 2026-09-08, so under LPA §70 her wages were due by 2026-09-11; no September line exists. Logged to MC separately. (Her August line shows `days_worked = 0` but net ฿11,400 — attendance was not recorded, not a payroll error.)
 - **Shift generation ignores `staff.is_active`.** The trigger turns templates off, which closes the hole; a guard in `generateMonth` itself would be belt-and-braces.
 - **Two password paths.** `fn_set_staff_pin_hash` (≥6 chars, cook-only, writes only `pin_hash`) coexists with `fn_set_staff_pin` (4 digits, sets the real Auth password). Only the latter lets anyone sign in. Consolidate later.
+
+---
+
+## 9. PIN storage: owners only (CEO, 2026-10-09)
+
+> "PIN в открытом виде быть не должен — он должен быть виден только мне и Басу, никому другому."
+
+**What leaked.** `public.staff` is SELECT-able by every logged-in user. Two of its columns carried the PIN: `pin_code` (plain text — Bas, Alex, Hein, Noe Noe) and `pin_hash` (bcrypt of a 4-digit PIN: 10 000 candidates, brute-forced in seconds, so the PIN in all but name — Alex, Hein, Noe Noe). Migration 454's `fn_set_staff_pin` still wrote `pin_hash` for every new login. Bas's `pin_code` was checked and is **not** his sign-in password.
+
+**Migration 455 (applied 2026-10-09):**
+- `pin_code` / `pin_hash` emptied on every row; CHECK `staff_no_readable_pin` keeps them empty. `staff_role_credential_check` (which demanded `pin_hash` on cook logins) becomes `staff_login_has_email`.
+- The PIN lives only in **Supabase Vault**, encrypted, as `staff_pin:<staff_id>`, written by `fn_set_staff_pin`.
+- **`fn_staff_pin_reveal(staff_id)`** returns it to an owner and raises `42501` for anyone else; `authenticated` has no access to the `vault` schema at all.
+- A deactivated or deleted row's PIN secret is deleted together with its login.
+- `fn_staff_login_status` gains `has_pin`; the dead `fn_set_staff_pin_hash` is dropped.
+- Verified in a rolled-back probe: owner creates a login → reveals it → changes it → reveals the new one (one secret); Nuk's own reveal is refused; direct Vault read as `authenticated` is refused; firing deletes the secret.
+
+**Trade-off, accepted by the CEO's requirement:** an owner must be able to read the PIN again, so it is stored reversibly (encrypted). Service-role access (agents, cron) can still decrypt Vault — the floor for any secret an owner can see.
+
+**UI:** "Show PIN / Hide PIN" in the Access block, owners only, for active non-owner rows that have a stored PIN; fetched on demand, held only in component state. `pin_code` removed from `useStaff`; the dead `StaffForm` (which wrote `pin_code`) deleted.
+
+**Follow-up:** drop the `pin_code` / `pin_hash` columns once the admin build that no longer selects `pin_code` is live on main. The standalone `apps/kds` app (not deployed) still compares `pin_code` client-side — logged to MC.
+
