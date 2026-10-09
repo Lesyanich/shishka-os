@@ -552,7 +552,7 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `fn_run_mrp(UUID)` | RPC | MRP v2: reads stock from v_inventory_by_nomenclature (was inventory_balances) | 023, 058 |
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
 | `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter | 021 |
-| `fn_approve_receipt(JSONB)` | RPC | Receipt approval v15: supplier resolution chain (tax_id → supplier_aliases → name ILIKE → auto-create + tax_id backfill) atop v11 SKU resolution + sku_balances UPSERT + receiving_records audit trail | 030, 038, 040, 041, 047, 049, 058, 065, 158 |
+| `fn_approve_receipt(JSONB)` | RPC | Receipt approval v15: supplier resolution chain (tax_id → supplier_aliases → name ILIKE → auto-create + tax_id backfill) atop v11 SKU resolution + sku_balances UPSERT + receiving_records audit trail. **Mig 456:** EXECUTE only for `service_role` (+ definer callers `fn_approve_receipt_with_learning`, `fn_approve_po`); revoked from PUBLIC/anon/authenticated — it had been callable with the anon key | 030, 038, 040, 041, 047, 049, 058, 065, 158, 456 |
 | `fn_generate_sku_code()` | UTIL FN | Generates next SKU code: SKU-0001, SKU-0002, etc. | 057 |
 | `fn_sku_set_code()` | TRIGGER FN | Auto-assigns sku_code on INSERT if not provided | 057 |
 | `fn_cleanup_stale_receipt_jobs()` | RPC | Lazy cleanup: marks zombie receipt_jobs (processing >5min) as failed | 036 |
@@ -568,6 +568,8 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `fn_approve_po(JSONB)` | RPC | Financial reconciliation → expense_ledger + purchase_logs + sku_balances + WAC | 064 |
 | `fn_pending_deliveries()` | RPC | Pending POs for /receive screen. No prices. Includes partial delivery aggregation | 064 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
+| `fn_assert_receipt_approver()` | UTIL FN | Raises 42501 unless the caller is owner/task_manager staff, the `service_role` key, or a direct DB session (`session_user <> 'authenticator'`: migrations, cron, SQL console). First statement of `fn_approve_receipt_with_learning` | 456 |
+| `fn_approve_receipt_with_learning(JSONB, UUID)` | RPC | API entry point for receipt approval (admin `/receipts`, shishka-finance MCP): `fn_assert_receipt_approver()` → `fn_approve_receipt` → capex assets, inbox rule counters, learning. EXECUTE: `authenticated`, `service_role` (revoked from PUBLIC/anon in 456) | 456 |
 | `fn_bkk_today()` | UTIL FN | `(now() AT TIME ZONE 'Asia/Bangkok')::date` — the one definition of "today" for business rules (UTC midnight is 07:00 here) | 454 |
 | `fn_staff_login_revoke_sessions(UUID)` | UTIL FN | Deletes every `auth.sessions` + `auth.refresh_tokens` row of one auth user. Internal (EXECUTE revoked from authenticated) | 454 |
 | `fn_staff_login_set_allowed(UUID, BOOLEAN)` | UTIL FN | Ban (`banned_until = now()+100y` + revoke sessions) or unban one auth user. Internal | 454 |
