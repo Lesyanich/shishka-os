@@ -9,7 +9,6 @@ export interface Staff {
   role: 'cook' | 'sous_chef' | 'admin' | 'dishwasher' | 'prep'
   app_role: string | null
   phone: string | null
-  pin_code: string | null
   is_active: boolean
   /** Opens the shop — a missing clock-in DMs the owners (LEG-004 §4a). */
   opening_critical: boolean
@@ -23,7 +22,6 @@ export interface StaffInsert {
   name_th?: string | null
   role?: Staff['role']
   phone?: string | null
-  pin_code?: string | null
   is_active?: boolean
   opening_critical?: boolean
   punctuality_ack_on?: string | null
@@ -34,7 +32,6 @@ export interface StaffUpdate {
   name_th?: string | null
   role?: Staff['role']
   phone?: string | null
-  pin_code?: string | null
   is_active?: boolean
   opening_critical?: boolean
   punctuality_ack_on?: string | null
@@ -64,7 +61,7 @@ export function useStaff(): UseStaffResult {
 
     const { data, error: fetchError } = await supabase
       .from('staff')
-      .select('id, name, name_th, role, app_role, phone, pin_code, is_active, opening_critical, punctuality_ack_on, created_at')
+      .select('id, name, name_th, role, app_role, phone, is_active, opening_critical, punctuality_ack_on, created_at')
       .order('name', { ascending: true })
 
     if (fetchError) {

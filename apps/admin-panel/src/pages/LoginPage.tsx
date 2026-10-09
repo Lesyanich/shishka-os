@@ -38,7 +38,7 @@ export function LoginPage() {
 
     const { error: err } = await signIn(creds.email, creds.password)
     if (err) {
-      setError(mode === 'staff' ? 'Неверное имя или PIN' : 'Неверный email или пароль')
+      setError(mode === 'staff' ? 'Неверный логин или PIN' : 'Неверный email или пароль')
       setSubmitting(false)
     }
   }
@@ -63,18 +63,20 @@ export function LoginPage() {
             <>
               <div>
                 <label htmlFor="name" className="mb-1 block text-xs font-medium text-slate-400">
-                  Имя
+                  Логин
                 </label>
                 <input
                   id="name"
                   type="text"
                   required
                   autoComplete="username"
-                  autoCapitalize="words"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-base text-slate-100 placeholder-slate-600 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  placeholder="напр. Alex"
+                  placeholder="напр. alex"
                 />
               </div>
 
