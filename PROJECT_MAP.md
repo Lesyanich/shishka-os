@@ -41,7 +41,6 @@ shishka-os/
 | Project | Path | Status |
 |---------|------|--------|
 | Admin Panel | `apps/admin-panel/` | Active — deployed on Vercel |
-| KDS | `apps/kds/` | Active |
 | Public site | separate repo **shishka-health** | Live at shishka.health (brand design system lives there) |
 
 ## AI Agents

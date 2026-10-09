@@ -193,5 +193,5 @@ Out of this PR: deleting the dead `components/schedule/StaffForm.tsx` (it writes
 
 **UI:** "Show PIN / Hide PIN" in the Access block, owners only, for active non-owner rows that have a stored PIN; fetched on demand, held only in component state. `pin_code` removed from `useStaff`; the dead `StaffForm` (which wrote `pin_code`) deleted.
 
-**Follow-up:** drop the `pin_code` / `pin_hash` columns once the admin build that no longer selects `pin_code` is live on main. The standalone `apps/kds` app (not deployed) still compares `pin_code` client-side — logged to MC.
+**Done 2026-10-09 (PR after #592):** `pin_code` / `pin_hash` dropped (migration 458) once the #592 build was live in production (no `pin_code` in any of its 132 chunks); the never-deployed `apps/kds`, which compared `pin_code` in the browser, deleted. Noe Noe's final pay confirmed paid by the CEO.
 

@@ -18,7 +18,7 @@
 | Vercel AI SDK | `ai` ^6, `@ai-sdk/*` | In-app AI features |
 | Deployment | Vercel | Project root: `apps/admin-panel/`; per-PR previews |
 
-Other apps: `apps/kds/` (kitchen display), `apps/web/` (public site lives in the separate **shishka-health** repo — live at shishka.health; the brand design system lives there too: `design-system/index.html` + `MASTER.md`).
+Other apps: `apps/web/` (public site lives in the separate **shishka-health** repo — live at shishka.health; the brand design system lives there too: `design-system/index.html` + `MASTER.md`).
 
 ## Backend
 
