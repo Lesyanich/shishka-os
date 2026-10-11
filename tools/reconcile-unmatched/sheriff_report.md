@@ -1,91 +1,124 @@
 # Data Health Sheriff Report
-**Date:** 2026-07-12  
-**Run type:** Scheduled weekly audit  
-**Status:** ⛔ BLOCKED — No database credentials available (2nd consecutive missed run)
+**Generated:** 2026-10-11 (4th consecutive blocked run)
+**Run type:** Scheduled weekly audit
+**Status:** ⛔ BLOCKED — Supabase host blocked by egress policy
 
 ---
 
-## ⚠️ URGENT: Audit Has Now Missed 2 Consecutive Weeks
+## Progress vs Last Run
 
-Previous blocked run: **2026-06-21**  
-This run: **2026-07-12**  
-Total weeks without data quality checks: **3 weeks**
+| Blocker | 2026-07-12 | 2026-10-11 |
+|---------|-----------|-----------|
+| `DATABASE_URL` not set | ❌ Missing | ✅ **FIXED** |
+| Supabase host reachable | ❌ DNS fail | ❌ **Egress policy blocks it** |
 
-The audit **cannot run** until `DATABASE_URL` is added to the scheduled routine's environment variables.
+`DATABASE_URL` is now correctly set — the previous fix worked. The remaining blocker is the session's egress policy.
 
 ---
 
-## Root Cause
+## Root Cause (This Run)
+
+The proxy status endpoint confirms:
+
+```json
+{
+  "recentRelayFailures": [{
+    "kind": "connect_rejected",
+    "detail": "gateway answered 403 to CONNECT (policy denial or upstream failure)",
+    "host": "qcqgtcsjoacuktcewpvo.supabase.co:443"
+  }]
+}
+```
+
+The CCR egress gateway returns **403 Forbidden** when this session tries to reach any Supabase endpoint. Port 5432 (PostgreSQL) also silently drops after CONNECT (no data flows). Both paths blocked.
 
 | Method | Result |
 |--------|--------|
-| `DATABASE_URL` env var | Not set |
-| `SUPABASE_SERVICE_ROLE_KEY` env var | Not set |
-| `SUPABASE_URL` env var | Not set |
-| `POSTGRES_URL` env var | Not set |
-| macOS Keychain `shishka-database-url` | Unavailable (Linux, no `security` CLI) |
-| `.env` files in repo | Gitignored — not present in clone |
+| PostgreSQL TCP (port 5432) via HTTP CONNECT proxy | 200 tunnel opened, but no data — upstream silently dropped |
+| HTTPS (port 443) to `qcqgtcsjoacuktcewpvo.supabase.co` | 403 Forbidden from egress gateway |
+| MCP tools (`shishka-chef`, `shishka-finance`) | SUPABASE_SERVICE_ROLE_KEY not set in environment |
 
 ---
 
-## Fix Required (One Time)
+## Fix Required
 
-Add to the **scheduled routine environment** in Claude Code web settings:
+### Option A — Allowlist Supabase in session environment (recommended)
+
+In Claude Code web settings for this scheduled routine, add the Supabase host to the network allowlist:
 
 ```
-DATABASE_URL=postgresql://postgres.[project-id]:[password]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+SUPABASE_URL=https://qcqgtcsjoacuktcewpvo.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service_role_key_from_supabase_dashboard>
 ```
 
-Supabase project: `qcqgtcsjoacuktcewpvo` (ap-south-1 / Mumbai)
+This also unblocks the MCP tools (`shishka-chef`, `shishka-finance`) which use `SUPABASE_SERVICE_ROLE_KEY` for their own DB access.
 
-Instructions: https://code.claude.com/docs/en/claude-code-on-the-web (Environment configuration section)
+Docs: https://code.claude.com/docs/en/claude-code-on-the-web (Environment configuration section)
+
+### Option B — Run audit from local machine
+
+From any machine with Supabase network access:
+
+```bash
+cd shishka-os
+DATABASE_URL="postgresql://..." python3.13 tools/reconcile-unmatched/audit_runner.py
+```
+
+This will connect directly without the egress restriction.
 
 ---
 
 ## Phases Blocked
 
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 1: data_health_rules (all active rules) | ⛔ BLOCKED | Needs DB |
-| Phase 2: Smart duplicate detection | ⛔ BLOCKED | Needs DB |
-| Phase 3: Full Makro barcode audit (~222 barcodes) | ⛔ BLOCKED | Needs DB + Makro API |
-| Phase 4: Price drift + conversion sanity | ⛔ BLOCKED | Needs DB |
+| Phase | Status | Blocker |
+|-------|--------|---------|
+| Phase 1: data_health_rules | ⛔ BLOCKED | DB unreachable |
+| Phase 2: Smart duplicate detection | ⛔ BLOCKED | DB unreachable |
+| Phase 3: Makro barcode audit | ⛔ BLOCKED | DB + Makro API unreachable |
+| Phase 4: Price drift + conversion | ⛔ BLOCKED | DB unreachable |
 | Phase 5: Report | ⚠ PARTIAL | This file only |
 
 ---
 
 ## What Is Accumulating Without Checks
 
-Based on learned patterns, the following issues are growing undetected:
+The following risk categories are growing undetected (4 weeks):
 
-### High-Risk: OCR Duplicate Accumulation
-Every week Makro receipts are processed, OCR creates new name variants for the same physical product.  
-- Pattern: same supplier + similar price (±20%) + overlapping purchase dates → duplicate RAW items  
-- Known example: lamb shoulder/leg/minced lamb all barcode 831436  
-- **Without weekly dedup, the catalog grows noisier each week**
+### 🔴 High Risk: OCR Duplicate Accumulation
+Every Makro receipt processed creates potential name variants for the same product.
+- Pattern: same supplier + similar price ±20% + overlapping dates → duplicate RAW items
+- Known example: lamb shoulder/leg/minced lamb all barcode 831436
+- **4 weeks of unaudited procurement = estimated 10-20 new duplicate candidates**
 
-### Medium-Risk: Zero-Cost Items With Purchases
-Items that had cost_per_unit = 0 but now have purchase_logs with real prices — WAC should be recalculated automatically (auto_apply rule). This has not run in 3 weeks.
+### 🟡 Medium Risk: Zero-Cost Items With Purchases
+Items where `cost_per_unit = 0` but `purchase_logs` contains real prices.
+Auto-apply WAC recalculation (rule `zero_cost_with_purchases`) has not run in 4 weeks.
 
-### Medium-Risk: Price Drift
-Supplier prices change; if conversion_factor is wrong, cost_per_unit may be wildly off (>1000% drift pattern from Olive Oil case). Undetected for 3 weeks.
+### 🟡 Medium Risk: Price Drift
+Supplier prices change weekly. If `conversion_factor` is wrong, `cost_per_unit`
+may be >1000% off (known pattern: Olive Oil WAC=440/L but last_price=2200 for 5L bottle).
+Undetected drift accumulates silently in BOM costs.
 
-### Low-Risk: Unlinked Makro Barcodes
-New purchases may have barcodes not yet linked to nomenclature. Makro barcode audit would catch these.
+### 🟢 Lower Risk: Unlinked Barcodes
+New Makro receipts may have barcodes not yet linked to nomenclature.
+Estimated 2-5 new unlinked barcodes per week of receipts.
 
 ---
 
 ## Health Score
-**N/A** — unable to compute (no DB access)
 
-Last successful audit: **never** (all runs blocked since this routine started)
+**N/A** — unable to compute without DB access.
+
+Last successful audit: **never** (all runs blocked).  
+Consecutive missed runs: **4** (starting 2026-06-21)
 
 ---
 
-## Action Required
+## Action Summary
 
-1. **Add `DATABASE_URL` to scheduled routine environment** (see fix above) — this unblocks everything
-2. Re-run the audit after credentials are configured
-3. Consider also running a manual `/techlead` session to catch up on 3 weeks of unaudited procurement data
+**One fix needed to unblock everything:**
 
-_Report generated: 2026-07-12 | Session: claude-opus-session-85e8f658 | Consecutive blocked runs: 2_
+Add `SUPABASE_SERVICE_ROLE_KEY` to the scheduled routine environment.  
+`DATABASE_URL` is already set ✅ — that blocker is gone.
+
+_Report generated: 2026-10-11 | Session: claude-opus-session-a21d47bd | Consecutive blocked: 4_
