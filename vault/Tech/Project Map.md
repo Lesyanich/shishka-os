@@ -68,6 +68,7 @@ The owner UI (`apps/admin-panel/`, React + Vite → Vercel at shishka-os.vercel.
 <!-- AUTO:pages START -->
 | Page | Source file |
 |---|---|
+| `AnalyticsLayout` | `apps/admin-panel/src/pages/analytics/AnalyticsLayout.tsx` |
 | `ApiCostPage` | `apps/admin-panel/src/pages/ApiCostPage.tsx` |
 | `AttendancePage` | `apps/admin-panel/src/pages/hr/AttendancePage.tsx` |
 | `BOMHub` | `apps/admin-panel/src/pages/BOMHub.tsx` |
@@ -96,9 +97,11 @@ The owner UI (`apps/admin-panel/`, React + Vite → Vercel at shishka-os.vercel.
 | `PayrollPage` | `apps/admin-panel/src/pages/hr/PayrollPage.tsx` |
 | `Procurement` | `apps/admin-panel/src/pages/Procurement.tsx` |
 | `PunctualityPage` | `apps/admin-panel/src/pages/hr/PunctualityPage.tsx` |
+| `PurchasesTabPlaceholder` | `apps/admin-panel/src/pages/analytics/AnalyticsPlaceholderTab.tsx` |
 | `ReceiptInbox` | `apps/admin-panel/src/pages/ReceiptInbox.tsx` |
 | `ReceivingStation` | `apps/admin-panel/src/pages/ReceivingStation.tsx` |
 | `SaladBarPage` | `apps/admin-panel/src/pages/SaladBarPage.tsx` |
+| `SalesPulseTab` | `apps/admin-panel/src/pages/analytics/SalesPulseTab.tsx` |
 | `SchedulePage` | `apps/admin-panel/src/pages/hr/SchedulePage.tsx` |
 | `Settings` | `apps/admin-panel/src/pages/Settings.tsx` |
 | `ShoppingList` | `apps/admin-panel/src/pages/ShoppingList.tsx` |
@@ -107,6 +110,7 @@ The owner UI (`apps/admin-panel/`, React + Vite → Vercel at shishka-os.vercel.
 | `StaffSchedulePage` | `apps/admin-panel/src/pages/staff/StaffSchedulePage.tsx` |
 | `StaffTasksPage` | `apps/admin-panel/src/pages/StaffTasksPage.tsx` |
 | `StationCountPage` | `apps/admin-panel/src/pages/StationCountPage.tsx` |
+| `StockControlTabPlaceholder` | `apps/admin-panel/src/pages/analytics/AnalyticsPlaceholderTab.tsx` |
 | `StocktakeReviewPage` | `apps/admin-panel/src/pages/StocktakeReviewPage.tsx` |
 | `ThawStation` | `apps/admin-panel/src/pages/ThawStation.tsx` |
 | `WasteTracker` | `apps/admin-panel/src/pages/WasteTracker.tsx` |
@@ -118,6 +122,7 @@ The address bar map, grouped by top-level area:
 
 <!-- AUTO:routes START -->
 - **/ (root)** — `/`
+- **/analytics** — `/analytics`, `sales`, `purchases`, `stock`
 - **/api-costs** — `/api-costs`
 - **/bom** — `/bom`
 - **/brain** — `/brain`, `wiki/*`, `drive`
@@ -159,7 +164,7 @@ Supabase Postgres is the **single source of truth** — everything else (admin, 
 | **Access / RLS** | auth, roles, row-level security | [[Database/RLS Policies]] |
 
 <!-- AUTO:tables START -->
-[[Database/Schema]]'s Tables Index documents **45 core tables** — a curated subset, not the full live schema (the live DB carries more). Full schema, RLS and RPCs live in the [[Database/]] folder; this map does not duplicate them.
+[[Database/Schema]]'s Tables Index documents **46 core tables** — a curated subset, not the full live schema (the live DB carries more). Full schema, RLS and RPCs live in the [[Database/]] folder; this map does not duplicate them.
 <!-- AUTO:tables END -->
 
 Contracts, migrations and RPCs: [[Database/Domain Contracts]] · [[Database/Migrations]] · [[Database/RPC Catalog]].
@@ -183,5 +188,5 @@ There is **no knowledge-graph shortcut** — use **grep + targeted `Read`** (or 
 
 ---
 <!-- AUTO:stamp START -->
-_Auto sections regenerated from the repo at commit `e92fb363`. Re-run: `node scripts/gen-project-map.mjs`._
+_Auto sections regenerated from the repo at commit `a3d1aa7d`. Re-run: `node scripts/gen-project-map.mjs`._
 <!-- AUTO:stamp END -->
