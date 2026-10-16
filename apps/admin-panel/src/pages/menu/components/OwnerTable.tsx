@@ -8,6 +8,9 @@ import type { TypeFilterValue } from '../../../components/menu/owner/TypeFilter'
 import { useExpandedRows } from '../../../hooks/useExpandedRows'
 import { useRowKeyboardNav } from '../../../hooks/useRowKeyboardNav'
 import { InlineEditCell } from '../../../components/menu/owner/InlineEditCell'
+import { CostTrustBadge } from '../../../components/menu/shared/CostTrustBadge'
+import { costTrustPresentation, isCostUntrustworthy } from '../../../components/menu/shared/costTrust'
+import type { DishCostTrust } from '../../../components/menu/shared/costTrust'
 import { DishExpandedCard } from './DishExpandedCard'
 
 interface OwnerTableProps {
@@ -28,6 +31,8 @@ interface OwnerTableProps {
   autoExpandId?: string | null
   /** Grab channel margin data keyed by nomenclature_id. */
   grabMargins?: Map<string, ChannelMargin>
+  /** Cost provenance keyed by nomenclature_id, from v_dish_cost_trust (mig 480). */
+  costTrust?: Map<string, DishCostTrust>
   /** Called after a successful Loyverse push so the parent can refetch
    * (updates pos_status + loyverse_synced_at in the table). */
   onPushed?: () => void
@@ -268,6 +273,7 @@ export function OwnerTable({
   onOpenDrawer,
   autoExpandId,
   grabMargins,
+  costTrust,
   onPushed,
 }: OwnerTableProps) {
   const filtered = selectedCategory
@@ -595,6 +601,9 @@ export function OwnerTable({
             const isDrilled = pfExpanded.isExpanded(dish.id)
             const isDual = dualTypeIds.has(dish.id)
             const rowFailed = isFailed?.(dish.id) ?? false
+            // Cost provenance for this row (mig 480). Undefined until the view
+            // loads; the badge then simply does not render.
+            const rowTrust = costTrust?.get(dish.id) ?? null
             const rowError = errorFor?.(dish.id)
             const rowIndex = orderedRowIds.indexOf(dish.id) + 1 // ARIA is 1-based
             const isFocused = kbd.focusedId === dish.id
@@ -795,32 +804,41 @@ export function OwnerTable({
                   })()}
                 </td>
 
-                {/* Cost */}
+                {/* Cost — the figure always carries where it came from (mig
+                    469). The `~est` badge was the first of these marks; the
+                    others use the same recipe, so there is one visual language. */}
                 <td className="px-3 py-2 text-right">
                   {hasCost ? (
                     <span className="inline-flex items-center gap-1">
-                      <span className="text-cream/60">{formatThb(cost)}</span>
-                      {dish.cost_source === 'catalog_estimate' && (
-                        <span
-                          title="Cost estimated from the Makro catalog — no real purchase yet"
-                          className="rounded-sm bg-amber-watch/15 px-1 py-0.5 text-[9px] font-medium leading-none text-amber-watch"
-                        >
-                          ~est
-                        </span>
-                      )}
+                      <span className={rowTrust?.trust_class === 'no_cost' ? 'text-brick-soft' : 'text-cream/60'}>
+                        {formatThb(cost)}
+                      </span>
+                      <CostTrustBadge trust={rowTrust} />
                     </span>
                   ) : (
-                    <span className="inline-flex rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-cream/60">
+                    <span
+                      title={
+                        costTrustPresentation(rowTrust)?.title ??
+                        'No recipe lines — this cost is not calculated from anything'
+                      }
+                      className="inline-flex rounded-full bg-[var(--color-royal-red)]/20 px-2 py-0.5 text-[10px] font-medium text-[color:var(--color-brick-soft)]"
+                    >
                       No BOM
                     </span>
                   )}
                 </td>
 
-                {/* Food Cost % */}
+                {/* Food Cost % — a '?' when an ingredient has no cost on file,
+                    because the percentage is then understated by an unknown
+                    amount and a green "good" pill would be a lie. */}
                 <td className="px-3 py-2 text-right">
                   {hasCost && price > 0 ? (
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${foodCostColor(foodCostPct)}`}>
+                    <span
+                      title={costTrustPresentation(rowTrust)?.title}
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${foodCostColor(foodCostPct)}`}
+                    >
                       {foodCostPct.toFixed(1)}%
+                      {isCostUntrustworthy(rowTrust) && <span className="ml-0.5">?</span>}
                     </span>
                   ) : (
                     <span className="text-cream/40">&mdash;</span>

@@ -4,10 +4,16 @@ export { CBSTags } from './CBSTags'
 export { PriceLabel } from './PriceLabel'
 export { CategoryTabs } from './CategoryTabs'
 export { DishPhotoSlot } from './DishPhotoSlot'
+export { CostTrustBadge } from './CostTrustBadge'
+export { costTrustPresentation, isCostUntrustworthy } from './costTrust'
 export {
   FOOD_COST_THRESHOLDS,
   foodCostTier,
 } from './types'
+export type {
+  DishCostTrust,
+  DishTrustClass,
+} from './costTrust'
 export type {
   DishSummary,
   DishModifierSummary,
