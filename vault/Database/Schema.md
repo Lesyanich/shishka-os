@@ -593,6 +593,29 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `v_inventory_by_nomenclature` | `sku_balances` | Aggregated inventory by nomenclature (SUM quantity, MAX last_counted_at). Drop-in replacement for inventory_balances. Used by WAC trigger, MRP, procurement. | 057 |
 | `v_order_builder` | `supplier_catalog` ⋈ `suppliers` ⋈ `nomenclature` ⋈ `product_categories` | Order Builder / add-item source: per-supplier catalog rows with `unit_cost_base` (last_seen_price ÷ conversion_factor), `verified_at` for price-freshness dots, image_url, min_order_thb, resolved product category. `security_invoker = true` | 379 |
 
+### Stock-control analytics views (S1)
+
+All 14 are plain `security_invoker = true` views, `GRANT SELECT TO authenticated`, ISO weeks bucketed in **Asia/Bangkok**, refund-aware (`receipt_type = 'REFUND'` excluded from sales and reported separately). Canonical item = `product_code NOT LIKE 'RAW-AUTO-%' AND NOT is_deleted`. Spec: `docs/plans/spec-stock-control-analytics.md` §4; MC `1be5f592`.
+
+| View | Grain | Source | Purpose | Migration |
+|---|---|---|---|---|
+| `v_analytics_sales_daily` | day | `orders` | Receipts, gross/net revenue, refunds, discounts, tax, tips, avg check, payment split, dine-in vs takeaway | 463 |
+| `v_analytics_item_sales_daily` | day × item | `order_items` ⋈ `orders` ⋈ `nomenclature` ⋈ `product_categories` | Units + revenue per item. `is_modifier` flags POS modifier lines — never sum them with dish lines | 463 |
+| `v_analytics_hourly_heat` | ISO dow × hour | `orders` | Receipts per local weekday/hour for the heatmap | 463 |
+| `v_analytics_abc_items` | item | `purchase_logs` ⋈ `nomenclature` | Rolling 8-week purchase THB, cumulative share, class A≤80 %/B≤95 %/C. Ranked over canonical items only; stubs listed with `count_class` NULL. Source of the `nomenclature.count_class` UPDATE | 463 |
+| `v_analytics_purchases_weekly` | week × item × supplier | `purchase_logs` ⋈ `supplier_catalog` ⋈ `suppliers` | Lines, `qty_base` (`quantity × COALESCE(conversion_factor,1)`), THB, last unit price. **Single place** where `conversion_factor` is resolved, via a de-duplicated catalog CTE — `purchase_logs.sku_id` → `supplier_catalog.sku_id` fans out 391/361 | 463 |
+| `v_analytics_purchase_coverage_weekly` | week | `purchase_logs`, `unmatched_items` | THB total vs THB on canonical items, `canonical_pct`, stub lines, open unmatched. Phase 0.1 gate: ≥ 90 % two weeks running | 463 |
+| `v_analytics_price_watch` | item | `v_analytics_purchases_weekly` | Last unit price per base unit vs 8-week median, Δ %, `is_spike` (> +10 %, ≥ 2 observed weeks) | 463 |
+| `v_analytics_usage_weekly` | week × item | `stock_movements` ⋈ `bom_structures` | Theoretical usage: direct deductions plus PF→leaf explosion (recursive, depth ≤ 3, `yield_loss_pct`, summed over all paths). **PF rows and the RAW rows exploded from them both appear — group by `tier`, never sum PF and RAW `usage_thb`** | 463 |
+| `v_analytics_bom_coverage_weekly` | week | `order_items` ⟕ `stock_movements` | `deducted_units_pct` + `offending_items` (sold with no deduction). Phase 0.5 gate: ≥ 95 % | 463 |
+| `v_analytics_count_days` | count_day × item | `stocktake_entries` ⋈ `stocktake_sessions` | Confirmed counts summed over locations. `is_complete` compares locations counted that day against the item's historical count footprint | 463 |
+| `v_analytics_stock_variance` | count interval × item | the four above + `waste_logs` | Periodic model: `expected = opening + purchases − usage − waste`; `variance = expected − counted` (positive = missing). Interval `(prev count day, this count day]`. Empty until a second count day exists | 463 |
+| `v_analytics_food_cost_weekly` | week | sales + `v_dish_cost_split` + purchases + counts | Theoretical vs actual food cost. `cogs_actual` nets the inventory delta only when both week ends are count days (`cogs_actual_basis = count_bracketed`), else purchases-based | 463 |
+| `v_analytics_inventory_value` | item × location | `v_stock_latest_by_location` ⋈ `nomenclature` ⋈ `locations` | Latest counted qty × current cost, days since count, class | 463 |
+| `v_analytics_waste_weekly` | week × reason | `waste_logs` ⋈ `nomenclature` | Qty, THB and `financial_liability` split per reason | 463 |
+
+**`nomenclature.count_class` has two generations.** Migration 350 heuristically backfilled it (A = shelf life ≤ 5 d or cost ≥ 500); migration 463 rewrites it from rolling 8-week purchase THB per spec §0.3, but only for items the ABC view has an opinion on, and never over `count_class_source = 'manual'`. Classes left from 350 on items with no recent purchases survive — see MC `1be5f592`.
+
 ## Storage Buckets
 
 | Bucket | Public | Max Size | MIME Types | Purpose |
