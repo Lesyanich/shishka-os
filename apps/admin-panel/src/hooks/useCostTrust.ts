@@ -18,7 +18,7 @@ function num(v: number | string | null | undefined): number | null {
 }
 
 /**
- * Cost provenance per sellable item, from v_dish_cost_trust (migration 480).
+ * Cost provenance per sellable item, from v_dish_cost_trust (migration 482).
  *
  * The view does the classifying — it walks the BOM tree, compares every
  * ingredient's stored cost against its own purchase history and reports the

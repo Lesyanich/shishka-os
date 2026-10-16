@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { costTrustPresentation, isCostUntrustworthy } from './costTrust'
+import {
+  COST_TRUST_UNAVAILABLE,
+  costTrustPresentation,
+  isCostUntrustworthy,
+} from './costTrust'
 import type { DishCostTrust, DishTrustClass } from './costTrust'
 
 function trust(over: Partial<DishCostTrust> & { trust_class: DishTrustClass }): DishCostTrust {
@@ -140,5 +144,19 @@ describe('isCostUntrustworthy', () => {
 
   it('is false when trust is unknown', () => {
     expect(isCostUntrustworthy(null)).toBe(false)
+  })
+})
+
+// A failed fetch leaves every figure unmarked, which is the exact screen this
+// feature replaces. The copy has to break that tie for the owner.
+describe('COST_TRUST_UNAVAILABLE', () => {
+  it('says unmarked means unchecked, not verified', () => {
+    expect(COST_TRUST_UNAVAILABLE).toMatch(/unchecked, not verified/i)
+  })
+
+  it('never claims a cost is fine — every "verified" is a denial of one', () => {
+    const mentions = COST_TRUST_UNAVAILABLE.match(/\w+\s+verified/gi) ?? []
+    expect(mentions.length).toBeGreaterThan(0)
+    for (const m of mentions) expect(m.toLowerCase()).toMatch(/^not verified$/)
   })
 })

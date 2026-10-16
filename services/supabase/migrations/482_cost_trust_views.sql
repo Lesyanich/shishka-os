@@ -1,13 +1,17 @@
 -- ============================================================
--- Migration 480: Cost trust classification (read-only views)
+-- Migration 482: Cost trust classification (read-only views)
 --
 -- MC 160040d2 — "the owner cannot tell a verified cost from a fabricated one".
 --
--- NUMBERING: the task reserved 464. By the time this was written 464-468 were all
--- applied by concurrent sessions, and the 469 it first took collided with
--- 469_allergen_tag_backfill.sql (applied 42 seconds earlier, already on main), so the
--- newer file — this one — was renumbered to 480, past the highest applied (479).
--- migration_log is the authority on what is taken, never the repo directory.
+-- NUMBERING: this file has moved three times, 464 -> 469 -> 480 -> 482, because other
+-- sessions were applying migrations the same afternoon. 469 collided with
+-- 469_allergen_tag_backfill.sql and 480 with 480_retire_rice_paper_rolls.sql; the latter
+-- owns 480+481 as a pair while this is a lone file, so this one moved again. 481 is
+-- taken by 481_unlink_stale_manakish_loyverse_pointers.sql, so 482 it is.
+-- migration_log is the authority on what is taken, never the repo directory — ask it.
+-- The log rows written under the earlier names are corrected below, the way
+-- 472_renumber_463_465_466_collision_log_sync.sql and 479_renumber_th_migrations_log_sync.sql
+-- did for other sessions' collisions the same day.
 --
 -- PROBLEM
 --   nomenclature.cost_per_unit is rendered everywhere as a bare number. A hand-set
@@ -187,7 +191,7 @@ COMMENT ON VIEW public.v_cost_trust_nomenclature IS
   'trust_rank is ordinal (higher = worse) so v_dish_cost_trust can take a max. '
   '`unverified` means the stored cost and purchase_logs disagree beyond 20%, or no '
   'purchase backs it — NOT that the stored cost is the wrong one of the two. '
-  'Migration 480, MC 160040d2.';
+  'Migration 482, MC 160040d2.';
 
 -- ─── 2. Per-dish rollup over the BOM tree ───
 
@@ -329,7 +333,7 @@ COMMENT ON VIEW public.v_dish_cost_trust IS
   'Worst cost-provenance class found anywhere in a sellable item''s BOM tree, plus the '
   'ingredient that caused it (tooltips name it). MOD-* children of SALE-* parents are '
   'excluded, mirroring fn_rollup_bom_costs. ingredient_count = 0 means no costed BOM '
-  'line exists, so the shown cost measures nothing. Migration 480, MC 160040d2.';
+  'line exists, so the shown cost measures nothing. Migration 482, MC 160040d2.';
 
 -- Purchase economics: signed-in staff only. The public site uses the anon key.
 REVOKE ALL ON public.v_cost_trust_nomenclature FROM PUBLIC, anon;
@@ -337,11 +341,16 @@ REVOKE ALL ON public.v_dish_cost_trust         FROM PUBLIC, anon;
 GRANT SELECT ON public.v_cost_trust_nomenclature TO authenticated, service_role;
 GRANT SELECT ON public.v_dish_cost_trust         TO authenticated, service_role;
 
+-- Log sync: this migration was applied before it settled on its final number.
+UPDATE public.migration_log
+SET filename = '482_cost_trust_views.sql'
+WHERE filename IN ('469_cost_trust_views.sql', '480_cost_trust_views.sql');
+
 INSERT INTO public.migration_log (filename, applied_by, status, notes)
-SELECT '480_cost_trust_views.sql', 'claude-opus-session-42e64bb9', 'success',
+SELECT '482_cost_trust_views.sql', 'claude-opus-session-42e64bb9', 'success',
        'MC 160040d2: v_cost_trust_nomenclature + v_dish_cost_trust. Read-only, no data touched.'
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.migration_log WHERE filename = '480_cost_trust_views.sql'
+  SELECT 1 FROM public.migration_log WHERE filename = '482_cost_trust_views.sql'
 );
 
 COMMIT;

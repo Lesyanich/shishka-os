@@ -71,9 +71,9 @@ export function MenuPage() {
   const inlineUpdate = useInlineUpdate(updateItem)
   const enrichment = useMenuListEnrichment(items, childrenByParent)
   const { margins: grabMargins } = useChannelMargins('grab')
-  // Cost provenance per dish (mig 480) — drives the trust badges on the cost
+  // Cost provenance per dish (mig 482) — drives the trust badges on the cost
   // figures in the table and in the drawer's Owner tab.
-  const { trustByDish } = useCostTrust()
+  const { trustByDish, error: costTrustError } = useCostTrust()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -457,6 +457,7 @@ export function MenuPage() {
           autoExpandId={justCreatedId}
           grabMargins={grabMargins}
           costTrust={trustByDish}
+          costTrustUnavailable={costTrustError != null}
           onPushed={() => refetch()}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
@@ -513,6 +514,7 @@ export function MenuPage() {
           drawerItem ? (enrichment.modifierOptionsByDish.get(drawerItem.id) ?? []) : []
         }
         costTrust={drawerItem ? (trustByDish.get(drawerItem.id) ?? null) : null}
+        costTrustUnavailable={costTrustError != null}
       />
     </div>
   )

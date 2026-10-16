@@ -1,6 +1,6 @@
 /** Cost provenance — how much a displayed cost can be trusted.
  *
- * Source of truth is the DB (migration 480, v_dish_cost_trust rolled up over the
+ * Source of truth is the DB (migration 482, v_dish_cost_trust rolled up over the
  * BOM tree). Nothing here recomputes a class; this module only turns the class
  * the view already decided into owner-facing words and the badge recipe.
  *
@@ -23,7 +23,7 @@ export type DishTrustClass =
   | 'manual'      // a human set it by hand
   | 'verified'    // agrees with this product's own purchase history
 
-/** Row of v_dish_cost_trust (mig 480). */
+/** Row of v_dish_cost_trust (mig 482). */
 export interface DishCostTrust {
   dish_id: string
   product_code: string
@@ -157,6 +157,15 @@ export function costTrustPresentation(
       return null
   }
 }
+
+/** Shown when the trust view could not be read at all.
+ *
+ * Without this, a failed fetch leaves every figure unmarked — which is exactly the
+ * screen this feature exists to replace, and the owner would have no way to tell the
+ * difference between "nothing is wrong with this cost" and "we could not check".
+ * Silence is only acceptable while the view is still loading. */
+export const COST_TRUST_UNAVAILABLE =
+  'Cost provenance could not be loaded, so nothing below is marked — unmarked here means unchecked, not verified.'
 
 /** True when the class means the figure on screen understates or invents the cost. */
 export function isCostUntrustworthy(trust: DishCostTrust | null | undefined): boolean {

@@ -6,7 +6,7 @@ import type { ModifierOption } from '../../../../hooks/useModifierOptions'
 import { DrawerScorecard } from '../../owner/DrawerScorecard'
 import { useLoyversePushDish } from '../../../../hooks/useLoyversePushDish'
 import { CostTrustBadge } from '../../shared/CostTrustBadge'
-import { costTrustPresentation, isCostUntrustworthy } from '../../shared/costTrust'
+import { COST_TRUST_UNAVAILABLE, costTrustPresentation, isCostUntrustworthy } from '../../shared/costTrust'
 import type { DishCostTrust } from '../../shared/costTrust'
 
 interface OwnerTabProps {
@@ -21,9 +21,12 @@ interface OwnerTabProps {
   /** Toggle website visibility (is_web_visible, mig 263). Undefined disables
    * the control. The parent's update refetches, so `item` reflects the result. */
   onToggleWeb?: (id: string, next: boolean) => void | Promise<void>
-  /** Cost provenance for this dish, from v_dish_cost_trust (mig 480). Undefined
+  /** Cost provenance for this dish, from v_dish_cost_trust (mig 482). Undefined
    * while the view is still loading — the tiles then render unmarked, as before. */
   costTrust?: DishCostTrust | null
+  /** The trust view could not be read. Says so out loud: an unmarked figure must
+   * never be mistaken for a checked one. */
+  costTrustUnavailable?: boolean
 }
 
 function posStatusBadge(status: string) {
@@ -46,6 +49,7 @@ export function OwnerTab({
   onSynced,
   onToggleWeb,
   costTrust,
+  costTrustUnavailable = false,
 }: OwnerTabProps) {
   const trust = costTrustPresentation(costTrust)
   // Cost missing or invented → the Food Cost % is understated by an unknown
@@ -132,7 +136,7 @@ export function OwnerTab({
         </span>
       </section>
 
-      {/* Cost rollup \u2014 every figure here carries where it came from (mig 480).
+      {/* Cost rollup \u2014 every figure here carries where it came from (mig 482).
           Without the mark a hand-typed number, a catalog guess and a WAC built
           on contradictory receipts all read as the same confident fact. */}
       <section className="space-y-1">
@@ -186,6 +190,11 @@ export function OwnerTab({
             }`}
           >
             {trust.detail}
+          </p>
+        )}
+        {!trust && costTrustUnavailable && (
+          <p className="pt-0.5 text-[10px] leading-relaxed text-amber-watch">
+            {COST_TRUST_UNAVAILABLE}
           </p>
         )}
       </section>

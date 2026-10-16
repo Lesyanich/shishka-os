@@ -38,9 +38,11 @@ interface DishDrawerProps {
   modifierOptions?: DishModifierOption[]
   /** Toggle website visibility (is_web_visible, mig 263) from the Owner tab. */
   onToggleWeb?: (id: string, next: boolean) => void | Promise<void>
-  /** Cost provenance for this dish (v_dish_cost_trust, mig 480) — the Owner tab
+  /** Cost provenance for this dish (v_dish_cost_trust, mig 482) — the Owner tab
    *  marks the Cost / Food Cost tiles with where the number came from. */
   costTrust?: DishCostTrust | null
+  /** The trust view could not be read (see OwnerTab). */
+  costTrustUnavailable?: boolean
 }
 
 export function DishDrawer({
@@ -51,6 +53,7 @@ export function DishDrawer({
   modifierOptions = [],
   onToggleWeb,
   costTrust,
+  costTrustUnavailable,
 }: DishDrawerProps) {
   const open = item != null
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -367,6 +370,7 @@ export function DishDrawer({
                 onSynced={() => onSaved?.()}
                 onToggleWeb={onToggleWeb}
                 costTrust={costTrust}
+                costTrustUnavailable={costTrustUnavailable}
               />
             )}
           </div>

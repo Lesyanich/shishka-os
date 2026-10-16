@@ -9,7 +9,7 @@ import { useExpandedRows } from '../../../hooks/useExpandedRows'
 import { useRowKeyboardNav } from '../../../hooks/useRowKeyboardNav'
 import { InlineEditCell } from '../../../components/menu/owner/InlineEditCell'
 import { CostTrustBadge } from '../../../components/menu/shared/CostTrustBadge'
-import { costTrustPresentation, isCostUntrustworthy } from '../../../components/menu/shared/costTrust'
+import { COST_TRUST_UNAVAILABLE, costTrustPresentation, isCostUntrustworthy } from '../../../components/menu/shared/costTrust'
 import type { DishCostTrust } from '../../../components/menu/shared/costTrust'
 import { DishExpandedCard } from './DishExpandedCard'
 
@@ -31,8 +31,11 @@ interface OwnerTableProps {
   autoExpandId?: string | null
   /** Grab channel margin data keyed by nomenclature_id. */
   grabMargins?: Map<string, ChannelMargin>
-  /** Cost provenance keyed by nomenclature_id, from v_dish_cost_trust (mig 480). */
+  /** Cost provenance keyed by nomenclature_id, from v_dish_cost_trust (mig 482). */
   costTrust?: Map<string, DishCostTrust>
+  /** The trust view could not be read, so no row carries a badge. Said once above
+   * the table rather than on every row. */
+  costTrustUnavailable?: boolean
   /** Called after a successful Loyverse push so the parent can refetch
    * (updates pos_status + loyverse_synced_at in the table). */
   onPushed?: () => void
@@ -274,6 +277,7 @@ export function OwnerTable({
   autoExpandId,
   grabMargins,
   costTrust,
+  costTrustUnavailable = false,
   onPushed,
 }: OwnerTableProps) {
   const filtered = selectedCategory
@@ -538,6 +542,14 @@ export function OwnerTable({
       aria-rowcount={orderedRowIds.length}
       className="shk-panel overflow-x-auto focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-brick-soft)]/40"
     >
+      {costTrustUnavailable && (
+        <p
+          role="status"
+          className="border-b border-[var(--color-amber-watch)]/30 bg-[var(--color-amber-watch)]/10 px-3 py-1.5 text-[11px] text-[color:var(--color-amber-watch)]"
+        >
+          {COST_TRUST_UNAVAILABLE}
+        </p>
+      )}
       <table className="w-full text-xs" role="presentation">
         <thead>
           <tr
@@ -601,7 +613,7 @@ export function OwnerTable({
             const isDrilled = pfExpanded.isExpanded(dish.id)
             const isDual = dualTypeIds.has(dish.id)
             const rowFailed = isFailed?.(dish.id) ?? false
-            // Cost provenance for this row (mig 480). Undefined until the view
+            // Cost provenance for this row (mig 482). Undefined until the view
             // loads; the badge then simply does not render.
             const rowTrust = costTrust?.get(dish.id) ?? null
             const rowError = errorFor?.(dish.id)
