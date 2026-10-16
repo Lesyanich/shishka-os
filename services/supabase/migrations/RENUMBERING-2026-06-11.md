@@ -150,3 +150,145 @@ A renumbering pass cleans up after the problem; it does not prevent the next
 one. The durable fix is an allocation mechanism — reserving the number at the
 moment a migration is first applied, so two sessions cannot be handed the same
 one.
+
+---
+
+## Addendum — 2026-10-16b (log↔repo reconciliation, the 50 collision rows)
+
+> MC `c520decf` (parent epic)
+> Branch: `claude/sweet-driscoll-2acb85`
+> Migration: `487_reconcile_migration_log_repo_drift.sql` — number **claimed** via
+> `fn_claim_migration_number()`, the mechanism 483 introduced.
+
+483 fixed the *cause* (atomic allocation + an apply-time guard) and deliberately
+left the accumulated debt alone. This addendum closes the part of that debt that
+can be closed, and says precisely why the rest cannot.
+
+### What drift actually was
+
+`v_migration_collisions` reported **50** duplicate prefixes, all
+`is_pre_guard = true`. The number 50 is prefixes, not rows: comparing prod's
+`migration_log` against the file tree at `origin/main` (e3676546) found **145**
+log rows naming a file that is not in the repo, and **13** repo files with no log
+row. Only where those two sets meet on the same slug is there a rename to undo.
+They meet in exactly **12** places, plus one file that was applied but never
+self-registered. Migration 487 fixes those 13 and nothing else.
+
+### Reconciled by 487 — matched on slug, never on number
+
+| migration_log row (applied as) | → repo file (shipped as) | cleared a duplicate? |
+|---|---|---|
+| `221_staff_codes.sql` | `244f_staff_codes.sql` | yes — 221 |
+| `222_loyverse_sync_dish_staff_code.sql` | `244g_loyverse_sync_dish_staff_code.sql` | yes — 222 |
+| `236_staff_schedule_templates.sql` | `244h_staff_schedule_templates.sql` | yes — 236 |
+| `245_shopping_list.sql` | `244i_shopping_list.sql` | no — 245 still has two rows |
+| `249_barada_chocolate_catalog.sql` | `248a_barada_chocolate_catalog.sql` | yes — 249 |
+| `225_orders_customer_channel.sql` | `224a_orders_customer_channel.sql` | no — 225 was never duplicated |
+| `226_public_menu_view.sql` | `224b_public_menu_view.sql` | no |
+| `227_order_code_and_status.sql` | `224c_order_code_and_status.sql` | no |
+| `321_matcha_drink_section.sql` | `360_matcha_drink_section.sql` | yes — 321 |
+| `322_fix_chocolate_section_and_drinks_order.sql` | `361_fix_chocolate_section_and_drinks_order.sql` | yes — 322 |
+| `338_thai_tea_category.sql` | `358_thai_tea_category.sql` | no |
+| `339_thai_tea_modifiers_and_price.sql` | `359_thai_tea_modifiers_and_price.sql` | no |
+
+Plus one **INSERT**, not a rename:
+`397_public_holidays_and_substitute_credits.sql` is in `main` and its objects are
+in prod — `holiday_credits`, `v_holiday_credit_balance`, `fn_sync_holiday_credits`
+and `public_holidays.is_company_closed` were all verified present before the
+backfill — but its self-register row never landed, so `check_migrations()` called
+it *pending* and a re-run would have been attempted. Prefix 397 was free.
+
+487 also inserts the 13 matching `migration_numbers` rows. 483 seeded that
+registry from `migration_log` as it then stood, so without this step
+`v_migration_number_map` would call 358-361 and 397 **gap** — i.e. reusable —
+when prod has in fact run them.
+
+**Result: `v_migration_collisions` 50 → 44. `check_migrations()` loses 13 of its
+phantom rows.**
+
+### The 44 that remain are not drift
+
+Every remaining duplicate is a number burned in prod by a file that is **not in
+the repo**, in one of two ways, and in neither case is renaming the log row the
+right move:
+
+* **On an unmerged branch.** The file exists, on a branch still awaiting CEO
+  merge. Renaming its log row now would *desync* that branch: its file would then
+  disagree with the log it already wrote. Renumbering belongs to the session that
+  merges it — file and log row together, in one commit. This is the standing rule
+  from the 2026-06-11 addendum; it has simply not been applied yet because the
+  branches have not landed.
+* **On no git ref at all.** 17 files were applied to prod and never committed
+  anywhere (`git log --all --diff-filter=A` finds nothing). There is no filename
+  to point the row at. The row is the only surviving evidence that prod ran that
+  SQL, so it stays. Deleting it would make prod *less* described, not more.
+
+Verified against every remote ref fetched on 2026-10-16:
+
+| # | migration_log rows at that number | where each file is | why it stays |
+|---|---|---|---|
+| 142 | 2 | `142_multilingual_aliases` repo<br>`142_fix_nutrition_olive_oil_coconut_milk` **no ref** | `142_fix_nutrition_olive_oil_coconut_milk` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 143 | 2 | `143_auto_conversion_factor` repo<br>`143_fix_nutrition_bulk_per_unit` **no ref** | `143_fix_nutrition_bulk_per_unit` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 144 | 2 | `144_bom_nutrition_rollup` **no ref**<br>`144_flavor_arch_tags` repo | `144_bom_nutrition_rollup` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 145 | 2 | `145_nomenclature_images_usage_gdrive` **no ref**<br>`145_bom_composition_slots` repo | `145_nomenclature_images_usage_gdrive` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 146 | 2 | `146_backfill_image_url_from_primary` **no ref**<br>`146_pumpkin_crunch_split` repo | `146_backfill_image_url_from_primary` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 147 | 2 | `147_backfill_sku_barcodes_round2` **no ref**<br>`147_dish_scorecard` repo | `147_backfill_sku_barcodes_round2` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 148 | 2 | `148_sku_identifiers` **no ref**<br>`148_manaish_category` repo | `148_sku_identifiers` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 174 | 2 | `174_staff_user_management` **no ref**<br>`174_financial_dashboard` repo | `174_staff_user_management` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 175 | 2 | `175_access_audit_log` **no ref**<br>`175_loyverse_integration` repo | `175_access_audit_log` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 176 | 2 | `176_staff_pin_rpc` **no ref**<br>`176_approve_receipt_v15_always_purchase_logs` repo | `176_staff_pin_rpc` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 201 | 2 | `201_channel_pricing` repo<br>`201_expense_ledger_period` **no ref** | `201_expense_ledger_period` is on **no git ref** — applied, never committed; nothing to rename it to. |
+| 245 | 2 | `245_menu_tables_anon_write_lockdown` `claude/eager-turing-4UEaR`<br>`245_stock_order_sheet` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 250 | 2 | `250_manakish_bundles` `feature/menu/manakish-bundles`<br>`250_vanilla_protein_syrups_coming_soon` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 253 | 2 | `253_buildyourown_from_price` `feature/menu/manakish-bundles`<br>`253_menu_public_modifiers_stock_state` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 255 | 2 | `255_price_tiers` `feature/menu/manakish-bundles`<br>`255_menu_public_surface_coming_soon` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 256 | 2 | `256_bundle_from_price_from_tiers` `feature/menu/manakish-bundles`<br>`256_menu_public_security_definer_fix` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 258 | 2 | `258_menu_public_section_fields` repo<br>`258_bundle_pool_subtree` `feature/menu/manakish-bundles` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 259 | 2 | `259_bundle_labels` `feature/menu/manakish-bundles`<br>`259_menu_modifiers_expose_min_select` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 260 | 2 | `260_bundle_sauce_labels` `feature/menu/manakish-bundles`<br>`260_modifier_group_max_select` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 309 | 2 | `309_staff_task_comment` repo<br>`309_staff_tasks_monthly_recurrence` `feature/admin/staff-tasks-monthly-recurrence` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 310 | 2 | `310_shift_clock_events` repo<br>`310_equipment_maintenance_link` `feature/admin/staff-tasks-monthly-recurrence` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 334 | 3 | `334_pantry_label_tag` `claude/amazing-villani-e24e5f`<br>`334_column_rls_owner_rpcs` `feature/cleanup/column-rls-rpcs`<br>`334_loyverse_push_queue` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 335 | 2 | `335_pantry_clean_label_names` `claude/amazing-villani-e24e5f`<br>`335_loyverse_push_queue_delete_action` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 375 | 2 | `375_shifts_freeze_past_and_audit` `fix/admin/leg004-audit-blockers`<br>`375_potato_tacos_vege_meat_restructure` **no ref** | `375_potato_tacos_vege_meat_restructure` is on **no git ref** — applied, never committed; nothing to rename it to. The other is on an unmerged branch. |
+| 390 | 2 | `390_mango_canonicalization_and_peanut_removal` `feature/menu/mango-sauce-allergens`<br>`390_rls_role_gating_mc_tables` repo | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 400 | 3 | `400_small_salads_section` `feature/menu/small-salads-section`<br>`400_coffee_milk_modifiers` `feature/menu/coffee-milk-modifiers`<br>`400_menu_section_order_wraps_bowls_salads` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 401 | 3 | `401_mini_salads_rename` `feature/menu/small-salads-section`<br>`401_flavour_syrups_all_made_drinks` `feature/menu/coffee-milk-modifiers`<br>`401_rename_protein_chicken_tawook` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 402 | 2 | `402_board_price_alignment` **no ref**<br>`402_organize_wraps_display_order` `feature/menu/section-reorder-wraps-bowls-salads` | `402_board_price_alignment` is on **no git ref** — applied, never committed; nothing to rename it to. The other is on an unmerged branch. |
+| 403 | 2 | `403_retire_shrimp_taco` **no ref**<br>`403_update_sauces_to_6_core` `feature/menu/section-reorder-wraps-bowls-salads` | `403_retire_shrimp_taco` is on **no git ref** — applied, never committed; nothing to rename it to. The other is on an unmerged branch. |
+| 404 | 2 | `404_retire_peanut_lime_sauce` `feature/marketing/restaurant-posters`<br>`404_add_mayonnaise_soy_sauce` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 405 | 2 | `405_clear_stale_peanut_pos_link` `feature/marketing/restaurant-posters`<br>`405_correct_sauces_6_core` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 406 | 2 | `406_drink_temperature_modifier` `feature/menu/drink-temperature-modifier`<br>`406_consolidate_wraps_to_tortilla` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 407 | 2 | `407_espresso_double_shot` `feature/menu/espresso-double-shot`<br>`407_reorder_wraps_final` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 408 | 2 | `408_mind_kombucha` `feature/menu/mind-kombucha`<br>`408_add_section_hero_images` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 409 | 2 | `409_menu_four_category_concept` `feature/menu/four-category-concept`<br>`409_set_section_hero_images` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 410 | 2 | `410_menu_breakfast_subsections` `feature/menu/four-category-concept`<br>`410_consolidate_sauces_dressings_dips` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 411 | 2 | `411_menu_copy_and_allergens` `feature/menu/four-category-concept`<br>`411_rename_bread_crackers_to_extras` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 412 | 2 | `412_tabbouleh_is_a_salad` `feature/menu/four-category-concept`<br>`412_rename_tortilla_to_whole_wheat_wraps` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 413 | 2 | `413_bowls_are_not_cups` `feature/menu/four-category-concept`<br>`413_organize_sauces_dressings_dips_3_lines` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 414 | 2 | `414_spring_rolls_are_rice_paper_wraps` `feature/menu/four-category-concept`<br>`414_move_rule_to_end_normal_font` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 415 | 2 | `415_toasts_one_slice_and_cheaper` `feature/menu/four-category-concept`<br>`415_rename_protein_chicken_to_wrap` `feature/menu/section-reorder-wraps-bowls-salads` | all duplicates sit on unmerged branches — renumbering is the merging session's job. |
+| 416 | 2 | `416_salads_bowls_wraps_renamed_and_cut` **no ref**<br>`416_remove_muhammara_move_hummus` `feature/menu/section-reorder-wraps-bowls-salads` | `416_salads_bowls_wraps_renamed_and_cut` is on **no git ref** — applied, never committed; nothing to rename it to. The other is on an unmerged branch. |
+| 417 | 2 | `417_ingredient_cost_corrections` **no ref**<br>`417_fix_web_visibility_sauces_muhammara_name` `feature/menu/section-reorder-wraps-bowls-salads` | `417_ingredient_cost_corrections` is on **no git ref** — applied, never committed; nothing to rename it to. The other is on an unmerged branch. |
+| 418 | 2 | `418_tropical_mango_bowl_clean_recipe` **no ref**<br>`418_set_sauce_photos_from_provided_images` `feature/menu/section-reorder-wraps-bowls-salads` | `418_tropical_mango_bowl_clean_recipe` is on **no git ref** — applied, never committed; nothing to rename it to. The other is on an unmerged branch. |
+
+### What a session must do when one of those branches merges
+
+Renumber the **file and the `migration_log` row in the same commit**. The file
+alone recreates exactly the drift this addendum just cleaned up; the row alone
+breaks the canary. `trg_migration_log_guard_number` now rejects an UPDATE into a
+taken prefix, so a wrong target fails loudly at apply time instead of silently.
+Claim the new number with `fn_claim_migration_letter(<anchor>, …)` — never pick
+one by looking.
+
+### Not closed here
+
+* **`check_migrations()` (the MCP tool) is broken for an unrelated reason** — it
+  resolves the migrations directory to `/services/supabase/migrations`, an
+  absolute path, and fails `ENOENT` before reading anything. Its repo-root env
+  var is unset in the launcher. Logged separately; 487 does not touch it.
+* **132 log rows still name no file**, down from 145. Beyond the 44 collision
+  groups above these are single (non-duplicate) rows from the same two causes —
+  mostly the uncommitted 2026-04 and 2026-06 manual batches and the unmerged
+  419-445 menu block. They are noise in `check_migrations()`, not a correctness
+  problem, and they resolve as their branches merge.
