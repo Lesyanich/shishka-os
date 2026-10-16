@@ -22,6 +22,18 @@
 #   already applied to prod whose number now collides, renumber the FILE to a
 #   fresh number and ship a migration that UPDATEs its migration_log.filename
 #   (see services/supabase/migrations/RENUMBERING-2026-06-11.md for precedent).
+#
+#   DON'T PICK A NUMBER BY LOOKING — that is what causes every failure below.
+#   Claim one (MC c520decf, migration 483, RULE-MIGRATION-NUMBERING):
+#       scripts/migration-number.sh claim <slug>
+#     or the Mission Control MCP tool claim_migration_number(slug, session_id)
+#   Numbers are consumed when a migration is APPLIED, so unmerged branches have
+#   already burned numbers above HEAD's max and you cannot see them. prod's
+#   migration_log is the only authority, and it now rejects a duplicate outright.
+#
+#   This check stays STRICT and OFFLINE on purpose: a pre-commit hook that needs
+#   credentials and a network round-trip is a hook that gets bypassed. Never
+#   loosen it to get a commit through — it is the thing that catches this.
 
 set -euo pipefail
 
@@ -106,7 +118,17 @@ check_numbering() {
   if [ -n "$dups" ]; then
     echo "FAIL  numbering: duplicate migration number(s): $(echo "$dups" | tr '\n' ' ')"
     echo "  ✗ Two migrations sharing a number replay in undefined order."
-    echo "  ✗ Renumber the NEWER file to a fresh number (see header of this script)."
+    echo "  ✗ Until this is fixed, EVERY session in the repo is blocked from"
+    echo "    committing ANY migration — not just you."
+    echo "  ✗ Claim a fresh number for the NEWER file, do not pick one by eye:"
+    echo "        scripts/migration-number.sh claim <slug>"
+    echo "    (or the MC MCP tool claim_migration_number(slug, session_id))"
+    echo "  ✗ If the newer file is ALREADY applied to prod, it needs a letter suffix"
+    echo "    instead, plus a migration_log.filename UPDATE:"
+    echo "        scripts/migration-number.sh letter <anchor> <slug>"
+    echo "    See services/supabase/migrations/RENUMBERING-2026-06-11.md"
+    echo "  ✗ Not yours? \`git fetch && git merge origin/main\` may already fix it —"
+    echo "    a merged cleanup removes duplicates your stale worktree still has."
     errors=$((errors + 1))
   fi
 
@@ -140,13 +162,18 @@ check_numbering() {
         echo "FAIL  numbering: $base — number $num is not above current max ($head_max)"
         echo "  ✗ New migrations must use a number strictly greater than the max in HEAD."
         echo "  ✗ Gap numbers may already be applied to prod from unmerged branches — check migration_log."
+        echo "  ✗ Claim the number instead of choosing it; prod knows what is free, HEAD does not:"
+        echo "        scripts/migration-number.sh claim <slug>"
+        echo "    (or the MC MCP tool claim_migration_number(slug, session_id))"
         echo "  ✗ If this migration is ALREADY applied to prod under this name, renumber the file"
         echo "    and ship a migration_log.filename UPDATE (see RENUMBERING-2026-06-11.md)."
         errors=$((errors + 1))
       elif [ "$((10#$num))" -gt "$((10#$head_max + 1))" ]; then
         echo "WARN  numbering: $base — skips ahead of max+1 ($((10#$head_max + 1)))"
         echo "  ! Allowed only when the skipped numbers are taken by applied-but-unmerged migrations."
-        echo "  ! Verify against migration_log before committing."
+        echo "  ! Expected if the number came from the allocator: it counts from prod's"
+        echo "    migration_log, which is ahead of HEAD whenever a branch is unmerged."
+        echo "  ! Verify: scripts/migration-number.sh status"
       fi
     done
   fi
