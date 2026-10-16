@@ -3,7 +3,7 @@
 **Status:** DRAFT — awaiting CEO review. Migration `460` is written but **NOT APPLIED**.
 **Depends on:** migration `459` (applied 2026-10-16; **PR #596 is now merged**). 460 lands after it.
 **Sibling:** migration `462` (`matcher_skip_soft_deleted_targets`) fixes `fn_match_nomenclature` and is
-**already applied** (PR #598). It shipped as 462, not 461 — there is no 461.
+**applied and MERGED** (PR #598, 2026-10-16). It shipped as 462, not 461 — there is no 461.
 **Migration 463 is reserved** for the `fn_match_nomenclature` level-1c `voided_at` predicate,
 which must land *after* 460 because that is where the column is added. 460 and 462 touch disjoint objects —
 462 replaced `fn_match_nomenclature`, 460 replaces only `fn_recalc_wac_for_product` — so the
@@ -457,6 +457,30 @@ ladder_target | ladder_level | fuzzy_candidate | fuzzy_score`.
 | **T3 review shortlist** | `fuzzy_score ≥ 0.65` | 40 | 48 | 8,119 | **CEO**, one line each |
 | **T4 plausible family** | `0.45 ≤ fuzzy_score < 0.65` | 87 | 95 | 19,891 | **CEO** |
 | **T5 promote or decide** | `fuzzy_score < 0.45` | 238 | 245 | 37,263 | **CEO** |
+
+### 5.3 ⚠️ Read this before writing the T3–T5 map
+
+Three defects slipped through this audit, and all three were the same mistake wearing
+different clothes: **a cheap predicate used as if it were the real question.** The T3–T5
+map is where that temptation will be strongest, because a cheap predicate over 365 stubs
+looks like leverage.
+
+| the cheap predicate | the real question | what it hid |
+|---|---|---|
+| "skip anything the ladder already resolves" | *does it resolve **correctly**?* | `Pineapple Juice _CS` → `RAW-PINEAPPLE`. The ladder resolved it confidently, at its highest-confidence level, onto the wrong product. Excluding "already resolved" excluded the one case that mattered. |
+| `ILIKE '%paste%'` | *is "paste" a **word** here?* | matched inside "**Paste**urized", producing a phantom finding |
+| comparing names as strings | *are they the same **token multiset**?* | `greenstemeggplant1kgperpack` vs `greenstemeggplantperpack1kg` — same product, different word order, so exact match silently failed |
+
+A fourth, mine: reading ratio **2.500** as "doesn't land on a pack size" when 1/2.5 = 0.4 is
+a 400 g can (migration 466). The number was in the table; the bucket was wrong.
+
+Practical rules that follow:
+* **"Already handled" is not "handled correctly."** Any exclusion rule hides exactly the
+  rows where the thing you trust is wrong. Audit the excluded set at least once.
+* **Use word boundaries** (`~* '\mpaste\M'`), never `ILIKE '%word%'`, on product names.
+* **Tokenize before comparing**, splitting digit/letter runs so `1 kg` and `1kg` agree.
+* **Re-derive, don't accept.** Every one of the findings above came from a second pass
+  asking a slightly different question — not from the first pass being careless.
 
 **The fuzzy column is a hint, never an instruction.** It is `pg_trgm` similarity against canonical
 names and it is wrong often enough to be dangerous: *SAVE Frozen White Prawns* → `RAW-FROZEN-STRAWBERRIES`
