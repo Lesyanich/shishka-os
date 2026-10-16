@@ -124,8 +124,8 @@ INSERT INTO tmp_void_dup VALUES
 --     mapped. The 18th (81812ca5) now returns the stub instead of the soft-deleted
 --     RAW-THAI-EGGPLANT — that is 462 working, and the override below still supplies
 --     the answer the ladder cannot derive.
-CREATE TEMP TABLE tmp_merge (stub_code text PRIMARY KEY, target_code text) ON COMMIT DROP;
-INSERT INTO tmp_merge VALUES
+CREATE TEMP TABLE tmp_merge (stub_code text PRIMARY KEY, target_code text, grade text DEFAULT 'ladder') ON COMMIT DROP;
+INSERT INTO tmp_merge (stub_code, target_code) VALUES
  ('RAW-AUTO-672dbea6','RAW-CHEESE-PARMESAN'), ('RAW-AUTO-69679c09','RAW-SYRUP_CARAMEL'),
  ('RAW-AUTO-ed7b4bed','RAW-BUTTER'),          ('RAW-AUTO-81812ca5','RAW-EGGPLANT'),
  -- ^ the ladder said RAW-THAI-EGGPLANT. REJECTED: that canonical is soft-deleted, and
@@ -139,6 +139,33 @@ INSERT INTO tmp_merge VALUES
  ('RAW-AUTO-704a566f','RAW-ONION'),           ('RAW-AUTO-9b27cc4e','RAW-OREGANO-DRIED'),
  ('RAW-AUTO-72df37a0','RAW-PUMPKIN'),         ('RAW-AUTO-997ce46a','RAW-POTATO'),
  ('RAW-AUTO-64ae91d8','RAW-CUCUMBER'),        ('RAW-AUTO-0c38f14e','RAW-BUTTER');
+
+-- 2e-bis. T1b — WORD-ORDER PERMUTATIONS. A DIFFERENT, WEAKER EVIDENCE GRADE: these are
+--     NOT ladder-confirmed. The ladder requires exact normalized equality, so a name whose
+--     words are merely reordered falls through and mints a stub. Found by comparing token
+--     MULTISETS (digit/letter boundaries split first, so '1 kg' and '1kg' tokenize alike).
+--     Method proposed here, built and run by 462's author, then re-derived independently.
+--
+--       stub                                           -> target                 evidence
+--       b3bb0493 Large Fresh Shiitake Mushrooms 300g   -> RAW-MUSHROOM-SHIITAKE  mig-325 tombstone names it
+--       c5b9070d ARO Shredded Cheese Frozen 1 kg       -> RAW-CHEESE-SHREDDED    canonical 'ARO Frozen Shredded Cheese 1kg'
+--       52873647 137 Degrees Unsweetened Almond Milk   -> RAW-ALMOND_MILK        canonical '137 DEGREES Almond Milk Unsweetened 1L'
+--       3fd9e94c ARO Frozen Mixed Vegetables           -> RAW-FROZEN-VEG-MIXED   canonical 'ARO Mixed frozen vegetables'
+--       ac4f864b Pineapple Juice CS                    -> RAW-JUICE-PINEAPPLE    canonical 'Pineapple Juice _CS'
+--
+--     5 stubs, 6 rows, 959.75 THB. The shiitake one carries a HUMAN merge decision
+--     (mig 325 tombstone) and is T1-grade; the other four rest on the permutation alone.
+--     ⚠️ CEO: strike any line here and the rest still applies. Deliberately a separate
+--     INSERT so that is a one-line edit.
+--     NOT a new ladder level, on purpose — permutation matching is a step back toward the
+--     ILIKE behaviour 459 removed, and that fallback is what swapped rice paper for rice
+--     noodles. It belongs in a reviewed map, not in fn_match_nomenclature.
+INSERT INTO tmp_merge (stub_code, target_code, grade) VALUES
+ ('RAW-AUTO-b3bb0493','RAW-MUSHROOM-SHIITAKE','permutation+tombstone'),
+ ('RAW-AUTO-c5b9070d','RAW-CHEESE-SHREDDED',  'permutation'),
+ ('RAW-AUTO-52873647','RAW-ALMOND_MILK',      'permutation'),
+ ('RAW-AUTO-3fd9e94c','RAW-FROZEN-VEG-MIXED', 'permutation'),
+ ('RAW-AUTO-ac4f864b','RAW-JUICE-PINEAPPLE',  'permutation');
 
 -- 2f. T2 — junk / not-a-product. Tombstone only, history preserved, no canonical.
 CREATE TEMP TABLE tmp_junk (stub_code text PRIMARY KEY, why text) ON COMMIT DROP;
@@ -398,10 +425,20 @@ UPDATE public.nomenclature n
 --     soft-deleted), but wrong catalog data is still wrong: it would bite again the
 --     moment anyone un-deletes morning glory. 462 stops the ladder RETURNING a bad row;
 --     it does not make the row correct.
+-- The Water row is disconnected: its right target is a CEO decision (which water item).
 UPDATE public.supplier_catalog
    SET nomenclature_id = NULL, match_reviewed_at = NULL, updated_at = now()
- WHERE id IN ('6ed27304-6b3a-41d6-9acf-7ecd23bc6270',   -- Water -> MORNING-GLORY
-              '9544d609-f29b-45b3-823c-0eade33f1d52');  -- Pineapple Juice -> PINEAPPLE
+ WHERE id = '6ed27304-6b3a-41d6-9acf-7ecd23bc6270';     -- Water -> MORNING-GLORY
+
+-- The Pineapple Juice row now gets a TARGET rather than a disconnect. The permutation
+-- pass (§2e-bis) independently identified RAW-JUICE-PINEAPPLE ('Pineapple Juice _CS') as
+-- the canonical, which is what this spec had only guessed at before. This is the ONE
+-- still-live mis-resolution post-462 — the target RAW-PINEAPPLE is not deleted, so 462's
+-- filter does not stop juice resolving onto whole fruit. Fixing it here closes it.
+UPDATE public.supplier_catalog
+   SET nomenclature_id = (SELECT id FROM public.nomenclature WHERE product_code='RAW-JUICE-PINEAPPLE'),
+       match_reviewed_at = NULL, updated_at = now()
+ WHERE id = '9544d609-f29b-45b3-823c-0eade33f1d52';
 
 -- 9c. Two more catalog rows point "Green Stem Eggplant" at RAW-THAI-EGGPLANT, which is
 --     (a) a different vegetable and (b) SOFT-DELETED. Repoint them at RAW-EGGPLANT, the
@@ -523,10 +560,10 @@ BEGIN
   IF v <> 6 THEN RAISE EXCEPTION '460 ABORT: % out-of-window invoice_date(s), expected exactly 6 (spec §3.3)', v; END IF;
 
   -- (f) the stub population moved by exactly what the map says
-  --     415 - 21 merged off stubs - 1 red pepper - 1 banana + 1 water parked on a stub = 393
+  --     415 - 21 (T1) - 6 (T1b permutations) - 1 red pepper - 1 banana + 1 water parked = 387
   SELECT count(*) INTO v FROM public.purchase_logs pl JOIN public.nomenclature n ON n.id=pl.nomenclature_id
    WHERE n.product_code LIKE 'RAW-AUTO-%';
-  IF v <> 393 THEN RAISE EXCEPTION '460 ABORT: % rows still on stubs, expected 393 (415 - 21 - 1 - 1 + 1)', v; END IF;
+  IF v <> 387 THEN RAISE EXCEPTION '460 ABORT: % rows still on stubs, expected 387 (415 - 21 - 6 - 1 - 1 + 1)', v; END IF;
 
   -- (g) every merged stub is tombstoned and holds no purchase rows
   SELECT count(*) INTO v FROM tmp_merge m JOIN public.nomenclature n ON n.product_code=m.stub_code
@@ -547,6 +584,10 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.supplier_catalog sc JOIN public.nomenclature n ON n.id=sc.nomenclature_id
               WHERE sc.id='6ed27304-6b3a-41d6-9acf-7ecd23bc6270' AND n.product_code='RAW-MORNING-GLORY') THEN
     RAISE EXCEPTION '460 ABORT: the Water -> RAW-MORNING-GLORY catalog row is still live';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.supplier_catalog sc JOIN public.nomenclature n ON n.id=sc.nomenclature_id
+                  WHERE sc.id='9544d609-f29b-45b3-823c-0eade33f1d52' AND n.product_code='RAW-JUICE-PINEAPPLE') THEN
+    RAISE EXCEPTION '460 ABORT: the Pineapple Juice catalog row does not point at RAW-JUICE-PINEAPPLE';
   END IF;
 
   RAISE NOTICE '460 OK: 20 units, 4 repoints, 18 dates, 11 voided, % stubs merged, % junk tombstoned, 4 catalog rows fixed; zero cost drift',

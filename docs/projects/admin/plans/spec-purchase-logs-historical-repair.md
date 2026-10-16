@@ -367,6 +367,40 @@ rows therefore resolve to **nothing** after 460 and the line goes to `unmatched_
 right outcome for junk. They also note `[JUNK-NO-MATCH]` is not new: **6** such tombstones and
 **107** `[MERGED->` ones are already live, so 460's 13 join an already-safe population.
 
+### 5.1b-bis T1b — the word-order tier
+
+The ladder requires *exact* normalized equality, so a name whose words are merely reordered
+falls through and mints a stub. Comparing token **multisets** instead — splitting digit/letter
+boundaries first, so `1 kg` and `1kg` tokenize alike — recovers a small, defensible set.
+
+Suggested here after the eggplant case showed the shape, built and run by 462's author, then
+re-derived independently against live data:
+
+| stub | → target | evidence | THB |
+|---|---|---|---|
+| `b3bb0493` Large Fresh Shiitake Mushrooms 300g per pack | `RAW-MUSHROOM-SHIITAKE` | **mig-325 tombstone names the target** | 266.75 (2 rows) |
+| `c5b9070d` ARO Shredded Cheese Frozen 1 kg | `RAW-CHEESE-SHREDDED` | canonical *ARO Frozen Shredded Cheese 1kg* | 319.00 |
+| `52873647` 137 Degrees Unsweetened Almond Milk 1 L | `RAW-ALMOND_MILK` | canonical *137 DEGREES Almond Milk Unsweetened 1L* | 240.00 |
+| `3fd9e94c` ARO Frozen Mixed Vegetables | `RAW-FROZEN-VEG-MIXED` | canonical *ARO Mixed frozen vegetables* | 55.00 |
+| `ac4f864b` Pineapple Juice CS | `RAW-JUICE-PINEAPPLE` | canonical *Pineapple Juice _CS* | 79.00 |
+
+**5 stubs, 6 rows, 959.75 THB.** The shiitake one carries a human merge decision and is
+T1-grade; the other four rest on the permutation alone, which is why they sit in their own
+`INSERT` — striking any line is a one-line edit.
+
+Two limits, so nobody over-trusts it: it catches **permutations only** — not synonyms,
+abbreviations, a pack size written differently (`300g` vs `0.3kg`), or a missing word. And
+tokenization is the whole game; the digit/letter fix above does not handle Thai mixed with
+Latin.
+
+**It is deliberately not a new ladder level.** Permutation matching is a step back toward the
+`ILIKE` fallback 459 removed — the one that swapped rice paper for rice noodles. It belongs in
+a map a human confirms, not in `fn_match_nomenclature`. 462's author independently reached the
+same conclusion.
+
+This does not disturb the §5.2 finding: 6 stubs out of 365 is a long tail, not a systemic
+pattern, and **promote** remains the dominant action.
+
 ### 5.1c One of the two eggplant repoints is redundant now; the other is not
 
 462's author expected both to be redundant post-462, since mig 325's tombstone does the work once
@@ -416,6 +450,7 @@ ladder_target | ladder_level | fuzzy_candidate | fuzzy_score`.
 | tier | rule | stubs | rows | THB | who decides |
 |---|---|---|---|---|---|
 | **T1 auto-merge** | `ladder_target` non-empty, hand-checked | **18** | **21** | ~1,750 | ships in 460 |
+| **T1b word-order permutation** | same token multiset as a canonical or a mig-325 tombstone | **5** | **6** | **959.75** | ships in 460, CEO may strike any line |
 | — rejected from T1 | poisoned catalog rows, §5.1a | 4 | 5 | 229 | CEO (§5.5) |
 | — partial merge | one row only, §5.1b | 1 | 1 of 2 | 90 | ships in 460 |
 | **T2 junk / not a product** | OCR artefacts and non-ingredients | **13** | 13 | 3,203 | ships in 460 as tombstone-only |
@@ -596,8 +631,8 @@ exactly (984 / 415 on stubs / 20 arithmetic / 12 orphans) before the migration r
 | metric | before | after 460 |
 |---|---|---|
 | `purchase_logs` rows | 984 | **984** (nothing created or deleted) |
-| rows on `RAW-AUTO` stubs | 415 | **393** |
-| THB parked on stubs | 67,713.59 | **65,792.34** |
+| rows on `RAW-AUTO` stubs | 415 | **387** |
+| THB parked on stubs | 67,713.59 | **64,832.59** |
 | `quantity × price ≠ total` (live rows) | 20 | **0** |
 | `invoice_date` outside 459's window | 24 | **6** (the unreadable ones, §3.3) |
 | orphan rows | 12 | **12**, 11 of them now `voided_at`-tagged with values intact |
@@ -614,7 +649,7 @@ The espresso line is the point of the whole exercise: **0.6412 against the ~0.66
 expected**. The landmine that made a blanket WAC recompute unsafe is defused by Part A alone,
 without touching a single cost.
 
-The stub count falls by 22 and rises by 1 — the water row is parked on the "FM Water 2000 L"
+The stub count falls by 28 and rises by 1 — the water row is parked on the "FM Water 2000 L"
 stub on purpose. A repair that only ever made that number fall would have had to leave morning
 glory priced as water. The assert hard-codes 393 for exactly that reason.
 
@@ -645,9 +680,10 @@ not widened into this change.
 
 ## 8. Questions for the CEO, in order
 
-0. **§5.1a, most urgent** — two `supplier_catalog` rows point at the wrong canonical
-   (`Water` → morning glory, `Pineapple Juice` → whole pineapple). Since 459 the importer acts on
-   them *confidently*. 460 disconnects both; what should each point at instead?
+0. **§5.1a** — the `Water` catalog row points at morning glory. 460 disconnects it; what should
+   it point at? (The `Pineapple Juice` half of this question is **answered**: the T1b permutation
+   pass identified `RAW-JUICE-PINEAPPLE`, so 460 now repoints it rather than asking. That was the
+   only still-live mis-resolution after 462.)
 1. **§4** — the 11 duplicates are now soft-deleted with their values intact (zeroing was impossible, DELETE is forbidden by mig 325). Confirm the approach, and see §4.2: **`RAW-TAMARIND-PASTE-WET` may not be a real product** — its only purchase row is the phantom one.
 2. **§5.4** — are the 13 junk stubs really empty of spend? The `Invoice 2606/957646` row alone is
    1,546 THB sitting in COGS as a product.
