@@ -2,8 +2,8 @@
 domain: [kitchen, procurement, sales]
 agents: [chef, procurement]
 load_when: "specific dishes, ingredients, BOM planning, procurement, menu updates"
-last_updated: 2026-07-19
-updated_by: CEO (2026-04-05 concept) + code-agent shipped-menu reconcile (2026-07-19)
+last_updated: 2026-10-16
+updated_by: CEO (2026-04-05 concept) + code-agent shipped-menu reconcile (2026-07-19) + Potato Tacos retirement (2026-10-16, MC 2dceda60)
 source: "Part 1 = live DB (nomenclature SALE / menu_public); Part 2 = Notion SHISHKA CORE HUB Section 2.2 (original concept)"
 status: live-snapshot + roadmap
 ---
@@ -21,15 +21,23 @@ status: live-snapshot + roadmap
 
 # PART 1 — Current Menu (shipped, snapshot 2026-07-19)
 
-Fast-casual **manakish + salads + fresh spring rolls + dips**, with a large **drinks program**
+Fast-casual **salads + bowls + wraps + fresh spring rolls + dips**, with a large **drinks program**
 (coffee, matcha, smoothies, juices, lemonades, shots) and retail chocolate. Prices in ฿.
 
-## 🫓 Manakish (potato-taco / flatbread base)
-| Tier | Items | Price |
-|------|-------|-------|
-| Classic | Za'atar Potato Tacos · Olive & Cheese · Pumpkin & Cheese Mix · 6 Cheese Potato Tacos | 59 |
-| Signature | Beef · Lamb · Falafel · Chilli & Cheese · Za'atar & Cheese Potato Tacos | 69 |
-| Premium | Truffle & Lamb Signature · Salami Potato Tacos · Sujuk · Pumpkin & Goat Cheese | 79 |
+## 🫓 Manakish / Potato Tacos — **RETIRED 2026-10-16**
+The whole line is off the menu and off the till. CEO 2026-10-16: *"we no longer sell them"*.
+Migrations `466_retire_potato_tacos.sql` + `467_unlink_stale_taco_loyverse_pointer.sql`.
+
+The eight dishes that were live until that date — Cheese & Mushroom (59); Za'atar, 6 Cheese,
+Falafel, Pumpkin (69); Lamb, Beef, Salami (89) — plus the Set ×4 (319) are now
+`[ARCHIVED]`, `is_available=false`, `is_web_visible=false`, `pos_status=draft`, and deleted
+from Loyverse. The `bundle4` / `bundle8` price tiers are `is_active=false`.
+
+Nothing was destroyed: BOMs, recipes, photos, prices, staff codes, the `KP-FIN-MAN*`
+categories and the potato-base PF tree all survive, `is_deleted` is still `false`, and the
+line is revivable by reverting four columns per row. This closed gap #6 from the
+Build-Your-Own epic (MC `80da7563`), which had flagged the tacos as having no home in the
+four-category menu.
 
 ## 🥗 Salads
 Tabbouleh (269) · Fattoush (249) · Chicken Caesar — avocado dressing, seed crackers, grana padano (249) · Chicken Mexican — chipotle honey (199) · Shrimp Caesar (349) · Smoked Salmon — eggs, avocado, lemon (299) · Beetroot Walnut (149).
@@ -71,7 +79,7 @@ Hummus · Mango · Tahini Tamarind · Yogurt Tahini
 ## In-store / POS-only (not yet web-published)
 Available at the counter but not on shishka.health (`is_web_visible = false`):
 - **🍗 Proteins & Grills** (add-ons, POS-priced): Grilled Chicken Breast · Grilled Salmon · Grilled Shrimp · Lamb Kebab · Cured Salmon (house-made) · Beef & Lamb Sausage (homemade)
-- **🎁 Bundles**: Potato Tacos Bundle ×4 / ×8 / ×12 (POS-configured)
+- **🎁 Bundles**: ~~Potato Tacos Bundle ×4 / ×8 / ×12~~ — retired 2026-10-16 with the taco line (migration 466); all three tiers `is_active=false` and the ×4 item is deleted from Loyverse.
 - **🥟 Sides**: Baked Potato — grilled half (80) · Mashed Potato Classic (80) · Mashed Potato Vegan (55)
 - **🥖 Bread**: Potato Pita — grilled, GF (15) · Potato Pita Set ×3 (40)
 - **🥤 Soft Drinks**: Coca-Cola / Coke Zero / Fanta / Sprite / Tonic (35) · Singha Soda (30) · Mont Fleur Mineral Water 500ml (20)
