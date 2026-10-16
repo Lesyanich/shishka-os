@@ -1,7 +1,9 @@
 # Spec — purchase_logs historical repair (MC 00a81c22, item 6)
 
 **Status:** DRAFT — awaiting CEO review. Migration `460` is written but **NOT APPLIED**.
-**Depends on:** migration `459` (applied 2026-10-16, PR #596 open). 460 must land after 459.
+**Depends on:** migration `459` (applied 2026-10-16; **PR #596 is now merged**). 460 lands after it.
+**Sibling:** migration `461` fixes `fn_match_nomenclature` and is **in flight in another session**.
+460 and 461 are independent in both directions — neither needs the other to have landed.
 **Scope:** the damage already in the database. 459 stopped new damage and backfilled nothing.
 **Out of scope:** item 7 (OpEx `supplier_id` backfill, 289/389 rows).
 
@@ -179,10 +181,65 @@ The duplicate even split one product across two canonicals: the orphan tamarind 
 The twelfth orphan (`0d037b68`, RAW-CHEESE_GOAT, 0.2 kg @ 1245) is **deliberate** — its note says
 *"Initial purchase to establish WAC"*. Keep it.
 
-**Proposal:** void the 11 duplicates. `purchase_logs` has no soft-delete column, so 460 sets
-`quantity = 0`, `total_price = 0` and prefixes `notes` with `[VOID-DUP-77460cc2]` rather than
-deleting — the row survives for audit, contributes nothing to WAC. **CEO: confirm, or say
-DELETE and we delete.**
+### 4.1 How they are voided — and a correction to the first draft
+
+The first draft of 460 zeroed `quantity`, `price_per_unit` and `total_price`. **Review from the
+session that wrote 459 showed that was wrong twice over, and both points stand:**
+
+1. **It cannot run.** `purchase_logs` carries a validated `CHECK (quantity <> 0)` —
+   `purchase_logs_quantity_check`. Verified independently: the UPDATE raises `23514` and aborts
+   the migration at §8, after §5–§7 have already run. Nothing would corrupt (it all rolls back),
+   but it would never complete. The draft reasoned "there is no soft-delete column, so zero it"
+   and never asked whether zero was legal. It isn't.
+2. **Zeroing destroys the evidence it claimed to preserve.** Afterwards only a `notes` tag would
+   survive and the original quantity/price/total would be gone — the opposite of migration 325's
+   never-destroy rule. And "void" would mean "the numbers were erased", not something the cost
+   path understands.
+
+**So 460 adds the column the table was missing** rather than working around its absence:
+
+```sql
+ALTER TABLE public.purchase_logs
+  ADD COLUMN voided_at timestamptz, ADD COLUMN void_reason text;
+```
+
+The 11 rows get `voided_at` and a reason, **keep every original value**, and
+`fn_recalc_wac_for_product` gains `AND voided_at IS NULL`. That clears the constraint, keeps the
+audit trail, and makes "voided" a concept the cost path actually respects.
+
+Two details worth recording. The function already carried `AND quantity > 0`, which is *why* the
+zeroing draft looked like it worked — it excluded the rows by erasing them. With the values kept,
+the filter has to be explicit. And `fn_update_cost_on_purchase` is deliberately **not** changed:
+it is `AFTER INSERT` and reads only `NEW`, so a historical voided row never reaches it. Checked,
+not assumed.
+
+**Hard DELETE is not on the table.** It was offered in the first draft as the simple alternative;
+migration 325 explicitly forbids it, so offering it was a mistake.
+
+### 4.2 The filter bites — measured on the fixture
+
+Nine of the eleven affected items move once voided rows stop counting:
+
+| item | WAC if the duplicate counts | after 460 |
+|---|---|---|
+| `RAW-ONION` | 62.8571 | **50.7692** |
+| `RAW-HONEY` | 300.0000 | **280.2260** |
+| `RAW-CORIANDER-POWDER` | 34.1667 | **31.7500** |
+| `RAW-BUTTER` | 168.5000 | **175.8750** |
+| `RAW-COFFEE-ESPRESSO` | 0.5370 | **0.6412** |
+| `RAW-PARSLEY` | 59.5103 | **60.1587** |
+| `RAW-FLOUR-WW` | 80.9643 | **81.1250** |
+| `RAW-COCONUT-OIL` | 109.5000 | **109.2500** |
+| **`RAW-TAMARIND-PASTE-WET`** | 62.0000 | **no purchase history at all** |
+
+`RAW-COFFEE-INSTANT` and `RAW-NUTMEG` are unchanged — their duplicate was identical, so the
+average did not move even though the volume was double-counted.
+
+**`RAW-TAMARIND-PASTE-WET` is a new finding.** Its *only* purchase row is the duplicate, so its
+entire cost derives from an import that never happened. After 460 it has no purchase history.
+**CEO: this item may not be real** — the genuine line from that receipt landed on
+`RAW-TAMARIND-PASTE-SEEDS`. Worth checking whether wet tamarind paste is a product we buy at all,
+or an artefact of the double import.
 
 ---
 
@@ -241,17 +298,38 @@ The rejected hits are therefore **not** in T1: `RAW-AUTO-8f43d34d`, `da96d8ab`, 
 
 **And the eggplant case exposed a gap in 459's ladder itself:** `RAW-THAI-EGGPLANT` is
 `is_deleted = true`, yet `fn_match_nomenclature` returned it. Only the `name:nomenclature` level
-filters `is_deleted = false`; the three `supplier_catalog` levels do not. So a live import can
-resolve onto a tombstoned item today. One line each to fix — logged in §9, deliberately not
-widened into this migration.
+filters `is_deleted = false`; the `supplier_catalog` levels and the `sku` level do not.
+
+**That gap is far wider than these four rows**, as 459's author measured after this spec first
+flagged it — reproduced independently here:
+
+| | count |
+|---|---|
+| `supplier_catalog` rows pointing at a soft-deleted item | **58** |
+| of those, barcode-reachable (level 1a, the highest-confidence level) | **26** |
+| `sku` rows pointing at a soft-deleted item | **40** |
+| of those, mig-325 `[MERGED->]` tombstones | **0** |
+
+Zero tombstones means past *merges* are not being bypassed — what is exposed is **retired
+canonicals**. Their example: barcode `8853478002111` (ARO Frozen Mango Puree) resolves at level
+1a onto `RAW-MANGO`, which migration **390 retired** in favour of `RAW-MANGO_FRESH`. The next
+receipt carrying that barcode silently undoes 390's canonicalization. Same shape for `RAW-CREAM`
+and `RAW-CHICKEN-THIGH`.
+
+**Migration 461, in flight in another session, fixes the function.** 460 does not touch it and
+does not depend on it; it only repairs the four catalog rows it diagnosed.
 
 ### 5.1b A deterministic stub code can collide two unrelated products
 
 `RAW-AUTO-b211fb59` ("Artificial Banana Leaf, ARO, 12x12 1kg") carries **two** rows: a genuine
 banana purchase (2024-01-10, 90 THB — §3.4) and a genuine ARO artificial banana **leaf** purchase
-(2026-03-13, 69 THB). 459's deterministic `md5(normalized name)` stub code is a clear improvement
-over the old random suffix, but it keys on the *name the OCR produced*, so two different products
-that OCR to the same name land on one stub. Here the merge is **partial**: only the banana row
+(2026-03-13, 69 THB).
+
+**This is a design trade-off in 459, not a regression.** Its author chose one shared stub over
+breeding a fresh stub per receipt — which is what the old random suffix did, and why 118 distinct
+stubs appeared in a single October. The deliberate cost is that a genuine collision needs a human
+to split. The code keys on the *name the OCR produced*, so two different products that OCR to the
+same name share a stub. Here the merge is **partial**: only the banana row
 moves to `RAW-BANANA`; the stub survives for the leaf. Worth knowing before the T3–T5 map is
 written — "one stub, one product" is not guaranteed.
 
@@ -432,12 +510,12 @@ base unit first, `total_price` untouched, then recompute).
 | 4 | normalize the 20 bad-unit rows from the confirmed map | 20 |
 | 5 | repoint the 3 wrong-item rows (red pepper, banana, iceberg) + the water row | 4 |
 | 6 | fix `invoice_date` on the 18 deterministic + image-read rows; leave the 6 human ones | 18 |
-| 7 | void the 11 duplicate orphan rows | 11 |
+| 8 | void the 11 duplicate rows: add `voided_at`/`void_reason`, set them, keep every value, and add `AND voided_at IS NULL` to `fn_recalc_wac_for_product` | 11 |
 | 8 | T1 auto-merge: repoint 21 rows onto 18 canonicals, tombstone those stubs `[MERGED->CODE]` | 21 |
 | 9b/9c | fix the 4 poisoned `supplier_catalog` rows from §5.1a — 2 set to NULL (CEO decides), 2 repointed to `RAW-EGGPLANT` | 4 |
 | 10 | T2: tombstone 13 junk stubs `[JUNK-NO-MATCH]` (the −419 return goes to `RAW-BUTTER` in §8) | 13 |
 | 11 | re-enable triggers | — |
-| 12 | asserts: **zero** `cost_per_unit` / `cost_source` drift vs the §1 snapshot; row counts unchanged; still exactly 12 orphans; 0 rows violating the arithmetic rule; exactly 6 violating the date rule; exactly 393 rows left on stubs; every merged stub tombstoned and empty; the Water→morning-glory catalog row no longer resolves — else ABORT | — |
+| 12 | asserts: **zero** `cost_per_unit` / `cost_source` drift vs the §1 snapshot; row counts unchanged; still exactly 12 orphans; 0 **live** rows violating the arithmetic rule; exactly 11 voided rows, none of which lost its values; exactly 6 violating the date rule; exactly 393 rows left on stubs; every merged stub tombstoned and empty; the Water→morning-glory catalog row no longer resolves — else ABORT | — |
 | — | **commented-out** Part B skeletons: the pack-factor table (§6.2) and the `cost_source` list (§6.3) | — |
 
 It does **not**: change any `cost_per_unit`, run `fn_recalc_wac_for_product`, touch the 365
@@ -455,13 +533,15 @@ exactly (984 / 415 on stubs / 20 arithmetic / 12 orphans) before the migration r
 | `purchase_logs` rows | 984 | **984** (nothing created or deleted) |
 | rows on `RAW-AUTO` stubs | 415 | **393** |
 | THB parked on stubs | 67,713.59 | **65,792.34** |
-| `quantity × price ≠ total` | 20 | **0** |
+| `quantity × price ≠ total` (live rows) | 20 | **0** |
 | `invoice_date` outside 459's window | 24 | **6** (the unreadable ones, §3.3) |
-| orphan rows | 12 | **12**, 11 of them now zero-valued |
+| orphan rows | 12 | **12**, 11 of them now `voided_at`-tagged with values intact |
+| `quantity × price ≠ total` among **voided** rows | — | **1**, preserved on purpose as evidence |
 | `RAW-AUTO` items tombstoned | — | **+21** (17 merged, 4 junk; 9 junk were already) |
 | **`RAW-COFFEE-ESPRESSO` log-derived cost** | **241.67 THB/g** | **0.6412 THB/g** |
 | `RAW-MORNING-GLORY` purchase rows | 1 (a water delivery) | **0** |
 | any `cost_per_unit` / `cost_source` moved | — | **0** (in-transaction assert) |
+| items whose WAC the void filter corrects | — | **9 of 11** (§4.2); one loses its history entirely |
 
 The espresso line is the point of the whole exercise: **0.6412 against the ~0.66 the audit
 expected**. The landmine that made a blanket WAC recompute unsafe is defused by Part A alone,
@@ -471,7 +551,14 @@ The stub count falls by 22 and rises by 1 — the water row is parked on the "FM
 stub on purpose. A repair that only ever made that number fall would have had to leave morning
 glory priced as water. The assert hard-codes 393 for exactly that reason.
 
-**The fixture earned its keep: it caught a defect in the first draft.** `RAW-AUTO-81812ca5`
+**The fixture earned its keep twice.** The CHECK constraint that blocked §8 slipped through the
+first round because that fixture was built from `information_schema.columns` alone, which carries
+column definitions but **not constraints**. The rebuilt fixture copies
+`purchase_logs_quantity_check` and `purchase_logs_price_per_unit_check` from production verbatim,
+and now reproduces the blocker: the old zeroing statement fails there with the same `23514` the
+reviewer saw against live data. **Lesson for the recipe: pull `pg_constraint`, not just columns.**
+
+And in the first round it caught a different defect: `RAW-AUTO-81812ca5`
 ("Green Stem Eggplant") was mapped to the ladder's answer, `RAW-THAI-EGGPLANT` — which is
 **soft-deleted**, and is a different vegetable (มะเขือเปราะ, small round) from green-stem
 aubergine. Migration 325 had already merged two identically-named stubs into `RAW-EGGPLANT`.
@@ -494,7 +581,7 @@ not widened into this change.
 0. **§5.1a, most urgent** — two `supplier_catalog` rows point at the wrong canonical
    (`Water` → morning glory, `Pineapple Juice` → whole pineapple). Since 459 the importer acts on
    them *confidently*. 460 disconnects both; what should each point at instead?
-1. **§4** — void the 11 duplicate rows by zeroing them, or hard-DELETE?
+1. **§4** — the 11 duplicates are now soft-deleted with their values intact (zeroing was impossible, DELETE is forbidden by mig 325). Confirm the approach, and see §4.2: **`RAW-TAMARIND-PASTE-WET` may not be a real product** — its only purchase row is the phantom one.
 2. **§5.4** — are the 13 junk stubs really empty of spend? The `Invoice 2606/957646` row alone is
    1,546 THB sitting in COGS as a product.
 3. **§3.3** — three dates we cannot read: the Asia Gas receipt's month (proposal 2026-04-18), the
@@ -509,10 +596,9 @@ not widened into this change.
 
 ## 9. Not done here, logged for later
 
-* **`fn_match_nomenclature` can resolve onto a soft-deleted canonical.** The three
-  `supplier_catalog` levels and the `purchase_logs`-history level do not filter
-  `is_deleted = false`; only `name:nomenclature` does. Found by the fixture run (see §7).
-  One `AND n.is_deleted = false` per level. Should be its own small migration against 459.
+* ~~`fn_match_nomenclature` can resolve onto a soft-deleted canonical.~~ **Now in flight as
+  migration 461** in another session — not a follow-up for later. See §5.1a; 460 touches only the
+  four catalog rows it diagnosed, never the function.
 * Item 7 — OpEx `supplier_id` backfill (289/389). Deliberately out of scope.
 * The `unmatched_items` queue still has no reader (317 legacy rows with no context).
 * `_shared/nomenclature.ts` still falls back to `ILIKE '%name%'`, looser than the DB ladder — the

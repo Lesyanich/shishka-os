@@ -17,13 +17,17 @@
 --
 -- SCOPE — Part A only, every change backed by a receipt line or by a value already
 -- correct elsewhere in the same record:
---   §4  normalize 20 bad-unit rows            §8  T1 auto-merge, 18 stubs + 1 partial
---   §5  repoint 4 wrong-item rows             §9  T2 tombstone 13 junk stubs
---   §6  fix 18 invoice_date rows              §9b un-poison 1 supplier_catalog row
---   §7  void 11 duplicate orphan rows
+--   §5  normalize 20 bad-unit rows           §9  T1 auto-merge, 18 stubs + 1 partial
+--   §6  repoint 4 wrong-item rows             §9b/§9c fix 4 poisoned catalog rows
+--   §7  fix 18 invoice_date rows              §10 T2 tombstone 13 junk stubs
+--   §8  void 11 duplicate rows (soft-delete column + WAC filter)
 --
--- NOT IN SCOPE, deliberately: no cost_per_unit changes, no fn_recalc_wac_for_product,
--- no touching the 365 unresolved stubs, nothing deleted, no OpEx supplier_id (item 7).
+-- NOT IN SCOPE, deliberately: no cost_per_unit changes, no WAC RECOMPUTE (the one
+-- function change is a filter added to fn_recalc_wac_for_product, which this migration
+-- never calls), no touching the 365 unresolved stubs, nothing deleted, no OpEx
+-- supplier_id (item 7), and NO change to fn_match_nomenclature — migration 461 owns
+-- that function and is in flight in another session. 460 and 461 are independent in
+-- both directions: neither needs the other to have landed.
 -- Part B skeletons are at the tail, commented out, for the CEO to fill in.
 --
 -- VERIFY BEFORE APPLYING: A/B on a throwaway local PG14 fixture built from
@@ -244,15 +248,89 @@ UPDATE public.expense_ledger el
  WHERE el.id = pl.expense_id AND f.also_expense;
 
 -- ──────────────────────────────────────────────────────────────────────────
--- 8. Void the 11 duplicate orphan rows. purchase_logs has no soft-delete column,
---    so they are zeroed and tagged: the row survives for audit, contributes
---    nothing to WAC, and nothing is hard-deleted (mig 325's rule).
---    ⚠️ CEO may instead choose DELETE — see spec §4.
+-- 8. Void the 11 duplicate orphan rows — PROPERLY, with a soft-delete column.
+--
+--    The first draft zeroed quantity/price/total. That was wrong twice over,
+--    and review from the session that wrote 459 caught both:
+--      (a) it CANNOT RUN. purchase_logs carries a validated
+--          CHECK (quantity <> 0) — constraint purchase_logs_quantity_check.
+--          Verified live: the UPDATE raises 23514 and aborts the migration.
+--      (b) even if it ran, zeroing DESTROYS the audit values the comment
+--          claimed to preserve. That is the opposite of mig 325's "never
+--          destroy" rule, and it makes "void" mean "numbers erased" rather
+--          than something the cost path actually understands.
+--
+--    So: add the soft-delete column the table was missing, keep every original
+--    value intact, and teach the WAC path to skip voided rows.
+--    Nothing is hard-deleted — mig 325 explicitly forbids that.
 -- ──────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.purchase_logs
+  ADD COLUMN IF NOT EXISTS voided_at   timestamptz,
+  ADD COLUMN IF NOT EXISTS void_reason text;
+
+COMMENT ON COLUMN public.purchase_logs.voided_at IS
+  'Set when a row is retracted (duplicate import, cancelled receipt). The row keeps '
+  'its original quantity/price/total as evidence; cost math must skip it. '
+  'fn_recalc_wac_for_product filters on this.';
+
 UPDATE public.purchase_logs
-   SET quantity = 0, price_per_unit = 0, total_price = 0,
-       notes = '[VOID-DUP-77460cc2] ' || COALESCE(notes,'')
+   SET voided_at   = now(),
+       void_reason = 'Duplicate import of expense 77460cc2 (Makro 2026-04-07, 2,288 THB): '
+                  || 'the same receipt was imported twice, 3 hours apart, double-counting '
+                  || '2,219 THB into WAC. Values left intact as evidence. MC 00a81c22 item 6, mig 460.'
  WHERE id IN (SELECT row_id FROM tmp_void_dup);
+
+-- 8b. Teach the WAC recompute to skip voided rows. Read live via pg_get_functiondef
+--     on 2026-10-16 and reproduced verbatim apart from the one added predicate —
+--     never the repo copy, which drifts.
+--     NOTE it already carried `AND quantity > 0`, which is why the zeroing draft
+--     appeared to work: it excluded the rows by erasing them. With the values kept,
+--     the filter has to be explicit.
+CREATE OR REPLACE FUNCTION public.fn_recalc_wac_for_product(p_nomenclature_id uuid)
+ RETURNS numeric
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+    v_new_cost    NUMERIC;
+    v_cost_source TEXT;
+BEGIN
+    IF p_nomenclature_id IS NULL THEN RETURN NULL; END IF;
+
+    SELECT cost_source INTO v_cost_source
+    FROM public.nomenclature WHERE id = p_nomenclature_id;
+
+    IF v_cost_source = 'manual' THEN
+        RETURN (SELECT cost_per_unit FROM public.nomenclature WHERE id = p_nomenclature_id);
+    END IF;
+
+    SELECT ROUND(SUM(total_price) / NULLIF(SUM(quantity), 0), 4)
+    INTO v_new_cost
+    FROM public.purchase_logs
+    WHERE nomenclature_id = p_nomenclature_id
+      AND quantity > 0
+      AND total_price IS NOT NULL
+      AND voided_at IS NULL;          -- <<< mig 460: a retracted row is not a purchase
+
+    UPDATE public.nomenclature
+    SET cost_per_unit = v_new_cost,
+        cost_source = CASE WHEN v_new_cost IS NOT NULL THEN 'wac' ELSE 'none' END,
+        updated_at = now()
+    WHERE id = p_nomenclature_id;
+    RETURN v_new_cost;
+END;
+$function$;
+
+-- fn_update_cost_on_purchase deliberately NOT changed: it is AFTER INSERT and reads
+-- only NEW, so a historical voided row never reaches it. Checked, not assumed.
+--
+-- Other readers of purchase_logs that may want `voided_at IS NULL` later, listed
+-- rather than changed here (out of scope, and one of them is being edited by 461):
+--   fn_match_nomenclature level 1c — learns from purchase history by barcode; a
+--     voided row should not teach the matcher. That function belongs to migration
+--     461, in flight in another session; flagged to its author rather than edited.
+--   v_data_health, v_data_health_items_legacy, pack_info_sweep_candidates,
+--   fn_validate_reconciliation, fn_learn_category_correction — informational.
 
 -- ──────────────────────────────────────────────────────────────────────────
 -- 9. T1 auto-merge — repoint every reference, then tombstone the stub.
@@ -363,11 +441,24 @@ BEGIN
   SELECT count(*) INTO v FROM public.purchase_logs WHERE expense_id IS NULL;
   IF v <> 12 THEN RAISE EXCEPTION '460 ABORT: orphan purchase_logs rows = %, expected 12', v; END IF;
 
-  -- (d) the arithmetic rule is now clean, table-wide
+  -- (d) the arithmetic rule is clean across every LIVE row.
+  --     Voided rows are excluded on purpose: they keep their original values as
+  --     evidence, and one of them (0eef5137, the duplicated Boncafe line) is itself
+  --     a 500-vs-250 violation. Preserving it unrepaired is the point.
   SELECT count(*) INTO v FROM public.purchase_logs
-   WHERE abs(COALESCE(quantity,0)*COALESCE(price_per_unit,0) - COALESCE(total_price,0))
+   WHERE voided_at IS NULL
+     AND abs(COALESCE(quantity,0)*COALESCE(price_per_unit,0) - COALESCE(total_price,0))
          > GREATEST(1, 0.02*abs(COALESCE(total_price,0)));
-  IF v > 0 THEN RAISE EXCEPTION '460 ABORT: % row(s) still violate quantity x price = total', v; END IF;
+  IF v > 0 THEN RAISE EXCEPTION '460 ABORT: % live row(s) still violate quantity x price = total', v; END IF;
+
+  -- (d2) the 11 duplicates are voided, and nothing else is
+  SELECT count(*) INTO v FROM public.purchase_logs WHERE voided_at IS NOT NULL;
+  IF v <> 11 THEN RAISE EXCEPTION '460 ABORT: % voided row(s), expected 11', v; END IF;
+
+  -- (d3) voiding kept the evidence — the values must NOT have been erased
+  SELECT count(*) INTO v FROM public.purchase_logs
+   WHERE voided_at IS NOT NULL AND (quantity = 0 OR total_price = 0);
+  IF v > 0 THEN RAISE EXCEPTION '460 ABORT: % voided row(s) lost their original values', v; END IF;
 
   -- (e) exactly the 6 unreadable dates remain outside 459's window
   SELECT count(*) INTO v FROM public.purchase_logs
