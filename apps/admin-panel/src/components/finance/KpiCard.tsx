@@ -5,9 +5,16 @@ export interface KpiCardProps {
   value: string
   delta?: number
   isLoading: boolean
+  /**
+   * Which direction is good news. Finance tracks spend, where a rise is bad —
+   * that stays the default. Revenue-style metrics pass 'up' so growth reads
+   * green instead of alarm-red.
+   */
+  goodDirection?: 'up' | 'down'
 }
 
-export function KpiCard({ label, value, delta, isLoading }: KpiCardProps) {
+export function KpiCard({ label, value, delta, isLoading, goodDirection = 'down' }: KpiCardProps) {
+  const isGoodNews = delta !== undefined && (goodDirection === 'up' ? delta > 0 : delta < 0)
   return (
     <div className="shk-kpi">
       {isLoading ? (
@@ -20,7 +27,7 @@ export function KpiCard({ label, value, delta, isLoading }: KpiCardProps) {
             {delta !== undefined && Math.abs(delta) > 0.5 && (
               <span
                 className={`flex items-center gap-0.5 text-[10px] font-medium ${
-                  delta > 0 ? 'text-brick-bright' : 'text-mint-200'
+                  isGoodNews ? 'text-mint-200' : 'text-brick-bright'
                 }`}
               >
                 {delta > 0 ? (
