@@ -25,6 +25,7 @@ import { assignToSprint } from "./tools/assign-to-sprint.js";
 import { addComment } from "./tools/add-comment.js";
 import { listComments } from "./tools/list-comments.js";
 import { checkMigrations } from "./tools/check-migrations.js";
+import { claimMigrationNumber } from "./tools/claim-migration-number.js";
 import { generateStatus } from "./tools/generate-status.js";
 import { getProjectState } from "./tools/get-project-state.js";
 
@@ -258,6 +259,28 @@ server.tool(
 // ─── Infrastructure Tools ──────────────────────────────────────────
 
 server.tool(
+  "claim_migration_number",
+  "Atomically claim the next free SQL migration number and get the filename to use. " +
+  "ALWAYS use this instead of eyeballing `ls services/supabase/migrations` or the max " +
+  "in origin/main — neither is authoritative, because numbers are consumed when a " +
+  "migration is APPLIED and unmerged branches have already burned numbers above " +
+  "main's max. Two sessions picking by eye take the same number, which blocks every " +
+  "session in the repo from committing a migration until someone renumbers by hand. " +
+  "The number returned is yours and is never reissued.",
+  {
+    slug: z.string().min(1).describe(
+      "What the migration does, in snake_case: 'retire_potato_tacos'. Normalised server-side."
+    ),
+    session_id: z.string().min(1).describe(
+      "Your session ID (e.g. 'claude-opus-session-c7283135'). Required so an abandoned claim is traceable."
+    ),
+    git_branch: z.string().optional().describe("Branch the migration will land on."),
+    mc_task_id: z.string().optional().describe("MC task this migration belongs to."),
+  },
+  async (args) => jsonResult(await claimMigrationNumber(args))
+);
+
+server.tool(
   "check_migrations",
   "Compare migration files on disk vs migration_log in DB. Returns: applied, pending, failed, checksum mismatches.",
   {},
@@ -294,7 +317,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`Shishka Mission Control MCP server running on stdio`);
-  console.error(`   Tools: 13 (emit_business_task, list_tasks, get_task, update_task, create_sprint, list_sprints, update_sprint, assign_to_sprint, add_comment, list_comments, check_migrations, generate_status, get_project_state)`);
+  console.error(`   Tools: 14 (emit_business_task, list_tasks, get_task, update_task, create_sprint, list_sprints, update_sprint, assign_to_sprint, add_comment, list_comments, claim_migration_number, check_migrations, generate_status, get_project_state)`);
 }
 
 main().catch((err) => {
