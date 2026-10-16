@@ -1,6 +1,6 @@
 -- 460 — purchase_logs historical repair, Part A (MC 00a81c22 item 6)
 --
--- ⛔ NOT APPLIED. This migration is the CEO's review surface. Spec:
+-- APPLIED 2026-10-16 on CEO instruction. Spec:
 --    docs/projects/admin/plans/spec-purchase-logs-historical-repair.md
 --
 -- DEPENDS ON migration 459 (applied 2026-10-16). 459 hardened the import path and
@@ -32,9 +32,13 @@
 -- APPLY ORDER IS 459 -> 462 -> 460, which is not filename order.
 -- Part B skeletons are at the tail, commented out, for the CEO to fill in.
 --
--- VERIFY BEFORE APPLYING: A/B on a throwaway local PG14 fixture built from
--- information_schema + the LIVE function bodies via pg_get_functiondef (never the repo
--- copies — they drift). Socket under a short path, e.g. /tmp/shk460/sock.
+-- VERIFIED BEFORE APPLYING: run end to end on a throwaway local PG14 fixture loaded with
+-- all 984 purchase_logs rows, 596 expense_ledger rows and 630 nomenclature rows copied
+-- from production, with purchase_logs' CHECK constraints copied verbatim from
+-- pg_constraint (information_schema.columns alone carries no constraints — that gap let
+-- a CHECK (quantity <> 0) blocker through an earlier draft). Socket under a short path,
+-- e.g. /tmp/shk460/sock. fn_recalc_wac_for_product's live body was re-read immediately
+-- before applying to confirm it had not drifted under §8b.
 
 BEGIN;
 
@@ -365,7 +369,7 @@ $function$;
 -- only NEW, so a historical voided row never reaches it. Checked, not assumed.
 --
 -- Other readers of purchase_logs that may want `voided_at IS NULL` later, listed
--- rather than changed here (out of scope, and one of them is being edited by 461):
+-- rather than changed here (out of scope; one of them is owned by 462, applied):
 --   fn_match_nomenclature level 1c — learns from purchase history by barcode; a
 --     voided row should not teach the matcher. RESERVED AS MIGRATION 463 by 462's
 --     author, to land AFTER 460 so the column exists when the function runs.
@@ -485,8 +489,8 @@ UPDATE public.nomenclature n
 -- 10b. CLEAN UP AFTER OUR OWN TOMBSTONES. §9 repoints supplier_catalog off a MERGED
 --      stub onto its canonical (mig 325's pattern), but a JUNK stub has no canonical
 --      to repoint to — so without this, 460 would leave live catalog rows pointing at
---      items it just tombstoned, i.e. it would ADD to the very population migration 461
---      is fixing. Measured: 7 supplier_catalog rows (4 barcode-reachable).
+--      items it just tombstoned, i.e. it would ADD to the very population migration 462
+--      fixed. Measured: 7 supplier_catalog rows (4 barcode-reachable).
 --      NULL is the right answer here, not a pointer: junk has no correct target, so the
 --      line belongs in the unmatched queue. Note these are tagged [JUNK-NO-MATCH], NOT
 --      [MERGED->CODE] — there is deliberately no pointer for 461 to follow.
@@ -497,8 +501,10 @@ UPDATE public.supplier_catalog sc
 
 -- ⚠️ sku.nomenclature_id is NOT NULL, so the 6 sku rows pointing at junk stubs CANNOT
 --    be cleaned the same way and will keep pointing at a tombstoned item (3 of them
---    barcode-reachable). That is squarely migration 461's case: the ladder must refuse
---    a soft-deleted target. Flagged to 461's author rather than worked around here.
+--    barcode-reachable). That is squarely migration 462's case: the ladder must refuse
+--    a soft-deleted target. Confirmed safe by 462's author — name:tombstone fires only on
+--    a literal MERGED-> pointer, so [JUNK-NO-MATCH] is ignored and these resolve to
+--    nothing, sending the line to unmatched_items, which is right for junk.
 
 -- ──────────────────────────────────────────────────────────────────────────
 -- 11. Re-enable the cost triggers
@@ -606,14 +612,14 @@ VALUES ('460_purchase_logs_historical_repair.sql', 'claude-opus-session-3b980af6
      || '13 junk stubs (mig 325 cost-frozen repoint + tombstone), and fixed 4 poisoned '
      || 'supplier_catalog rows that made 459''s matcher assert a wrong canonical. No cost_per_unit '
      || 'changed (in-transaction assert); no WAC recompute. Part B (pack factors, the 365 '
-     || 'unresolved stubs, cost_source) is CEO-gated and ships as 461. '
+     || 'unresolved stubs, cost_source) is CEO-gated and ships as a later migration. '
      || 'Spec: docs/projects/admin/plans/spec-purchase-logs-historical-repair.md')
 ON CONFLICT DO NOTHING;
 
 COMMIT;
 
 -- ══════════════════════════════════════════════════════════════════════════
--- PART B — NOT IN THIS MIGRATION. The CEO fills these in; they ship as 461.
+-- PART B — NOT IN THIS MIGRATION. The CEO fills these in; they ship separately.
 -- ══════════════════════════════════════════════════════════════════════════
 --
 -- B1. PACK-FACTOR NORMALIZATION (spec §6.1-§6.2). The stored cost is the plausible
