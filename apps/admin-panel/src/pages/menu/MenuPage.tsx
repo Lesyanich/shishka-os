@@ -17,6 +17,7 @@ import { useMenuData } from '../../hooks/useMenuData'
 import { useInlineUpdate } from '../../hooks/useInlineUpdate'
 import { useMenuListEnrichment } from '../../hooks/useMenuListEnrichment'
 import { useChannelMargins } from '../../hooks/useChannelMargins'
+import { useCostTrust } from '../../hooks/useCostTrust'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
@@ -70,6 +71,9 @@ export function MenuPage() {
   const inlineUpdate = useInlineUpdate(updateItem)
   const enrichment = useMenuListEnrichment(items, childrenByParent)
   const { margins: grabMargins } = useChannelMargins('grab')
+  // Cost provenance per dish (mig 482) — drives the trust badges on the cost
+  // figures in the table and in the drawer's Owner tab.
+  const { trustByDish, error: costTrustError } = useCostTrust()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -452,6 +456,8 @@ export function MenuPage() {
           onOpenDrawer={openDrawer}
           autoExpandId={justCreatedId}
           grabMargins={grabMargins}
+          costTrust={trustByDish}
+          costTrustUnavailable={costTrustError != null}
           onPushed={() => refetch()}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
@@ -507,6 +513,8 @@ export function MenuPage() {
         modifierOptions={
           drawerItem ? (enrichment.modifierOptionsByDish.get(drawerItem.id) ?? []) : []
         }
+        costTrust={drawerItem ? (trustByDish.get(drawerItem.id) ?? null) : null}
+        costTrustUnavailable={costTrustError != null}
       />
     </div>
   )

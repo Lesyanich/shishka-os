@@ -17,6 +17,7 @@ import { CustomerTab } from './tabs/CustomerTab'
 import { L1CookTab } from './tabs/L1CookTab'
 import { L2AssemblerTab, shelfLifeValid } from './tabs/L2AssemblerTab'
 import { OwnerTab } from './tabs/OwnerTab'
+import type { DishCostTrust } from '../shared/costTrust'
 
 type DrawerTab = 'customer' | 'l1-cook' | 'l2-assembler' | 'owner'
 
@@ -37,6 +38,11 @@ interface DishDrawerProps {
   modifierOptions?: DishModifierOption[]
   /** Toggle website visibility (is_web_visible, mig 263) from the Owner tab. */
   onToggleWeb?: (id: string, next: boolean) => void | Promise<void>
+  /** Cost provenance for this dish (v_dish_cost_trust, mig 482) — the Owner tab
+   *  marks the Cost / Food Cost tiles with where the number came from. */
+  costTrust?: DishCostTrust | null
+  /** The trust view could not be read (see OwnerTab). */
+  costTrustUnavailable?: boolean
 }
 
 export function DishDrawer({
@@ -46,6 +52,8 @@ export function DishDrawer({
   returnFocusToId,
   modifierOptions = [],
   onToggleWeb,
+  costTrust,
+  costTrustUnavailable,
 }: DishDrawerProps) {
   const open = item != null
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -361,6 +369,8 @@ export function DishDrawer({
                 modifiers={modifiers.modifiers}
                 onSynced={() => onSaved?.()}
                 onToggleWeb={onToggleWeb}
+                costTrust={costTrust}
+                costTrustUnavailable={costTrustUnavailable}
               />
             )}
           </div>
