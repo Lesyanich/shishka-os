@@ -184,10 +184,16 @@ claim_migration_number(slug: "retire_potato_tacos", session_id: "<your session i
 
 ```
 ERROR: migration number 473 is already taken by 473_analytics_hourly_heat_weekly.sql
-HINT:  Claim a free number instead of guessing: SELECT * FROM fn_claim_migration_number(...)
+       (applied by claude-opus-session-bbb at 2026-10-16 15:37), claimed by <session>
+HINT:  Next free number is 487 — ADVISORY, not reserved: another session can take it
+       between now and your apply. Claim it, do not just rename to it:
+       SELECT * FROM fn_claim_migration_number('<slug>', '<your-session-id>');
+       … Only your apply is blocked — nobody else is.
 ```
 
 …you picked by eye. Claim a number, rename the file, re-apply. Do **not** disable the trigger.
+
+**Only the colliding apply is blocked.** The guard rejects *your* INSERT/UPDATE; no other session is affected. That is the point of catching it here rather than letting it reach `main`, where the canary blocks everyone — which is what used to happen, and what cost an unrelated session an afternoon on 2026-10-16.
 
 **Gap numbers are never reused.** Rows in `migration_numbers` are never deleted, so an abandoned claim permanently burns its number. That is intentional, and it is the old "never reuse a gap" rule now enforced structurally.
 
