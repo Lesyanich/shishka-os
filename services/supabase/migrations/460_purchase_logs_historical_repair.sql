@@ -406,6 +406,24 @@ UPDATE public.nomenclature n
   FROM tmp_junk j
  WHERE n.product_code = j.stub_code;
 
+-- 10b. CLEAN UP AFTER OUR OWN TOMBSTONES. §9 repoints supplier_catalog off a MERGED
+--      stub onto its canonical (mig 325's pattern), but a JUNK stub has no canonical
+--      to repoint to — so without this, 460 would leave live catalog rows pointing at
+--      items it just tombstoned, i.e. it would ADD to the very population migration 461
+--      is fixing. Measured: 7 supplier_catalog rows (4 barcode-reachable).
+--      NULL is the right answer here, not a pointer: junk has no correct target, so the
+--      line belongs in the unmatched queue. Note these are tagged [JUNK-NO-MATCH], NOT
+--      [MERGED->CODE] — there is deliberately no pointer for 461 to follow.
+UPDATE public.supplier_catalog sc
+   SET nomenclature_id = NULL, match_reviewed_at = NULL, updated_at = now()
+  FROM public.nomenclature n, tmp_junk j
+ WHERE sc.nomenclature_id = n.id AND n.product_code = j.stub_code;
+
+-- ⚠️ sku.nomenclature_id is NOT NULL, so the 6 sku rows pointing at junk stubs CANNOT
+--    be cleaned the same way and will keep pointing at a tombstoned item (3 of them
+--    barcode-reachable). That is squarely migration 461's case: the ladder must refuse
+--    a soft-deleted target. Flagged to 461's author rather than worked around here.
+
 -- ──────────────────────────────────────────────────────────────────────────
 -- 11. Re-enable the cost triggers
 -- ──────────────────────────────────────────────────────────────────────────
@@ -477,6 +495,14 @@ BEGIN
   IF v > 0 THEN RAISE EXCEPTION '460 ABORT: % merged stub(s) not tombstoned', v; END IF;
   SELECT count(*) INTO v FROM public.purchase_logs pl JOIN tmp_resolve r ON r.stub_id = pl.nomenclature_id;
   IF v > 0 THEN RAISE EXCEPTION '460 ABORT: % purchase row(s) still point at a merged stub', v; END IF;
+
+  -- (g2) 460 leaves NO live supplier_catalog row pointing at a stub it tombstoned
+  SELECT count(*) INTO v
+    FROM public.supplier_catalog sc JOIN public.nomenclature n ON n.id = sc.nomenclature_id
+   WHERE n.product_code LIKE 'RAW-AUTO-%' AND n.is_deleted
+     AND (n.product_code IN (SELECT stub_code FROM tmp_junk)
+       OR n.product_code IN (SELECT stub_code FROM tmp_merge));
+  IF v > 0 THEN RAISE EXCEPTION '460 ABORT: % supplier_catalog row(s) still point at a stub this migration tombstoned', v; END IF;
 
   -- (h) the poisoned catalog rows no longer resolve
   IF EXISTS (SELECT 1 FROM public.supplier_catalog sc JOIN public.nomenclature n ON n.id=sc.nomenclature_id

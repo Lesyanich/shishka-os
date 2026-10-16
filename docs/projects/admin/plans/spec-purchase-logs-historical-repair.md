@@ -319,6 +319,22 @@ and `RAW-CHICKEN-THIGH`.
 **Migration 461, in flight in another session, fixes the function.** 460 does not touch it and
 does not depend on it; it only repairs the four catalog rows it diagnosed.
 
+**One interaction between the two migrations, worth stating plainly.** 460 tombstones 31 stubs.
+§9 repoints `supplier_catalog` off the 18 *merged* ones onto their canonical (mig 325's pattern),
+but a *junk* stub has no canonical to repoint to — so without care 460 would leave live catalog
+rows pointing at items it had just tombstoned, i.e. it would **add** to the population 461 is
+fixing. Measured: 7 `supplier_catalog` rows (4 barcode-reachable) and 6 `sku` rows (3
+barcode-reachable).
+
+§10b disconnects the 7 catalog rows (`nomenclature_id → NULL`), and the migration asserts that
+none is left. NULL is the right answer rather than a pointer: junk has no correct target, so the
+line belongs in the unmatched queue. Note these stubs are tagged `[JUNK-NO-MATCH]`, **not**
+`[MERGED->CODE]` — there is deliberately no pointer for 461 to follow.
+
+The 6 `sku` rows **cannot** be handled the same way: `sku.nomenclature_id` is `NOT NULL`. They
+will keep pointing at a tombstoned item, which is exactly 461's case — the ladder must refuse a
+soft-deleted target. Flagged to 461's author rather than worked around here.
+
 ### 5.1b A deterministic stub code can collide two unrelated products
 
 `RAW-AUTO-b211fb59` ("Artificial Banana Leaf, ARO, 12x12 1kg") carries **two** rows: a genuine
@@ -514,6 +530,7 @@ base unit first, `total_price` untouched, then recompute).
 | 8 | T1 auto-merge: repoint 21 rows onto 18 canonicals, tombstone those stubs `[MERGED->CODE]` | 21 |
 | 9b/9c | fix the 4 poisoned `supplier_catalog` rows from §5.1a — 2 set to NULL (CEO decides), 2 repointed to `RAW-EGGPLANT` | 4 |
 | 10 | T2: tombstone 13 junk stubs `[JUNK-NO-MATCH]` (the −419 return goes to `RAW-BUTTER` in §8) | 13 |
+| 10b | clean up after our own tombstones: disconnect the 7 `supplier_catalog` rows that pointed at those junk stubs | 7 |
 | 11 | re-enable triggers | — |
 | 12 | asserts: **zero** `cost_per_unit` / `cost_source` drift vs the §1 snapshot; row counts unchanged; still exactly 12 orphans; 0 **live** rows violating the arithmetic rule; exactly 11 voided rows, none of which lost its values; exactly 6 violating the date rule; exactly 393 rows left on stubs; every merged stub tombstoned and empty; the Water→morning-glory catalog row no longer resolves — else ABORT | — |
 | — | **commented-out** Part B skeletons: the pack-factor table (§6.2) and the `cost_source` list (§6.3) | — |
@@ -542,6 +559,8 @@ exactly (984 / 415 on stubs / 20 arithmetic / 12 orphans) before the migration r
 | `RAW-MORNING-GLORY` purchase rows | 1 (a water delivery) | **0** |
 | any `cost_per_unit` / `cost_source` moved | — | **0** (in-transaction assert) |
 | items whose WAC the void filter corrects | — | **9 of 11** (§4.2); one loses its history entirely |
+| `supplier_catalog` rows left pointing at a stub 460 tombstoned | — | **0** (asserted) |
+| `sku` rows left pointing at a tombstoned stub | 6 | **6** — cannot be fixed here, see below |
 
 The espresso line is the point of the whole exercise: **0.6412 against the ~0.66 the audit
 expected**. The landmine that made a blanket WAC recompute unsafe is defused by Part A alone,
