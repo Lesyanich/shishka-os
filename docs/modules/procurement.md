@@ -81,12 +81,24 @@ Three rules worth knowing:
   or a reviewable stub — minting a stub beats silently booking onto the wrong item,
   which is the whole premise of 459.
 
-⛔ **Still open (MC 00a81c22 items 6-7, human-gated):** the 20 rows whose
-`quantity × price ≠ total`, the re-dedupe of the 415 stub-bound rows, and the WAC
-recompute. For the spice/oil cases the STORED cost is the plausible one and
+**Mig 460 (applied 2026-10-16) — the historical repair, Part A.** The 20 rows whose
+`quantity × price ≠ total` are normalized (17 read line by line off the receipt
+photographs; quantity only, `total_price` untouched per mig 390, so no money moved), 4
+wrong-item rows repointed, 18 `invoice_date` rows corrected, 11 duplicate rows from a
+twice-imported receipt retracted via a new `purchase_logs.voided_at` soft-delete column,
+and 23 stubs merged + 13 junk stubs tombstoned (mig 325 cost-frozen repoint + tombstone).
+Rows on `RAW-AUTO` stubs 415 → 387; **no `cost_per_unit` changed**, asserted in-transaction.
+RAW-COFFEE-ESPRESSO's log-derived cost is now **0.6412 THB/g**, not 241.67 — the landmine
+that made a blanket recompute unsafe is gone.
+
+⛔ **Still open (MC 00a81c22, human-gated):** Part B — the pack factors, the 365 unresolved
+stubs, and `cost_source`. For the spice/oil cases the STORED cost is the plausible one and
 purchase_logs is the corrupt source (a 100 g pack booked as 1 kg), so a blanket
-`fn_recalc_wac_for_product` is destructive — on RAW-COFFEE-ESPRESSO it yields
-241.67 THB/g instead of ~0.66. Normalize quantities against the receipt images first.
+`fn_recalc_wac_for_product` is **still destructive** until a human confirms each pack size.
+The procedure and its safety net — recompute only where the normalized log agrees with the
+hand-set cost to within 5% — are in
+`docs/projects/admin/plans/spec-purchase-logs-historical-repair.md` §6. Item 7, the OpEx
+`supplier_id` backfill, is untouched.
 
 ### New (Phase 12)
 - `fn_create_purchase_order(JSONB)` — Creates PO with lines, auto-populates prices from supplier_catalog

@@ -195,6 +195,9 @@ erDiagram
         NUMERIC price_per_unit
         NUMERIC total_price
         DATE invoice_date
+        TEXT barcode "Mig 459 — written at import; closes the learning loop"
+        TIMESTAMPTZ voided_at "Mig 460 — retracted row; values kept as evidence, cost math skips it"
+        TEXT void_reason "Mig 460"
     }
 
     fin_categories {
@@ -549,7 +552,7 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `fn_open_batch(UUID)` | RPC | Open batch, shrink expires_at +12h | 018 |
 | `fn_transfer_batch(TEXT, TEXT)` | RPC | Move batch by barcode, log transfer | 018 |
 | `fn_update_cost_on_purchase()` | TRIGGER FN | WAC v4 (mig 459): skips when `nomenclature.cost_source = 'manual'` (a hand-set cost is a decision, not a guess) and rolls the average from `total_price / quantity` instead of the OCR's `price_per_unit`. Reads stock from v_inventory_by_nomenclature | 021, 050, 058, 459 |
-| `fn_recalc_wac_for_product(UUID)` | RPC | Recomputes WAC for one item from its purchase history. **Mig 459:** returns the stored cost untouched when `cost_source = 'manual'`, and the formula is `SUM(total_price)/SUM(quantity)` — was `SUM(price_per_unit*quantity)/SUM(quantity)`, a fabricated product that reproduced any OCR error in `price_per_unit`. ⛔ Do NOT run it broadly until the 20 bad-unit rows are normalized (MC 00a81c22 item 6): on RAW-COFFEE-ESPRESSO today's history yields 241.67 THB/g instead of ~0.66 | 459 |
+| `fn_recalc_wac_for_product(UUID)` | RPC | Recomputes WAC for one item from its purchase history. **Mig 459:** returns the stored cost untouched when `cost_source = 'manual'`, and the formula is `SUM(total_price)/SUM(quantity)` — was `SUM(price_per_unit*quantity)/SUM(quantity)`, a fabricated product that reproduced any OCR error in `price_per_unit`. **Mig 460:** also skips rows with `voided_at IS NOT NULL` — a retracted row keeps its values as evidence, so the filter has to be explicit. ⛔ The 20 bad-unit rows ARE now normalized (mig 460), and RAW-COFFEE-ESPRESSO's history yields **0.6412 THB/g**, not 241.67. Still do not run it broadly: the ~19 drifted items in MC 00a81c22 §6 need their pack sizes confirmed first, or a recompute will overwrite hand-set costs with pack-vs-kg errors | 459, 460 |
 | `fn_process_new_order(UUID)` | RPC | BOM explosion: order items -> production tasks | 022 |
 | `fn_run_mrp(UUID)` | RPC | MRP v2: reads stock from v_inventory_by_nomenclature (was inventory_balances) | 023, 058 |
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
