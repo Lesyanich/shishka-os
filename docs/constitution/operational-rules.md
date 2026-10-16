@@ -335,7 +335,7 @@ Every routing comment from one agent to another on a task with `executor_type = 
 
 > **`/code` is not a command.** `executor_type = "code"` is a task attribute, not something the CEO can type — no such slash command has ever existed. Routing to an executing agent means handing the CEO an MC task id to open in a **new session**. Never write `/code <id>` in a report or handoff.
 
-### CEO delivery gate (front-end tasks: `apps/admin-panel`, `apps/web`, `apps/kds`)
+### CEO delivery gate (front-end tasks: `apps/admin-panel`, `apps/web`)
 
 Any task that changes a user-facing surface closes to the CEO with a **working Vercel preview link** plus a one-line *"what changed / where to click"* (the exact route, e.g. `/menu` → Owner tab). This is an **acceptance criterion**, not a courtesy.
 

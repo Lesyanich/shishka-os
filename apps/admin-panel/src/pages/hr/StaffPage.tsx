@@ -10,6 +10,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { PaymentQrCard } from '../../components/hr/PaymentQrCard'
+import { StaffAccessPanel } from '../../components/hr/StaffAccessPanel'
 import {
   useStaffCards,
   type StaffCard,
@@ -17,6 +18,9 @@ import {
   type StaffPatch,
   type NewStaff,
 } from '../../hooks/use-staff-cards'
+import { useStaffAccess, type LoginStatus } from '../../hooks/use-staff-access'
+
+type StaffAccess = ReturnType<typeof useStaffAccess>
 
 const ROLE_BADGE: Record<string, string> = {
   owner: 'bg-amber-500/15 text-amber-300',
@@ -63,11 +67,16 @@ const STAFF_ROLES = ['cook', 'helper', 'prep', 'dishwasher', 'sous_chef', 'admin
 function StaffCardView({
   card,
   leaves,
+  loginStatus,
+  access,
   onUpdate,
   onChanged,
 }: {
   card: StaffCard
   leaves: LeaveBalance[]
+  /** From fn_staff_login_status — undefined when the person has no login. */
+  loginStatus: LoginStatus | undefined
+  access: Pick<StaffAccess, 'setAppRole' | 'setLogin' | 'fire' | 'revealPin'>
   onUpdate: (id: string, patch: StaffPatch) => Promise<void>
   /** Refetch after a write that bypasses onUpdate — the QR upload writes storage + the row. */
   onChanged: () => void
@@ -79,6 +88,7 @@ function StaffCardView({
 
   function startEdit() {
     setDraft({
+      name: card.name,
       monthly_salary: card.monthly_salary,
       employment_type: card.employment_type,
       nationality: card.nationality,
@@ -93,7 +103,9 @@ function StaffCardView({
   }
 
   async function save() {
-    await onUpdate(card.id, draft)
+    const name = draft.name?.trim()
+    if (!name) return // a staff member always has a name
+    await onUpdate(card.id, { ...draft, name })
     setEditing(false)
   }
 
@@ -119,7 +131,10 @@ function StaffCardView({
             <p className="text-[10px] text-slate-500">
               {card.role} · {card.is_active ? 'Active' : 'Inactive'}
               {card.fire_date && (
-                <span className="text-red-400"> · Fired {card.fire_date}</span>
+                <span className="text-red-400"> · Last day {card.fire_date}</span>
+              )}
+              {loginStatus?.is_blocked && (
+                <span className="text-red-400"> · login blocked</span>
               )}
             </p>
           </div>
@@ -127,6 +142,7 @@ function StaffCardView({
         {card.is_active && !editing && (
           <button
             onClick={startEdit}
+            aria-label={`Edit ${card.name}`}
             className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300 transition"
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -136,12 +152,14 @@ function StaffCardView({
           <div className="flex gap-1">
             <button
               onClick={save}
+              aria-label="Save"
               className="rounded p-1 text-emerald-400 hover:bg-emerald-500/15 transition"
             >
               <Check className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => setEditing(false)}
+              aria-label="Cancel"
               className="rounded p-1 text-slate-500 hover:bg-slate-800 transition"
             >
               <X className="h-3.5 w-3.5" />
@@ -179,6 +197,16 @@ function StaffCardView({
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <div className="col-span-2">
+            <EditField
+              label="Name"
+              value={draft.name ?? ''}
+              onChange={(v) => setDraft({ ...draft, name: v })}
+            />
+            <p className="mt-0.5 text-[9px] text-slate-600">
+              Changing the name does not change the login. A new person gets a new record.
+            </p>
+          </div>
           <EditField
             label="Salary (THB)"
             type="number"
@@ -205,6 +233,21 @@ function StaffCardView({
           <EditField label="Tax ID" value={draft.tax_id ?? ''} onChange={(v) => setDraft({ ...draft, tax_id: v || null })} />
         </div>
       )}
+
+      {/* Access — tier, login, firing. The rule itself is in the DB (mig 454). */}
+      <StaffAccessPanel
+        staffId={card.id}
+        staffName={card.name}
+        appRole={card.app_role}
+        isActive={card.is_active}
+        fireDate={card.fire_date}
+        status={loginStatus}
+        onSetRole={access.setAppRole}
+        onSetLogin={access.setLogin}
+        onFire={access.fire}
+        onRevealPin={access.revealPin}
+        onChanged={onChanged}
+      />
 
       {/* Payment QR — how this person actually gets paid on a transfer. */}
       <PaymentQrCard
@@ -374,7 +417,13 @@ function AddStaffForm({
 
 export function StaffPage() {
   const { staff, leaveBalances, isLoading, updateStaff, createStaff, refetch } = useStaffCards()
+  const access = useStaffAccess()
   const [showAddForm, setShowAddForm] = useState(false)
+
+  // A role change or a firing rewrites the row AND (via trigger) the login.
+  async function refetchAll() {
+    await Promise.all([refetch(), access.refetchStatus()])
+  }
 
   if (isLoading) {
     return (
@@ -409,8 +458,10 @@ export function StaffPage() {
             key={s.id}
             card={s}
             leaves={leaveBalances.filter((l) => l.staff_id === s.id)}
+            loginStatus={access.loginStatus[s.id]}
+            access={access}
             onUpdate={updateStaff}
-            onChanged={refetch}
+            onChanged={refetchAll}
           />
         ))}
       </div>

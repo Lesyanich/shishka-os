@@ -21,6 +21,6 @@ related:
 **Source of truth:** `docs/business/domains/ops.md` + `docs/bible/operations.md`
 
 - The daily playbook — locations, staff, daily standards, food safety, and KDS.
-- ⚠️ KDS lives in the dedicated `apps/kds/` app (not `apps/admin-panel/src/pages/kds/`), and the live roster includes cashier **Mint** — not the old "Lesia, Bas, Alex, Hein" list.
+- ⚠️ KDS lives in the admin panel's `/kitchen/*` routes (the standalone `apps/kds/` app was removed on 2026-10-09). The live roster is on `/hr/staff` — Mint, Alex, Hein and Noe Noe have left.
 
 _See also:_ [[Operations/Locations]], [[Operations/Staff]], [[Operations/KDS]]

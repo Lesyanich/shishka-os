@@ -37,6 +37,8 @@ export interface LeaveBalance {
 }
 
 export interface StaffPatch {
+  /** Display name. Renaming the same person is fine; giving the row to someone else is not (spec P1). */
+  name?: string
   monthly_salary?: number | null
   employment_type?: string | null
   nationality?: string | null
