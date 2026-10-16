@@ -1,5 +1,5 @@
 -- =============================================================================
--- 463_analytics_views_s1.sql
+-- 466b_analytics_views_s1.sql
 -- S1 of docs/plans/spec-stock-control-analytics.md (MC 1be5f592)
 --
 -- Creates the 14 v_analytics_* read-only views (spec section 4), populates
@@ -856,7 +856,7 @@ WHERE a.nomenclature_id = n.id
 -- -----------------------------------------------------------------------------
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
 VALUES (
-  '463_analytics_views_s1.sql',
+  '466b_analytics_views_s1.sql',
   'claude-code',
   NULL,
   'S1 stock-control analytics: 14 v_analytics_* security_invoker views (Asia/Bangkok ISO weeks, refund-aware, PF->RAW explosion depth<=3) + nomenclature.count_class ABC population (MC 1be5f592)'
