@@ -3,7 +3,9 @@
 **Status:** DRAFT — awaiting CEO review. Migration `460` is written but **NOT APPLIED**.
 **Depends on:** migration `459` (applied 2026-10-16; **PR #596 is now merged**). 460 lands after it.
 **Sibling:** migration `462` (`matcher_skip_soft_deleted_targets`) fixes `fn_match_nomenclature` and is
-**already applied** (PR #598). It shipped as 462, not 461. 460 and 462 touch disjoint objects —
+**already applied** (PR #598). It shipped as 462, not 461 — there is no 461.
+**Migration 463 is reserved** for the `fn_match_nomenclature` level-1c `voided_at` predicate,
+which must land *after* 460 because that is where the column is added. 460 and 462 touch disjoint objects —
 462 replaced `fn_match_nomenclature`, 460 replaces only `fn_recalc_wac_for_product` — so the
 independence held in both directions. **Note the apply order is 459 → 462 → 460**, which is not
 filename order.
@@ -355,9 +357,31 @@ none is left. NULL is the right answer rather than a pointer: junk has no correc
 line belongs in the unmatched queue. Note these stubs are tagged `[JUNK-NO-MATCH]`, **not**
 `[MERGED->CODE]` — there is deliberately no pointer for 461 to follow.
 
-The 6 `sku` rows **cannot** be handled the same way: `sku.nomenclature_id` is `NOT NULL`. They
-will keep pointing at a tombstoned item, which is exactly 461's case — the ladder must refuse a
-soft-deleted target. Flagged to 461's author rather than worked around here.
+The 6 `sku` rows **cannot** be handled the same way: `sku.nomenclature_id` is `NOT NULL`, so they
+keep pointing at a tombstoned item. **462's author confirmed this is already safe**, verified
+against the live function: `name:tombstone` fires only on a literal `MERGED->` pointer, so it
+follows `[MERGED->CODE]` and ignores `[JUNK-NO-MATCH]`; 462's filters refuse a deleted target at
+every level that could otherwise return one; and the prefix strip is `MERGED->`-only, so a junk
+tombstone normalizes to `junknomatch…` and can never collide at the name levels either. Those 6
+rows therefore resolve to **nothing** after 460 and the line goes to `unmatched_items` — the
+right outcome for junk. They also note `[JUNK-NO-MATCH]` is not new: **6** such tombstones and
+**107** `[MERGED->` ones are already live, so 460's 13 join an already-safe population.
+
+### 5.1c One of the two eggplant repoints is redundant now; the other is not
+
+462's author expected both to be redundant post-462, since mig 325's tombstone does the work once
+the retired target stops shadowing it. Re-tested against the live ladder — it holds for one:
+
+| catalog row | resolves to, today | verdict |
+|---|---|---|
+| `98718b35` "Green Stem Eggplant **per kg**" | `RAW-EGGPLANT` via `name:tombstone` | **redundant** — kept anyway, it agrees with the ladder and the stored row is still wrong data |
+| `7c830126` "Green Stem Eggplant **1 kg per pack**" | `RAW-AUTO-81812ca5` via `name:existing_stub` | **load-bearing** — only §9c supplies the answer |
+
+The difference is word order. `7c830126` normalizes to `greenstemeggplant1kgperpack`; the nearest
+mig-325 tombstone (`RAW-AUTO-eee9ce2d`) is `greenstemeggplantperpack1kg`. Same words, different
+order, so exact match fails and the ladder correctly refuses to guess. That is the exact-match
+rule working as designed — **and its limit**: a human can see the two names are the same product.
+It is also why 460's T1 merge of `RAW-AUTO-81812ca5 → RAW-EGGPLANT` is still necessary.
 
 ### 5.1b A deterministic stub code can collide two unrelated products
 

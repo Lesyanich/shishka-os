@@ -270,6 +270,13 @@ UPDATE public.expense_ledger el
 --    value intact, and teach the WAC path to skip voided rows.
 --    Nothing is hard-deleted — mig 325 explicitly forbids that.
 -- ──────────────────────────────────────────────────────────────────────────
+-- ORDERING IS LOAD-BEARING: the column is added HERE, before §8b replaces
+-- fn_recalc_wac_for_product to reference it. plpgsql resolves column references at
+-- EXECUTION, so a function mentioning voided_at before the column exists would fail
+-- at call time with "column does not exist". Same transaction, so both or neither.
+-- Do not split these two sections, and do not let any earlier migration reference
+-- voided_at — 462's author reserved 463 for the fn_match_nomenclature level-1c
+-- predicate precisely so it lands AFTER this.
 ALTER TABLE public.purchase_logs
   ADD COLUMN IF NOT EXISTS voided_at   timestamptz,
   ADD COLUMN IF NOT EXISTS void_reason text;
@@ -333,8 +340,8 @@ $function$;
 -- Other readers of purchase_logs that may want `voided_at IS NULL` later, listed
 -- rather than changed here (out of scope, and one of them is being edited by 461):
 --   fn_match_nomenclature level 1c — learns from purchase history by barcode; a
---     voided row should not teach the matcher. That function belongs to migration
---     461, in flight in another session; flagged to its author rather than edited.
+--     voided row should not teach the matcher. RESERVED AS MIGRATION 463 by 462's
+--     author, to land AFTER 460 so the column exists when the function runs.
 --   v_data_health, v_data_health_items_legacy, pack_info_sweep_candidates,
 --   fn_validate_reconciliation, fn_learn_category_correction — informational.
 
@@ -399,6 +406,25 @@ UPDATE public.supplier_catalog
 -- 9c. Two more catalog rows point "Green Stem Eggplant" at RAW-THAI-EGGPLANT, which is
 --     (a) a different vegetable and (b) SOFT-DELETED. Repoint them at RAW-EGGPLANT, the
 --     canonical mig 325 chose for this exact product name.
+--
+--     POST-462 RE-TEST, per review from 462's author. They expected both rows to be
+--     redundant now, because mig 325's tombstone does the work once the retired target
+--     stops shadowing it. That holds for ONE of the two, not both:
+--
+--       98718b35 "Green Stem Eggplant per kg"        -> RAW-EGGPLANT  (name:tombstone)
+--                 REDUNDANT — mig 325's tombstone RAW-AUTO-ceab8890 normalizes to
+--                 'greenstemeggplantperkg', an exact match. Kept anyway: the repoint
+--                 agrees with the ladder, and a catalog row pointing at a retired item
+--                 is still wrong data.
+--
+--       7c830126 "Green Stem Eggplant 1 kg per pack" -> RAW-AUTO-81812ca5 (name:existing_stub)
+--                 LOAD-BEARING — normalizes to 'greenstemeggplant1kgperpack', while the
+--                 nearest tombstone (RAW-AUTO-eee9ce2d) is 'greenstemeggplantperpack1kg'.
+--                 Same words, different order, so exact match fails and the ladder
+--                 correctly refuses to guess. Only this UPDATE supplies the answer.
+--
+--     That word-order near-miss is the ladder's exact-match rule working as designed —
+--     and its limit: a human can see the two names are the same product.
 --     ⚠️ THE REAL FINDING: the ladder resolved onto a soft-deleted canonical. Only the
 --     `name:nomenclature` level filters is_deleted=false; the supplier_catalog levels do
 --     not. A one-line fix for fn_match_nomenclature — see the spec's §9 follow-ups.
