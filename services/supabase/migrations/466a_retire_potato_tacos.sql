@@ -1,4 +1,4 @@
--- 466_retire_potato_tacos.sql
+-- 466a_retire_potato_tacos.sql
 -- MC 2dceda60 — CEO 2026-10-16: "вижу что на сайте в продаже все еще Картофельные
 -- тако - мы больше их не продаем! сделать неактивными". Scope confirmed the same
 -- day: FULL retirement, site AND till.
@@ -252,7 +252,7 @@ END
 $verify$;
 
 INSERT INTO public.migration_log (filename, applied_by, status, notes)
-VALUES ('466_retire_potato_tacos.sql', 'claude-opus-session-5bddb375', 'success',
+VALUES ('466a_retire_potato_tacos.sql', 'claude-opus-session-5bddb375', 'success',
         'MC 2dceda60 — CEO 2026-10-16 "we no longer sell Potato Tacos, make them inactive", scope confirmed '
      || 'site AND till. Retired 9 rows (7 live tacos 69/69/69/69 + 89/89/89, the 59 Cheese & Mushroom that was '
      || 'web-visible but already unsellable, and SALE-BUNDLE_MANAKISH_4 Set x4 319 which was still ringing at '
