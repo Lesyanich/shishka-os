@@ -32,9 +32,61 @@ Three roles:
 ## RPCs / Triggers
 
 ### Existing
-- `fn_update_cost_on_purchase()` — Trigger: on purchase_logs INSERT → WAC updates nomenclature.cost_per_unit
+- `fn_update_cost_on_purchase()` — Trigger: on purchase_logs INSERT → WAC updates nomenclature.cost_per_unit. **Mig 459:** skips an item whose `cost_source = 'manual'`, and averages `total_price / quantity` rather than the OCR's `price_per_unit`
 - `fn_predictive_procurement(UUID)` — Recursive BOM walk → shortage array (used by MRP and WasteTracker)
-- `fn_approve_receipt(JSONB)` — v11: receipt approval + receiving_records side effect
+- `fn_approve_receipt(JSONB)` — v17 (mig 459): receipt approval + receiving_records side effect. See § Import path below
+- `fn_match_nomenclature(UUID, TEXT, TEXT, TEXT, TEXT)` — **Mig 459.** The receipt-line → nomenclature ladder, in the DB. **Mig 462:** every level filters `nomenclature.is_deleted = false`
+- `fn_normalize_product_name(TEXT)` — **Mig 459.** Shared matching normalizer
+- `fn_purchase_log_import_guard()` — **Mig 459.** BEFORE INSERT on purchase_logs: date window + quantity×price vs total
+
+## Import path — how a receipt line finds its ingredient (mig 459, MC 00a81c22)
+
+Until migration 459 `fn_approve_receipt` had **no matcher**: a line without a
+`nomenclature_id` in the payload was given a fresh `RAW-AUTO-<random>` stub. The
+suffix was random, so the same product bred a new stub on every receipt — 415 of
+984 purchase rows (THB 67,714) ended up on stubs that reach no dish.
+
+v17 resolves every food line through `fn_match_nomenclature` **before** anything
+is minted:
+
+1. **barcode** → `supplier_catalog` → `sku` → `purchase_logs` history → `correction_rules`
+2. **supplier_sku** (+ supplier) → `supplier_catalog` → catalog-barcode cross-reference → history
+3. **normalized exact name** → `supplier_catalog` (4 name columns) → `nomenclature` → `nomenclature.aliases` → mig-325 `[MERGED->CODE]` tombstones
+4. **last resort:** a stub whose code is `RAW-AUTO-` + md5 of the normalized name, so a
+   repeat item reuses one stub, plus an `unmatched_items` row carrying expense_id,
+   barcode and supplier so a human can actually resolve it.
+
+Three rules worth knowing:
+
+- **The name levels require NORMALIZED EXACT equality and refuse to guess** when two
+  canonical items match. The edge function (`functions/_shared/nomenclature.ts`)
+  still falls back to `ILIKE '%name%'`; that is how "Three Ladies rice noodles" and
+  "Boran rice paper" got swapped, and the DB ladder deliberately will not do it.
+- **`barcode` and `sku_id` are written to purchase_logs.** v16 omitted them, which
+  switched off the matcher's own "previously approved by barcode" level — every
+  approval taught the system nothing.
+- **`conversion_factor` comes from the catalog row the ladder matched**, not from a
+  `nomenclature_id` that does not exist yet, so a first-time purchase normalizes too.
+- **No level can return a RETIRED item (mig 462).** Five levels resolved through
+  `supplier_catalog` / `sku` without filtering `nomenclature.is_deleted`, so a bad
+  catalog row could book a purchase onto a canonical someone had deliberately
+  retired — `"Water"` onto RAW-MORNING-GLORY (which is why morning glory cost the
+  price of a water delivery), and barcode `8853478002111` onto the RAW-MANGO that
+  mig 390 replaced with RAW-MANGO_FRESH, silently undoing that canonicalization on
+  the next receipt. Measured surface: 58 `supplier_catalog` rows and 40 `sku` rows,
+  26 of them reachable by barcode — the ladder's highest-confidence level. Such a
+  line now falls through to the exact-name levels and, failing those, mints a
+  visible stub queued in `unmatched_items`. Falling through cannot land on a worse
+  match: the DB ladder has no fuzzy level, so the alternatives are exact-name hits
+  or a reviewable stub — minting a stub beats silently booking onto the wrong item,
+  which is the whole premise of 459.
+
+⛔ **Still open (MC 00a81c22 items 6-7, human-gated):** the 20 rows whose
+`quantity × price ≠ total`, the re-dedupe of the 415 stub-bound rows, and the WAC
+recompute. For the spice/oil cases the STORED cost is the plausible one and
+purchase_logs is the corrupt source (a 100 g pack booked as 1 kg), so a blanket
+`fn_recalc_wac_for_product` is destructive — on RAW-COFFEE-ESPRESSO it yields
+241.67 THB/g instead of ~0.66. Normalize quantities against the receipt images first.
 
 ### New (Phase 12)
 - `fn_create_purchase_order(JSONB)` — Creates PO with lines, auto-populates prices from supplier_catalog
