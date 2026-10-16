@@ -35,7 +35,7 @@ Three roles:
 - `fn_update_cost_on_purchase()` — Trigger: on purchase_logs INSERT → WAC updates nomenclature.cost_per_unit. **Mig 459:** skips an item whose `cost_source = 'manual'`, and averages `total_price / quantity` rather than the OCR's `price_per_unit`
 - `fn_predictive_procurement(UUID)` — Recursive BOM walk → shortage array (used by MRP and WasteTracker)
 - `fn_approve_receipt(JSONB)` — v17 (mig 459): receipt approval + receiving_records side effect. See § Import path below
-- `fn_match_nomenclature(UUID, TEXT, TEXT, TEXT, TEXT)` — **Mig 459.** The receipt-line → nomenclature ladder, in the DB
+- `fn_match_nomenclature(UUID, TEXT, TEXT, TEXT, TEXT)` — **Mig 459.** The receipt-line → nomenclature ladder, in the DB. **Mig 462:** every level filters `nomenclature.is_deleted = false`
 - `fn_normalize_product_name(TEXT)` — **Mig 459.** Shared matching normalizer
 - `fn_purchase_log_import_guard()` — **Mig 459.** BEFORE INSERT on purchase_logs: date window + quantity×price vs total
 
@@ -67,6 +67,19 @@ Three rules worth knowing:
   approval taught the system nothing.
 - **`conversion_factor` comes from the catalog row the ladder matched**, not from a
   `nomenclature_id` that does not exist yet, so a first-time purchase normalizes too.
+- **No level can return a RETIRED item (mig 462).** Five levels resolved through
+  `supplier_catalog` / `sku` without filtering `nomenclature.is_deleted`, so a bad
+  catalog row could book a purchase onto a canonical someone had deliberately
+  retired — `"Water"` onto RAW-MORNING-GLORY (which is why morning glory cost the
+  price of a water delivery), and barcode `8853478002111` onto the RAW-MANGO that
+  mig 390 replaced with RAW-MANGO_FRESH, silently undoing that canonicalization on
+  the next receipt. Measured surface: 58 `supplier_catalog` rows and 40 `sku` rows,
+  26 of them reachable by barcode — the ladder's highest-confidence level. Such a
+  line now falls through to the exact-name levels and, failing those, mints a
+  visible stub queued in `unmatched_items`. Falling through cannot land on a worse
+  match: the DB ladder has no fuzzy level, so the alternatives are exact-name hits
+  or a reviewable stub — minting a stub beats silently booking onto the wrong item,
+  which is the whole premise of 459.
 
 ⛔ **Still open (MC 00a81c22 items 6-7, human-gated):** the 20 rows whose
 `quantity × price ≠ total`, the re-dedupe of the 415 stub-bound rows, and the WAC
