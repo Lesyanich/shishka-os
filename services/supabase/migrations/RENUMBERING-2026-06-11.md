@@ -95,3 +95,58 @@ Kept (row already matched repo name): `273_recipes_flow_location.sql`,
 Note: `280`/`281` are **not free** — `280_dip_serving_modifiers_and_hide_variants.sql`
 and `281_dip_bread_choice_default_bun.sql` are applied to prod from an unmerged
 branch. Hence the log-sync migration takes the next clear number, `282`.
+
+---
+
+## Addendum — 2026-10-16 (duplicate 463/465/466)
+
+> Branch: `fix/menu/allergen-tag-backfill`
+> Migration: `472_renumber_463_465_466_collision_log_sync.sql`
+
+Three more colliding prefixes appeared within about half an hour of each other
+when four sessions applied migrations to prod in parallel and merged without
+renumbering. All six files were already applied; this is a repo + log rename,
+prod schema untouched. Same rule as above: earliest-applied keeps its name, each
+later duplicate moves to `<anchor><letter>_` where anchor = the numeric prefix
+of the latest kept-name migration applied strictly before it (by `applied_at`).
+
+Applied order on 2026-10-16 (UTC), keepers marked `*`:
+
+```
+12:45:47 * 463_ru_translations_catch_up_wraps
+12:49:40 * 464_menu_translations_owner_rights_freshness
+12:50:33 * 460_purchase_logs_historical_repair
+13:05:00 * 465_pack_factor_normalization
+13:10:27 * 466_tomato_paste_pack_factor
+13:11:03   466_retire_potato_tacos               -> 466a
+13:14:25   463_analytics_views_s1                -> 466b
+13:15:38 * 467_unlink_stale_taco_loyverse_pointer
+13:17:58   465_ru_hero_no_harm_moves_to_subline  -> 467a
+13:37:53 * 468_count_class_clear_stubs_and_deleted
+15:19:10 * 469_allergen_tag_backfill
+```
+
+| Old | New | migration_log row |
+|---|---|---|
+| `466_retire_potato_tacos.sql` | `466a_retire_potato_tacos.sql` | renamed by 472 |
+| `463_analytics_views_s1.sql` | `466b_analytics_views_s1.sql` | renamed by 472 |
+| `465_ru_hero_no_harm_moves_to_subline.sql` | `467a_ru_hero_no_harm_moves_to_subline.sql` | renamed by 472 |
+
+`470` and `471` are **not free** — `470_th_ingredients_part2.sql` and
+`471_ru_new_allergen_tags_and_worklist_drops_dish_names.sql` are applied to prod
+from an unmerged branch. Hence the log-sync migration takes `472`.
+
+### This is the third time, and the cause is still unaddressed
+
+2026-06-11 renamed 37 files, 2026-06-14 another three, and this round another
+three — all from the same thing: a number is chosen as "max + 1 at the moment I
+look", which cannot hold when several sessions apply migrations in the same
+minute. While *this* addendum was being written, prod's `migration_log` already
+accumulated further same-number pairs at 466, 467, 468 and 469 from branches not
+yet merged; they are not in the repo, so they are out of scope here and will
+collide again on merge.
+
+A renumbering pass cleans up after the problem; it does not prevent the next
+one. The durable fix is an allocation mechanism — reserving the number at the
+moment a migration is first applied, so two sessions cannot be handed the same
+one.

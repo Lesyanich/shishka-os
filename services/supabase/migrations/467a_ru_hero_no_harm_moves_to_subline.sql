@@ -1,4 +1,4 @@
--- 465_ru_hero_no_harm_moves_to_subline.sql
+-- 467a_ru_hero_no_harm_moves_to_subline.sql
 -- CEO copy change (2026-10-16, MC f91194f7): «Без вреда» moves out of the Russian hero title and
 -- opens the subline instead.
 --
@@ -24,7 +24,7 @@ SET value = value
 WHERE entity = 'site_content' AND entity_key = 'hero' AND field = 'data' AND lang = 'ru';
 
 INSERT INTO migration_log (filename, applied_by, checksum, notes)
-VALUES ('465_ru_hero_no_harm_moves_to_subline.sql', 'claude-opus-session-20399950', NULL,
+VALUES ('467a_ru_hero_no_harm_moves_to_subline.sql', 'claude-opus-session-20399950', NULL,
   'RU hero: «Без вреда» moves from the title to the head of the subline (MC f91194f7)')
 ON CONFLICT DO NOTHING;
 
