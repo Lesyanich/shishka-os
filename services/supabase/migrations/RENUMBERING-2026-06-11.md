@@ -150,3 +150,83 @@ A renumbering pass cleans up after the problem; it does not prevent the next
 one. The durable fix is an allocation mechanism — reserving the number at the
 moment a migration is first applied, so two sessions cannot be handed the same
 one.
+
+---
+
+## Addendum — 2026-10-16 evening: the cause is now addressed
+
+> MC task: `c520decf-8ea1-45a8-b3dc-c55240ede544`
+> Migration: `483_migration_number_allocator.sql`
+> Spec: `docs/plans/spec-migration-number-allocator.md`
+> Rule: `docs/constitution/technical-rules.md` § RULE-MIGRATION-NUMBERING
+
+The section above ends: *"A renumbering pass cleans up after the problem; it does
+not prevent the next one. The durable fix is an allocation mechanism."* That
+mechanism now exists.
+
+### What happened in the hours after the third pass
+
+The third pass (mig `472`) landed at 15:27. Before the evening was out the race
+fired **four more times**, twice inside a cleanup:
+
+| Time | Event |
+|---|---|
+| 15:37 | `473_analytics_hourly_heat_weekly.sql` applied |
+| 15:39 | `479_renumber_th_migrations_log_sync.sql` renumbers the five TH migrations `466-471` → `473-478`, assigning **473** to `dish_names` — two minutes after 473 was taken. **Four collisions resolved, a fifth created.** |
+| 15:43 | `480_retire_rice_paper_rolls.sql` applied, while `480_cost_trust_views.sql` already held 480 (it had just been renumbered there out of a 469 collision) |
+| 15:51 | `481_unlink_stale_manakish_loyverse_pointers.sql` applied |
+| ~15:55 | This allocator migration, written as `481`, finds 481 **and** 482 taken while it is being tested. Applied as `483`. |
+
+The lesson is not that the cleanups were careless. It is that **the repair path
+used the same rule as the thing it was repairing** — "max + 1 at the moment I
+look" — and that rule is racy no matter who runs it.
+
+### The four collisions this round was asked to resolve
+
+`466`, `467`, `468`, `469` (nine files, five unmerged) were all resolved during
+2026-10-16 by the owning sessions, which renumbered forward rather than by letter
+suffix because their files were unmerged:
+
+| Was | Became | By |
+|---|---|---|
+| `466_dish_names_stay_english_in_every_language.sql` | `473a_…` | mig 479 (+ a later fix off 473) |
+| `467_th_translations_labels.sql` | `474_…` | mig 479 |
+| `468_th_descriptions_and_allergen_clauses.sql` | `475_…` | mig 479 |
+| `469_th_ingredients_part1.sql` | `476_…` | mig 479 |
+| `469_cost_trust_views.sql` | `482_…` | owning session |
+
+`466`, `467`, `468`, `469` keep the files that were already on `main`. **Nothing
+is outstanding from that set.**
+
+### State at the time of writing
+
+- **Actionable collisions: zero.** `SELECT * FROM v_migration_collisions WHERE NOT is_pre_guard` → 0 rows.
+- **File tree: clean.** `migration-canary.sh --check-numbering` → OK, 439 files, HEAD max 482.
+- **50 frozen log-only duplicates** remain in `migration_log` (latest 2026-10-04,
+  mostly the `400`-`418` band). These are branches whose files were renamed in the
+  repo *without* a `migration_log.filename` UPDATE — the log↔repo reconciliation
+  debt this document has noted since the first pass. They are flagged
+  `is_pre_guard = true` and **block nothing**: the canary reads the file *tree*,
+  not the log, and the tree has no duplicates. Reconciling them is cosmetic and
+  out of scope; they are now at least visible in one query.
+
+### The standing rule from here
+
+1. **New migration** → claim the number, never choose it:
+   `claim_migration_number(slug, session_id)` (MC MCP tool), or
+   `scripts/migration-number.sh claim <slug>`.
+2. **Repairing an already-applied duplicate** → still a letter suffix anchored by
+   apply order, exactly as the three passes above did it — but claim the letter
+   too, so two sessions repairing at once cannot both take `469a`:
+   `scripts/migration-number.sh letter <anchor> <slug>`. Ship the
+   `migration_log.filename` UPDATE in the same branch as the rename.
+3. **Gap numbers are still never reused.** `migration_numbers` rows are never
+   deleted, so an abandoned claim burns its number permanently. The rule is now
+   structural rather than remembered.
+4. **A fourth bulk pass should not be necessary.**
+   `trg_migration_log_guard_number` rejects a duplicate prefix on
+   `INSERT OR UPDATE OF filename`, so prod cannot accept the second file at all.
+   A session that picks by eye now fails at *apply* time, with one file to
+   rename — instead of at *merge* time, with the whole repo blocked. If a row
+   ever appears with `is_pre_guard = false`, the trigger was disabled; that is
+   the only way back into this state.

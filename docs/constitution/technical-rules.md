@@ -166,6 +166,55 @@ Workflow:
 
 ---
 
+## RULE-MIGRATION-NUMBERING
+
+**Never pick a migration number by looking.** Not `ls services/supabase/migrations`, not the max in `origin/main`, not the max in your worktree. Claim it:
+
+```
+claim_migration_number(slug: "retire_potato_tacos", session_id: "<your session id>")
+```
+
+(Mission Control MCP tool — preferred. Shell equivalent: `scripts/migration-number.sh claim <slug>`.)
+
+**Why looking cannot work.** A number is consumed when a migration is **applied**, not when it is merged. A session that has not merged yet has already burned numbers above `origin/main`'s max, and you cannot see them. Two sessions that look in the same minute take the same number — and `migration-canary.sh --check-numbering` fails on **any** duplicate prefix in the tree, so the moment both branches reach `main`, *every* session in the repo is blocked from committing *any* migration until someone renumbers by hand.
+
+`migration_log` in prod is the only authority. `fn_claim_migration_number()` reads it under an advisory lock and inserts into `migration_numbers`, whose `PRIMARY KEY (number, letter)` makes a double-issue physically impossible.
+
+**Prod rejects a duplicate.** `trg_migration_log_guard_number` fires `BEFORE INSERT OR UPDATE OF filename` on `migration_log` and raises if the full prefix is taken. If you see:
+
+```
+ERROR: migration number 473 is already taken by 473_analytics_hourly_heat_weekly.sql
+       (applied by claude-opus-session-bbb at 2026-10-16 15:37), claimed by <session>
+HINT:  Next free number is 487 — ADVISORY, not reserved: another session can take it
+       between now and your apply. Claim it, do not just rename to it:
+       SELECT * FROM fn_claim_migration_number('<slug>', '<your-session-id>');
+       … Only your apply is blocked — nobody else is.
+```
+
+…you picked by eye. Claim a number, rename the file, re-apply. Do **not** disable the trigger.
+
+**Only the colliding apply is blocked.** The guard rejects *your* INSERT/UPDATE; no other session is affected. That is the point of catching it here rather than letting it reach `main`, where the canary blocks everyone — which is what used to happen, and what cost an unrelated session an afternoon on 2026-10-16.
+
+**Gap numbers are never reused.** Rows in `migration_numbers` are never deleted, so an abandoned claim permanently burns its number. That is intentional, and it is the old "never reuse a gap" rule now enforced structurally.
+
+**Letter suffixes are unchanged**, and are only for repairing an **already-applied** duplicate after the fact (see `services/supabase/migrations/RENUMBERING-2026-06-11.md`). `469` and `469a` are distinct everywhere — allocator, guard and canary. Claim one with `fn_claim_migration_letter(<anchor>, ...)`; two sessions repairing at once must not both pick `469a`, which is how the 2026-10-16 15:39 cleanup went wrong.
+
+**Visibility:**
+
+| Query | Answers |
+|---|---|
+| `SELECT fn_migration_number_high_water()` | highest number prod knows (applied + reserved) |
+| `SELECT * FROM v_migration_collisions` | duplicate numbers in the **log**. 50 rows are frozen pre-guard history and block nothing (the canary reads the **tree**). `is_pre_guard = false` should never appear. |
+| `SELECT * FROM v_migration_number_map` | every number with state: `applied` / `reserved` / `burned` / `gap` |
+| `check_migrations()` | adds `next_free_number`, `tree_duplicates` (blocks commits repo-wide), `log_collisions` |
+| `scripts/migration-number.sh status` | the above, from a shell |
+
+**The canary is not the problem.** It is the thing that catches this, and it stays strict and offline — a pre-commit hook that needs credentials and a network round-trip is a hook that gets bypassed. Online allocation and offline enforcement are deliberately separate. Never loosen `--check-numbering` to get a commit through.
+
+> Origin: 2026-10-16, MC `c520decf`, migration `483`. Three bulk renumbering cleanups (mig 267 — 37 files, mig 282, mig 472) failed to converge because they addressed the symptom. On 2026-10-16 the race fired four times in one afternoon, including once *inside a cleanup*: `479_renumber_th_migrations_log_sync` assigned `473` two minutes after `473` was taken, resolving four collisions and creating a fifth. It also took this migration's own number mid-build (written as 481, applied as 483).
+
+---
+
 # PART II — Code Patterns
 
 ## RULE-OLLAMA-MODEL-NAME-NORMALIZATION
