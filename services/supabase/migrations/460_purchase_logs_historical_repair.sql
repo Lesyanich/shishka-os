@@ -25,9 +25,11 @@
 -- NOT IN SCOPE, deliberately: no cost_per_unit changes, no WAC RECOMPUTE (the one
 -- function change is a filter added to fn_recalc_wac_for_product, which this migration
 -- never calls), no touching the 365 unresolved stubs, nothing deleted, no OpEx
--- supplier_id (item 7), and NO change to fn_match_nomenclature — migration 461 owns
--- that function and is in flight in another session. 460 and 461 are independent in
--- both directions: neither needs the other to have landed.
+-- supplier_id (item 7), and NO change to fn_match_nomenclature — that function is
+-- owned by migration 462 (matcher_skip_soft_deleted_targets), ALREADY APPLIED. It
+-- shipped as 462, not 461. The two touch disjoint objects: 462 replaced
+-- fn_match_nomenclature, 460 replaces only fn_recalc_wac_for_product.
+-- APPLY ORDER IS 459 -> 462 -> 460, which is not filename order.
 -- Part B skeletons are at the tail, commented out, for the CEO to fill in.
 --
 -- VERIFY BEFORE APPLYING: A/B on a throwaway local PG14 fixture built from
@@ -118,6 +120,10 @@ INSERT INTO tmp_void_dup VALUES
 --       RAW-AUTO-8f43d34d / da96d8ab / 05764dbf  "Water" -> RAW-MORNING-GLORY
 --       RAW-AUTO-ac4f864b  "Pineapple Juice CS"  -> RAW-PINEAPPLE (juice is not the fruit)
 --     Both come from poisoned supplier_catalog rows, not from the ladder's logic.
+--     RE-CHECKED AFTER 462 WAS APPLIED: 17 of the 18 below still resolve exactly as
+--     mapped. The 18th (81812ca5) now returns the stub instead of the soft-deleted
+--     RAW-THAI-EGGPLANT — that is 462 working, and the override below still supplies
+--     the answer the ladder cannot derive.
 CREATE TEMP TABLE tmp_merge (stub_code text PRIMARY KEY, target_code text) ON COMMIT DROP;
 INSERT INTO tmp_merge VALUES
  ('RAW-AUTO-672dbea6','RAW-CHEESE-PARMESAN'), ('RAW-AUTO-69679c09','RAW-SYRUP_CARAMEL'),
@@ -378,6 +384,13 @@ UPDATE public.nomenclature n
 --     fn_match_nomenclature skips rows WHERE sc.nomenclature_id IS NOT NULL, so
 --     nulling the link removes them from the ladder without deleting the price history.
 --     The right canonical for each is a CEO decision (spec §5.5).
+--     POST-462 STATUS, re-tested live: "Pineapple Juice _CS" STILL resolves onto
+--     RAW-PINEAPPLE at name:supplier_catalog, because that target is LIVE and 462 only
+--     blocks soft-deleted ones — so this row is still a live mis-resolution and this
+--     UPDATE is the only thing that fixes it. The Water row is now inert (its target is
+--     soft-deleted), but wrong catalog data is still wrong: it would bite again the
+--     moment anyone un-deletes morning glory. 462 stops the ladder RETURNING a bad row;
+--     it does not make the row correct.
 UPDATE public.supplier_catalog
    SET nomenclature_id = NULL, match_reviewed_at = NULL, updated_at = now()
  WHERE id IN ('6ed27304-6b3a-41d6-9acf-7ecd23bc6270',   -- Water -> MORNING-GLORY

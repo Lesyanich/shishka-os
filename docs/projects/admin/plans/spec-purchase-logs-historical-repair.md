@@ -2,8 +2,11 @@
 
 **Status:** DRAFT — awaiting CEO review. Migration `460` is written but **NOT APPLIED**.
 **Depends on:** migration `459` (applied 2026-10-16; **PR #596 is now merged**). 460 lands after it.
-**Sibling:** migration `461` fixes `fn_match_nomenclature` and is **in flight in another session**.
-460 and 461 are independent in both directions — neither needs the other to have landed.
+**Sibling:** migration `462` (`matcher_skip_soft_deleted_targets`) fixes `fn_match_nomenclature` and is
+**already applied** (PR #598). It shipped as 462, not 461. 460 and 462 touch disjoint objects —
+462 replaced `fn_match_nomenclature`, 460 replaces only `fn_recalc_wac_for_product` — so the
+independence held in both directions. **Note the apply order is 459 → 462 → 460**, which is not
+filename order.
 **Scope:** the damage already in the database. 459 stopped new damage and backfilled nothing.
 **Out of scope:** item 7 (OpEx `supplier_id` backfill, 289/389 rows).
 
@@ -282,15 +285,36 @@ Hand-checking the 23 found that the ladder is faithfully reproducing **poisoned
 The first is the root cause of §2.4: morning glory costs 30.00/kg because the only thing ever
 booked against it is a water delivery.
 
-**This is a live bug, not history.** Before 459 a "Water" line from that supplier minted a
-harmless stub. After 459 the ladder resolves it at level `name:supplier_catalog` — confidently,
-onto morning glory, with `conversion_factor 1`. 459 did not create the bad catalog row, but it
-turned a visible mess into a silent wrong answer.
+**UPDATE 2026-10-16 — migration 462 is now applied, and it neutralised three of these four.**
+This paragraph originally read "this is a live bug, not history", and that is no longer true for
+most of it. Re-tested against the live ladder after 462:
+
+| catalog line | resolves to, today | still dangerous? |
+|---|---|---|
+| `Pineapple Juice _CS` | **`RAW-PINEAPPLE`** at `name:supplier_catalog` | **YES** — the target is live, so 462 does not stop it |
+| `Water` | a stub (`name:existing_stub`) | no — 462 refuses it |
+| `Green Stem Eggplant` ×2 | a stub (`name:existing_stub`) | no — 462 refuses it |
+
+462 stops a level returning a **soft-deleted** item, and `RAW-MORNING-GLORY` and
+`RAW-THAI-EGGPLANT` are both soft-deleted — so those three fall through to the name levels now.
+`RAW-PINEAPPLE` is **live**, so juice still resolves onto whole fruit and only §9b fixes it.
+
+**A correction to my own §2.4, while we are here.** I described morning glory as a live canonical
+priced at 30 THB/kg off a water delivery. It has in fact been **soft-deleted since 2026-04-20**
+and feeds **0 BOMs**, so no dish cost was ever affected. The audit query I derived that claim from
+joined `purchase_logs` without filtering `is_deleted`. The repair is unchanged and still worth
+doing — the water row should not sit on a vegetable — but the severity was overstated and the
+"what cost should morning glory have?" question in §8 is moot: it is retired and in no recipe.
 
 460 nulls `nomenclature_id` on the first two (the ladder skips rows where it is NULL), which
 removes them from matching without destroying the price history; the right canonical for each is
 a CEO call (§5.5). The two eggplant rows get a deterministic answer instead — `RAW-EGGPLANT`,
 which migration 325 already chose for this exact product name — so no decision is needed there.
+
+Post-462 these are still worth doing, with the urgency re-ranked: the **pineapple row is a live
+mis-resolution today**, and the other three are now wrong-but-inert catalog data that would bite
+again the moment anyone un-deletes their target. 462 stops the ladder *returning* a bad row; it
+does not make the row correct. Cleaning the data is still ours.
 
 The rejected hits are therefore **not** in T1: `RAW-AUTO-8f43d34d`, `da96d8ab`, `05764dbf` (all
 "Water") and `ac4f864b` ("Pineapple Juice CS"). `RAW-AUTO-81812ca5` stays in T1 but merges into
@@ -615,9 +639,11 @@ not widened into this change.
 
 ## 9. Not done here, logged for later
 
-* ~~`fn_match_nomenclature` can resolve onto a soft-deleted canonical.~~ **Now in flight as
-  migration 461** in another session — not a follow-up for later. See §5.1a; 460 touches only the
-  four catalog rows it diagnosed, never the function.
+* ~~`fn_match_nomenclature` can resolve onto a soft-deleted canonical.~~ **Fixed and applied as
+  migration 462** (PR #598) — `AND n.is_deleted = false` added to the five levels that lacked it.
+  Re-verified afterwards: 17 of 460's 18 T1 merges resolve exactly as mapped, and the 18th
+  (`RAW-AUTO-81812ca5`) now returns the stub instead of the deleted `RAW-THAI-EGGPLANT`, which is
+  462 working. 460's override to `RAW-EGGPLANT` still adds the answer the ladder cannot derive.
 * Item 7 — OpEx `supplier_id` backfill (289/389). Deliberately out of scope.
 * The `unmatched_items` queue still has no reader (317 legacy rows with no context).
 * `_shared/nomenclature.ts` still falls back to `ILIKE '%name%'`, looser than the DB ladder — the
