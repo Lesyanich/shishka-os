@@ -131,10 +131,10 @@ Code in git worktrees is **invisible to main**. Before ending a session that use
 ## RULE-HOOK-WIRING
 
 Every hook `command` in `.claude/settings.json` **anchors its script on
-`"$CLAUDE_PROJECT_DIR"`**, quoted:
+`"${CLAUDE_PROJECT_DIR:-.}"`** — quoted, and with the `:-.` fallback:
 
 ```json
-"command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-guard-pretool.sh\""
+"command": "sh \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/git-guard-pretool.sh\""
 ```
 
 Never a bare relative path (`sh scripts/session-start.sh`). A relative command
@@ -142,8 +142,21 @@ resolves against the **hook process's** cwd, which is not necessarily the
 checkout the session is editing: in a worktree session the hook process sat in
 the parent checkout `/Users/lesianich/code/shishka`, so **the parent's copy of
 every hook ran** and a hook edited in the worktree was inert until merged *and*
-the parent synced — you cannot test a hook fix where you write it. The quotes
-are load-bearing: an unquoted expansion breaks on any path containing a space.
+the parent synced — you cannot test a hook fix where you write it.
+
+**Both decorations are load-bearing — do not "clean up" either one.** The quotes
+keep a path containing a space in one argument. The `:-.` covers the variable
+being unset or empty in the hook process: without it the command expands to
+`sh "/.claude/hooks/…"`, `sh` exits 127, and because a PreToolUse hook only
+blocks on exit 2, **the tool call proceeds** — the git guard and the claim gate
+would be off for every session, noisily but completely. With `:-.` that case
+degrades to `./…`, which is byte-for-byte the old relative behaviour. Measured,
+all three cases, by feeding the hook a real payload:
+
+| `CLAUDE_PROJECT_DIR` | `"${CLAUDE_PROJECT_DIR:-.}/…"` | `"$CLAUDE_PROJECT_DIR/…"` |
+|---|---|---|
+| set | exit 0, guard denies | exit 0, guard denies |
+| unset or empty | exit 0, guard denies (relative) | **exit 127, guard silent** |
 
 Changing a hook's wiring governs every future session, so prove it, don't reason
 about it: edit the hook in a worktree, start a session there, and confirm the
