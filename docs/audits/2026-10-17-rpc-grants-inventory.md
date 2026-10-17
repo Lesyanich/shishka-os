@@ -1151,3 +1151,94 @@ Renamed to `staff_tasks_read_auth`.
 **The staff-id harvest path is closed.** `staff`, `shifts`, `production_tasks`,
 `staff_task_assignees`, `staff_schedule_templates` and `staff_tasks` all deny anon, and a
 sweep of every table carrying a staff foreign key returns nothing.
+
+---
+
+# Step 11 — RBAC at the DB: the payroll/HR slice
+
+**MC** `61463954` · **migration** 523 · 2026-10-17
+
+## 11.1 The gap, and a correction to the task's own premise
+
+48 SECURITY DEFINER functions in `public` are executable by `authenticated`; **15 carried a
+role check, 33 did not.** Role separation for those is UI-only.
+
+The task said signed-in users "can call payroll RPCs", plural. **`fn_approve_payroll` was
+already gated** by migration 457 with
+`fn_assert_caller_role(ARRAY['owner'], 'Only owners can approve payroll')`. My first pass
+reported it ungated because the detector looked only for `fn_is_owner`, `fn_get_my_role`,
+`fn_has_app_role` and `app_role`. **There are five gate idioms in this schema**, and 457
+introduced a fifth. Approving was safe; **calculating was not.**
+
+Two genuinely ungated, both HR:
+
+- **`fn_calculate_payroll`** — destructive. Per the known payroll trap, a recalc **wipes
+  manually entered bonuses**. Active staff: 2 owners, 2 active task_managers (Mint's row is
+  `is_active = false` now), 0 cooks — so an active task_manager could wipe bonuses, and one
+  of those accounts signed in the same day this was measured.
+- **`fn_sync_holiday_credits`** — reads only, despite the name. But being DEFINER it bypasses
+  `holiday_credits_select`, which limits a non-owner to their own rows. Any signed-in user
+  could read every employee's holiday credits. The table states the rule; the function hands
+  out an exemption.
+
+## 11.2 Why `fn_assert_caller_role` and not `fn_is_owner()`
+
+`fn_is_owner()` is the more common local form, but the 457 helper is correct here: it returns
+early when `session_user <> 'authenticator'` (direct psql, cron) and when
+`auth.role() = 'service_role'` (edge functions), gating humans without locking automation
+out. `fn_is_owner()` would block both. Neither function has such a caller today — checked
+`cron.job`, every other function's source, both repos and all 15 edge functions — so this is
+future-proofing, plus the two payroll functions now read identically.
+
+Tiers mirror the UI, the convention 457 set (`fn_approve_po` allows `owner, task_manager`,
+matching `/receipts` and `/procurement`). Both functions here are reached only from
+`/hr/payroll` and `/hr/holidays`, both `RoleGuard minRole="owner"`.
+
+## 11.3 Patching a function whose repo copy is not what runs
+
+`fn_calculate_payroll` is a known repo-vs-prod drift case, so re-applying the committed
+version to add one line would silently revert whatever prod actually has. The gate is
+therefore inserted into the **live** definition programmatically — idempotent, asserting it
+found the function's opening `BEGIN`, aborting rather than guessing.
+
+That beats retyping 7.5 KB of payroll arithmetic into a migration where one slip corrupts
+wages. **The dry run proved it:** stripping the inserted line from the patched definition
+reproduced the previous one **byte for byte**, with exactly 93 and 96 bytes added.
+
+## 11.4 What is NOT proven — the honest part
+
+**The owner path through this gate has never run in production.** Migration 457 applied
+2026-10-09; the last payroll approval was 2026-08-31. So `fn_approve_payroll`'s identical
+gate has never been exercised by a real owner session, and that latent risk is now shared by
+the calculate step. A migration cannot test it: `fn_has_app_role` resolves `auth.uid()`,
+NULL without a JWT, so `SET LOCAL ROLE` proves nothing.
+
+What *was* verified is the data the gate depends on:
+
+```
+fn_has_app_role = EXISTS(SELECT 1 FROM staff
+                         WHERE auth_user_id = auth.uid() AND is_active AND app_role = ANY(...))
+Lesia — 'owner', is_active, linked to a real auth.users row, last sign-in 2026-10-17 07:55Z
+Bas   — 'owner', is_active, linked
+```
+
+So the predicate has everything it needs to return true for an owner. The residual risk is
+narrow and loud: a misfire gives the owner `42501 forbidden` on `/hr/payroll` — an error,
+not silent bad data — and **the next payroll run is the first live test**, for the calculate
+step and the already-shipped approve step alike.
+
+## 11.5 Still open on `61463954`
+
+**31 ungated SECURITY DEFINER functions**, which split by intended tier:
+
+- `owner`: `fn_set_canonical_cost`, `fn_confirm_dish_diets`, `fn_confirm_ingredient_diet`, …
+- `owner, task_manager`: the PO cluster (`fn_create_purchase_order`, `fn_update_po`,
+  `fn_delete_purchase_order`, `fn_archive_purchase_order`), `fn_approve_receipt_with_learning`,
+  `fn_receive_goods`, `fn_record_supplier_quote`, the shopping-list seeders
+- `cook` and up: the stocktake cluster, `fn_thaw_batch`, `fn_submit_stock_sheet`,
+  `fn_start_production_task`, `fn_create_batches_from_task`
+
+Gating the PO/receipt cluster to `owner` would **break Mint's actual job** — those are
+task_manager-tier screens. So each needs its tier read off the route table, not a blanket
+`owner`. Separately, narrowing the 59 views `authenticated` can read still needs a per-tier
+signed-in verification harness that does not exist.
