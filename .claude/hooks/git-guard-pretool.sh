@@ -21,16 +21,27 @@
 # honours it in its own env for cron-configured runners. Deliberately
 # NOT advertised in deny messages.
 #
-# Scope: THIS repo only. The hook process runs in the session repo, but
-# the command may target another one (`cd ~/other && git push origin
-# main`, `git -C /elsewhere commit`). Judging a foreign repo by this
-# repo's branch produced false denials — the agent-memory store is a
-# private notes repo whose main is not a deploy target, yet its pushes
-# were blocked by a rule about shishka-os production. So: resolve the
-# command's target repo, and exit silently when it is not ours. Repo
-# identity is the SHARED git dir (`--git-common-dir`), so sibling
-# worktrees of shishka-os all count as ours — their toplevels differ,
-# their common dir does not.
+# Scope: THIS repo only. The command may target another one (`cd ~/other
+# && git push origin main`, `git -C /elsewhere commit`). Judging a
+# foreign repo by this repo's branch produced false denials — the
+# agent-memory store is a private notes repo whose main is not a deploy
+# target, yet its pushes were blocked by a rule about shishka-os
+# production. So: resolve the command's target repo, and exit silently
+# when it is not ours. Repo identity is the SHARED git dir
+# (`--git-common-dir`), so sibling worktrees of shishka-os all count as
+# ours — their toplevels differ, their common dir does not.
+#
+# WHICH CHECKOUT GETS JUDGED (MC 8aafd8eb). A commit mutates the repo of
+# the directory the command runs IN, so that is the branch to judge — the
+# payload's `cwd`, not this hook process's cwd. They are not the same: the
+# hook can be spawned in the parent checkout while the command runs in a
+# worktree. That cost us a whole class of false denials — the parent
+# checkout sits on main, so BLOCK 1 refused EVERY commit from EVERY
+# worktree, on a correct feature branch, reporting "refusing to modify
+# main locally" and sending you hunting the command instead of the cwd.
+# Precedence: `git -C <dir>` > `cd <dir>` > payload cwd > this process's
+# cwd (the last only as a fallback, so a payload without `cwd` keeps the
+# old enforcing behaviour).
 #
 # Known limits (this layer stops accidents, not adversaries — the
 # server-side GitHub protection is the real fence):
@@ -55,6 +66,12 @@ TOOL=$(printf '%s' "$PAYLOAD" | jq -r '.tool_name // empty')
 
 CMD=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty')
 [ -z "$CMD" ] && exit 0
+
+# The directory the command will actually run in. Absent in older
+# payloads (and in this hook's own unit tests) → fall back to this
+# process's cwd, which is the pre-8aafd8eb behaviour.
+SESSION_DIR=$(printf '%s' "$PAYLOAD" | jq -r '.cwd // empty')
+[ -n "$SESSION_DIR" ] && [ -d "$SESSION_DIR" ] || SESSION_DIR="."
 
 # Cheap early-out: only care about commands that invoke git
 printf '%s' "$CMD" | grep -qE '(^|[;&|( ])git([ (]|$)' || exit 0
@@ -85,21 +102,28 @@ case "$TARGET_DIR" in                           # strip one layer of quoting
 esac
 case "$TARGET_DIR" in "~/"*) TARGET_DIR="$HOME/${TARGET_DIR#\~/}" ;; esac
 
-SESSION_ID=$(repo_id .)
-CTX_DIR="."
-if [ -n "$TARGET_DIR" ]; then
-  TARGET_ID=$(repo_id "$TARGET_DIR")
-  # Resolvably a DIFFERENT repo → not ours to police. Stay silent.
-  if [ -n "$TARGET_ID" ] && [ -n "$SESSION_ID" ] && [ "$TARGET_ID" != "$SESSION_ID" ]; then
-    exit 0
-  fi
-  # Ours, but maybe a sibling worktree → judge THAT checkout's branch.
-  [ -n "$TARGET_ID" ] && CTX_DIR="$TARGET_DIR"
-fi
-# Unresolvable path → CTX stays the session repo, i.e. we fall back to
+# "Ours" is anchored on where THIS SCRIPT lives, not on any cwd: the hook
+# ships inside shishka-os, so its own shared git dir is the one identity
+# that cannot drift when the session, the command and the hook process sit
+# in three different directories.
+OWN_ID=$(repo_id "$(dirname "$0")")
+
+CTX_DIR="$SESSION_DIR"
+[ -n "$TARGET_DIR" ] && [ -n "$(repo_id "$TARGET_DIR")" ] && CTX_DIR="$TARGET_DIR"
+# Unresolvable path → CTX stays the session dir, i.e. we fall back to
 # enforcing rather than skipping.
 
-REPO_ROOT=$( (cd "$CTX_DIR" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || pwd)
+# Resolvably a DIFFERENT repo → not ours to police. Stay silent. This is
+# what keeps a rule about shishka-os production out of, say, the private
+# agent-memory notes repo, whose own main is not a deploy target.
+CTX_ID=$(repo_id "$CTX_DIR")
+if [ -n "$CTX_ID" ] && [ -n "$OWN_ID" ] && [ "$CTX_ID" != "$OWN_ID" ]; then
+  exit 0
+fi
+
+REPO_ROOT=$( (cd "$CTX_DIR" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) \
+             || (cd "$SESSION_DIR" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) \
+             || pwd)
 BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
 deny() {

@@ -13,6 +13,8 @@
 HOOK=".claude/hooks/git-guard-pretool.sh"
 [ -f "$HOOK" ] || { echo "run me from the repo root"; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq required"; exit 1; }
+# Absolute, so a case can run the hook from a different cwd.
+HOOK_ABS="$(cd "$(dirname "$HOOK")" && pwd)/$(basename "$HOOK")"
 
 # A real git repo that is NOT this one, sitting on main.
 OTHER=$(mktemp -d)/other
@@ -41,6 +43,30 @@ run() {  # run <deny|warn|silent> <label> <command>
 }
 skip() { skip=$((skip + 1)); printf 'skip %-50s (%s)\n' "$1" "$2"; }
 
+# run_in <deny|warn|silent> <label> <command> <payload_cwd> <hook_cwd>
+# Same as run(), but sets the payload's `cwd` (empty = omit the key, i.e.
+# an older payload) and spawns the hook from <hook_cwd>. Needed because
+# MC 8aafd8eb is precisely about those two directories differing.
+run_in() {
+  exp=$1; label=$2; cmd=$3; pcwd=$4; hcwd=$5
+  if [ -n "$pcwd" ]; then
+    payload=$(printf '%s' "$cmd" | jq -Rs --arg c "$pcwd" \
+      '{tool_name:"Bash", cwd:$c, tool_input:{command:.}}')
+  else
+    payload=$(printf '%s' "$cmd" | jq -Rs '{tool_name:"Bash", tool_input:{command:.}}')
+  fi
+  out=$(printf '%s' "$payload" | ( cd "$hcwd" 2>/dev/null && sh "$HOOK_ABS" ) 2>&1)
+  if   printf '%s' "$out" | grep -q '"permissionDecision": *"deny"'; then got=deny
+  elif printf '%s' "$out" | grep -q 'additionalContext';             then got=warn
+  elif [ -z "$out" ];                                                then got=silent
+  else got="other($out)"; fi
+  if [ "$got" = "$exp" ]; then
+    pass=$((pass + 1)); printf 'ok   %-50s → %s\n' "$label" "$got"
+  else
+    fail=$((fail + 1)); printf 'FAIL %-50s → got %s, want %s\n' "$label" "$got" "$exp"
+  fi
+}
+
 echo "=== still protects THIS repo ==="
 run deny   "push origin main"                       "git push origin main"
 run deny   "push HEAD:main"                         "git push origin HEAD:main"
@@ -62,6 +88,31 @@ run silent "cd other && commit while on main"       "cd $OTHER && git commit -m 
 run silent "quoted path"                            "cd \"$OTHER\" && git push origin main"
 run silent "single-quoted path"                     "cd '$OTHER' && git push origin main"
 run silent "-C beats an earlier cd"                 "cd $(pwd) && git -C $OTHER push origin main"
+
+echo
+echo "=== MC 8aafd8eb — judge the checkout the command RUNS IN ==="
+# The real topology, not a synthetic one: this repo's parent checkout plus
+# this worktree, with the hook spawned in the PARENT while the command
+# runs HERE. Before the fix, the parent's branch was the one judged, so a
+# parent sitting on main denied every commit from every worktree.
+PARENT=$(dirname "$(git rev-parse --git-common-dir 2>/dev/null)")
+HERE=$(git rev-parse --show-toplevel 2>/dev/null)
+PARENT_BRANCH=$(git -C "$PARENT" rev-parse --abbrev-ref HEAD 2>/dev/null)
+HERE_BRANCH=$(git -C "$HERE" rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ "$PARENT_BRANCH" = "main" ] && [ "$HERE" != "$PARENT" ] && [ "$HERE_BRANCH" != "main" ]; then
+  run_in deny   "parent on main, command runs in the parent"   "git commit -m x" "$PARENT" "$PARENT"
+  run_in silent "worktree on a branch, hook spawned in parent" "git commit -m x" "$HERE"   "$PARENT"
+  run_in silent "…and a push from that worktree, too"          "git push -u origin $HERE_BRANCH" "$HERE" "$PARENT"
+  run_in deny   "no cwd in payload → falls back to hook cwd"   "git commit -m x" ""        "$PARENT"
+  run_in deny   "explicit -C parent beats the payload cwd"     "git -C $PARENT commit -m x" "$HERE" "$HERE"
+else
+  skip "MC 8aafd8eb cwd cases" "needs a parent on main + a worktree off main"
+fi
+
+echo
+echo "=== other repos stay silent even when the payload names them ==="
+run_in silent "cwd is another repo on main, commit"  "git commit -m x"      "$OTHER" "$OTHER"
+run_in silent "cwd is another repo on main, push"    "git push origin main" "$OTHER" "$(pwd)"
 
 echo
 echo "=== unchanged behaviour ==="
