@@ -42,3 +42,17 @@ Payment slip with no lines (#1) · OpEx water payment (#13) · handwritten water
   `inbox/1783069717215_1_cswupo.webp` exists in storage but `receipt_pages` is `[]`. Link lost.
 * No `supplier_catalog` row exists for Makro articles 831436 / 28006169 / 373997 / 8851988009170, so the next receipt
   resolves only by NAME (tombstone / alias levels), not by article number. Adding them is the cheapest next step.
+
+## RESULT (applied 2026-10-17, mig 502)
+| | before | after |
+|---|---|---|
+| stubs with live rows | 359 | 337 |
+| THB sitting on stubs | 62,782.59 | 46,913.84 (−15,868.75, exactly as projected) |
+| purchase_logs rows / total | 984 / 164,590.344 | 984 / 164,590.344 |
+| trust, 133 live SALE dishes | unverified 49 · estimated 29 · no_bom 26 · no_cost 16 · verified 8 · manual 4 · deleted 1 | unverified 49 · estimated **26** · no_bom 26 · no_cost 16 · verified **11** · manual 4 · deleted 1 |
+
+New costs: olive oil 480.10→403.40/L · lamb mince 420→433.00 · potato 43.51→44.21 · red cabbage 37.03→44.01 · espresso 0.6412→0.6356/g ·
+smoked trout 1038→1071.33 · PET 250 4.63→3.27 · RAW-SHRIMP manual 239 unchanged · striploin 449.97 · crying tiger 330.02 ·
+CP shrimp 26-30 414.00 · ARO black 0.489/g. No live ingredient lost its cost.
+First apply attempt rolled back on a bug in the "lost cost" assert (it flagged 43 ingredients that already had cost_source='none');
+the assert now compares against the before-state. The committed file is the one that applied.

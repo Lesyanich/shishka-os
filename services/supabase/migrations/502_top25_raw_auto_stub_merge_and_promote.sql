@@ -82,7 +82,7 @@
 -- product OUTSIDE the intended set; PF-/SALE-/MOD- are allowed to move through trg_cascade_bom_cost.
 -- RAW-SHRIMP is cost_source='manual' (239): the trigger skips it, so its cost is asserted UNCHANGED.
 --
--- Applied through the claude.ai Supabase connector (the plugin silently declines writes); the
+-- APPLIED 2026-10-17 through the claude.ai Supabase connector (the plugin silently declines writes); the
 -- connector wraps this file in one transaction, so any failed assert rolls everything back.
 
 CREATE TEMP TABLE tmp_money AS
@@ -249,8 +249,9 @@ BEGIN
     -- nothing live may have been nulled
     SELECT count(*), string_agg(n.product_code, ', ') INTO v_bad, v_list
       FROM public.nomenclature n JOIN tmp_before_cost t ON t.id = n.id
-     WHERE coalesce(n.is_deleted,false) = false AND t.cost_per_unit IS NOT NULL
-       AND (n.cost_per_unit IS NULL OR n.cost_source = 'none') AND n.product_code LIKE 'RAW-%';
+     WHERE coalesce(n.is_deleted,false) = false AND n.product_code LIKE 'RAW-%'
+       AND ((n.cost_per_unit IS NULL AND t.cost_per_unit IS NOT NULL)
+            OR (n.cost_source = 'none' AND t.cost_source IS DISTINCT FROM 'none'));
     IF v_bad > 0 THEN RAISE EXCEPTION '502 abort: % live ingredient(s) lost their cost: %', v_bad, v_list; END IF;
 
     -- no RAW- cost may move outside the intended set (tombstoned stubs are the stubs themselves)
