@@ -1,7 +1,8 @@
 # Spec (DRAFT, not built): diet tags derived from ingredients + "check tags" mark
 
-Status: design only. No migration written, nothing tagged, nothing applied. SOCRATIC-GATE: the four
-questions at the bottom are the CEO's to answer before any code.
+Status: design only. No migration written, nothing tagged, nothing applied. SOCRATIC-GATE.
+CEO answers so far (2026-10-17): Q2 = hybrid (rules + model for ambiguous + human confirms),
+Q3 = hide diet tags from guests while a dish is flagged. Q1 (scope) and Q4 (review place) are still open.
 Why in docs/plans/: next to spec-migration-number-allocator.md and the other mechanism specs; it is a
 mechanism spec, not a domain fact (docs/domain/ holds those).
 
@@ -30,67 +31,104 @@ mechanism spec, not a domain fact (docs/domain/ holds those).
 ## 2. Design
 
 Principle: AI belongs at the INGREDIENT layer, never the dish layer. About 150 leaves change rarely;
-a dish tag is then pure deterministic set logic over classified leaves. Nothing is called per page view.
+a dish tag is then pure deterministic set logic over classified leaves. Compute once, store in the DB,
+never call a model while rendering a page.
 
-1. **Ingredient fact (new, mirrors the allergen ledger).** One classification per RAW, drawn from a closed
-   vocabulary of animal origin: meat, fish, shellfish, dairy, egg, honey, other_animal (gelatin, rennet,
-   fish extract, carmine...), plus `diet_reviewed_at/by` and `diet_evidence` (label, supplier spec, chef).
-   An empty set counts as "plant" ONLY when reviewed, exactly like allergen_reviewed_at.
-2. **Dish status.** `fn_dish_diet_status(dish_id)` next to `fn_dish_allergen_status`, same walk, same
-   {diets, confident, unreviewed_items} shape. plant-based/vegan = no animal origin on any food leaf;
-   vegetarian = no meat/fish/shellfish/other_animal. confident requires ingredients > 0, every leaf
-   reviewed, and no soft-deleted leaf (mig 392 rule, plus the is_deleted hole above).
-3. **Where the published value lives.** One store: `nomenclature_tags` (tag_group 'dietary', slug
-   `plant-based`; the site contract already reads it). Beside it on the dish: `diet_basis_hash`,
-   `diet_reviewed_at`, `diet_needs_check boolean`.
-4. **What invalidates.** Correctness comes from the hash: md5 of the sorted (leaf id, classification) set at
-   review time. needs_check = hash now differs from stored. It is correct by construction (BOM edit,
-   sub-recipe edit, reclassification, soft-delete, new line all change it). Publication cannot compute it
-   live (anon 3s timeout, planning cost), so triggers keep the stored boolean fresh, modelled on
-   `trg_cascade_bom_nutrition_on_bom/_on_item` (walk UP to every ancestor dish), and a nightly/CI audit
-   recomputes the hash and fails if any dish disagrees with its boolean. Triggers are the speed path, the hash
-   is the proof.
-5. **Who reviews.** The agent proposes (offline, in-session, free: the project's precompute-and-store rule),
-   a human confirms. Confirming writes the tags, stores the hash, clears the flag.
-6. **Guest view.** Public views expose a dietary tag only when `NOT diet_needs_check` and confident.
-   Flagged dish: diet badge and filter membership vanish; allergens are untouched (separate, already gated).
-7. **customer_ingredients.** Same drift, same trigger path, MC 1dce3c7e (auto-derive with manual override,
-   still inbox). Recommendation: reuse the walk and the needs_check trigger so one mechanism flags both,
-   but ship diets first; the ingredient-text derivation is a separate display problem.
+1. **Ingredient fact.** One classification per RAW from a closed vocabulary of animal origin: meat, fish,
+   shellfish, dairy, egg, honey, other_animal (gelatin, rennet, fish extract, carmine...), plus
+   `diet_state` (unknown | proposed | confirmed), `diet_reviewed_at/by`, `diet_evidence`
+   (label, supplier spec, chef). An empty set means "plant" ONLY when state = confirmed.
+2. **Dish status.** `fn_dish_diet_status(dish_id)`, same walk as `fn_dish_allergen_status`, same
+   {diets, confident, unreviewed_items} shape. plant-based = no animal origin on any food leaf (honey counts as
+   animal, per the CEO's original brief); vegetarian = no meat/fish/shellfish/other_animal (honey and dairy
+   allowed). confident requires ingredients > 0, every leaf confirmed, no soft-deleted leaf.
+3. **Published value.** One store: `nomenclature_tags` (tag_group 'dietary', slug `plant-based`; the site contract
+   already reads it). On the dish: `diet_basis_hash`, `diet_reviewed_at`, `diet_needs_check boolean`.
+4. **What invalidates.** The hash of the sorted (leaf id, classification) set at review time. Quantity, yield,
+   packaging and note edits do NOT change it, so they never raise a flag; adding/removing an ingredient,
+   editing a sub-recipe, reclassifying a RAW or soft-deleting one does. Triggers (modelled on
+   `trg_cascade_bom_nutrition_on_bom/_on_item`, walking UP to every ancestor dish) keep the stored boolean fresh,
+   because publication cannot compute the hash live (anon 3s timeout). A nightly/CI audit recomputes the hash
+   and fails if any dish disagrees with its boolean: triggers are the speed path, the hash is the proof.
+5. **Guest view (CEO Q3: hide).** The public view exposes dietary tags only for dishes with
+   `NOT diet_needs_check`. A flagged dish keeps selling; its diet badge and its membership in the Plant-based
+   filter disappear until a human confirms. Allergens are a separate, already-gated path and are not touched.
+6. **customer_ingredients.** Same drift, same trigger path, MC 1dce3c7e. One mechanism can flag both, but
+   ship diets first; deriving the ingredient text is a separate display problem.
 
-## 3. Migration sketch (NOT a migration; number via claim_migration_number at write time)
+### 2a. Q1 evidence: does the allergen confidence model fit diets?
+
+The walk and the shape fit. The confidence column does NOT. `allergen_reviewed_at` asserts "this
+ingredient's ALLERGEN set is known". RAW-CHICKEN-BREAST is reviewed with an empty allergen set, so reusing that
+column would read chicken as clean. Diets need their own assertion (`diet_state`). Recommendation: extend the
+pattern, the walk and the function family, but give diets their own ledger columns; make the review a
+single action per ingredient that sets both (one label read answers allergens AND animal origin). That costs
+one review per ingredient instead of two mechanisms side by side.
+
+### 2b. Hybrid escalation rules (CEO Q2)
+
+Rules, free and re-runnable, never use the model:
+- R1 allergen-tag implication: a leaf tagged allergen-dairy / eggs / fish / shellfish gets dairy / egg / fish /
+  shellfish. Deterministic.
+- R2 category-to-origin, only for categories that cannot lie: F-PRO-RED (meat), F-PRO-SEA (fish or shellfish by
+  tag), F-PRO-EGG, F-DAI-CHZ and F-DAI-YGT (dairy); plain-produce categories (fruit, frozen fruit, herbs,
+  vegetables, dry spices, nuts, seeds, rice, legumes, salt, coffee, water) propose "plant" ONLY when the item
+  is not composite (no sauce/paste/mix/syrup/seasoned/protein/bread/wrap in the name, and no unreviewed
+  allergen tag).
+- R3 honey (name or supplier category) = honey, by definition.
+- R4 packaging (NF-%), PF and SALE rows are never classified directly; they roll up.
+- R5 a confirmed value is never overwritten; a re-run only touches unknown/proposed rows, and an ingredient
+  whose name, brand or supplier changed goes back to unknown.
+
+Escalates to the model (offline, in-session, a proposal only): leaves that no rule resolves. Concretely the
+categories that mislead (F-DAI-MLK holds coconut and almond milk, F-DAI-OIL, F-PRO-PLT holds chicken,
+F-PRO-VEG) and composite items: bread/wraps, sauces and pastes, syrups, pickles, wakame salad, truffle
+sauce, supplements, the six bought-in chocolates. Input: name, brand, supplier_catalog row, purchase history,
+any stored label text. Output: proposed origin set + evidence + `needs_label` when it cannot ground the answer.
+The model may not output "plant" without evidence, and absence of evidence yields unknown, which blocks the
+dish from being confident. Never decides alone: every model output lands as `proposed`, a human confirms.
+Estimate on today's 141 leaves: about 100 resolved by R2 plant, about 20 by R1/R2 animal, about 20-40 escalated,
+once; afterwards only new RAW items.
+
+## 3. Consequence of hiding, and who owns it (CEO Q3)
+
+A dish whose composition just changed silently loses its vegan / plant-based label on shishka.health until
+someone clears the flag. The review queue is therefore not housekeeping: it is what stops correct dishes
+from looking unlabelled. How often: 26 of 81 live dishes (own or sub-recipe) received a new BOM line in the
+last 30 days and 51 in 90 days. That is an UPPER bound (it includes initial builds of new dishes, and the
+hash ignores quantity edits and re-created lines for the same ingredient), but plan for roughly one dish in
+four to three per month needing a look.
+Duration and owner (recommendation, part of Q4): the person or agent who changes the recipe proposes the new
+tags in the same session and a human confirms with one click; a flag open longer than 48 h is escalated to the
+chef agent's daily list. Unflagged, unconfirmed dishes (all of them at launch) simply have no diet tag.
+
+## 4. Migration sketch (NOT a migration; number via claim_migration_number at write time)
 
 ```sql
--- ingredient layer
 ALTER TABLE nomenclature
-  ADD COLUMN animal_origin text[],            -- NULL = unknown; '{}' = reviewed plant (needs reviewed_at)
-  ADD COLUMN diet_reviewed_at timestamptz,
-  ADD COLUMN diet_reviewed_by text,
-  ADD COLUMN diet_evidence text,
+  ADD COLUMN animal_origin text[],            -- NULL = unknown; '{}' = plant, valid only when confirmed
+  ADD COLUMN diet_state text NOT NULL DEFAULT 'unknown',  -- unknown | proposed | confirmed
+  ADD COLUMN diet_reviewed_at timestamptz, ADD COLUMN diet_reviewed_by text, ADD COLUMN diet_evidence text,
   ADD COLUMN diet_basis_hash text,            -- dishes only
-  ADD COLUMN diet_needs_check boolean NOT NULL DEFAULT true;  -- dishes only; true until first review
--- fn_dish_diet_status(uuid) jsonb  : STABLE, same recursive walk as fn_dish_allergen_status
--- fn_dish_diet_hash(uuid) text     : md5(string_agg(leaf_id||':'||animal_origin::text ORDER BY leaf_id))
--- trg on bom_structures (I/U/D) and nomenclature(animal_origin, is_deleted): set diet_needs_check=true
---   on every ancestor dish (recursive UP, as fn_cascade_bom_nutrition_on_item does)
--- fn_confirm_dish_diets(dish_id, reviewer) : writes dietary tag links, stores hash, clears flag
--- public view change: join tags only WHERE NOT diet_needs_check  (verify with the anon KEY, not SQL)
--- audit: scripts / canary query comparing fn_dish_diet_hash to diet_basis_hash
--- backfill: classify ~141 food leaves in ONE reviewed batch; no dish tagged until its leaves are done
+  ADD COLUMN diet_needs_check boolean NOT NULL DEFAULT true;  -- dishes only
+-- fn_dish_diet_status(uuid) jsonb, fn_dish_diet_hash(uuid) text (md5 of sorted leaf_id:animal_origin)
+-- fn_propose_ingredient_diets(): applies R1-R5, writes proposed only, returns the escalation list
+-- triggers on bom_structures (I/U/D) and nomenclature(animal_origin, is_deleted) -> ancestors diet_needs_check=true
+-- fn_confirm_dish_diets(dish_id, reviewer): writes dietary tag links, stores hash, clears flag
+-- v_diet_review_queue: flagged dishes + why (changed leaf) for the admin
+-- public view: dietary tags only WHERE NOT diet_needs_check (verify with the anon KEY, not SQL)
+-- REVOKE on every new view/table in public (born anon-writable); canary query for hash vs boolean
 ```
-Safe alongside mig 500 (touches tags/nomenclature columns, not sections). New views/tables in public are born
-anon-writable: REVOKE and verify.
+Safe alongside mig 500 (columns on nomenclature, not sections).
 
-## 4. Questions for the CEO (nobody else decides these)
+## 5. Questions still open for the CEO
 
-1. **Scope.** Diets only (plant-based / vegetarian / vegan), or fold allergens and the Seafood filter into
-   the same ingredient classification? Allergens already work; seafood would reuse the new fish/shellfish values.
-2. **What "AI" means.** Recommended: rules cover the obvious, the agent (offline, stored) proposes the
-   ambiguous, a human confirms; never a model per page view. Is that acceptable, and does honey count as
-   animal-derived for "plant-based"?
-3. **A flagged dish on the site.** Recommended: suppress its diet badge and filter membership until reviewed
-   (a stale diet claim is a wrong promise to a guest). Or keep the old tag visible?
-4. **Where review happens.** An admin queue of flagged dishes, a badge on the dish card, or both?
+1. **Scope.** Diets only, or one classification that also settles allergens and the Seafood filter?
+   Recommendation: one ingredient review, two outputs. Diets own columns (section 2a), allergens keep
+   their function; seafood then reads the same fish/shellfish values and the exclusion filter becomes
+   safe once the 52 unreviewed leaves are confirmed.
+4. **Where review happens.** Recommendation: a "needs check" badge on the dish row in the existing admin menu
+   table plus one filter/queue view of flagged dishes, no separate page.
 
-Open dependency: the 52 unreviewed allergen leaves and 4 soft-deleted RAW in live BOMs must be cleaned
-first or the first backfill will report most dishes as not confident (MC 572c53b1 owns the allergen half).
+Open dependency: the 52 allergen-unreviewed leaves and 4 soft-deleted RAW in live BOMs must be cleaned first
+or the first backfill reports most dishes as not confident (MC 572c53b1 owns the allergen half).
