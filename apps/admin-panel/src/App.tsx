@@ -29,7 +29,7 @@ const ThawStation = lazyWithReload(() => import('./pages/ThawStation').then(m =>
 const SkuManagerPage = lazyWithReload(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
 const AnalyticsLayout = lazyWithReload(() => import('./pages/analytics/AnalyticsLayout').then(m => ({ default: m.AnalyticsLayout })))
 const SalesPulseTab = lazyWithReload(() => import('./pages/analytics/SalesPulseTab').then(m => ({ default: m.SalesPulseTab })))
-const PurchasesTabPlaceholder = lazyWithReload(() => import('./pages/analytics/AnalyticsPlaceholderTab').then(m => ({ default: m.PurchasesTabPlaceholder })))
+const PurchasesTab = lazyWithReload(() => import('./pages/analytics/PurchasesTab').then(m => ({ default: m.PurchasesTab })))
 const StockControlTabPlaceholder = lazyWithReload(() => import('./pages/analytics/AnalyticsPlaceholderTab').then(m => ({ default: m.StockControlTabPlaceholder })))
 const FinanceLayout = lazyWithReload(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
 const FinanceLedger = lazyWithReload(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
@@ -139,8 +139,8 @@ function App() {
                   <Route path="/analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsLayout /></Suspense>}>
                     <Route index element={<Navigate to="sales" replace />} />
                     <Route path="sales" element={<SalesPulseTab />} />
-                    {/* S3 399488b2 / S4 d8c02f8c — registered now, placeholder until then */}
-                    <Route path="purchases" element={<PurchasesTabPlaceholder />} />
+                    <Route path="purchases" element={<PurchasesTab />} />
+                    {/* S4 d8c02f8c — registered now, placeholder until then */}
                     <Route path="stock" element={<StockControlTabPlaceholder />} />
                   </Route>
                   <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
