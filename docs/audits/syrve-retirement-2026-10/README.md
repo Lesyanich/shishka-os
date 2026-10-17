@@ -52,7 +52,14 @@ tail -n +2 syrve_config.csv | sort | awk 'NR>1{printf "\n"}{printf "%s",$0}' | m
 
 ## Not in this retirement
 
-`expense_ledger_payout_dupes_bak_20260701` also carries `syrve_doc_id` and `syrve_synced`
-(10136 rows, both empty — 0 non-null / 0 TRUE). It is a backup table owned by MC
-`725371dd` on the db-hygiene branch, which quarantines it into the `backup` schema. Left
-untouched here on purpose.
+`expense_ledger_payout_dupes_bak_20260701` also carried `syrve_doc_id` and `syrve_synced`
+(10136 rows, both empty — 0 non-null / 0 TRUE). It was a backup table owned by MC
+`725371dd`, and migration 499 **dropped** it — it is not in any schema any more, and the
+`backup` schema holds two unrelated tables. Verified against prod 2026-10-17.
+
+So nothing here waits on it, and there is no later drop coming for it. The only surviving
+copy of those 10136 rows is that session's CSV at
+`docs/audits/backup-tables-2026-10/expense_ledger_payout_dupes_bak_20260701.csv` (verified
+by md5 and `sum(amount_thb) = 1,167,780.00`). Worth stating precisely: "in `backup` until
+December" and "exists only as a CSV in git" lead to very different decisions if anyone ever
+needs that data. Either way it was never this migration's to touch.
