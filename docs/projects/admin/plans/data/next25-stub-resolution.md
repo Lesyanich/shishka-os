@@ -32,3 +32,18 @@ Every pack size was read off the receipt image (finance MCP `download_receipt`).
 * **615e2645** B002 2-compartment 1000 ml food box, 385: Sangdamrong prints `(1*50*10)` — 50 or 500 pieces cannot be told apart, and 7.7 vs 0.77 per box changes the cost 10x.
 * **53ae5f17** "[JUNK] (1*40)", 350: the description is under a receipt stamp on Sangdamrong 000601002650.
 * **642000f9** "Ice/water/Avocado/Iceberg lettuce", 345, dated 2024-07-07: a junk row with an implausible date and no readable lines.
+
+## RESULT (applied 2026-10-17, mig 503)
+| | before | after |
+|---|---|---|
+| stubs with live rows | 337 | 315 |
+| THB sitting on stubs | 46,913.84 | 38,885.09 (−8,028.75, exactly as projected) |
+| purchase_logs rows / total | 984 / 164,590.344 | 984 / 164,590.344 |
+| trust, 133 live SALE | unverified 49 · estimated 26 · no_bom 26 · no_cost 16 · verified 11 · manual 4 · deleted 1 | unverified **44** · estimated **30** · no_bom 26 · no_cost 16 · verified **12** · manual 4 · deleted 1 |
+
+Across both passes (502 + 503): 359 → 315 stubs, 62,782.59 → 38,885.09 THB on stubs (−23,897.50), unverified 49 → 44, verified 8 → 12.
+New costs: chicken breast 97.69 · espresso 0.6240/g · coconut oil 113.00/L · matcha 3500 (first purchase history ever) · tonic 14.21 ·
+scallop 334.00 · shredded cheddar 333.33 · mozzarella 369.23 · mixed mozzarella 331.67 · potato 43.89. No live ingredient lost its cost.
+The first apply aborted in the pre-flight (rolled back, nothing written): three stubs (83bf4ed0, 53ae5f17, cd6db537) were already soft-deleted on
+2026-07-20 with live purchase rows and no `[MERGED->]` tombstone — the dead-end shape mig 495 fixed. The pre-flight now accepts a retired stub and the
+two merges among them add the missing prefix; 53ae5f17 stays as an unresolved junk row.

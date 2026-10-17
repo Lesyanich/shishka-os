@@ -2,7 +2,7 @@
 --       (MC 00a81c22, item 6 Part B.2). Method and traps are exactly those of mig 502; see
 --       docs/projects/admin/plans/data/next25-stub-resolution.md for the receipt that justifies each row.
 --
--- NOT YET APPLIED at the time of writing: the Supabase connector's apply_migration was denied by the
+-- APPLIED 2026-10-17 (CEO-approved). The first apply attempt aborted in the pre-flight and rolled back, see below. Earlier: the connector was denied by the
 -- permission classifier (the earlier CEO approval covered mig 502 only).
 --
 -- BEFORE (measured live just before): 337 stubs with live rows, 46,913.84 THB on stubs, 984 rows / 164,590.344.
@@ -11,6 +11,9 @@
 -- Worth noting: the stub "ARO Shredded Mozzarella Frozen 1 kg" (b2f2a0c5) is NOT mozzarella. The chit prints
 -- article 8858768700807 `ARO เชดด้าบูดเส้นแช่แข็ง 1 กก.` = shredded CHEDDAR, the barcode already catalogued under
 -- RAW-GOLD_SHREDDED_CHEDDAR. And "Powder 1" (83bf4ed0, 9 x 41) is Makro article 28006169, the 1 kg potato pack.
+-- THREE OF THE 25 WERE ALREADY SOFT-DELETED with live purchase rows and no [MERGED->] tombstone (83bf4ed0 and
+-- 53ae5f17 "[JUNK-NO-MATCH]", cd6db537 chicken breast, all deleted 2026-07-20): the dead-end shape mig 495 fixed.
+-- The merges of 83bf4ed0 and cd6db537 add the missing prefix; 53ae5f17 is left alone.
 -- Applied through the claude.ai Supabase connector in one transaction; any failed assert rolls everything back.
 
 CREATE TEMP TABLE tmp_money AS
@@ -53,8 +56,8 @@ DO $$
 DECLARE r record; v int;
 BEGIN
     FOR r IN SELECT stub_code AS c FROM tmp_merge UNION ALL SELECT stub_code FROM tmp_promote LOOP
-        SELECT count(*) INTO v FROM public.nomenclature WHERE product_code = r.c AND coalesce(is_deleted,false) = false;
-        IF v <> 1 THEN RAISE EXCEPTION '503 abort: stub % not found live', r.c; END IF;
+        SELECT count(*) INTO v FROM public.nomenclature WHERE product_code = r.c;
+        IF v <> 1 THEN RAISE EXCEPTION '503 abort: stub % not found', r.c; END IF;
         SELECT count(*) INTO v FROM public.bom_structures b JOIN public.nomenclature n ON n.id = b.ingredient_id
          WHERE n.product_code = r.c;
         IF v > 0 THEN RAISE EXCEPTION '503 abort: stub % is referenced by % BOM line(s)', r.c, v; END IF;
