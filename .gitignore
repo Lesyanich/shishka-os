@@ -85,6 +85,12 @@ token.json
 *.csv
 *.mp4
 
+# Audit artifacts are evidence, not data dumps — a before/after state table is the
+# whole point of a security or data audit and has to survive in git next to the
+# migration it justifies. Added 2026-10-17 (MC f133850a): `git add docs/audits/`
+# silently dropped the RPC-grant dumps against the blanket *.csv rule above.
+!docs/audits/*.csv
+
 # Non-code folders (Google Drive content, not source code)
 01_Business/
 01_Source_Data/
