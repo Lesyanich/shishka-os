@@ -418,7 +418,7 @@ Never let a widget crash on null.
 | Layer | Mechanism | Strength |
 |---|---|---|
 | 1. Rule | this section + the CEO guide | agents read it |
-| 2. Local hook | `.claude/hooks/git-guard-pretool.sh` (PreToolUse/Bash): **hard-blocks** local `main` mutations (commit/merge/cherry-pick/revert) and any push targeting `main`; **warns** on off-convention branch names (only until the branch has an upstream — after the first push a rename would break the PR). **Scoped to THIS repo** — it resolves the target of a `cd …`/`git -C …` command and stays silent for other repos (the agent-memory store, dotfiles), since their `main` is nobody's production; all shishka-os worktrees stay in scope | blocks any Claude session in the terminal |
+| 2. Local hook | `.claude/hooks/git-guard-pretool.sh` (PreToolUse/Bash): **hard-blocks** local `main` mutations (commit/merge/cherry-pick/revert) and any push whose **refspec** targets `main`; **warns** on off-convention branch names (only until the branch has an upstream — after the first push a rename would break the PR). It **parses** the command — quote-aware tokens, split at `;` `&` `(` `)` and pipes — and judges each `git` call by its own verb, options and refspecs, in **the checkout the command actually runs in** (the payload `cwd`, so a worktree is judged by its own branch and not by the parent checkout's). A `main` token inside a quoted commit message, or in a chained `gh pr create --base main`, is therefore invisible to it. **Scoped to THIS repo** — identity is the shared git dir, so all shishka-os worktrees are in scope while other repos (the agent-memory store, dotfiles) stay silent, since their `main` is nobody's production | blocks any Claude session in the terminal |
 | 3. GitHub settings | branch protection on `main` (block direct push), squash-only merge, required CI checks, auto-delete head branches | server-side; applies to everyone, cannot be bypassed by a prompt |
 
 Layer 3 is set once in the GitHub UI (the proxy blocks settings writes from
@@ -430,6 +430,10 @@ session that commits its report straight to `main` (e.g. `6015194`). Before
 enabling require-PR on `main`, either add the committing actor to the ruleset
 **bypass list** or migrate the sheriff to PR flow — otherwise its next run fails
 at the server with no escape hatch.
+
+**Sanctioned exception — syncing `main` to its own upstream (layer 2).** `git merge --ff-only origin/main` (or `git pull --ff-only`) **while on `main` is allowed**: `--ff-only` makes git refuse anything but a pointer advance, and the target already exists on the remote, so nothing unreviewed lands and no commit is created. All three conditions are checked — verb is `merge`/`pull`, `--ff-only` is present, and the target resolves to **that branch's own upstream**. The third is load-bearing: `git merge --ff-only feature/x` also fast-forwards, but it lands unreviewed local work on `main`, so it stays denied. Why it matters: the shared checkout at `/Users/lesianich/code/shishka` is what the MCP launchers run from, and it kept serving stale code because no agent could fast-forward it.
+
+**The matrix is the contract.** Any change to the guard must be proven against `sh .claude/hooks/git-guard-pretool.test.sh` — every narrowing there is paired with the TRUE positive it must keep denying. A guard that silently stops denying is worse than the friction it removes, so: never widen the escape hatch to fix a false positive, narrow the match instead. Origin: MC `8aafd8eb` collected five false-denial classes (a trailing `-q`, the `--ff-only` sync, any push from a checkout sitting on `main`, a `main` token belonging to a chained non-git command, and every commit made from a worktree) — all one root cause: matching command TEXT plus the ambient branch instead of parsing the git call.
 
 **Escape hatch (layer 2 only).** Sanctioned automation that must write to
 `main` (e.g. the sheriff) **prefixes the command**: `SHISHKA_ALLOW_MAIN=1 git
