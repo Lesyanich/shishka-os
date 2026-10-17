@@ -1,8 +1,9 @@
 # Spec (DRAFT, not built): diet tags derived from ingredients + "check tags" mark
 
 Status: design only. No migration written, nothing tagged, nothing applied. SOCRATIC-GATE.
-CEO answers so far (2026-10-17): Q2 = hybrid (rules + model for ambiguous + human confirms),
-Q3 = hide diet tags from guests while a dish is flagged. Q1 (scope) and Q4 (review place) are still open.
+CEO answers so far (2026-10-17): Q1 = one ingredient review, two outputs (diets get own columns; allergens and Seafood read the same review),
+Q2 = hybrid (rules + model for ambiguous + human confirms), Q3 = hide diet tags from guests while a dish is flagged,
+Q4 = badge on the dish row + one queue view. All four decided; next step is the build (needs its own PR and a claimed migration number).
 Why in docs/plans/: next to spec-migration-number-allocator.md and the other mechanism specs; it is a
 mechanism spec, not a domain fact (docs/domain/ holds those).
 
@@ -121,14 +122,15 @@ ALTER TABLE nomenclature
 ```
 Safe alongside mig 500 (columns on nomenclature, not sections).
 
-## 5. Questions still open for the CEO
+## 5. Decisions (all four answered by the CEO, 2026-10-17)
 
-1. **Scope.** Diets only, or one classification that also settles allergens and the Seafood filter?
-   Recommendation: one ingredient review, two outputs. Diets own columns (section 2a), allergens keep
-   their function; seafood then reads the same fish/shellfish values and the exclusion filter becomes
-   safe once the 52 unreviewed leaves are confirmed.
-4. **Where review happens.** Recommendation: a "needs check" badge on the dish row in the existing admin menu
-   table plus one filter/queue view of flagged dishes, no separate page.
+1. **Scope:** one ingredient review, two outputs. Diets own their columns (section 2a); the allergen function is
+   unchanged; Seafood reads the same fish/shellfish values, and its exclusion filter becomes safe once the 52
+   unreviewed leaves are confirmed.
+2. **AI:** hybrid, rules in section 2b.
+3. **Flagged dish:** diet tags hidden from guests (section 3).
+4. **Review:** "needs check" badge on the dish row in the existing admin menu table plus one queue/filter view,
+   no separate page.
 
 Open dependency: the 52 allergen-unreviewed leaves and 4 soft-deleted RAW in live BOMs must be cleaned first
 or the first backfill reports most dishes as not confident (MC 572c53b1 owns the allergen half).
