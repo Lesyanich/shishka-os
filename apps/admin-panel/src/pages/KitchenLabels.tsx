@@ -11,8 +11,10 @@ import {
   Plus,
   LayoutGrid,
   ClipboardList,
+  FlaskConical,
 } from 'lucide-react'
 import { usePrepLabelItems, type PrepItem, type PrepItemKind } from '../hooks/usePrepLabelItems'
+import { usePantryLabelItems } from '../hooks/usePantryLabelItems'
 import { usePrepBatches, type PrepBatch } from '../hooks/usePrepBatches'
 import { useAllPrepBatches, type AllPrepBatch } from '../hooks/useAllPrepBatches'
 import { useSaleLabelInfo, type SaleLabelInfo } from '../hooks/useSaleLabelInfo'
@@ -59,23 +61,27 @@ const shortDateTime = (iso: string | Date) =>
 const shelfDaysOf = (b: PrepBatch) =>
   Math.max(1, Math.round((new Date(b.expires_at).getTime() - new Date(b.produced_at).getTime()) / DAY_MS))
 
-/** PF / Sale filter chips for the item list. */
-type KindFilter = 'all' | PrepItemKind
+/** PF / Sale filter chips for the Kitchen tab (RAW pantry has its own tab). */
+type KindFilter = 'all' | 'PF' | 'SALE'
 const KIND_FILTERS: { id: KindFilter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'PF', label: 'Preps (PF)' },
   { id: 'SALE', label: 'Dishes (Sale)' },
 ]
 
-/** Small colored badge marking an item as a PF prep or a SALE dish. */
+/** Small colored badge marking an item as a PF prep, a SALE dish, or a RAW
+ * pantry staple (jars & bottles). */
 function KindBadge({ kind }: { kind: PrepItemKind }) {
   const styles =
     kind === 'SALE'
       ? 'bg-emerald-900/40 text-emerald-300'
-      : 'bg-amber-900/40 text-amber-300'
+      : kind === 'RAW'
+        ? 'bg-sky-900/40 text-sky-300'
+        : 'bg-amber-900/40 text-amber-300'
+  const label = kind === 'SALE' ? 'Sale' : kind === 'RAW' ? 'Pantry' : 'PF'
   return (
     <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${styles}`}>
-      {kind === 'SALE' ? 'Sale' : 'PF'}
+      {label}
     </span>
   )
 }
@@ -108,29 +114,37 @@ function groupByCategory(list: PrepItem[]): CatGroup[] {
   return [...map.values()].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name))
 }
 
+/** The three sources of labels, kept in the URL (?view=) so links/back work. */
+type LabelView = 'kitchen' | 'pantry' | 'log'
+
 /**
- * Kitchen label station (cook-accessible). An L1 cook picks a prep item, enters
- * the batch weight + shelf life, and prints a storage label to the XP-420B via
- * RawBT. Each print records a batch in inventory_batches (with its own ID + QR
- * barcode), and the recorded batches are listed below for delete / reprint.
+ * Kitchen label station (cook-accessible). Three tabs:
+ *  - Kitchen        — PF preps + SALE dishes (made in-house)
+ *  - Jars & Bottles — RAW pantry staples decanted into labeled jars/bottles
+ *  - All batches    — the global production log
+ *
+ * A cook picks an item, enters the quantity + shelf life, and prints a storage
+ * label to the XP-420B. Each print records a batch in inventory_batches (its own
+ * ID + QR barcode) so the sticker can later be scanned for stock checks.
  *
  * UI copy is English by default (Thai / Burmese to be added later).
  */
 export function KitchenLabels() {
   const { items, isLoading, error } = usePrepLabelItems()
+  const { items: pantryItems, isLoading: pantryLoading, error: pantryError } = usePantryLabelItems()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [query, setQuery] = useState('')
-  const [kind, setKind] = useState<KindFilter>('all')
-  // Active-only by default — hide archived / discontinued items.
-  const [activeOnly, setActiveOnly] = useState(true)
 
   // Selection + view live in the URL so the link reflects the open item, the
   // back button works, and a label page can be deep-linked / refreshed.
   const itemCode = searchParams.get('item')
-  const view: 'items' | 'log' = searchParams.get('view') === 'log' ? 'log' : 'items'
+  const viewParam = searchParams.get('view')
+  const view: LabelView = viewParam === 'log' ? 'log' : viewParam === 'pantry' ? 'pantry' : 'kitchen'
+
+  // A selected item can come from either source (kitchen PF/SALE or RAW pantry).
   const selected = useMemo(
-    () => (itemCode ? items.find((i) => i.product_code === itemCode) ?? null : null),
-    [items, itemCode],
+    () =>
+      itemCode ? [...items, ...pantryItems].find((i) => i.product_code === itemCode) ?? null : null,
+    [items, pantryItems, itemCode],
   )
 
   function openItem(productCode: string) {
@@ -143,51 +157,20 @@ export function KitchenLabels() {
     next.delete('item')
     setSearchParams(next)
   }
-  function setView(v: 'items' | 'log') {
+  function setView(v: LabelView) {
     const next = new URLSearchParams(searchParams)
-    if (v === 'log') next.set('view', 'log')
-    else next.delete('view')
+    if (v === 'kitchen') next.delete('view')
+    else next.set('view', v)
     setSearchParams(next, { replace: true })
   }
-
-  // Active filter applies before the kind counts so the chips match what shows.
-  const visible = useMemo(
-    () => (activeOnly ? items.filter((i) => i.isAvailable) : items),
-    [items, activeOnly],
-  )
-
-  const counts = useMemo(
-    () => ({
-      all: visible.length,
-      PF: visible.filter((i) => i.kind === 'PF').length,
-      SALE: visible.filter((i) => i.kind === 'SALE').length,
-    }),
-    [visible],
-  )
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return visible.filter((i) => {
-      if (kind !== 'all' && i.kind !== kind) return false
-      if (!q) return true
-      return (
-        i.name.toLowerCase().includes(q) ||
-        i.product_code.toLowerCase().includes(q)
-      )
-    })
-  }, [visible, query, kind])
-
-  // Group the filtered items into category sections, ordered by category sort.
-  const sections = useMemo(() => groupByCategory(filtered), [filtered])
-  const inactiveCount = items.length - items.filter((i) => i.isAvailable).length
 
   if (selected) {
     return <LabelEditor item={selected} onBack={closeItem} />
   }
 
-  // Deep link to ?item=… while the list is still loading: hold for resolution
+  // Deep link to ?item=… while the lists are still loading: hold for resolution
   // rather than flashing the picker.
-  if (itemCode && isLoading) {
+  if (itemCode && (isLoading || pantryLoading)) {
     return (
       <div className="mx-auto max-w-2xl p-4">
         <div className="flex items-center justify-center py-20 text-slate-500">
@@ -197,6 +180,12 @@ export function KitchenLabels() {
     )
   }
 
+  const tabs: { id: LabelView; label: string; icon: typeof LayoutGrid }[] = [
+    { id: 'kitchen', label: 'Kitchen', icon: LayoutGrid },
+    { id: 'pantry', label: 'Jars & Bottles', icon: FlaskConical },
+    { id: 'log', label: 'All batches', icon: ClipboardList },
+  ]
+
   return (
     <div className="mx-auto max-w-2xl p-4">
       <div className="mb-4 flex items-center gap-2">
@@ -204,134 +193,194 @@ export function KitchenLabels() {
         <h1 className="text-lg font-semibold text-slate-100">Kitchen Labels</h1>
       </div>
 
-      {/* View toggle: pick an item to print vs. the global production log */}
-      <div className="mb-4 flex gap-1 rounded-xl border border-slate-800 bg-slate-900/60 p-1">
-        <button
-          type="button"
-          onClick={() => setView('items')}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition ${
-            view === 'items'
-              ? 'bg-slate-800 text-amber-300'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <LayoutGrid className="h-4 w-4" /> Print labels
-        </button>
-        <button
-          type="button"
-          onClick={() => setView('log')}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition ${
-            view === 'log'
-              ? 'bg-slate-800 text-amber-300'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <ClipboardList className="h-4 w-4" /> All batches
-        </button>
+      {/* Source tabs: kitchen preps/dishes · pantry jars & bottles · batch log */}
+      <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-slate-800 bg-slate-900/60 p-1">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setView(id)}
+            className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-1 py-2 text-[13px] font-medium transition ${
+              view === id ? 'bg-slate-800 text-amber-300' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Icon className="h-4 w-4 shrink-0" /> {label}
+          </button>
+        ))}
       </div>
 
       {view === 'log' ? (
         <AllBatchesLog onOpen={openItem} />
+      ) : view === 'pantry' ? (
+        <LabelItemPicker
+          items={pantryItems}
+          isLoading={pantryLoading}
+          error={pantryError}
+          showKindFilter={false}
+          emptyText="No pantry items yet. Tag RAW items with “pantry-label” to list them here."
+          onOpen={openItem}
+        />
       ) : (
-        <>
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search item…"
-              className="w-full rounded-xl border border-slate-700 bg-slate-900 py-3 pl-10 pr-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
-            />
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            {KIND_FILTERS.map((f) => {
-              const active = kind === f.id
-              return (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setKind(f.id)}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                    active
-                      ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
-                      : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-                  }`}
-                >
-                  {f.label}
-                  <span className="ml-1.5 text-xs text-slate-500">{counts[f.id]}</span>
-                </button>
-              )
-            })}
-            <button
-              type="button"
-              onClick={() => setActiveOnly((v) => !v)}
-              title={
-                activeOnly
-                  ? `Showing active only — ${inactiveCount} hidden`
-                  : 'Showing all statuses'
-              }
-              className={`ml-auto rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                activeOnly
-                  ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                  : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-              }`}
-            >
-              {activeOnly ? 'Active only' : 'All statuses'}
-              {activeOnly && inactiveCount > 0 && (
-                <span className="ml-1.5 text-xs text-emerald-400/60">{inactiveCount} hidden</span>
-              )}
-            </button>
-          </div>
-
-          {isLoading && (
-            <div className="flex items-center justify-center py-20 text-slate-500">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading…
-            </div>
-          )}
-
-          {error && (
-            <p className="rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
-              Couldn&apos;t load items: {error}
-            </p>
-          )}
-
-          {!isLoading && !error && filtered.length === 0 && (
-            <p className="py-20 text-center text-sm text-slate-500">Nothing found.</p>
-          )}
-
-          <div className="space-y-5">
-            {sections.map((sec) => (
-              <section key={sec.key}>
-                <div className="mb-2 flex items-baseline gap-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    {sec.name}
-                  </h2>
-                  <span className="text-[11px] text-slate-600">{sec.items.length}</span>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {sec.items.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => openItem(item.product_code)}
-                      className="flex flex-col items-start gap-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-left transition hover:border-amber-500/50 hover:bg-slate-800"
-                    >
-                      <div className="flex w-full items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-slate-100">{item.name}</span>
-                        <KindBadge kind={item.kind} />
-                      </div>
-                      <span className="text-[11px] text-slate-500">{item.product_code}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        </>
+        <LabelItemPicker
+          items={items}
+          isLoading={isLoading}
+          error={error}
+          showKindFilter
+          emptyText="Nothing found."
+          onOpen={openItem}
+        />
       )}
     </div>
+  )
+}
+
+/**
+ * The item picker shared by the Kitchen (PF/SALE) and Jars & Bottles (RAW) tabs:
+ * a search box, an optional PF/Sale kind filter, an active-only toggle, and the
+ * matching items grouped into category sections. Tapping an item opens its
+ * label editor.
+ */
+function LabelItemPicker({
+  items,
+  isLoading,
+  error,
+  showKindFilter,
+  emptyText,
+  onOpen,
+}: {
+  items: PrepItem[]
+  isLoading: boolean
+  error: string | null
+  showKindFilter: boolean
+  emptyText: string
+  onOpen: (productCode: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [kind, setKind] = useState<KindFilter>('all')
+  // Active-only by default — hide archived / discontinued items.
+  const [activeOnly, setActiveOnly] = useState(true)
+
+  // Active filter applies before the kind counts so the chips match what shows.
+  const visible = useMemo(
+    () => (activeOnly ? items.filter((i) => i.isAvailable) : items),
+    [items, activeOnly],
+  )
+  const counts = useMemo(
+    () => ({
+      all: visible.length,
+      PF: visible.filter((i) => i.kind === 'PF').length,
+      SALE: visible.filter((i) => i.kind === 'SALE').length,
+    }),
+    [visible],
+  )
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return visible.filter((i) => {
+      if (showKindFilter && kind !== 'all' && i.kind !== kind) return false
+      if (!q) return true
+      return i.name.toLowerCase().includes(q) || i.product_code.toLowerCase().includes(q)
+    })
+  }, [visible, query, kind, showKindFilter])
+  const sections = useMemo(() => groupByCategory(filtered), [filtered])
+  const inactiveCount = items.length - items.filter((i) => i.isAvailable).length
+
+  return (
+    <>
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search item…"
+          className="w-full rounded-xl border border-slate-700 bg-slate-900 py-3 pl-10 pr-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
+        />
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {showKindFilter &&
+          KIND_FILTERS.map((f) => {
+            const active = kind === f.id
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setKind(f.id)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                  active
+                    ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
+                    : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                }`}
+              >
+                {f.label}
+                <span className="ml-1.5 text-xs text-slate-500">{counts[f.id]}</span>
+              </button>
+            )
+          })}
+        <button
+          type="button"
+          onClick={() => setActiveOnly((v) => !v)}
+          title={
+            activeOnly ? `Showing active only — ${inactiveCount} hidden` : 'Showing all statuses'
+          }
+          className={`ml-auto rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+            activeOnly
+              ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+              : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+          }`}
+        >
+          {activeOnly ? 'Active only' : 'All statuses'}
+          {activeOnly && inactiveCount > 0 && (
+            <span className="ml-1.5 text-xs text-emerald-400/60">{inactiveCount} hidden</span>
+          )}
+        </button>
+      </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-20 text-slate-500">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading…
+        </div>
+      )}
+
+      {error && (
+        <p className="rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
+          Couldn&apos;t load items: {error}
+        </p>
+      )}
+
+      {!isLoading && !error && filtered.length === 0 && (
+        <p className="py-20 text-center text-sm text-slate-500">{emptyText}</p>
+      )}
+
+      <div className="space-y-5">
+        {sections.map((sec) => (
+          <section key={sec.key}>
+            <div className="mb-2 flex items-baseline gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {sec.name}
+              </h2>
+              <span className="text-[11px] text-slate-600">{sec.items.length}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {sec.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onOpen(item.product_code)}
+                  className="flex flex-col items-start gap-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-left transition hover:border-amber-500/50 hover:bg-slate-800"
+                >
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-slate-100">{item.displayName}</span>
+                    <KindBadge kind={item.kind} />
+                  </div>
+                  <span className="text-[11px] text-slate-500">{item.product_code}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -471,6 +520,10 @@ function LabelPreview({
 
 function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const isSale = item.kind === 'SALE'
+  // RAW = a bought pantry staple (jar/bottle). It prints a plain storage label
+  // (name + opened-on + use-by + QR) with an optional free quantity in its base
+  // unit — no КБЖУ, no pack-card / pieces-per-bag logic (that's PF-only).
+  const isRaw = item.kind === 'RAW'
   const { info: saleInfo } = useSaleLabelInfo(item.id, isSale)
   const { staffId } = useAppRole()
   const { locations } = useLocations()
@@ -480,8 +533,8 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   // Countable preps (pcs / portion) are packed N-per-package: ONE label shows
   // the piece count (+ total weight from the DB), unlike mass preps (kg) which
   // print a per-label weight. SALE dishes keep their one-portion-per-label flow.
-  const isCountable = !isSale && isCountableUnit(unit)
-  const { card: packCard } = usePfPackCard(isSale ? null : item.id)
+  const isCountable = item.kind === 'PF' && isCountableUnit(unit)
+  const { card: packCard } = usePfPackCard(item.kind === 'PF' ? item.id : null)
   const portionWeightG = packCard?.portion_weight_g ?? null
 
   // Inputs: per-label weight (grams, mass preps) OR pieces-per-pack (countable
@@ -571,14 +624,20 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const useBy = daysValid ? addDays(new Date(), daysNum) : null
   const useByLabel = useBy ? shortDate(useBy) : '—'
 
-  // What a batch row stores in its base_unit: a mass (kg) base keeps kilograms;
-  // a countable (pcs/portion) base records the pieces packed into this label.
-  const batchWeight = packBatchWeight({ unit, isCountable, gramsNum, piecesNum })
+  // What a batch row stores in its base_unit: RAW records the entered quantity
+  // directly in its base unit (0 = unspecified); a mass (kg) base keeps
+  // kilograms; a countable (pcs/portion) base records the pieces in this label.
+  const batchWeight = isRaw
+    ? gramsValid && gramsNum != null
+      ? gramsNum
+      : 0
+    : packBatchWeight({ unit, isCountable, gramsNum, piecesNum })
 
-  // Per-label weight string for a recorded batch: SALE = the fixed portion,
-  // mass base = stored kg → g, countable = "8 pcs / 480 g" (total from the DB
-  // per-piece weight), otherwise the raw amount in its base unit.
+  // Per-label quantity string for a recorded batch: RAW = amount in base unit
+  // (blank when unspecified), SALE = the fixed portion, mass base = stored
+  // kg → g, countable = "8 pcs / 480 g", otherwise the raw amount in its unit.
   function weightLabelFor(b: PrepBatch): string {
+    if (isRaw) return b.weight > 0 ? `${b.weight} ${unit}` : ''
     if (hasPortion && saleInfo?.portionSize != null) return formatGramsAscii(saleInfo.portionSize)
     if (unit === 'kg') return formatGramsAscii(b.weight * 1000)
     if (isCountable) return packQtyLabel(b.weight, unit, portionWeightG)
@@ -597,14 +656,20 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const showSaleExtras =
     isSale && !!saleInfo && (saleNutrition != null || !!saleInfo.ingredients || priceLabel != null)
 
-  // Countable preps validate the pieces-per-pack field; mass / SALE validate the weight.
-  const measureValid = isCountable ? piecesValid : gramsValid
+  // RAW quantity is optional (label can be just name + dates + QR); countable
+  // preps validate the pieces-per-pack field; mass / SALE validate the weight.
+  const measureValid = isRaw ? true : isCountable ? piecesValid : gramsValid
   const canPrint = measureValid && countValid && daysValid && !!locationId && !printing
+  // RAW prints with no shelf life / location — just a valid copy count.
+  const canPrintRaw = countValid && !printing
 
-  // Weight string for the live preview, mirroring weightLabelFor but from the
-  // current form inputs (null while the field is empty/invalid).
-  const previewWeight =
-    hasPortion && saleInfo?.portionSize != null
+  // Quantity string for the live preview, mirroring weightLabelFor but from the
+  // current form inputs (null while the field is empty/invalid → no QTY line).
+  const previewWeight = isRaw
+    ? gramsValid && gramsNum != null
+      ? `${gramsNum} ${unit}`
+      : null
+    : hasPortion && saleInfo?.portionSize != null
       ? formatGramsAscii(saleInfo.portionSize)
       : isCountable
         ? packQtyLabel(piecesValid && piecesNum != null ? piecesNum : 0, unit, portionWeightG)
@@ -626,7 +691,7 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
     : ''
   const previewData: PrepLabelData = useMemo(
     () => ({
-      name: item.name,
+      name: item.displayName,
       productCode: item.product_code,
       prepDate: new Date(),
       shelfLifeDays: daysValid ? daysNum : item.shelfLifeDays ?? null,
@@ -637,10 +702,12 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       nutritionPortionG: portionG,
       ingredients,
       price: priceLabel,
+      // RAW pantry labels print only name + QR (+ optional QTY), no dates.
+      hideDates: isRaw,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      item.name,
+      item.displayName,
       item.product_code,
       item.shelfLifeDays,
       daysValid,
@@ -650,68 +717,54 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       portionG,
       ingredients,
       priceLabel,
+      isRaw,
     ],
   )
 
-  async function printBatch(b: PrepBatch) {
-    // SALE dishes get a consumer label: per-portion КБЖУ + состав + price. PF
-    // preps print the plain storage label (extras stay undefined). `nutrition`
-    // and `ingredients` are the same values that drive the live preview above.
-    const nutrition = saleNutrition
-
+  // Send one prepared label to the printer over the chosen transport. Returns
+  // false (and sets an error) when the USB printer isn't connected / a job fails.
+  async function sendLabel(data: PrepLabelData): Promise<boolean> {
     // Bluetooth fallback: RawBT can only rasterize a PNG (ESC/POS) — may drift.
     if (transport === 'bluetooth') {
-      printPrepLabel(
-        {
-          name: item.name,
-          productCode: item.product_code,
-          prepDate: new Date(b.produced_at),
-          shelfLifeDays: shelfDaysOf(b),
-          weight: weightLabelFor(b),
-          qr: b.barcode,
-          batchCode: b.batch_code ?? b.barcode,
-          nutrition,
-          nutritionPortionG: portionG,
-          ingredients,
-          price: priceLabel,
-        },
-        size,
-        true, // launch RawBT via intent each job
-      )
-      return
+      printPrepLabel(data, size, true) // launch RawBT via intent each job
+      return true
     }
-
     // USB (recommended): print the previewed canvas as a native TSPL bitmap.
     // SIZE/GAP make the printer self-register to the gap, so there's no drift,
     // and the bytes are exactly what the cook saw in the preview.
-    const bytes = buildPrepLabelTSPLBitmap(
-      {
-        name: item.name,
-        productCode: item.product_code,
-        prepDate: new Date(b.produced_at),
-        shelfLifeDays: shelfDaysOf(b),
-        weight: weightLabelFor(b),
-        qr: b.barcode,
-        batchCode: b.batch_code ?? b.barcode,
-        nutrition,
-        nutritionPortionG: portionG,
-        ingredients,
-        price: priceLabel,
-      },
-      size,
-    )
+    const bytes = buildPrepLabelTSPLBitmap(data, size)
     const device = usbDevice ?? (await getGrantedPrinter())
     if (!device) {
       setActionError('Connect the USB printer first (button below).')
-      return
+      return false
     }
     setUsbDevice(device)
     try {
       await sendRawViaUSB(device, bytes)
+      return true
     } catch (e) {
       setUsbDevice(null)
       setActionError(`USB print failed: ${(e as Error).message} — reconnect the printer.`)
+      return false
     }
+  }
+
+  async function printBatch(b: PrepBatch) {
+    // SALE dishes get a consumer label (per-portion КБЖУ + состав + price); PF
+    // preps print the plain storage label. Same values drive the live preview.
+    await sendLabel({
+      name: item.displayName,
+      productCode: item.product_code,
+      prepDate: new Date(b.produced_at),
+      shelfLifeDays: shelfDaysOf(b),
+      weight: weightLabelFor(b),
+      qr: b.barcode,
+      batchCode: b.batch_code ?? b.barcode,
+      nutrition: saleNutrition,
+      nutritionPortionG: portionG,
+      ingredients,
+      price: priceLabel,
+    })
   }
 
   // Make `count` batches in one run — each its own row + unique code/QR — and
@@ -744,6 +797,28 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
   const handlePrint = () => runBatches(true)
   const handleAddBatch = () => runBatches(false)
 
+  // RAW pantry labels are print-only — no batch row, no expiry (these are
+  // shelf-stable staples). Prints `count` identical name + QR (+ optional QTY)
+  // stickers; the QR encodes the product code so a jar can be scanned for stock.
+  async function printRawCopies() {
+    if (printing || countNum == null) return
+    setPrinting(true)
+    setActionError(null)
+    for (let i = 0; i < countNum; i++) {
+      const ok = await sendLabel({
+        name: item.displayName,
+        productCode: item.product_code,
+        prepDate: new Date(),
+        shelfLifeDays: null,
+        weight: previewWeight,
+        qr: item.product_code,
+        hideDates: true,
+      })
+      if (!ok) break
+    }
+    setPrinting(false)
+  }
+
   async function handleDelete(b: PrepBatch) {
     setActionError(null)
     const res = await remove(b.id)
@@ -761,7 +836,10 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
       </button>
 
       <div className="mb-5">
-        <h1 className="text-lg font-semibold text-slate-100">{item.name}</h1>
+        <h1 className="text-lg font-semibold text-slate-100">{item.displayName}</h1>
+        {item.displayName !== item.name && (
+          <p className="text-xs text-slate-400">{item.name}</p>
+        )}
         <p className="text-xs text-slate-500">{item.product_code}</p>
       </div>
 
@@ -796,29 +874,36 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
         ) : (
           <label className="block">
             <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-              Weight per label
+              {isRaw ? 'Quantity (optional)' : 'Weight per label'}
             </span>
             <div className="flex items-center gap-2">
               <input
                 type="number"
                 inputMode="decimal"
                 min={0}
-                step="1"
+                step={isRaw ? 'any' : '1'}
                 value={grams}
                 onChange={(e) => setGrams(e.target.value)}
                 readOnly={hasPortion}
-                placeholder="e.g. 100"
+                placeholder={isRaw ? 'optional' : 'e.g. 100'}
                 className={`w-full rounded-xl border px-3 py-3 text-lg outline-none ${
                   hasPortion
                     ? 'border-slate-800 bg-slate-900 text-slate-300'
                     : 'border-slate-700 bg-slate-950 text-slate-100 focus:border-amber-500/60'
                 }`}
               />
-              <span className="whitespace-nowrap text-base text-slate-400">{hasPortion ? portionUnit : 'g'}</span>
+              <span className="whitespace-nowrap text-base text-slate-400">
+                {isRaw ? unit : hasPortion ? portionUnit : 'g'}
+              </span>
             </div>
             {hasPortion && (
               <span className="mt-1 block text-[11px] text-slate-500">
                 Auto from portion size — one portion per label
+              </span>
+            )}
+            {isRaw && (
+              <span className="mt-1 block text-[11px] text-slate-500">
+                Leave blank to print just the name, dates &amp; QR
               </span>
             )}
           </label>
@@ -842,28 +927,31 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           />
         </label>
 
-        {/* Shelf life */}
-        <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-            Shelf life (days)
-          </span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={365}
-            value={days}
-            onChange={(e) => setDays(e.target.value)}
-            placeholder="e.g. 3"
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-lg text-slate-100 outline-none focus:border-amber-500/60"
-          />
-        </label>
+        {/* Shelf life + use-by — not shown for RAW pantry labels (name + QR only) */}
+        {!isRaw && (
+          <>
+            <label className="block">
+              <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
+                Shelf life (days)
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={365}
+                value={days}
+                onChange={(e) => setDays(e.target.value)}
+                placeholder="e.g. 3"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-lg text-slate-100 outline-none focus:border-amber-500/60"
+              />
+            </label>
 
-        {/* Use-by preview */}
-        <div className="flex items-center justify-between rounded-xl bg-slate-950 px-3 py-3 text-sm">
-          <span className="text-slate-400">Use by (from today)</span>
-          <span className="text-base font-semibold text-slate-100">{useByLabel}</span>
-        </div>
+            <div className="flex items-center justify-between rounded-xl bg-slate-950 px-3 py-3 text-sm">
+              <span className="text-slate-400">Use by (from today)</span>
+              <span className="text-base font-semibold text-slate-100">{useByLabel}</span>
+            </div>
+          </>
+        )}
 
         {/* SALE consumer-label preview: price + per-portion КБЖУ + состав */}
         {showSaleExtras && saleInfo && (
@@ -895,23 +983,25 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
           </div>
         )}
 
-        {/* Location */}
-        <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
-            Location
-          </span>
-          <select
-            value={locationId}
-            onChange={(e) => chooseLocation(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
-          >
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Location — feeds the recorded batch; RAW pantry labels aren't recorded */}
+        {!isRaw && (
+          <label className="block">
+            <span className="mb-1 block text-xs uppercase tracking-wider text-slate-400">
+              Location
+            </span>
+            <select
+              value={locationId}
+              onChange={(e) => chooseLocation(e.target.value)}
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-base text-slate-100 outline-none focus:border-amber-500/60"
+            >
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {/* Paper size */}
         <label className="block">
@@ -977,40 +1067,62 @@ function LabelEditor({ item, onBack }: { item: PrepItem; onBack: () => void }) {
 
         {actionError && <p className="text-sm text-rose-400">{actionError}</p>}
 
-        {/* Print + record */}
-        <button
-          type="button"
-          onClick={handlePrint}
-          disabled={!canPrint}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3.5 text-base font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {printing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />}
-          {countValid && countNum != null && countNum > 1
-            ? `Print ${countNum} labels`
-            : 'Print & record batch'}
-        </button>
+        {isRaw ? (
+          <>
+            {/* RAW: print-only — name + QR (+ optional QTY), no dates, no batch */}
+            <button
+              type="button"
+              onClick={printRawCopies}
+              disabled={!canPrintRaw}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3.5 text-base font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {printing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />}
+              {countValid && countNum != null && countNum > 1 ? `Print ${countNum} labels` : 'Print label'}
+            </button>
+            <p className="text-center text-[11px] text-slate-500">
+              Prints the name + QR sticker — no dates, nothing recorded. Scan the QR for stock checks.
+            </p>
+          </>
+        ) : (
+          <>
+            {/* Print + record */}
+            <button
+              type="button"
+              onClick={handlePrint}
+              disabled={!canPrint}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3.5 text-base font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {printing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />}
+              {countValid && countNum != null && countNum > 1
+                ? `Print ${countNum} labels`
+                : 'Print & record batch'}
+            </button>
 
-        <button
-          type="button"
-          onClick={handleAddBatch}
-          disabled={!canPrint}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-600 py-3 text-sm font-medium text-slate-200 transition hover:border-amber-500/50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Plus className="h-4 w-4" />
-          {countValid && countNum != null && countNum > 1
-            ? `Add ${countNum} batches (no print)`
-            : 'Add batch (no print)'}
-        </button>
+            <button
+              type="button"
+              onClick={handleAddBatch}
+              disabled={!canPrint}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-600 py-3 text-sm font-medium text-slate-200 transition hover:border-amber-500/50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Plus className="h-4 w-4" />
+              {countValid && countNum != null && countNum > 1
+                ? `Add ${countNum} batches (no print)`
+                : 'Add batch (no print)'}
+            </button>
 
-        <p className="text-center text-[11px] text-slate-500">
-          {transport === 'usb'
-            ? 'Records the batch + prints the previewed label over USB (native TSPL bitmap)'
-            : 'Records the batch + prints via RawBT over Bluetooth (may misalign)'}
-        </p>
+            <p className="text-center text-[11px] text-slate-500">
+              {transport === 'usb'
+                ? 'Records the batch + prints the previewed label over USB (native TSPL bitmap)'
+                : 'Records the batch + prints via RawBT over Bluetooth (may misalign)'}
+            </p>
+          </>
+        )}
       </div>
 
-      {/* Recorded batches */}
-      <RecordedBatches batches={batches} unit={unit} onReprint={printBatch} onDelete={handleDelete} />
+      {/* Recorded batches — only for recorded (PF/SALE) items, not RAW pantry */}
+      {!isRaw && (
+        <RecordedBatches batches={batches} unit={unit} onReprint={printBatch} onDelete={handleDelete} />
+      )}
     </div>
   )
 }

@@ -68,6 +68,12 @@ export interface PrepLabelData {
   ingredients?: string | null
   /** Preformatted price, e.g. "฿111". Shown top-right on the consumer label. */
   price?: string | null
+  /**
+   * Minimal pantry label (jars & bottles): print just the name, an optional QTY,
+   * and a large QR — no PREP / USE BY dates, no batch-code line. The QR encodes
+   * the product code so a jar can be scanned to identify it during stock counts.
+   */
+  hideDates?: boolean
 }
 
 /** Greedy word-wrap `text` into lines that fit `maxWidth` at the current font. */
@@ -195,6 +201,47 @@ export function renderPrepLabelCanvas(
   // SALE consumer label: name + price + nutrition + ingredients + dates.
   if (data.nutrition || data.ingredients || data.price) {
     drawSaleLabel(ctx, data, wPx, hPx, s)
+    return canvas
+  }
+
+  // ── Minimal pantry label (jars & bottles): the NAME is dead-centred on the
+  //    sticker (horizontally + vertically). A small QR (the product code, for
+  //    stock scans) sits in the bottom-right corner. No dates / batch code. ──
+  if (data.hideDates) {
+    const Fm = (n: number) => Math.round(n * s)
+    const cx = wPx / 2
+
+    // Small QR in the bottom-right corner — minimal but still scannable (~12 mm).
+    const qrPx = data.qr ? Math.round(Math.min(96 * s, wPx * 0.26, hPx * 0.34)) : 0
+    if (qrPx && data.qr) {
+      drawQr(ctx, data.qr, wPx - qrPx - PAD, hPx - qrPx - PAD, qrPx)
+    }
+
+    // Name: bold, up to 2 lines, auto-shrink; sized to the symmetric inner width
+    // so it stays clear of both side dead-zones when centred.
+    const { size: nameSize, lines } = fitText(
+      ctx,
+      data.name.toUpperCase(),
+      wPx - 2 * LPAD,
+      2,
+      Math.round(48 * s),
+      Math.round(20 * s),
+      '800',
+    )
+    const lineH = nameSize + 6 * s
+    // Centre the name block on the label's centre; optional QTY hangs just below.
+    let ny = (hPx - lines.length * lineH) / 2
+    ctx.textAlign = 'center'
+    ctx.font = `800 ${nameSize}px sans-serif`
+    for (const line of lines) {
+      ctx.fillText(line, cx, ny)
+      ny += lineH
+    }
+    if (data.weight) {
+      ctx.font = `600 ${Fm(24)}px sans-serif`
+      ctx.fillText(data.weight, cx, ny + 2 * s)
+    }
+    ctx.textAlign = 'left'
     return canvas
   }
 
