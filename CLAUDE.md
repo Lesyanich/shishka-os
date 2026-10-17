@@ -53,3 +53,26 @@ When unsure → ask: "This sounds like [domain]. Should I load [agent]?"
 - **Git:** branches `feature/{project}/description`, never commit to `main`
 - **Task lifecycle:** `.claude/skills/task-lifecycle/SKILL.md`
 - **STATUS.md** is auto-generated — never edit manually
+
+## Database hygiene
+> Origin: the 2026-10-16 outage — `cron.job_run_details` grew to 328 MB of a 419 MB instance because
+> nothing cleaned it. Policy + inventory: `docs/audits/log-retention-policy-2026-10.md`. Epic `7352e57c`.
+
+- **Every table has a COMMENT** with purpose + owner + retention. No COMMENT → the table is not created.
+- **Every journal/queue gets a `log_retention_policy` row in the same migration** that creates it — including
+  the ones never purged (`keep_days NULL`, `enabled false`, reason stated). A log-shaped table missing from
+  the registry means nobody decided; the weekly audit files a task for it.
+- **Cron calls a function, body on one line.** `SELECT public.fn_x()` and nothing else — `job_run_details`
+  archives the full command text of every run, which is what filled the disk. Any interval under 5 minutes
+  needs its justification in `cron_job_catalog.interval_rationale`, and every job needs a catalog row.
+- **Temporary copies live in schema `backup` only**, with a `COMMENT` containing `drop after YYYY-MM-DD`.
+  `fn_log_retention` drops them when due; one without a date is reported, never dropped. A copy in `public`
+  is a bug.
+- **A new table in `public` gets RLS + at least one policy in the same migration.**
+- **One migration = one claimed number, one session, one apply.** Dump the affected tables to
+  `docs/audits/` before any migration that DROPs or DELETEs. The only backup is a **periodic manual**
+  `pg_dump` copied to the shared Drive (`02_DB_Backups/`) — chosen to stay inside the free tier — so it is
+  as fresh as the last time someone remembered, and **its restore has never been tested** (MC `4405c6e9`).
+  Treat the per-migration dump as the undo you can actually rely on.
+- **Bulk `DELETE`/`UPDATE` on prod goes in batches ≤ 25k rows.** `VACUUM FULL` only as its own statement,
+  never inside a transaction. One large statement times out and rolls back on Nano — measured on 2026-10-16.

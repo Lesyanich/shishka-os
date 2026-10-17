@@ -27,11 +27,18 @@ That's it. 3-4 tool calls before first useful action.
 
 ## Systems of Record
 
-| System       | Role                  | Notes                                                  |
-|--------------|-----------------------|--------------------------------------------------------|
-| **SYRVE**    | System of Record (SoR)| Inventory, BOM, Sales. Pushed via `nomenclature_sync`. |
-| **Supabase** | System of Engagement  | KDS, DB (PostgreSQL 17.6). SSoT for our apps.          |
-| **Obsidian** | Knowledge Base        | Must reflect DB reality. Logs and Handovers live here. |
+| System       | Role                      | Notes                                                                                              |
+|--------------|---------------------------|----------------------------------------------------------------------------------------------------|
+| **Supabase** | **SSoT** + System of Engagement | PostgreSQL 17.6. The source of truth for inventory, BOM, cost and everything our apps show. KDS, admin panel, site. |
+| **Loyverse** | System of Record for the till | Sales, receipts, shifts, cash movements. Pulled in by cron #1–#3; our menu is pushed out via `loyverse_push_queue` (cron #9). The till is authoritative for what was actually sold. |
+| **Obsidian** | Knowledge Base            | Must reflect DB reality. Logs and Handovers live here.                                             |
+
+> **SYRVE is not in use.** It was connected over its API as a test and rejected in favour of
+> Loyverse (CEO, 2026-10-17). This table used to name SYRVE as the System of Record for
+> Inventory, BOM and Sales, which had been false for a long time — every agent read it at
+> session start and inherited the wrong picture. The leftover `syrve_*` tables, columns,
+> functions, admin panels and the `syrve-poc` edge function are being retired; nothing should
+> be built against them. Do not reintroduce SYRVE as an SoR without a CEO decision.
 
 ## RULE-SUPABASE-SSOT
 
@@ -41,7 +48,7 @@ Supabase (PostgreSQL 17.6) is the **only source of truth** for the apps. UI is j
 
 ## RULE-UUID-COMPLIANCE
 
-All database relationships **must** use UUIDs. No integer FKs. All IDs sourced from SYRVE are stored as `UUID`. No exceptions.
+All database relationships **must** use UUIDs. No integer FKs. IDs issued by an external system of record (Loyverse item, variant and receipt ids) are stored as `UUID` in their own dedicated column, never used as an internal FK. No exceptions.
 
 > Origin: Foundational. Replaces legacy `P0 Rule #2`.
 
@@ -100,7 +107,7 @@ The translation happens **at the boundary**, not "later when we have time."
 For any new feature, DB migration, or architectural change — **stop before generating code**. Ask the CEO 2–3 specific questions covering:
 
 1. **Scalability** — does this scale beyond the obvious case? (e.g., recursive BOM queries)
-2. **SSoT alignment** — does this conflict with SYRVE or break the Supabase contract?
+2. **SSoT alignment** — does this conflict with what the till (Loyverse) holds, or break the Supabase contract?
 3. **Security** — what happens if a hostile client sends this?
 
 Only proceed after the CEO answers.
