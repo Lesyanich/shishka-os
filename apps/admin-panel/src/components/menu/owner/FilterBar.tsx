@@ -1,5 +1,13 @@
 import { FilterChip, type FilterChipOption } from './FilterChip'
-import type { MenuFilters, AvailableFilter, LoyverseFilter, FlagKey } from '../../../pages/menu/hooks/useMenuFilters'
+import {
+  DEFAULT_AVAILABLE,
+  defaultFilters,
+  isNonDefault,
+  type MenuFilters,
+  type AvailableFilter,
+  type LoyverseFilter,
+  type FlagKey,
+} from '../../../pages/menu/hooks/useMenuFilters'
 import type { MenuCategorySummary } from '../shared/types'
 
 interface FilterBarProps {
@@ -9,9 +17,12 @@ interface FilterBarProps {
   onChange: (next: MenuFilters) => void
 }
 
-const AVAILABLE_OPTS: FilterChipOption<'yes' | 'no'>[] = [
+// 'all' is the only way back to retired/archived dishes, since 'yes' is the
+// default the page opens with — it must stay visible in the dropdown.
+const AVAILABLE_OPTS: FilterChipOption<AvailableFilter>[] = [
   { value: 'yes', label: 'Yes' },
   { value: 'no', label: 'No' },
+  { value: 'all', label: 'All (incl. retired)' },
 ]
 
 const LOYVERSE_OPTS: FilterChipOption<'synced' | 'unsynced'>[] = [
@@ -25,9 +36,6 @@ const FLAG_OPTS: FilterChipOption<FlagKey>[] = [
   { value: 'no-bom', label: 'No BOM' },
   { value: 'draft', label: 'Draft (no price)' },
 ]
-
-const hasAny = (f: MenuFilters) =>
-  f.categoryIds.length > 0 || f.available !== null || f.loyverse !== null || f.flags.length > 0
 
 export function FilterBar({ filters, categories, categoryCounts, onChange }: FilterBarProps) {
   const catOpts: FilterChipOption<string>[] = categories.map((c) => ({
@@ -44,12 +52,12 @@ export function FilterBar({ filters, categories, categoryCounts, onChange }: Fil
         selectedValues={filters.categoryIds}
         onChange={(v) => onChange({ ...filters, categoryIds: v })}
       />
-      <FilterChip<'yes' | 'no'>
+      <FilterChip<AvailableFilter>
         label="Available"
         mode="single"
         options={AVAILABLE_OPTS}
-        selectedValues={filters.available ? [filters.available] : []}
-        onChange={(v) => onChange({ ...filters, available: (v[0] ?? null) as AvailableFilter })}
+        selectedValues={[filters.available]}
+        onChange={(v) => onChange({ ...filters, available: v[0] ?? DEFAULT_AVAILABLE })}
       />
       <FilterChip<'synced' | 'unsynced'>
         label="Loyverse"
@@ -64,12 +72,10 @@ export function FilterBar({ filters, categories, categoryCounts, onChange }: Fil
         selectedValues={filters.flags}
         onChange={(v) => onChange({ ...filters, flags: v })}
       />
-      {hasAny(filters) && (
+      {isNonDefault(filters) && (
         <button
           type="button"
-          onClick={() =>
-            onChange({ categoryIds: [], available: null, loyverse: null, flags: [] })
-          }
+          onClick={() => onChange(defaultFilters())}
           className="text-xs text-cream/50 underline-offset-2 hover:text-cream hover:underline"
         >
           Clear all
