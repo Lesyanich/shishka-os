@@ -1,0 +1,164 @@
+#!/bin/sh
+# ============================================================
+# db-audit.sh — weekly database audit (MC 37f5dcaa, epic db-reliability 7352e57c)
+#
+# Takes one snapshot into db_audit_snapshots, diffs it against the previous snapshot, prints
+# only what is new or worse, and writes the delta report to vault/Database/audit-YYYY-WW.md.
+#
+# A quiet week prints "nothing changed" and writes a three-line report. That is the success
+# case: this tool exists to be silent. Data Sheriff and Data Health both died from reporting
+# inventory every week until nobody read them.
+#
+# Usage:
+#   scripts/db-audit.sh                      # SQL metrics only
+#   scripts/db-audit.sh advisors.json        # SQL metrics + Supabase advisors
+#   scripts/db-audit.sh --dry-run            # print the delta of the LAST snapshot, take none
+#
+# ADVISORS. The Supabase security/performance advisors are not visible from SQL — they come
+# from the Management API. The weekly agent fetches them with the MCP tool get_advisors
+# (security and performance), concatenates the two `lints` arrays into one JSON array, and
+# passes the file path here. Without that file the run is still valid, just blind to advisors,
+# and the report says so rather than implying a clean bill of health.
+#
+# WHAT THIS SCRIPT DOES NOT DO: file tasks. Deduping a finding against already-open MC tasks
+# needs the Mission Control tools, so the agent does that step using the printed list.
+# ============================================================
+
+set -eu
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+ADVISORS=""
+DRY_RUN=0
+case "${1:-}" in
+  --dry-run) DRY_RUN=1 ;;
+  "")        : ;;
+  *)         ADVISORS="$1" ;;
+esac
+
+# --- credentials: environment, then repo .env, then Keychain (same order as the MCP launchers)
+if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+  if [ -f "$REPO_ROOT/.env" ]; then
+    # shellcheck disable=SC2046
+    export $(grep -vE '^#|^$' "$REPO_ROOT/.env" | xargs) 2>/dev/null || true
+  fi
+fi
+if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+  SUPABASE_SERVICE_ROLE_KEY="$(security find-generic-password -s 'SUPABASE_SERVICE_ROLE_KEY' -w 2>/dev/null || true)"
+fi
+SUPABASE_URL="${SUPABASE_URL:-https://qcqgtcsjoacuktcewpvo.supabase.co}"
+if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+  echo "[db-audit] ERROR: no SUPABASE_SERVICE_ROLE_KEY (env, .env or Keychain)" >&2
+  exit 1
+fi
+
+rpc() { # rpc <function> <json-body>
+  curl -s -X POST \
+    -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+    -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$2" "$SUPABASE_URL/rest/v1/rpc/$1"
+}
+
+# --- snapshot
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "[db-audit] dry run — diffing the last snapshot, taking none"
+  ADVISOR_NOTE="dry run: no new snapshot taken"
+elif [ -n "$ADVISORS" ]; then
+  [ -f "$ADVISORS" ] || { echo "[db-audit] ERROR: advisors file not found: $ADVISORS" >&2; exit 1; }
+  BODY=$(printf '{"p_advisors": %s}' "$(cat "$ADVISORS")")
+  RUN=$(rpc fn_db_audit_snapshot "$BODY" | tr -d '"')
+  echo "[db-audit] snapshot $RUN (with advisors from $ADVISORS)"
+  ADVISOR_NOTE="advisors included"
+else
+  RUN=$(rpc fn_db_audit_snapshot '{}' | tr -d '"')
+  echo "[db-audit] snapshot $RUN (no advisors — SQL metrics only)"
+  ADVISOR_NOTE="**advisors NOT checked this run** — rerun with the get_advisors output to cover them"
+fi
+
+case "${RUN:-}" in
+  *error*|*message*) echo "[db-audit] ERROR: snapshot failed: $RUN" >&2; exit 1 ;;
+esac
+
+# --- delta
+DELTA=$(rpc fn_db_audit_delta '{}')
+
+WEEK=$(date -u +%G-W%V)
+REPORT="$REPO_ROOT/vault/Database/audit-$WEEK.md"
+mkdir -p "$REPO_ROOT/vault/Database"
+
+printf '%s' "$DELTA" | python3 -I -c '
+import json, sys, datetime
+report, week, advisor_note = sys.argv[1], sys.argv[2], sys.argv[3]
+raw = sys.stdin.read()
+try:
+    rows = json.loads(raw)
+except Exception:
+    print("[db-audit] ERROR: delta was not JSON:", raw[:400], file=sys.stderr); sys.exit(1)
+if isinstance(rows, dict):
+    print("[db-audit] ERROR from delta:", rows, file=sys.stderr); sys.exit(1)
+
+order = {"breach": 0, "new": 1, "standing": 2, "worse": 3}
+rows.sort(key=lambda r: (order.get(r.get("severity"), 9), r.get("metric",""), r.get("key","")))
+
+# ---- terminal output
+if not rows:
+    print("[db-audit] nothing changed. 0 findings.")
+else:
+    print("[db-audit] %d finding(s):" % len(rows))
+    for r in rows:
+        print("  [%-8s] %-18s %s" % (r.get("severity"), r.get("metric"), r.get("headline")))
+
+# ---- delta report: what changed, the three biggest risks, nothing else
+top = [r for r in rows if r.get("severity") == "breach"][:3]
+if len(top) < 3:
+    top += [r for r in rows if r not in top][: 3 - len(top)]
+
+lines = []
+lines.append("---")
+lines.append("tags: [database, audit, db-reliability]")
+lines.append("date: %s" % datetime.date.today().isoformat())
+lines.append("---")
+lines.append("")
+lines.append("# DB audit %s" % week)
+lines.append("")
+lines.append("> Delta only. Generated by `scripts/db-audit.sh` (MC 37f5dcaa). %s." % advisor_note)
+lines.append("")
+if not rows:
+    lines.append("## What changed")
+    lines.append("")
+    lines.append("Nothing. No new or worsened findings against the previous snapshot.")
+    lines.append("")
+    lines.append("## Top three risks")
+    lines.append("")
+    lines.append("None outstanding.")
+else:
+    lines.append("## What changed")
+    lines.append("")
+    lines.append("| Severity | Metric | Target | Finding |")
+    lines.append("|---|---|---|---|")
+    for r in rows:
+        lines.append("| %s | %s | `%s` | %s |" % (
+            r.get("severity"), r.get("metric"), r.get("key"),
+            (r.get("headline") or "").replace("|", "\\|")))
+    lines.append("")
+    lines.append("## Top three risks")
+    lines.append("")
+    for i, r in enumerate(top, 1):
+        lines.append("%d. **%s** — %s" % (i, r.get("key"), r.get("headline")))
+lines.append("")
+lines.append("## Linked")
+lines.append("")
+lines.append("[[Schema]] · epic `7352e57c` db-reliability · thresholds in `fn_db_audit_delta`")
+lines.append("")
+open(report, "w").write("\n".join(lines))
+print("[db-audit] report written: %s" % report)
+
+# ---- the list the agent files as MC tasks (breaches and new findings only)
+filable = [r for r in rows if r.get("severity") in ("breach", "new")]
+if filable:
+    print("")
+    print("[db-audit] FILE THESE as MC tasks (domain tech, tag db-audit, source agent_discovery)")
+    print("[db-audit] check related_ids against open db-audit tasks first — do not re-file:")
+    for r in filable:
+        print("  - key=%s metric=%s :: %s" % (r.get("key"), r.get("metric"), r.get("headline")))
+' "$REPORT" "$WEEK" "$ADVISOR_NOTE"

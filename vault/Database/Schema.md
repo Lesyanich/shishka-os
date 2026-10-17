@@ -512,6 +512,18 @@ erDiagram
 | `receiving_lines` | `id` UUID | qty_expected, qty_received, qty_rejected, reject_reason (reject_reason), unit_price_actual | receiving_id -> receiving_records (CASCADE), po_line_id -> po_lines, nomenclature_id -> nomenclature, sku_id -> sku | 062 |
 | `content_translations` | `id` UUID | entity (dish/category/tag/modifier_group/modifier_option/price_tier/site_content), entity_key, field, lang (2-letter, never `en`), value JSONB (string, or partial object for site_content), source_hash (md5 of the EN at translation time — mismatch = stale), reviewed_at/by, UNIQUE(entity,entity_key,field,lang). RLS: read = authenticated, write = fn_is_owner(); no anon grant. Two-way mirrored with nomenclature.customer_description_ru/_th | -- (soft keys, see mig 446 header) | 446 |
 
+| `log_retention_policy` | `id` UUID | schema_name, table_name, ts_column, keep_days (NULL = keep forever), status_filter (SQL fragment, shape-CHECKed), batch_size (100..25000), enabled, reason, last_run_at, last_deleted, last_capped, UNIQUE(schema_name,table_name). CHECK: an enabled row must have both ts_column and keep_days. RLS: read = authenticated; writes only via migration (service_role). **Retention registry — a journal/queue missing from here is an unmade decision** | -- | 496, 498 |
+| `cron_job_catalog` | `jobname` text | purpose, owner, breaks_if_disabled, interval_rationale (required reading for any interval < 5 min). Stands in for a COMMENT on a cron job, which pg_cron cannot have. RLS: read = authenticated | -- (soft key to cron.job.jobname) | 497 |
+| `db_audit_snapshots` | `id` UUID | run_at, metric (db_size/table_size/unused_index/cron_failed_7d/backup_table/storage_size/retention_capped/cron_undocumented/advisor_security/advisor_performance), key, value JSONB. Indexed on (run_at DESC) and (metric,key,run_at DESC). Retention 365d | -- | 498 |
+
+### Schema `backup` (mig 499)
+
+The only legal home for temporary table copies. Every table in it **must** carry a `COMMENT`
+containing `drop after YYYY-MM-DD`; `fn_log_retention` drops it once that date passes, and a copy
+without a parseable date is warned about but never dropped. Not exposed to PostgREST. A copy left
+in `public` is a bug the weekly DB audit files a task for. Currently holds
+`nomenclature_rename_backup_311dc7fe_…` and `sku_balances_bak_20260901`, both due 2026-12-31.
+
 ### Columns added by mig 379 to tables documented elsewhere
 
 Procurement v2 Phase A also widened five tables that this index does not carry
@@ -545,6 +557,12 @@ rows for. Listed here so the migration's full footprint is greppable:
 
 | Function | Type | Purpose | Migration |
 |---|---|---|---|
+| `fn_log_retention(integer, numeric)` | CRON | Nightly housekeeping, two passes: (1) purge every enabled `log_retention_policy` row in `batch_size` ctid chunks up to p_max_batches, recording last_run_at/last_deleted/last_capped; (2) drop tables in schema `backup` whose COMMENT carries a past `drop after YYYY-MM-DD`. Returns jsonb. SECURITY INVOKER, search_path pinned, PUBLIC revoked. Called by cron `log-retention` 03:10 UTC | 496, 499 |
+| `fn_loyverse_push_drain(integer)` | CRON | Body of cron #9. Claims up to p_batch pending `loyverse_push_queue` rows (FOR UPDATE SKIP LOCKED), marks processing, POSTs one internal_push each. Returns rows claimed. Reads vault inside the function so no secret reaches `cron.job_run_details` | 497 |
+| `fn_loyverse_push_watchdog(interval)` | CRON | Body of cron #10. Re-queues rows stuck in processing past p_stuck_after; marks `error` at 3+ attempts. Returns rows touched | 497 |
+| `fn_loyverse_pull(text)` | CRON | Body of cron #1/#2/#3. Action whitelist receipts\|shifts\|all; POSTs to the Loyverse pull edge function, returns the pg_net request id | 497 |
+| `fn_db_audit_snapshot(jsonb)` | RPC | Takes one weekly audit snapshot into `db_audit_snapshots` (sizes, unused non-unique indexes, 7-day cron failures, leftover copies outside schema `backup`, storage bytes, capped retention, undocumented cron jobs). p_advisors carries the MCP get_advisors output so advisor lints diff the same way. Returns run_at | 498 |
+| `fn_db_audit_delta(timestamptz)` | RPC | Diffs the latest snapshot against the previous one and returns ONLY breaches (db > 350 MB, table > 50 MB, storage > 0.9 GiB, cron > 10 failures/day), genuinely new findings, and 20%+ size growth above 5 MB. Zero rows = quiet week. Deliberately does not report top-20 rank churn, a fresh unused index, or a single cron blip | 498 |
 | `fn_start_production_task(UUID)` | RPC | Start cook task, freeze BOM snapshot. Reads target_nomenclature_id directly (056 rewrite, was flow_step_id→recipes_flow) | 016, 056 |
 | `fn_predictive_procurement(UUID)` | RPC | Procurement v3: reads stock from v_inventory_by_nomenclature (was inventory_balances) | 017, 056, 058 |
 | `fn_generate_barcode()` | UTIL | 8-char alphanumeric barcode | 018 |

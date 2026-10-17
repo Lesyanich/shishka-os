@@ -85,6 +85,11 @@ token.json
 *.csv
 *.mp4
 
+# EXCEPTION — pre-DROP table dumps are a safety net, not data clutter. Production has no
+# backups yet (MC 4405c6e9), so the CSV written before a DROP/DELETE migration IS the backup
+# and must be in git. Rule: CLAUDE.md § Database hygiene.
+!docs/audits/**/*.csv
+
 # Non-code folders (Google Drive content, not source code)
 01_Business/
 01_Source_Data/
