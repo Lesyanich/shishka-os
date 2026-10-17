@@ -395,3 +395,88 @@ forbids.
 5. `get_advisors(security)` and compare against 2.5.
 6. Smoke with real keys, not SQL: the live site with the **publishable** key, the admin
    panel with a real user JWT, and the Loyverse edge functions under `service_role`.
+
+---
+
+# Step 3 — applied to production 2026-10-17 10:12 UTC (17:12 Phuket)
+
+Applied during service, not in the small hours. The brief said "after 23:00 Phuket";
+the logs said otherwise, so the rule was checked rather than followed:
+
+| Hour (Phuket) | Requests | RPC |
+|---|---:|---:|
+| 17 (apply) | 382 | 222 |
+| 22 | 1778 | 316 |
+| 23 | 903 | 158 |
+| 01–09 | 0–33 | **0** |
+
+23:00 is one of the busier hours and 22:00 is the daily peak — waiting for it would
+have made things worse, not better. The genuinely quiet window is 01:00–09:00. With the
+change already proven byte-identical by the rolled-back dry run, the transaction only
+seconds long, assertions that self-roll-back, a verified dump in hand and a surgical
+rollback script, applying at 17:12 was the better trade. CEO agreed on that reading.
+
+## Result — every number as predicted
+
+| Check | Expected | Actual |
+|---|---:|---:|
+| our functions executable by `anon` | 0 | **0** |
+| executable by `authenticated` | 55 | **55** |
+| retaining `service_role` | 190 | **190** |
+| with a mutable `search_path` | 0 | **0** |
+| `http` functions still open to `anon` | 19 | **19** (expected — MC `16ad5772`) |
+| snapshot rows written | 702 | **702** (512 grants + 190 search_path) |
+
+`migration_log` registered 490 at 10:12.
+
+**Production state matches the committed prediction exactly.** Order-independent checksum
+over all 190 rows of name/args/secdef/anon/auth/triggers/search_path:
+`d6dee875989e8a6427902ac1da73b0a0` from live `pg_proc`, and the same value from
+`2026-10-17-rpc-grants-after.csv`, which was generated from the dry run *before* the apply.
+(A first comparison disagreed only because the database and `sort` order lines under
+different collations; the multiset checksum removes that.)
+
+## Advisors, before → after
+
+| Lint | Level | Before | After |
+|---|---|---:|---:|
+| `anon_security_definer_function_executable` | WARN | 109 | **0 — gone** |
+| `function_search_path_mutable` | WARN | 126 | **0 — gone** |
+| `authenticated_security_definer_function_executable` | WARN | 121 | **46** |
+| `security_definer_view` | ERROR | 34 | 34 |
+| `extension_in_public` | WARN | 4 | 4 |
+| `rls_enabled_no_policy` | INFO | 21 | 22 |
+| `auth_leaked_password_protection` | WARN | 1 | 1 |
+
+The two headline lints disappeared from the report entirely. `rls_enabled_no_policy` went
+up by one: the new `rpc_grant_snapshot_490` table, which the `rls_auto_enable` event
+trigger protected on creation and which deliberately has no policy — only `service_role`
+and `postgres` should ever read it.
+
+## Live smoke, with real keys
+
+- **Public site** — `node scripts/contract-check.mjs` green on both endpoints with the
+  publishable key: menu_public 81, nomenclature_tags 942, site_content 4, menu_modifiers
+  436, menu_translations 236, price_tiers 0, and all four content assertions.
+- **anon over REST, post-apply** — every read 200/206, no 4xx/5xx:
+  menu_public, price_tiers, nomenclature_tags, menu_modifiers, site_content,
+  menu_translations.
+- **service_role / cron** — all pg_cron jobs succeeded after the apply, zero errors.
+  `loyverse-push-drain` ran at 10:13, one minute *after* the migration, and succeeded;
+  `loyverse-pull-receipts`, `loyverse-pull-shifts`, `loyverse-push-watchdog`,
+  `staff-tasks-reminders` and `attendance-no-show` all green.
+
+## Backup in place before the apply
+
+CEO took a manual `pg_dump` (8.4 MB, 3529 objects, verified with `pg_restore --list`),
+copied to the shared drive at `Shishka healthy kitchen/02_DB_Backups/` with matching
+SHA-256. The recurring off-site automation remains MC `4405c6e9`; the lessons from doing
+it by hand — client version, SSL, and not putting the password in the URI — are recorded
+there.
+
+## Rollback, if it is ever needed
+
+`services/supabase/rollback/490_rollback.sql`, replaying
+`public.rpc_grant_snapshot_490`. It restores the prior grants and `search_path` exactly
+and asserts the result against the snapshot. Note that running it **reopens the anon
+hole** — it is incident response, not a resting state.
