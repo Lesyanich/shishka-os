@@ -1,0 +1,6 @@
+table,row_count,total_size,dumped
+syrve_config,6,32 kB,syrve_config.csv
+syrve_sales,0,24 kB,n/a (empty)
+syrve_sync_log,0,16 kB,n/a (empty)
+syrve_sync_queue,0,24 kB,n/a (empty)
+syrve_uom_map,0,24 kB,n/a (empty)
