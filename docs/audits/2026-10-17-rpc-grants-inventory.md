@@ -1090,3 +1090,64 @@ for when the predicate itself has to change.
 are all closed. The one left is **`staff_tasks.assigned_to`** — and unlike the others it is
 genuinely live (3757 rows, written today, the Telegram staff tracker), so it needs its
 consumers exercised rather than a policy edit.
+
+---
+
+# Step 10 — the last staff-id surface, and why it needed four checks
+
+**MC** `ef80ceed` · **migration** 518 · 2026-10-17
+
+`staff_tasks.assigned_to` was the only place left where an anonymous caller could still
+collect a real employee UUID. Unlike the five closed in § 7–9, **this table is live** —
+3757 rows, written today, the Telegram staff tracker — so "probably vestigial like the
+rest" was not good enough. A wrong call blanks the board staff open every day.
+
+## 10.1 Four independent checks, all agreeing
+
+1. **The creating migration.** 264a: *"read for anon+authenticated (mirrors shifts/staff),
+   write authenticated"* — the **third** copy of migration 069's open-`/kitchen` convention.
+   `staff_read_anon` was removed long ago by someone else; `shifts_read_anon` went in 508.
+   Inherited, never reasoned for.
+2. **App consumers.** `useStaffTasks.ts` is the only one, via `KitchenTasksPage`
+   (`/kitchen/my-tasks`, `/staff-tasks`). Both are behind `<ProtectedRoute>`, which renders
+   a spinner and **no children** while `AuthContext.loading` is true, then redirects to
+   `/login` without a user. The hook cannot mount pre-session, so there is no anon fetch to
+   break. **This mattered:** `fetchData` is `useCallback(…, [])` and its effect runs once on
+   mount — had rendering been allowed pre-session, closing anon would have left a
+   permanently empty board with no refetch.
+3. **Edge functions.** `telegram-push`, `telegram-ai`, `telegram-webhook` all import `db`
+   from `_shared/supabase.ts`, built with `SUPABASE_SERVICE_ROLE_KEY`, which bypasses RLS
+   and the ACL.
+4. **Real traffic**, 24 h of edge_logs with my own `curl` and the service-role Deno runtime
+   filtered out: every real `GET` carries `request.sb.auth_user`.
+
+## 10.2 Two log-reading traps inside check 4
+
+Both nearly produced the wrong answer, and both generalise:
+
+- **An empty `auth_user` does not mean anon.** It is empty for service_role too — all 29
+  edge-function requests had it blank. Absence of a user is not presence of anon.
+- **Read the `method` column.** The three auth-less browser entries looked like live
+  anonymous usage until they turned out to be **`OPTIONS`** — CORS preflight, which carries
+  no credentials by design and is answered before any policy runs.
+
+## 10.3 Rename, so the name stops lying
+
+A policy called `staff_tasks_read_anon` that no longer admits anon is the trap already
+recorded for storage policies: the name reads as authoritative, the qual holds the truth.
+Renamed to `staff_tasks_read_auth`.
+
+## 10.4 Verification — the epic's closing numbers
+
+| check | before | after |
+|---|---|---|
+| `GET /staff_tasks` as anon | 200, rows | `401 / 42501` |
+| policy | `staff_tasks_read_anon {anon,authenticated}` | **`staff_tasks_read_auth {authenticated}`**, `qual = true` intact |
+| `authenticated` SELECT + INSERT | yes | **yes** |
+| **staff UUIDs reachable by anon** | yes | **none — all 28 staff-FK surfaces swept** |
+| live-site surface (8 objects) | 200 | 200 |
+| `contract-check.mjs`, both endpoints | green | green |
+
+**The staff-id harvest path is closed.** `staff`, `shifts`, `production_tasks`,
+`staff_task_assignees`, `staff_schedule_templates` and `staff_tasks` all deny anon, and a
+sweep of every table carrying a staff foreign key returns nothing.
