@@ -319,15 +319,41 @@ helpers to `authenticated` in the same migration that introduces the policy.
    needs to be the *grantor*; all three therefore need `supabase_admin`. Measured
    2026-10-17, MC `16ad5772`, migration 501 — don't re-derive it, and don't write a
    migration that pretends otherwise.
-4. **"Closed by default" is true for FUNCTIONS only.** Migration 490 cleared the `postgres`
-   default privilege for functions in `public`; the one for **tables and views** was left
-   alone and still reads `anon=arwdDxtm/postgres`. A new view or table in `public` is
-   therefore born readable *and writable* by `anon` — and a view has no RLS to save it.
-   **Every migration that creates a view in `public` must end with
-   `REVOKE ALL ON public.<view> FROM anon, authenticated;`** unless the live site genuinely
-   needs it, and must then verify with `has_table_privilege` rather than trusting the
-   statement. Found the hard way in 501, whose own monitoring view came out world-readable
-   on first apply.
+4. **Tables and views in `public` are closed by default too — since migration 504.**
+   490 cleared the `postgres` default privilege for functions and left the one for TABLES
+   (which covers views) granting `anon=arwdDxtm`. 504 fixed it: the default ACL is now
+   `postgres` + `service_role` only, so **a new table or view in `public` is born closed and
+   needs an explicit grant**, exactly like a function. End the migration that adds one with
+   its grant, or a comment saying none is wanted:
+
+   ```sql
+   GRANT SELECT ON public.v_my_new_view TO authenticated;   -- or anon, with a reason
+   ```
+
+   Then **verify with `has_table_privilege`, not by reading the statement** — and for
+   anything the live site touches, with a real `curl` using the publishable key.
+
+   Why it mattered: a TABLE has RLS as a backstop, a VIEW has none, and a view is
+   `SECURITY DEFINER` unless created with `security_invoker = true`, so it reads its base
+   tables as the view owner and bypasses RLS by design. For a view the ACL is the only gate.
+   504 found 23 views answering the publishable key with real data — COGS, stock positions,
+   equipment cost, staff holiday balances, 1112 rows of `v_data_health_items_legacy`.
+
+   Two measurement traps, both of which hid part of that:
+   - **Count HTTP 206, not just 200.** PostgREST answers a large result with `206 Partial
+     Content`; a `== 200` filter hid the single biggest leak.
+   - **A 500 is not safety.** Four ACL-open views answered 500 only because of the anon
+     role's 3 s `statement_timeout`. One schema change away, they leak.
+
+   `authenticated` is deliberately still granted on views: the admin panel reads 35 of them.
+   Narrowing that per screen is separate work.
+
+   Existing **table** grants were left alone on purpose, and the reason generalises: 31 RLS
+   policies in `public` carry `qual = true` for `anon` or `public`, written deliberately for
+   the KDS (`kds_anon_read`) and the staff Telegram app ("TWA anon can view warnings"). The
+   ACL is checked *before* RLS, so revoking a table grant cuts those surfaces off even
+   though their policies still permit them. Never sweep table grants without exercising
+   every consumer first.
 
 **Verify by dry run, not by reading.** A grants migration can be run against production
 inside a transaction that rolls back — `BEGIN; <migration body>; SET LOCAL ROLE anon;
