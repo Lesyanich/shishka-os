@@ -128,6 +128,46 @@ Code in git worktrees is **invisible to main**. Before ending a session that use
 
 > Origin: 2026-04-04. Full Receipt Review UI (`InboxReviewPanel`, ~1000 LOC) was lost because it lived only in a worktree that was deleted. (Legacy: `P0 Rule #12`.)
 
+## RULE-HOOK-WIRING
+
+Every hook `command` in `.claude/settings.json` **anchors its script on
+`"${CLAUDE_PROJECT_DIR:-.}"`** — quoted, and with the `:-.` fallback:
+
+```json
+"command": "sh \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/git-guard-pretool.sh\""
+```
+
+Never a bare relative path (`sh scripts/session-start.sh`). A relative command
+resolves against the **hook process's** cwd, which is not necessarily the
+checkout the session is editing: in a worktree session the hook process sat in
+the parent checkout `/Users/lesianich/code/shishka`, so **the parent's copy of
+every hook ran** and a hook edited in the worktree was inert until merged *and*
+the parent synced — you cannot test a hook fix where you write it.
+
+**Both decorations are load-bearing — do not "clean up" either one.** The quotes
+keep a path containing a space in one argument. The `:-.` covers the variable
+being unset or empty in the hook process: without it the command expands to
+`sh "/.claude/hooks/…"`, `sh` exits 127, and because a PreToolUse hook only
+blocks on exit 2, **the tool call proceeds** — the git guard and the claim gate
+would be off for every session, noisily but completely. With `:-.` that case
+degrades to `./…`, which is byte-for-byte the old relative behaviour. Measured,
+all three cases, by feeding the hook a real payload:
+
+| `CLAUDE_PROJECT_DIR` | `"${CLAUDE_PROJECT_DIR:-.}/…"` | `"$CLAUDE_PROJECT_DIR/…"` |
+|---|---|---|
+| set | exit 0, guard denies | exit 0, guard denies |
+| unset or empty | exit 0, guard denies (relative) | **exit 127, guard silent** |
+
+Changing a hook's wiring governs every future session, so prove it, don't reason
+about it: edit the hook in a worktree, start a session there, and confirm the
+edit takes effect without merging. The cheapest tell is the SessionStart banner —
+it prints the branch of the checkout the hook ran in, so a worktree session that
+still prints `Branch: main` is running the parent's copy.
+
+> Origin: 2026-10-17, MC `51fa2d68`, raised by MC `8aafd8eb` (PR #617). The git
+> guard refused every commit made from a worktree, and the fix could not be
+> tested in the worktree that held it.
+
 ## RULE-DEPLOY-MAP
 
 The live customer site `shishka.health` is served by the Vercel project **`shishka-web`**, which builds the **`Lesyanich/shishka-health`** repo (`main`) — **not this repo**. The `shishka-os` Vercel project builds `apps/admin-panel` only. Full topology: `docs/operations/deploy-map.md`.
@@ -492,7 +532,7 @@ at the server with no escape hatch.
 
 **Sanctioned exception — syncing `main` to its own upstream (layer 2).** `git merge --ff-only origin/main` (or `git pull --ff-only`) **while on `main` is allowed**: `--ff-only` makes git refuse anything but a pointer advance, and the target already exists on the remote, so nothing unreviewed lands and no commit is created. All three conditions are checked — verb is `merge`/`pull`, `--ff-only` is present, and the target resolves to **that branch's own upstream**. The third is load-bearing: `git merge --ff-only feature/x` also fast-forwards, but it lands unreviewed local work on `main`, so it stays denied. Why it matters: the shared checkout at `/Users/lesianich/code/shishka` is what the MCP launchers run from, and it kept serving stale code because no agent could fast-forward it.
 
-**The matrix is the contract.** Any change to the guard must be proven against `sh .claude/hooks/git-guard-pretool.test.sh` — every narrowing there is paired with the TRUE positive it must keep denying. A guard that silently stops denying is worse than the friction it removes, so: never widen the escape hatch to fix a false positive, narrow the match instead. Origin: MC `8aafd8eb` collected five false-denial classes (a trailing `-q`, the `--ff-only` sync, any push from a checkout sitting on `main`, a `main` token belonging to a chained non-git command, and every commit made from a worktree) — all one root cause: matching command TEXT plus the ambient branch instead of parsing the git call.
+**The matrix is the contract.** Any change to the guard must be proven against `sh .claude/hooks/git-guard-pretool.test.sh` — every narrowing there is paired with the TRUE positive it must keep denying. A guard that silently stops denying is worse than the friction it removes, so: never widen the escape hatch to fix a false positive, narrow the match instead. Origin: MC `8aafd8eb` collected five false-denial classes (a trailing `-q`, the `--ff-only` sync, any push from a checkout sitting on `main`, a `main` token belonging to a chained non-git command, and every commit made from a worktree) — all one root cause: matching command TEXT plus the ambient branch instead of parsing the git call. The guard only governs a session if `.claude/settings.json` points at the right copy of it — see § RULE-HOOK-WIRING.
 
 **Escape hatch (layer 2 only).** Sanctioned automation that must write to
 `main` (e.g. the sheriff) **prefixes the command**: `SHISHKA_ALLOW_MAIN=1 git
