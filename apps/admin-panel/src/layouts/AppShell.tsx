@@ -6,7 +6,6 @@ import {
   BarChart3,
   BookOpen,
   CalendarDays,
-  ChefHat,
   ChevronDown,
   ClipboardCheck,
   DollarSign,
@@ -98,7 +97,6 @@ const NAV_SECTIONS: NavSection[] = [
       { path: '/staff-tasks', icon: ListTodo, label: 'Staff Tasks', minRole: 'task_manager' },
       // Heavy KDS production tooling — managers only, moved off the cook floor.
       // Schedule + Cook Station are two views of one board since 2026-07-29.
-      { path: '/kitchen/schedule', icon: ChefHat, label: 'Kitchen KDS', minRole: 'task_manager' },
       // Inventory/waste + receiving — owner-only, pulled off the cook floor (kept for the owner).
       { path: '/kitchen/waste', icon: Trash2, label: 'Waste', minRole: 'owner' },
       { path: '/receive', icon: ClipboardCheck, label: 'Receiving', minRole: 'owner' },
