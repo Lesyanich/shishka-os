@@ -70,6 +70,9 @@ When unsure → ask: "This sounds like [domain]. Should I load [agent]?"
   is a bug.
 - **A new table in `public` gets RLS + at least one policy in the same migration.**
 - **One migration = one claimed number, one session, one apply.** Dump the affected tables to
-  `docs/audits/` before any migration that DROPs or DELETEs — production has no backups yet (MC `4405c6e9`).
+  `docs/audits/` before any migration that DROPs or DELETEs. The only backup is a **periodic manual**
+  `pg_dump` copied to the shared Drive (`02_DB_Backups/`) — chosen to stay inside the free tier — so it is
+  as fresh as the last time someone remembered, and **its restore has never been tested** (MC `4405c6e9`).
+  Treat the per-migration dump as the undo you can actually rely on.
 - **Bulk `DELETE`/`UPDATE` on prod goes in batches ≤ 25k rows.** `VACUUM FULL` only as its own statement,
   never inside a transaction. One large statement times out and rolls back on Nano — measured on 2026-10-16.
