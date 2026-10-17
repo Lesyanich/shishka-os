@@ -851,3 +851,84 @@ true of the tables still open on `ef80ceed`.
 **Still open on `ef80ceed`:** the 23 leaking tables and the other three unconditional anon
 INSERT policies — `cook_feedback`, `recipe_feedback`, `production_log` — which look like
 deliberate feedback intake and need the same consumer check.
+
+---
+
+# Step 7 — the `shifts` staff_id leak, and what closing it did not fix
+
+**MC** `ef80ceed` · **migration** 508 · 2026-10-17
+
+## 7.1 Why `shifts` was the one to take first
+
+`shifts` carries `staff_id` and `shifts_read_anon` (`qual = true`, 206 rows) handed it to
+the publishable key. `staff` itself is closed (401), so **`shifts` was the leak that made
+real employee UUIDs obtainable anonymously** — the input that turned § 6's forgery from
+anonymous junk into a record attributed to a named employee.
+
+## 7.2 It was vestigial, and the git history says so outright
+
+Migration 069 created four siblings under one comment:
+
+```sql
+-- Чтение для всех (открытый дашборд кухни /kitchen)
+CREATE POLICY "staff_read_anon"           ON staff           FOR SELECT USING (true);
+CREATE POLICY "shifts_read_anon"          ON shifts          FOR SELECT USING (true);
+CREATE POLICY "shift_tasks_read_anon"     ON shift_tasks     FOR SELECT USING (true);
+CREATE POLICY "equipment_slots_read_anon" ON equipment_slots FOR SELECT USING (true);
+```
+
+"Read for everyone (open kitchen dashboard /kitchen)". **There is no open `/kitchen` any
+more** — every `/kitchen/*` route in `App.tsx` is inside `<ProtectedRoute>`, and the only
+routes outside it are `/login` and `/stock`, neither of which touches these tables.
+`staff_read_anon` was already removed by someone else; the other three were left behind.
+508 finishes that job. All three are consumed only by the authenticated admin panel; the
+one edge function touching `shifts` runs on the service role.
+
+**Reading the migration that created a policy is cheaper than inferring its purpose.** The
+comment settled in one line what consumer-hunting had been circling.
+
+## 7.3 A replacement policy, not just a DROP
+
+Each table also had `<t>_write_auth` — `FOR ALL`, `roles = {public}`,
+`qual = auth.role() = 'authenticated'` — and `ALL` covers SELECT, so dropping `_read_anon`
+would *in principle* leave authenticated reading through it. In principle: it depends on
+`auth.role()` resolving from a real JWT, and **a migration cannot cheaply verify that** —
+`SET LOCAL ROLE authenticated` has no JWT, so `auth.role()` is NULL and the policy returns
+nothing either way. A mistake would surface as a staff member hitting a blank schedule
+mid-shift.
+
+So each table got an explicit `<t>_read_auth` — `FOR SELECT TO authenticated USING (true)`
+— created **before** the anon policy was dropped. Unconditional and role-scoped, so
+authenticated cannot regress regardless of `auth.role()`.
+
+## 7.4 What this did NOT fix — measured after applying
+
+**Closing `shifts` narrowed the staff-id harvest path; it did not close it.** 26 tables
+still carry a staff FK with anon in the ACL, and four still hand a real UUID to the
+publishable key:
+
+```
+staff_task_assignees.staff_id      staff_schedule_templates.staff_id
+staff_tasks.assigned_to            production_tasks.assigned_to
+```
+
+An attacker can still get an employee id, from 10-row surfaces instead of a 206-row one.
+The § 6 sink is shut so that specific forgery is dead, but **a future table with a
+`recorded_by` FK would be exploitable again.** Those four are the KDS and staff-Telegram
+surfaces — the work that needs each consumer exercised — and stay on `ef80ceed`.
+
+Worth stating plainly because the opposite is tempting: closing the biggest leak looks like
+closing the leak, and the post-apply check is what distinguishes them.
+
+## 7.5 Verification
+
+Dry run in a rolling-back transaction that re-read `shifts.staff_id` as anon and asserted
+it now fails, then applied. From outside with the publishable key:
+
+| check | before | after |
+|---|---|---|
+| `GET /shifts` | 200, 206 rows | `401 / 42501` |
+| `GET /shift_tasks`, `GET /equipment_slots` | 200 | `401 / 42501` |
+| `authenticated` SELECT on all three | yes | **yes**, via explicit `_read_auth` |
+| staff UUID harvestable anywhere | yes (`shifts`, 206 rows) | **yes — 4 smaller surfaces** (§ 7.4) |
+| live-site surface, all 7 objects | 200 | 200, unchanged |
