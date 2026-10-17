@@ -348,6 +348,19 @@ helpers to `authenticated` in the same migration that introduces the policy.
    `authenticated` is deliberately still granted on views: the admin panel reads 35 of them.
    Narrowing that per screen is separate work.
 
+   **Write a policy as `TO <role>`, not `roles = {public}` guarded by a helper.** Both deny
+   anon, but the guard form makes anon *evaluate* `fn_is_authenticated()`, which it lost
+   EXECUTE on in 490 — so it raises `42501 permission denied for function` instead of a
+   clean denial. Noisy, and it confirms the policy exists. `TO authenticated` means no
+   policy applies to anon at all. (Migration 506; the same 42501 also derailed a probe
+   that merely tried to read `recipes_flow` as anon.)
+
+   **Probe a write without `RETURNING`.** `INSERT … RETURNING` as anon fails with
+   `new row violates row-level security policy` whenever there is no SELECT policy — which
+   reads exactly like the write being blocked, *after* it was in fact permitted. 506 was
+   nearly closed as a non-issue on that false negative. Use a plain INSERT, or PostgREST's
+   `Prefer: return=minimal`, then count the rows as `postgres`.
+
    Existing **table** grants were left alone on purpose, and the reason generalises: 31 RLS
    policies in `public` carry `qual = true` for `anon` or `public`, written deliberately for
    the KDS (`kds_anon_read`) and the staff Telegram app ("TWA anon can view warnings"). The

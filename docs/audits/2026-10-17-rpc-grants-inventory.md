@@ -765,3 +765,89 @@ Prior ACLs for all 221 tables/views are snapshotted in `public.acl_snapshot_504`
 rollback without a dump. `supabase_admin`'s parallel default ACL still grants anon and is
 out of reach as `postgres`; it only applies to objects `supabase_admin` itself creates
 (none of ours), so 504 raises a WARNING naming it rather than failing.
+
+---
+
+# Step 6 — anon could forge food-safety and waste records
+
+**MC** `ef80ceed` (the INSERT slice) · **migration** 506 · 2026-10-17
+
+§ 5.2 listed five policies granting unconditional INSERT to anon and flagged two of them —
+`haccp_logs` and `waste_entries`, both `roles = {public}` with `with_check = true` — as
+looking wider than intended. They were.
+
+## 6.1 Confirmed by doing it
+
+Run against production inside a transaction that rolled back:
+
+```sql
+SET LOCAL ROLE anon;
+INSERT INTO public.waste_entries
+  (production_task_id, waste_type, gross_weight, net_weight, recorded_by, notes)
+SELECT (SELECT id FROM public.production_tasks LIMIT 1), 'spoilage', 99.0, 1.0,
+       (SELECT staff_id FROM public.shifts WHERE staff_id IS NOT NULL LIMIT 1), '…';
+-- → 1 row inserted, recorded_by = a real staff UUID
+```
+
+**Every input is harvestable by anon.** `recorded_by` is `NOT NULL REFERENCES staff(id)`,
+and `staff` is closed (401) — but **`shifts` is not** (`shifts_read_anon`, `qual = true`,
+206 rows) and carries `staff_id`; `production_tasks` is open via `kds_anon_read` (82 rows)
+and supplies `production_task_id`. So the output is not anonymous junk but **a fabricated
+waste record attributed to a named employee**. For HACCP that is records integrity, not
+data quality.
+
+**A false negative worth recording.** The first attempt used `INSERT … RETURNING` inside a
+CTE and failed with `new row violates row-level security policy`, which reads exactly like
+the write being blocked. It was not: anon has no SELECT policy on `waste_entries`, so
+RETURNING fails *after* the insert is permitted. A plain INSERT succeeded. **Probe writes
+without RETURNING**, or PostgREST's own `Prefer: return=minimal`.
+
+`haccp_logs` was blocked only by accident: `recipe_flow_id` is `NOT NULL REFERENCES
+recipes_flow(id)` and `recipes_flow` is closed to anon, so no valid id can be obtained. The
+policy itself permitted the write — one leaked id from exploitable.
+
+## 6.2 Why this slice could be done when the rest of ef80ceed cannot
+
+504 left table grants alone because 31 `qual = true` policies serve the KDS and staff TWA
+and the ACL sits in front of RLS. That objection does not apply here:
+
+* **No code writes either table** — searched `apps/`, `services/`, `packages/`, all 15 edge
+  functions and the shishka-health repo: zero references outside migrations.
+* **Both tables are empty**, 0 rows.
+
+They are scaffolding for the shrinkage / HACCP work that is not wired up yet. No consumer
+exists to break.
+
+## 6.3 `TO authenticated`, not a `fn_is_authenticated()` guard
+
+Both deny anon, but the guard form makes anon evaluate a function it lost EXECUTE on in
+490, raising `42501 permission denied for function fn_is_authenticated` instead of a clean
+denial — noisy, and it confirms the policy exists. `TO authenticated` means no policy
+applies to anon at all. It also matches what `waste_entries` already did for SELECT and
+UPDATE, so the table is now internally consistent.
+
+This is worth generalising: **prefer `TO <role>` over a `roles = {public}` policy guarded by
+a helper function.** Hit twice in one session — the same 42501 derailed the first forgery
+probe when `recipes_flow` was read.
+
+## 6.4 Verification
+
+Dry run in a rolling-back transaction that re-ran the exact successful forgery and asserted
+it now fails, then applied. Confirmed from outside with the publishable key:
+
+| probe | before | after |
+|---|---|---|
+| `POST /waste_entries` (forged, `return=minimal`) | **inserted** | `401 / 42501` |
+| `POST /haccp_logs` | permitted by policy | `401 / 42501` |
+| `GET /haccp_logs` | open (`qual = true`) | `401 / 42501` |
+| `authenticated` INSERT on both | yes | **yes** (future feature unaffected) |
+| probe rows left in prod | — | **0** |
+| `contract-check.mjs`, both endpoints | green | green |
+
+Policies now read uniformly `{authenticated}` on both tables, and anon is off both table
+ACLs as belt-and-braces — safe *only* because there is no anonymous consumer, which is not
+true of the tables still open on `ef80ceed`.
+
+**Still open on `ef80ceed`:** the 23 leaking tables and the other three unconditional anon
+INSERT policies — `cook_feedback`, `recipe_feedback`, `production_log` — which look like
+deliberate feedback intake and need the same consumer check.
