@@ -166,6 +166,114 @@ Workflow:
 
 ---
 
+## RULE-MIGRATION-NUMBERING
+
+**Never pick a migration number by looking.** Not `ls services/supabase/migrations`, not the max in `origin/main`, not the max in your worktree. Claim it:
+
+```
+claim_migration_number(slug: "retire_potato_tacos", session_id: "<your session id>")
+```
+
+(Mission Control MCP tool — preferred. Shell equivalent: `scripts/migration-number.sh claim <slug>`.)
+
+**Why looking cannot work.** A number is consumed when a migration is **applied**, not when it is merged. A session that has not merged yet has already burned numbers above `origin/main`'s max, and you cannot see them. Two sessions that look in the same minute take the same number — and `migration-canary.sh --check-numbering` fails on **any** duplicate prefix in the tree, so the moment both branches reach `main`, *every* session in the repo is blocked from committing *any* migration until someone renumbers by hand.
+
+`migration_log` in prod is the only authority. `fn_claim_migration_number()` reads it under an advisory lock and inserts into `migration_numbers`, whose `PRIMARY KEY (number, letter)` makes a double-issue physically impossible.
+
+**Prod rejects a duplicate.** `trg_migration_log_guard_number` fires `BEFORE INSERT OR UPDATE OF filename` on `migration_log` and raises if the full prefix is taken. If you see:
+
+```
+ERROR: migration number 473 is already taken by 473_analytics_hourly_heat_weekly.sql
+       (applied by claude-opus-session-bbb at 2026-10-16 15:37), claimed by <session>
+HINT:  Next free number is 487 — ADVISORY, not reserved: another session can take it
+       between now and your apply. Claim it, do not just rename to it:
+       SELECT * FROM fn_claim_migration_number('<slug>', '<your-session-id>');
+       … Only your apply is blocked — nobody else is.
+```
+
+…you picked by eye. Claim a number, rename the file, re-apply. Do **not** disable the trigger.
+
+**Only the colliding apply is blocked.** The guard rejects *your* INSERT/UPDATE; no other session is affected. That is the point of catching it here rather than letting it reach `main`, where the canary blocks everyone — which is what used to happen, and what cost an unrelated session an afternoon on 2026-10-16.
+
+**Gap numbers are never reused.** Rows in `migration_numbers` are never deleted, so an abandoned claim permanently burns its number. That is intentional, and it is the old "never reuse a gap" rule now enforced structurally.
+
+**Letter suffixes are unchanged**, and are only for repairing an **already-applied** duplicate after the fact (see `services/supabase/migrations/RENUMBERING-2026-06-11.md`). `469` and `469a` are distinct everywhere — allocator, guard and canary. Claim one with `fn_claim_migration_letter(<anchor>, ...)`; two sessions repairing at once must not both pick `469a`, which is how the 2026-10-16 15:39 cleanup went wrong.
+
+**Visibility:**
+
+| Query | Answers |
+|---|---|
+| `SELECT fn_migration_number_high_water()` | highest number prod knows (applied + reserved) |
+| `SELECT * FROM v_migration_collisions` | duplicate numbers in the **log**. 50 rows are frozen pre-guard history and block nothing (the canary reads the **tree**). `is_pre_guard = false` should never appear. |
+| `SELECT * FROM v_migration_number_map` | every number with state: `applied` / `reserved` / `burned` / `gap` |
+| `check_migrations()` | adds `next_free_number`, `tree_duplicates` (blocks commits repo-wide), `log_collisions` |
+| `scripts/migration-number.sh status` | the above, from a shell |
+
+**The canary is not the problem.** It is the thing that catches this, and it stays strict and offline — a pre-commit hook that needs credentials and a network round-trip is a hook that gets bypassed. Online allocation and offline enforcement are deliberately separate. Never loosen `--check-numbering` to get a commit through.
+
+> Origin: 2026-10-16, MC `c520decf`, migration `483`. Three bulk renumbering cleanups (mig 267 — 37 files, mig 282, mig 472) failed to converge because they addressed the symptom. On 2026-10-16 the race fired four times in one afternoon, including once *inside a cleanup*: `479_renumber_th_migrations_log_sync` assigned `473` two minutes after `473` was taken, resolving four collisions and creating a fifth. It also took this migration's own number mid-build (written as 481, applied as 483).
+
+---
+
+## RULE-RPC-GRANTS
+
+Functions in `public` are **closed by default**. Migration 490 revoked EXECUTE from
+`PUBLIC`, `anon` and `authenticated` on all 190 of our functions and cleared the default
+privilege that handed EXECUTE to `PUBLIC` on every new one. A function you add is callable
+by `service_role` and `postgres` and by nobody else until you say otherwise.
+
+**Every migration that creates a function in `public` must end with its grant**, or state
+in a comment that none is wanted:
+
+```sql
+GRANT EXECUTE ON FUNCTION public.fn_my_new_rpc(p_id uuid) TO authenticated;
+COMMENT ON FUNCTION public.fn_my_new_rpc(p_id uuid)
+  IS 'rpc: authenticated — <which screen calls it>';
+```
+
+**Grant to `anon` only with a reason in the migration header.** The allowlist is empty
+today: the live site (`shishka-health`) and `apps/web` read views and tables, and neither
+repo contains a `.rpc(` call. An `anon` grant means the publishable key that ships in the
+site's JavaScript can call it, so it needs its own argument, not a default.
+
+**The failure mode that is not obvious.** Four helpers are not RPCs but are evaluated
+*inside RLS policies* — `fn_is_authenticated()`, `fn_get_my_role()`, `fn_is_owner()`,
+`fn_has_app_role()` — and one inside a `security_invoker` view,
+`fn_active_menu_ingredient_ids()`. A policy runs with the **caller's** privileges. Add a
+helper like these without granting EXECUTE and every table whose policy names it stops
+returning zero rows and starts raising `permission denied for function`. Grant policy
+helpers to `authenticated` in the same migration that introduces the policy.
+
+**Three things that look right and are not:**
+
+1. `REVOKE EXECUTE … FROM anon, authenticated` on an existing function usually does
+   nothing. Most functions carry a grant to `PUBLIC` (`{=X/…}` in `proacl`) and anon
+   inherits through it. Revoke from `PUBLIC` too, and check `proacl` afterwards rather
+   than trusting the statement.
+2. `… ON ALL FUNCTIONS IN SCHEMA public` also hits extension-owned functions — pgvector,
+   pg_trgm and http all live in `public` here. Revoking pgvector's or pg_trgm's support
+   functions breaks `%` and `<=>` queries; `ALTER FUNCTION` on one breaks `pg_dump` and
+   extension upgrades. Filter on `NOT EXISTS (SELECT 1 FROM pg_depend d WHERE
+   d.objid = p.oid AND d.deptype = 'e')`.
+3. `postgres` cannot revoke a grant that `supabase_admin` made. It is neither superuser
+   nor a member. Anything owned by `supabase_admin` — the `http` and `pg_net` extensions —
+   is out of reach from a migration and needs Supabase support.
+
+**Verify by dry run, not by reading.** A grants migration can be run against production
+inside a transaction that rolls back — `BEGIN; <migration body>; SET LOCAL ROLE anon;
+<read the live-site surface>; RESET ROLE; … ROLLBACK;` — which exercises the real ACLs and
+the real policies. That is strictly better than a Supabase branch for this kind of change,
+because a branch replays the repo's migration history and this schema is known to drift
+from it. Compare the role-scoped row counts against the same counts taken before the
+change; they should be identical.
+
+> Origin: 2026-10-17, MC `f133850a`, migration 490. The Supabase advisor flagged 109
+> SECURITY DEFINER functions in `public` executable by `anon` (89 with no role check) and
+> 126 with a mutable `search_path`. The task as scoped would have been a no-op — it said
+> revoke from `anon, authenticated`, and the grants were to `PUBLIC`.
+
+---
+
 # PART II — Code Patterns
 
 ## RULE-OLLAMA-MODEL-NAME-NORMALIZATION
@@ -369,7 +477,7 @@ Never let a widget crash on null.
 | Layer | Mechanism | Strength |
 |---|---|---|
 | 1. Rule | this section + the CEO guide | agents read it |
-| 2. Local hook | `.claude/hooks/git-guard-pretool.sh` (PreToolUse/Bash): **hard-blocks** local `main` mutations (commit/merge/cherry-pick/revert) and any push targeting `main`; **warns** on off-convention branch names (only until the branch has an upstream — after the first push a rename would break the PR). **Scoped to THIS repo** — it resolves the target of a `cd …`/`git -C …` command and stays silent for other repos (the agent-memory store, dotfiles), since their `main` is nobody's production; all shishka-os worktrees stay in scope | blocks any Claude session in the terminal |
+| 2. Local hook | `.claude/hooks/git-guard-pretool.sh` (PreToolUse/Bash): **hard-blocks** local `main` mutations (commit/merge/cherry-pick/revert) and any push whose **refspec** targets `main`; **warns** on off-convention branch names (only until the branch has an upstream — after the first push a rename would break the PR). It **parses** the command — quote-aware tokens, split at `;` `&` `(` `)` and pipes — and judges each `git` call by its own verb, options and refspecs, in **the checkout the command actually runs in** (the payload `cwd`, so a worktree is judged by its own branch and not by the parent checkout's). A `main` token inside a quoted commit message, or in a chained `gh pr create --base main`, is therefore invisible to it. **Scoped to THIS repo** — identity is the shared git dir, so all shishka-os worktrees are in scope while other repos (the agent-memory store, dotfiles) stay silent, since their `main` is nobody's production | blocks any Claude session in the terminal |
 | 3. GitHub settings | branch protection on `main` (block direct push), squash-only merge, required CI checks, auto-delete head branches | server-side; applies to everyone, cannot be bypassed by a prompt |
 
 Layer 3 is set once in the GitHub UI (the proxy blocks settings writes from
@@ -381,6 +489,10 @@ session that commits its report straight to `main` (e.g. `6015194`). Before
 enabling require-PR on `main`, either add the committing actor to the ruleset
 **bypass list** or migrate the sheriff to PR flow — otherwise its next run fails
 at the server with no escape hatch.
+
+**Sanctioned exception — syncing `main` to its own upstream (layer 2).** `git merge --ff-only origin/main` (or `git pull --ff-only`) **while on `main` is allowed**: `--ff-only` makes git refuse anything but a pointer advance, and the target already exists on the remote, so nothing unreviewed lands and no commit is created. All three conditions are checked — verb is `merge`/`pull`, `--ff-only` is present, and the target resolves to **that branch's own upstream**. The third is load-bearing: `git merge --ff-only feature/x` also fast-forwards, but it lands unreviewed local work on `main`, so it stays denied. Why it matters: the shared checkout at `/Users/lesianich/code/shishka` is what the MCP launchers run from, and it kept serving stale code because no agent could fast-forward it.
+
+**The matrix is the contract.** Any change to the guard must be proven against `sh .claude/hooks/git-guard-pretool.test.sh` — every narrowing there is paired with the TRUE positive it must keep denying. A guard that silently stops denying is worse than the friction it removes, so: never widen the escape hatch to fix a false positive, narrow the match instead. Origin: MC `8aafd8eb` collected five false-denial classes (a trailing `-q`, the `--ff-only` sync, any push from a checkout sitting on `main`, a `main` token belonging to a chained non-git command, and every commit made from a worktree) — all one root cause: matching command TEXT plus the ambient branch instead of parsing the git call.
 
 **Escape hatch (layer 2 only).** Sanctioned automation that must write to
 `main` (e.g. the sheriff) **prefixes the command**: `SHISHKA_ALLOW_MAIN=1 git

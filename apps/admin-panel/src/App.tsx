@@ -27,6 +27,10 @@ const StocktakeReviewPage = lazyWithReload(() => import('./pages/StocktakeReview
 const StationCountPage = lazyWithReload(() => import('./pages/StationCountPage').then(m => ({ default: m.StationCountPage })))
 const ThawStation = lazyWithReload(() => import('./pages/ThawStation').then(m => ({ default: m.ThawStation })))
 const SkuManagerPage = lazyWithReload(() => import('./pages/SkuManagerPage').then(m => ({ default: m.SkuManagerPage })))
+const AnalyticsLayout = lazyWithReload(() => import('./pages/analytics/AnalyticsLayout').then(m => ({ default: m.AnalyticsLayout })))
+const SalesPulseTab = lazyWithReload(() => import('./pages/analytics/SalesPulseTab').then(m => ({ default: m.SalesPulseTab })))
+const PurchasesTab = lazyWithReload(() => import('./pages/analytics/PurchasesTab').then(m => ({ default: m.PurchasesTab })))
+const StockControlTabPlaceholder = lazyWithReload(() => import('./pages/analytics/AnalyticsPlaceholderTab').then(m => ({ default: m.StockControlTabPlaceholder })))
 const FinanceLayout = lazyWithReload(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
 const FinanceLedger = lazyWithReload(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
 const FinanceAnalytics = lazyWithReload(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
@@ -131,6 +135,14 @@ function App() {
                   <Route path="/nomenclature" element={<Navigate to="/menu" replace />} />
                   <Route path="/bom" element={<Suspense fallback={<PageLoader />}><BOMHub /></Suspense>} />
                   <Route path="/sku" element={<Suspense fallback={<PageLoader />}><SkuManagerPage /></Suspense>} />
+                  {/* Analytics hub — owner-only; tabs switch inside the shell (spec §5) */}
+                  <Route path="/analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsLayout /></Suspense>}>
+                    <Route index element={<Navigate to="sales" replace />} />
+                    <Route path="sales" element={<SalesPulseTab />} />
+                    <Route path="purchases" element={<PurchasesTab />} />
+                    {/* S4 d8c02f8c — registered now, placeholder until then */}
+                    <Route path="stock" element={<StockControlTabPlaceholder />} />
+                  </Route>
                   <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
                     <Route index element={<Navigate to="dashboard" replace />} />
                     <Route path="dashboard" element={<FinanceDashboard />} />

@@ -271,7 +271,7 @@ This guide is backed by **three layers** so the rules self-enforce (`RULE-GIT-HY
 | Layer | What it is | Who it stops |
 |---|---|---|
 | **1. Rule** | This guide + `technical-rules.md` § RULE-GIT-HYGIENE | Claude reads it |
-| **2. Local hook** | `.claude/hooks/git-guard-pretool.sh` — **hard-blocks** local `main` mutations (commit/merge/etc.) and pushes to `main`, **warns** on off-convention branch names (only before the first push) | any Claude session in the terminal |
+| **2. Local hook** | `.claude/hooks/git-guard-pretool.sh` — **hard-blocks** local `main` mutations (commit/merge/etc.) and pushes to `main`, **warns** on off-convention branch names (only before the first push). It reads the actual git command, not the text around it, so a `main` mentioned in a commit message or in `gh pr create --base main` is not mistaken for a push. Updating your local `main` to match GitHub is allowed: `git merge --ff-only origin/main` | any Claude session in the terminal |
 | **3. GitHub settings** | branch protection, squash-only, required CI, auto-delete branches | **everyone** — can't be bypassed by a prompt |
 
 Layer 2 already ships in this repo. Layer 3 is the strongest and only **you** can

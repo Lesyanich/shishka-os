@@ -5,6 +5,9 @@ import type { DishScorecard } from '../../../../hooks/useDishScorecard'
 import type { ModifierOption } from '../../../../hooks/useModifierOptions'
 import { DrawerScorecard } from '../../owner/DrawerScorecard'
 import { useLoyversePushDish } from '../../../../hooks/useLoyversePushDish'
+import { CostTrustBadge } from '../../shared/CostTrustBadge'
+import { COST_TRUST_UNAVAILABLE, costTrustPresentation, isCostUntrustworthy } from '../../shared/costTrust'
+import type { DishCostTrust } from '../../shared/costTrust'
 
 interface OwnerTabProps {
   item: MenuItem
@@ -18,6 +21,12 @@ interface OwnerTabProps {
   /** Toggle website visibility (is_web_visible, mig 263). Undefined disables
    * the control. The parent's update refetches, so `item` reflects the result. */
   onToggleWeb?: (id: string, next: boolean) => void | Promise<void>
+  /** Cost provenance for this dish, from v_dish_cost_trust (mig 482). Undefined
+   * while the view is still loading — the tiles then render unmarked, as before. */
+  costTrust?: DishCostTrust | null
+  /** The trust view could not be read. Says so out loud: an unmarked figure must
+   * never be mistaken for a checked one. */
+  costTrustUnavailable?: boolean
 }
 
 function posStatusBadge(status: string) {
@@ -39,7 +48,13 @@ export function OwnerTab({
   modifiers = [],
   onSynced,
   onToggleWeb,
+  costTrust,
+  costTrustUnavailable = false,
 }: OwnerTabProps) {
+  const trust = costTrustPresentation(costTrust)
+  // Cost missing or invented → the Food Cost % is understated by an unknown
+  // amount, so it must not read as a measurement.
+  const costUnderstated = isCostUntrustworthy(costTrust)
   const { pushDish, isPushing, lastResult } = useLoyversePushDish()
   const [pushToast, setPushToast] = useState<{
     type: 'ok' | 'error'
@@ -121,14 +136,20 @@ export function OwnerTab({
         </span>
       </section>
 
-      {/* Cost rollup */}
+      {/* Cost rollup \u2014 every figure here carries where it came from (mig 482).
+          Without the mark a hand-typed number, a catalog guess and a WAC built
+          on contradictory receipts all read as the same confident fact. */}
       <section className="space-y-1">
-        <h4 className="text-[10px] uppercase tracking-widest text-cream/50">
-          Cost Rollup
+        <h4 className="flex items-center justify-between text-[10px] uppercase tracking-widest text-cream/50">
+          <span>Cost Rollup</span>
+          <CostTrustBadge trust={costTrust} className="normal-case tracking-normal" />
         </h4>
         <div className="grid grid-cols-3 gap-2 text-xs">
           <div className="rounded-lg border border-surface-3 bg-surface-2/30 p-2 text-center">
-            <div className="font-mono text-sm font-medium text-cream/90">
+            <div
+              className={`font-mono text-sm font-medium ${costUnderstated ? 'text-brick-soft' : 'text-cream/90'}`}
+              title={trust?.title}
+            >
               {item.cost_per_unit != null
                 ? `\u0E3F${item.cost_per_unit.toFixed(0)}`
                 : '-'}
@@ -142,16 +163,40 @@ export function OwnerTab({
             <div className="text-[10px] text-cream/40">Price</div>
           </div>
           <div className="rounded-lg border border-surface-3 bg-surface-2/30 p-2 text-center">
-            <div className="font-mono text-sm font-medium text-cream/90">
+            <div
+              className={`font-mono text-sm font-medium ${costUnderstated ? 'text-brick-soft' : 'text-cream/90'}`}
+              title={trust?.title}
+            >
               {item.cost_per_unit != null &&
               item.price != null &&
-              item.price > 0
-                ? `${((item.cost_per_unit / item.price) * 100).toFixed(1)}%`
-                : '-'}
+              item.price > 0 ? (
+                <>
+                  {((item.cost_per_unit / item.price) * 100).toFixed(1)}%
+                  {/* The percentage is real arithmetic on an understated cost,
+                      so it reads lower than the truth — mark it, don't hide it. */}
+                  {costUnderstated && <span className="ml-0.5 text-[10px]">?</span>}
+                </>
+              ) : (
+                '-'
+              )}
             </div>
             <div className="text-[10px] text-cream/40">Food Cost</div>
           </div>
         </div>
+        {trust && (
+          <p
+            className={`pt-0.5 text-[10px] leading-relaxed ${
+              costUnderstated ? 'text-brick-soft' : 'text-cream/45'
+            }`}
+          >
+            {trust.detail}
+          </p>
+        )}
+        {!trust && costTrustUnavailable && (
+          <p className="pt-0.5 text-[10px] leading-relaxed text-amber-watch">
+            {COST_TRUST_UNAVAILABLE}
+          </p>
+        )}
       </section>
 
       {/* Modifier options cost/margin (Phase 6) — owner view of per-option economics */}

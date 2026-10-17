@@ -195,6 +195,9 @@ erDiagram
         NUMERIC price_per_unit
         NUMERIC total_price
         DATE invoice_date
+        TEXT barcode "Mig 459 — written at import; closes the learning loop"
+        TIMESTAMPTZ voided_at "Mig 460 — retracted row; values kept as evidence, cost math skips it"
+        TEXT void_reason "Mig 460"
     }
 
     fin_categories {
@@ -507,6 +510,7 @@ erDiagram
 | `supplier_files` | `id` UUID | kind CHECK (pdf/image/link), title, storage_path (`supplier-files` bucket), url, supplier_name_raw (new-supplier uploads, find-or-create at digitize time), ingest_status CHECK (library/new/to_digitize/digitized/rejected), reviewed_at, digitized_at, digitized_rows, review_note | supplier_id -> suppliers (NULLABLE) | 379 |
 | `receiving_records` | `id` UUID | source (receiving_source), received_by, received_at, status ('received'/'reconciled') | po_id -> purchase_orders, expense_id -> expense_ledger | 062 |
 | `receiving_lines` | `id` UUID | qty_expected, qty_received, qty_rejected, reject_reason (reject_reason), unit_price_actual | receiving_id -> receiving_records (CASCADE), po_line_id -> po_lines, nomenclature_id -> nomenclature, sku_id -> sku | 062 |
+| `content_translations` | `id` UUID | entity (dish/category/tag/modifier_group/modifier_option/price_tier/site_content), entity_key, field, lang (2-letter, never `en`), value JSONB (string, or partial object for site_content), source_hash (md5 of the EN at translation time — mismatch = stale), reviewed_at/by, UNIQUE(entity,entity_key,field,lang). RLS: read = authenticated, write = fn_is_owner(); no anon grant. Two-way mirrored with nomenclature.customer_description_ru/_th | -- (soft keys, see mig 446 header) | 446 |
 
 ### Columns added by mig 379 to tables documented elsewhere
 
@@ -548,13 +552,13 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `fn_open_batch(UUID)` | RPC | Open batch, shrink expires_at +12h | 018 |
 | `fn_transfer_batch(TEXT, TEXT)` | RPC | Move batch by barcode, log transfer | 018 |
 | `fn_update_cost_on_purchase()` | TRIGGER FN | WAC v4 (mig 459): skips when `nomenclature.cost_source = 'manual'` (a hand-set cost is a decision, not a guess) and rolls the average from `total_price / quantity` instead of the OCR's `price_per_unit`. Reads stock from v_inventory_by_nomenclature | 021, 050, 058, 459 |
-| `fn_recalc_wac_for_product(UUID)` | RPC | Recomputes WAC for one item from its purchase history. **Mig 459:** returns the stored cost untouched when `cost_source = 'manual'`, and the formula is `SUM(total_price)/SUM(quantity)` — was `SUM(price_per_unit*quantity)/SUM(quantity)`, a fabricated product that reproduced any OCR error in `price_per_unit`. ⛔ Do NOT run it broadly until the 20 bad-unit rows are normalized (MC 00a81c22 item 6): on RAW-COFFEE-ESPRESSO today's history yields 241.67 THB/g instead of ~0.66 | 459 |
+| `fn_recalc_wac_for_product(UUID)` | RPC | Recomputes WAC for one item from its purchase history. **Mig 459:** returns the stored cost untouched when `cost_source = 'manual'`, and the formula is `SUM(total_price)/SUM(quantity)` — was `SUM(price_per_unit*quantity)/SUM(quantity)`, a fabricated product that reproduced any OCR error in `price_per_unit`. **Mig 460:** also skips rows with `voided_at IS NOT NULL` — a retracted row keeps its values as evidence, so the filter has to be explicit. ⛔ The 20 bad-unit rows ARE now normalized (mig 460), and RAW-COFFEE-ESPRESSO's history yields **0.6412 THB/g**, not 241.67. Still do not run it broadly: the ~19 drifted items in MC 00a81c22 §6 need their pack sizes confirmed first, or a recompute will overwrite hand-set costs with pack-vs-kg errors | 459, 460 |
 | `fn_process_new_order(UUID)` | RPC | BOM explosion: order items -> production tasks | 022 |
 | `fn_run_mrp(UUID)` | RPC | MRP v2: reads stock from v_inventory_by_nomenclature (was inventory_balances) | 023, 058 |
 | `fn_approve_plan(UUID)` | RPC | Convert prep_schedule to production_tasks | 023 |
 | `fn_set_updated_at()` | TRIGGER FN | Generic updated_at setter | 021 |
 | `fn_approve_receipt(JSONB)` | RPC | Receipt approval **v17 (mig 459)**: every food line goes through `fn_match_nomenclature` BEFORE any stub is minted; the stub code is now deterministic (`RAW-AUTO-` + md5 of the normalized name) so a repeat item reuses one stub; writes `barcode` + `sku_id` into purchase_logs (the learning loop — v16 omitted them, so the matcher's "previously approved by barcode" level could never fire); `conversion_factor` is keyed off the matched catalog row, not off a nomenclature_id that does not exist yet; rejects a line where `|quantity x price - total|` exceeds max(1 THB, 2%); rejects an `invoice_date` outside [today-2y, today+7d]; files an `unmatched_items` row on every mint. v15/v16 supplier resolution chain unchanged. **Mig 456:** EXECUTE only for `service_role` (+ definer callers `fn_approve_receipt_with_learning`, `fn_approve_po`); revoked from PUBLIC/anon/authenticated | 030, 038, 040, 041, 047, 049, 058, 065, 158, 386, 456, 459 |
-| `fn_match_nomenclature(UUID, TEXT, TEXT, TEXT, TEXT)` | RPC | **New in 459.** The receipt-line resolution ladder, in the DB: barcode -> supplier_catalog / sku / purchase_logs history / correction_rules; then supplier_sku (+supplier, catalog-barcode xref, history); then NORMALIZED EXACT name against supplier_catalog's four name columns, nomenclature, `nomenclature.aliases`, and mig-325 `[MERGED->CODE]` tombstones. Returns `(nomenclature_id, sku_id, conversion_factor, match_level)`. Refuses to guess when two canonical items match — deliberately stricter than the edge function's ILIKE fallback, which is how two rice-paper products got swapped | 459 |
+| `fn_match_nomenclature(UUID, TEXT, TEXT, TEXT, TEXT)` | RPC | **New in 459.** The receipt-line resolution ladder, in the DB: barcode -> supplier_catalog / sku / purchase_logs history / correction_rules; then supplier_sku (+supplier, catalog-barcode xref, history); then NORMALIZED EXACT name against supplier_catalog's four name columns, nomenclature, `nomenclature.aliases`, and mig-325 `[MERGED->CODE]` tombstones. Returns `(nomenclature_id, sku_id, conversion_factor, match_level)`. Refuses to guess when two canonical items match — deliberately stricter than the edge function's ILIKE fallback, which is how two rice-paper products got swapped. **Mig 462:** every level now joins `nomenclature.is_deleted = false` — five levels (barcode:supplier_catalog, barcode:sku, sku:supplier_catalog, sku:supplier_catalog_xref, name:supplier_catalog on both the ambiguity count and the pick) could previously resolve a receipt line onto a RETIRED canonical, e.g. "Water" -> RAW-MORNING-GLORY and the mango barcode onto RAW-MANGO that mig 390 retired. Such a line now falls through to the exact-name levels and, failing those, to a visible stub queued in `unmatched_items` | 459, 462 |
 | `fn_normalize_product_name(TEXT)` | UTIL FN | **New in 459.** Lowercase, strip punctuation/whitespace, keep latin alphanumerics + Thai. Digits are kept: a 600 g and a 250 g pack must not collapse. Mirrors `fn_normalize_supplier_name` (386) | 459 |
 | `fn_purchase_log_import_guard()` | TRIGGER FN | **New in 459.** BEFORE INSERT on purchase_logs: rejects an out-of-range `invoice_date` and a `quantity x price_per_unit` that disagrees with `total_price` beyond max(1 THB, 2%). INSERT only — an UPDATE-time check would block the repairs the 20 already-broken rows need | 459 |
 | `fn_generate_sku_code()` | UTIL FN | Generates next SKU code: SKU-0001, SKU-0002, etc. | 057 |
@@ -572,6 +576,8 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `fn_approve_po(JSONB)` | RPC | Financial reconciliation → expense_ledger + purchase_logs + sku_balances + WAC | 064 |
 | `fn_pending_deliveries()` | RPC | Pending POs for /receive screen. No prices. Includes partial delivery aggregation | 064 |
 | `sync_equipment_last_service()` | TRIGGER FN | Auto-update equipment.last_service_date | pre-existing |
+| `fn_translation_source(text,text,text)` | UTIL FN | Current EN text behind a content_translations key; NULL = orphan | 446 |
+| `fn_mirror_translation_to_nomenclature()` / `fn_mirror_nomenclature_description_translations()` | TRIGGER FN | Keep content_translations (dish/description/ru,th) and nomenclature.customer_description_ru/_th in sync both ways; pg_trigger_depth() guard stops the ping-pong. Retire once the A4 generator reads menu_translations | 446 |
 | `fn_assert_caller_role(TEXT[], TEXT)` | UTIL FN | The one caller gate for SECURITY DEFINER RPCs: passes for active staff whose `app_role` is in the array, the `service_role` key, or a direct DB session (`session_user <> 'authenticator'`: migrations, cron, SQL console); otherwise raises 42501 with the given message. Patched as the first statement of `fn_approve_payroll` (owner), `fn_approve_po` (owner, task_manager), `fn_vat_report` (owner), `fn_validate_reconciliation` (owner) — all of which had been executable by anon; EXECUTE now `authenticated` + `service_role` only. `fn_sync_loyverse_payouts_to_ledger` is cron/service_role only | 457 |
 | `fn_assert_receipt_approver()` | UTIL FN | `fn_assert_caller_role(['owner','task_manager'], …)`; first statement of `fn_approve_receipt_with_learning` | 456, 457 |
 | `fn_approve_receipt_with_learning(JSONB, UUID)` | RPC | API entry point for receipt approval (admin `/receipts`, shishka-finance MCP): `fn_assert_receipt_approver()` → `fn_approve_receipt` → capex assets, inbox rule counters, learning. EXECUTE: `authenticated`, `service_role` (revoked from PUBLIC/anon in 456) | 456 |
@@ -586,12 +592,97 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `fn_staff_login_status()` | RPC | Owner-only (zero rows otherwise): `(staff_id, login_email, last_sign_in_at, is_blocked, has_pin)` for every staff row with a login. Feeds the Access block on `/hr/staff`; `auth.users` is not readable from the client | 454, 455 |
 | `fn_staff_retire_expired()` | RPC | Per-row `UPDATE staff SET is_active=false` for active rows with `fire_date < fn_bkk_today()`, each in its own exception block so one refused row (last-owner guard) does not stop the rest. Run by pg_cron `staff-fire-date-expiry` at `5 17 * * *` UTC = 00:05 Bangkok | 454 |
 
+## Function EXECUTE Grants (Migration 490)
+
+Before mig 490 every function in `public` was callable by anyone holding the publishable
+key: 109 SECURITY DEFINER functions were executable by `anon`, 89 of them with no role
+check inside. Migrations 382/456/457 had closed individual functions one at a time; 490
+inverted the default for the whole schema.
+
+**The model now:** closed by default, opened by name.
+
+| Role | EXECUTE on `public` functions |
+|---|---|
+| `anon` | **none** — the live site and `apps/web` read views and tables only; neither repo contains a `.rpc(` call |
+| `authenticated` | **55** — 51 RPCs the admin panel / KDS / staff TWA call, plus 4 helpers evaluated internally (below) |
+| `service_role` | all 190 — every one of our functions carries an explicit `service_role=X` grant, untouched by 490 |
+| `postgres` | all 190 — explicit, untouched |
+
+**The 4 non-RPC grants.** These are not called over REST. They are evaluated under the
+*caller's* privileges, so without EXECUTE the dependent objects raise
+`permission denied for function` rather than returning zero rows:
+
+| Function | Evaluated by |
+|---|---|
+| `fn_is_authenticated()` | RLS policies on ~58 tables |
+| `fn_get_my_role()` | RLS policies on 8 HR tables (also a real RPC) |
+| `fn_is_owner()` | RLS policies on 10 tables |
+| `fn_has_app_role(TEXT[])` | RLS policies on 6 tables |
+| `fn_active_menu_ingredient_ids()` | the `security_invoker` view `v_stock_sheet_items` |
+
+**Two traps 490 had to route around, both measured against prod:**
+
+1. **`REVOKE ... FROM anon, authenticated` is a no-op here.** 165 of our 190 functions
+   carry a grant to PUBLIC (`{=X/postgres,…}` in `proacl`); anon inherits EXECUTE through
+   it. The revoke has to name `PUBLIC`. Same for default privileges — PostgreSQL's
+   built-in "grant EXECUTE to PUBLIC on every new function" default does not appear in
+   `pg_default_acl` at all.
+2. **Not "ALL FUNCTIONS IN SCHEMA public".** 164 of the 354 functions there belong to
+   extensions — pgvector (114), pg_trgm (31), http (19). Revoking pgvector's and
+   pg_trgm's support functions breaks `%` / `<=>` queries, and `ALTER FUNCTION` on an
+   extension-owned function breaks `pg_dump` and extension upgrades. 490 walks `pg_proc`
+   and skips anything with `pg_depend.deptype = 'e'`.
+
+**`search_path`:** all 190 of our functions now pin it (`public, pg_temp`; two keep an
+extra schema — `fn_provision_cook_auth` → `public, auth, pg_temp`, `rls_auto_enable` →
+`pg_catalog, pg_temp`). Extension functions are left alone.
+
+**Still open after 490 — `http` extension.** Its 19 functions in `public` are executable
+by `anon` and 490 cannot revoke them: the extension is owned by `supabase_admin`, and
+`postgres` is neither a superuser nor a member, so only the grantor can revoke. Section C
+of the migration attempts it and raises a WARNING naming the gap. MC `16ad5772`.
+
+**Adding a function after 490:** it is created closed. Any new RPC needs an explicit
+`GRANT EXECUTE … TO authenticated`, and so does any new RLS helper — forgetting the
+latter makes its policies raise `permission denied for function`. See
+`docs/constitution/technical-rules.md` § RULE-RPC-GRANTS.
+
+Audit artifacts: `docs/audits/2026-10-17-rpc-grants-{before,after}.csv`,
+`2026-10-17-rpc-grants.diff`, `2026-10-17-rpc-grants-inventory.md`. MC `f133850a`.
+
 ## Views
 
 | View | Source | Purpose | Migration |
 |---|---|---|---|
 | `v_inventory_by_nomenclature` | `sku_balances` | Aggregated inventory by nomenclature (SUM quantity, MAX last_counted_at). Drop-in replacement for inventory_balances. Used by WAC trigger, MRP, procurement. | 057 |
 | `v_order_builder` | `supplier_catalog` ⋈ `suppliers` ⋈ `nomenclature` ⋈ `product_categories` | Order Builder / add-item source: per-supplier catalog rows with `unit_cost_base` (last_seen_price ÷ conversion_factor), `verified_at` for price-freshness dots, image_url, min_order_thb, resolved product category. `security_invoker = true` | 379 |
+| `menu_translations` | `content_translations` ⋈ `nomenclature` / `product_categories` / `tags` / `price_tiers` / `site_content` | Anon-facing: FRESH translations of public content only (stale → hidden → site falls back to EN; dish rows only for menu_public dishes). `security_invoker = false`. **mig 464:** the freshness check resolves the English source by JOIN, not by `fn_translation_source()` — an invoker-rights function read `nomenclature` under anon's RLS (`pos_status='synced'`), which silently hid translations of web-visible but unsynced dishes | 446, 464 |
+| `v_translation_worklist` | `menu_public`, categories, tags, `menu_modifiers`, `price_tiers`, `site_content` × (ru, th, ar) | Every public guest-facing string with status missing/stale/fresh/reviewed — drives offline translation + phase-2 admin editor. `security_invoker = true`, authenticated only | 446, 478 |
+| `v_cost_trust_nomenclature` | `nomenclature` ⋈ `purchase_logs` ⋈ `bom_structures` | Per-product cost provenance: `cost_source`, the unit cost implied by its own non-voided purchase history (`SUM(total_price)/SUM(quantity)`), `divergence_ratio` against the stored cost, and `trust_class` / `trust_rank` (ordinal, higher = worse: no_cost 50 · deleted 40 · unverified 30 · estimated 20 · manual 10 · verified/derived 0). Tolerance 20%, justified in the migration header. `unverified` = the two sources disagree, NOT a verdict on which is right. `authenticated` only — purchase economics, never anon | 482 |
+| `v_dish_cost_trust` | `v_cost_trust_nomenclature` ⋈ recursive `bom_structures` | Worst trust class in a sellable item's BOM tree + the ingredient that caused it (tooltips name it), plus per-class counts and `has_deleted_ingredient`. MOD-* children of SALE-* parents excluded, mirroring `fn_rollup_bom_costs`; depth limit 10, cycle-safe. `ingredient_count = 0` → class `no_bom` (rank 60): the cost measures nothing. Drives the cost badges on /menu. `authenticated` only | 482 |
+
+### Stock-control analytics views (S1)
+
+All 14 are plain `security_invoker = true` views, `GRANT SELECT TO authenticated`, ISO weeks bucketed in **Asia/Bangkok**, refund-aware (`receipt_type = 'REFUND'` excluded from sales and reported separately). Canonical item = `product_code NOT LIKE 'RAW-AUTO-%' AND NOT is_deleted`. Spec: `docs/plans/spec-stock-control-analytics.md` §4; MC `1be5f592`.
+
+| View | Grain | Source | Purpose | Migration |
+|---|---|---|---|---|
+| `v_analytics_sales_daily` | day | `orders` | Receipts, gross/net revenue, refunds, discounts, tax, tips, avg check, payment split, dine-in vs takeaway | 463 |
+| `v_analytics_item_sales_daily` | day × item | `order_items` ⋈ `orders` ⋈ `nomenclature` ⋈ `product_categories` | Units + revenue per item. `is_modifier` flags POS modifier lines — never sum them with dish lines | 463 |
+| `v_analytics_hourly_heat` | week × ISO dow × hour | `orders` | Receipts per local weekday/hour for the heatmap. Bucketed by ISO week (mig **473**) so the `/analytics` period selector can drive it — 463 shipped it all-time with no time dimension. `receipts`/`revenue` are **per week per cell**; sum over the selected weeks (reconciles exactly to `v_analytics_sales_daily`). `week` is the last column because `CREATE OR REPLACE VIEW` can only append | 463, 473 |
+| `v_analytics_abc_items` | item | `purchase_logs` ⋈ `nomenclature` | Rolling 8-week purchase THB, cumulative share, class A≤80 %/B≤95 %/C. Ranked over canonical items only; stubs listed with `count_class` NULL. Source of the `nomenclature.count_class` UPDATE | 463 |
+| `v_analytics_purchases_weekly` | week × item × supplier | `purchase_logs` ⋈ `supplier_catalog` ⋈ `suppliers` | Lines, `qty_base` (`quantity × COALESCE(conversion_factor,1)`), THB, last unit price. **Single place** where `conversion_factor` is resolved, via a de-duplicated catalog CTE — `purchase_logs.sku_id` → `supplier_catalog.sku_id` fans out 391/361 | 463 |
+| `v_analytics_purchase_coverage_weekly` | week | `purchase_logs`, `unmatched_items` | THB total vs THB on canonical items, `canonical_pct`, stub lines, open unmatched. Phase 0.1 gate: ≥ 90 % two weeks running | 463 |
+| `v_analytics_price_watch` | item | `v_analytics_purchases_weekly` | Last unit price per base unit vs 8-week median, Δ %, `is_spike` (> +10 %, ≥ 2 observed weeks) | 463 |
+| `v_analytics_usage_weekly` | week × item | `stock_movements` ⋈ `bom_structures` | Theoretical usage: direct deductions plus PF→leaf explosion (recursive, depth ≤ 3, `yield_loss_pct`, summed over all paths). **PF rows and the RAW rows exploded from them both appear — group by `tier`, never sum PF and RAW `usage_thb`** | 463 |
+| `v_analytics_bom_coverage_weekly` | week | `order_items` ⟕ `stock_movements` | `deducted_units_pct` + `offending_items` (sold with no deduction). Phase 0.5 gate: ≥ 95 % | 463 |
+| `v_analytics_count_days` | count_day × item | `stocktake_entries` ⋈ `stocktake_sessions` | Confirmed counts summed over locations. `is_complete` compares locations counted that day against the item's historical count footprint | 463 |
+| `v_analytics_stock_variance` | count interval × item | the four above + `waste_logs` | Periodic model: `expected = opening + purchases − usage − waste`; `variance = expected − counted` (positive = missing). Interval `(prev count day, this count day]`. Empty until a second count day exists | 463 |
+| `v_analytics_food_cost_weekly` | week | sales + `v_dish_cost_split` + purchases + counts | Theoretical vs actual food cost. `cogs_actual` nets the inventory delta only when both week ends are count days (`cogs_actual_basis = count_bracketed`), else purchases-based | 463 |
+| `v_analytics_inventory_value` | item × location | `v_stock_latest_by_location` ⋈ `nomenclature` ⋈ `locations` | Latest counted qty × current cost, days since count, class | 463 |
+| `v_analytics_waste_weekly` | week × reason | `waste_logs` ⋈ `nomenclature` | Qty, THB and `financial_liability` split per reason | 463 |
+
+**`nomenclature.count_class` has two generations.** Migration 350 heuristically backfilled it (A = shelf life ≤ 5 d or cost ≥ 500); migration 463 rewrites it from rolling 8-week purchase THB per spec §0.3, but only for items the ABC view has an opinion on, and never over `count_class_source = 'manual'`. Classes left from 350 on items with no recent purchases survive — see MC `1be5f592`.
 
 ## Storage Buckets
 
