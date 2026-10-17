@@ -19,7 +19,6 @@ import { StockSheetPage } from './pages/StockSheetPage'
 
 // Lazy — loaded on-demand per route
 const BOMHub = lazyWithReload(() => import('./pages/BOMHub').then(m => ({ default: m.BOMHub })))
-const KDSBoard = lazyWithReload(() => import('./pages/KDSBoard').then(m => ({ default: m.KDSBoard })))
 const WasteTracker = lazyWithReload(() => import('./pages/WasteTracker').then(m => ({ default: m.WasteTracker })))
 const Procurement = lazyWithReload(() => import('./pages/Procurement').then(m => ({ default: m.Procurement })))
 const ShoppingList = lazyWithReload(() => import('./pages/ShoppingList').then(m => ({ default: m.ShoppingList })))
@@ -180,12 +179,6 @@ function App() {
                   <Route path="/shopping-list" element={<Suspense fallback={<PageLoader />}><ShoppingList /></Suspense>} />
                   {/* Stocktake review → apply → route to Shopping/Production (S3) */}
                   <Route path="/count/session/:id" element={<Suspense fallback={<PageLoader />}><StocktakeReviewPage /></Suspense>} />
-                  {/* Heavy KDS production tooling — managers only, off the cook floor */}
-                  <Route path="/kitchen/schedule" element={<Suspense fallback={<PageLoader />}><KDSBoard /></Suspense>} />
-                  {/* Cook Station merged into the KDS board (2026-07-29). Kept as a
-                      redirect: the stocktake review page and any bookmark still
-                      point here. */}
-                  <Route path="/kitchen/tasks" element={<Navigate to="/kitchen/schedule?tab=cook" replace />} />
                 </Route>
 
                 {/* ── Staff floor (cook) — all authenticated roles ── */}

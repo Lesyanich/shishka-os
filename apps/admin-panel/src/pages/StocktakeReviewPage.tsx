@@ -477,13 +477,6 @@ export function StocktakeReviewPage() {
             >
               Open Shopping List →
             </button>
-            <button
-              type="button"
-              onClick={() => navigate('/kitchen/schedule?tab=cook')}
-              className="text-xs text-honey-300 hover:underline"
-            >
-              Open Production →
-            </button>
           </div>
         </div>
       )}

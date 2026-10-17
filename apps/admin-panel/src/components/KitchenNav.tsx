@@ -4,14 +4,14 @@ import {
   ListTodo,
   Tag,
   Trash2,
-  CalendarDays,
   PackageOpen,
 } from 'lucide-react'
 import { useAppRole } from '../contexts/AppRoleContext'
 
-// Cooks get the lean kitchen set (tasks + reference stations). The heavy KDS
-// planner (Gantt / production scheduling) is hidden from cooks and kept for
-// managers only.
+// Reference stations for the kitchen floor. The KDS planner (Gantt / production
+// scheduling) was retired in 2026-10: its initiative was cancelled and nothing
+// had written to production_tasks since April. Tasks here are the unified
+// staff_tasks board, which is live.
 const COOK_PAGES = [
   { path: '/kitchen/my-tasks', label: 'Tasks', icon: ListTodo },
   { path: '/kitchen/recipes', label: 'Recipes', icon: ChefHat },
@@ -22,7 +22,6 @@ const COOK_PAGES = [
 const MANAGER_PAGES = [
   { path: '/kitchen/my-tasks', label: 'Tasks', icon: ListTodo },
   { path: '/kitchen/recipes', label: 'Recipes', icon: ChefHat },
-  { path: '/kitchen/schedule', label: 'Schedule', icon: CalendarDays },
   { path: '/receive', label: 'Receiving', icon: PackageOpen },
 ] as const
 

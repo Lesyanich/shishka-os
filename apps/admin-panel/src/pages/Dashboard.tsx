@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import { LayoutDashboard, RefreshCw, ChefHat, Clock, AlertTriangle, CheckCircle2, MessageCircle, Check } from 'lucide-react'
+import { LayoutDashboard, RefreshCw, ChefHat, Clock, AlertTriangle, MessageCircle, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCoalescedRealtimeRefetch } from '../hooks/useCoalescedRealtimeRefetch'
 import { KitchenNav } from '../components/KitchenNav'
@@ -332,23 +331,6 @@ export function Dashboard() {
               </div>
             )}
 
-            {/* Quick links */}
-            <div className="grid grid-cols-2 gap-3">
-              <Link
-                to="/kitchen/schedule?tab=cook"
-                className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 transition hover:border-emerald-500/30"
-              >
-                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                <span className="text-sm font-medium text-slate-200">Cook Station</span>
-              </Link>
-              <Link
-                to="/live"
-                className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 transition hover:border-sky-500/30"
-              >
-                <Clock className="h-5 w-5 text-sky-400" />
-                <span className="text-sm font-medium text-slate-200">Kitchen Live</span>
-              </Link>
-            </div>
           </>
         )}
       </main>
