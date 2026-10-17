@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   DollarSign,
+  Gauge,
   GitBranch,
   Inbox,
   LayoutDashboard,
@@ -101,6 +102,14 @@ const NAV_SECTIONS: NavSection[] = [
       // Inventory/waste + receiving — owner-only, pulled off the cook floor (kept for the owner).
       { path: '/kitchen/waste', icon: Trash2, label: 'Waste', minRole: 'owner' },
       { path: '/receive', icon: ClipboardCheck, label: 'Receiving', minRole: 'owner' },
+    ],
+  },
+  {
+    // Analytics hub — one entry; the Sales/Purchases/Stock tabs live in the
+    // in-page .shk-seg switcher, not as separate nav rows.
+    title: 'Analytics',
+    items: [
+      { path: '/analytics', icon: Gauge, label: 'Analytics', minRole: 'owner' },
     ],
   },
   {
