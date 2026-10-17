@@ -11,7 +11,7 @@ since June to 328 MB of a 419 MB Nano instance. It now has a cleaner (cron job #
 and the database is back to 76 MB.
 
 Every other journal in the database still had no cleaner at all. `loyverse_sync_log` held
-19,153 rows and had never seen a single `DELETE` — `n_tup_del = 0` since 2026-05-18.
+19,180 rows and had never seen a single `DELETE` — `n_tup_del = 0` since 2026-05-18.
 
 ## Inventory
 
@@ -23,11 +23,11 @@ copy of it.
 
 | Table | Age column | Keep | Writes | Reads | Rows at audit | First purge |
 |---|---|---|---|---|---|---|
-| `loyverse_sync_log` | `started_at` | 30d | Loyverse pull/push edge fns, cron #1–#3, #9 | incident triage only | 19,153 | ~14,771 |
+| `loyverse_sync_log` | `started_at` | **14d** | Loyverse pull/push edge fns, cron #1–#3, #9 | incident triage only | 19,180 | ~17,191 |
 | `api_cost_log` | `ts` | 90d | receipt OCR + brain wrappers | `/admin/api-costs` | 354 | 268 |
 | `brain_query_log` | `ts` | 90d | lightrag-server wrapper | `/admin/brain-cost` | 5 | 5 |
 | `access_audit_log` | `created_at` | 90d | admin auth layer | security review | 0 | 0 |
-| `syrve_sync_log` | `created_at` | 30d | SYRVE sync | incident triage | 0 | 0 |
+| `syrve_sync_log` | `created_at` | 30d | SYRVE sync (`syrve-poc` only) | incident triage | 0 | 0 |
 | `loyverse_push_queue` | `requested_at` | 14d, `status IN ('done','error')` | admin panel / chef MCP | cron #9 drain | 421 (400 done, 21 error) | 396 |
 | `syrve_sync_queue` | `created_at` | 14d, `status IN ('done','error')` | SYRVE sync | SYRVE drain | 0 | 0 |
 | `db_audit_snapshots` | `run_at` | 365d | `fn_db_audit_snapshot` (weekly) | `fn_db_audit_delta` | new in 498 | — |
@@ -54,6 +54,31 @@ never touched, whatever their age — a stuck row is the watchdog's business, no
 A log-shaped table **missing** from `log_retention_policy` is the bug the registry exists to
 catch: it means nobody decided. That is why the never-purge tables get rows too, with
 `keep_days NULL` and `enabled = false`, instead of being left out.
+
+## Are these even logs we need?
+
+The CEO asked this on 2026-10-17, and it is the right question. Checked by row count in
+production against code references in `apps/` and `services/`:
+
+| Table | Rows | Last write | Who writes it |
+|---|---|---|---|
+| `loyverse_sync_log` | 19,180 | today | 3 edge functions (`loyverse-sync`, `loyverse-pull`, `loyverse-receipt`) |
+| `api_cost_log` | 354 | 2026-10-10 | 6 call sites (`apiCostLog.ts`, `telegram-ai`, `receipt-batch-process`) |
+| `brain_query_log` | 5 | **2026-04-10** | LightRAG wrapper — silent six months |
+| `access_audit_log` | **0** | never | **nothing. Zero references in the codebase** |
+| `syrve_sync_log` | **0** | never | `syrve-poc` only |
+| `syrve_sync_queue` | **0** | never | no code |
+| `chef_feedback_queue` | **0** | never | no code |
+
+**Two of the eight enabled rows are live.** `loyverse_sync_log` earns its keep for exactly one
+job — when the till did not get a dish, it is the only place that shows the push failed and
+why — and nobody reads it past the last few days, which is why the horizon is 14 days and not
+30. `api_cost_log` earns its keep because it tracks money and a dashboard reads it.
+
+The other five are empty or frozen, and for them retention is the wrong question: the real one
+is drop-or-finish. That is **MC `c0ec41b0`**, deliberately a separate task — dropping a table a
+planned feature expects is a product decision, not cleanup. Registering them here costs nothing
+and means the decision is written down instead of being rediscovered by the next audit.
 
 ## How the cleaner works
 

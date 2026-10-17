@@ -54,9 +54,32 @@ search_path, security_invoker) — untouched here.
 - [10:48] **NOTHING APPLIED TO PRODUCTION.** Awaiting CEO sign-off on the DROP list and the
           job #9 interval, then apply after 23:00 Phuket per the session brief
 
+- [19:33] CEO approved the DROP list (4 drop, 2 quarantine) and the 23:00 apply. Re-verified all
+          four DROP verdicts against live data: still hold. Quarantine case still 16/64 old-named.
+          Numbers 496-499 still reserved to me; 500/501/502 went to other sessions, 502 applied
+- [19:35] Captured the pre-apply baseline for the 24h check (see MC 2a0ad979 comment) and set a
+          one-shot trigger for 23:07 Phuket. Caveat told to the CEO: CronCreate is session-only
+- [19:57] CEO asked "это логи? а они нам нужны?" — checked writers in code against row counts.
+          Only 2 of the 8 enabled rows are live: loyverse_sync_log (19,180 rows, written today,
+          3 edge fns) and api_cost_log (354 rows, 6 call sites, dashboard). FIVE are dead or
+          frozen: access_audit_log has 0 rows and ZERO code references, syrve_sync_log /
+          syrve_sync_queue / chef_feedback_queue are empty with no live code, brain_query_log
+          last written 2026-04-10. Logged as MC c0ec41b0 (drop-or-finish is a product decision,
+          not cleanup) rather than acting on it — RULE-BACKLOG-FIRST
+- [20:05] CEO cut loyverse_sync_log 30d -> 14d. Patched 496 (policy row, COMMENT, header count,
+          migration_log note), left syrve_sync_log at 30d since only loyverse was named, and
+          rewrote its reason so it no longer claims a shared horizon. New first purge ~17.9k
+          (17,191 from sync_log instead of 14,798). Re-verified on the fixture: boundary exact —
+          800 rows older than 14d deleted, 300 within 14d untouched, 0 stale left
+- [20:08] Answered the liveness question durably in the policy doc (§ Are these even logs we
+          need?) so it is not rediscovered next audit — RULE-COMPOUND-ENGINEERING
+
 ### Session Close: 2026-10-17 (open)
 **Worked on:** 44278890, 2a0ad979, 725371dd, 37f5dcaa
 **Status:** partial — all four built and verified offline, none applied to prod
-**Handoff:** CEO decisions needed: (1) DROP list, (2) job #9 interval 1 min → 5 min.
-Then apply 496→499 in order after 23:00 Phuket, run `scripts/db-audit.sh` manually, create the
-Monday 02:00 UTC scheduled task, and verify after 24h that `job_run_details` grew < 1 MB.
+**Handoff:** DROP list approved; loyverse_sync_log set to 14d. Still open: job #9 interval
+(1 min → 5 min) — asked twice, unanswered, and it does not block the apply. Trigger set for
+23:07 Phuket to apply 496→499 in order, run `fn_log_retention` and `scripts/db-audit.sh`
+manually, create the Monday 02:00 UTC scheduled task; then verify after 24h that
+`cron.job_run_details` grew < 1 MB. CronCreate is session-only — if the session closes before
+23:00 the apply must be triggered by hand.

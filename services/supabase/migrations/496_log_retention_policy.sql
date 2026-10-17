@@ -4,7 +4,7 @@
 -- WHY. On 2026-10-16 the database was down ~14 hours. cron.job_run_details had grown since
 -- June with nobody trimming it — 328 MB of 419 — and the Nano instance ran out of disk. That
 -- one table now has a cleaner (cron job #15, 7 days). Every OTHER journal in this database
--- still has none: loyverse_sync_log holds 19,153 rows and has never seen a single DELETE
+-- still has none: loyverse_sync_log holds 19,180 rows and has never seen a single DELETE
 -- (n_tup_del = 0 since 2026-05-18). The fix is not another cleaner per table — it is one
 -- registry that says, for every log-shaped table, who cleans it and after how long.
 --
@@ -176,8 +176,8 @@ INSERT INTO public.log_retention_policy
   (schema_name, table_name, ts_column, keep_days, status_filter, enabled, reason)
 VALUES
   -- technical journals
-  ('public','loyverse_sync_log','started_at',30,NULL,true,
-   'Loyverse sync attempts (pull cron #1-#3, push drain #9). Read only for incident triage; 30d covers it. 19,153 rows and zero deletes before this migration.'),
+  ('public','loyverse_sync_log','started_at',14,NULL,true,
+   'Loyverse sync attempts (pull cron #1-#3, push drain #9). The ONLY place that shows why a till push failed, and nobody reads it beyond the last few days — the CEO set 14 days on 2026-10-17 after we checked who actually writes and reads it. 19,180 rows and zero deletes before this migration.'),
   ('public','api_cost_log','ts',90,NULL,true,
    'Per-call external API cost, read by /admin/api-costs. 90d keeps a full quarter for cost review.'),
   ('public','brain_query_log','ts',90,NULL,true,
@@ -185,7 +185,7 @@ VALUES
   ('public','access_audit_log','created_at',90,NULL,true,
    'Admin access audit trail. 90d: long enough to investigate, short enough not to accumulate.'),
   ('public','syrve_sync_log','created_at',30,NULL,true,
-   'SYRVE sync attempts. Same class and horizon as loyverse_sync_log.'),
+   'SYRVE sync attempts. Same class as loyverse_sync_log but left at 30d: the table is empty (the integration lives only in the syrve-poc edge function), so the horizon is theoretical until it actually writes. See MC c0ec41b0.'),
   -- queues: terminal rows only, live work is never touched
   ('public','loyverse_push_queue','requested_at',14,'status IN (''done'',''error'')',true,
    'Loyverse push queue. Only done/error rows are purged after 14d — pending/processing are live work the drain still owns.'),
@@ -221,7 +221,7 @@ ON CONFLICT (schema_name, table_name) DO NOTHING;
 -- Every covered table says its own retention out loud. Existing comment text is preserved.
 -- ---------------------------------------------------------------------------
 COMMENT ON TABLE public.loyverse_sync_log IS
-  'Loyverse sync attempt log (pull cron #1-#3, push drain #9). Written by edge functions; read for incident triage. Owner: integrations. retention: 30 days, cleaned by fn_log_retention';
+  'Loyverse sync attempt log (pull cron #1-#3, push drain #9). Written by edge functions; read for incident triage — the only record of why a till push failed. Owner: integrations. retention: 14 days, cleaned by fn_log_retention';
 COMMENT ON TABLE public.api_cost_log IS
   'Unified per-call cost log for all external API usage (receipt OCR, brain, future). Consumed by /admin/api-costs dashboard. Owner: finance-ops. retention: 90 days, cleaned by fn_log_retention';
 COMMENT ON TABLE public.brain_query_log IS
@@ -271,7 +271,7 @@ VALUES (
   '496_log_retention_policy.sql',
   'claude-code',
   NULL,
-  'Log retention registry + fn_log_retention + nightly cron 03:10 UTC. 19 tables registered, 7 enabled; first run purges ~15.4k rows (MC 44278890)'
+  'Log retention registry + fn_log_retention + nightly cron 03:10 UTC. 19 tables registered, 7 enabled; first run purges ~17.9k rows (MC 44278890; loyverse_sync_log at 14d per CEO 2026-10-17)'
 )
 ON CONFLICT DO NOTHING;
 
