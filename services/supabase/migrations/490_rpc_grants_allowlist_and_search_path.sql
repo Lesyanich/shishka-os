@@ -97,6 +97,63 @@
 BEGIN;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- A0. Snapshot the prior state, so this is reversible without a backup.
+--     There are no database backups (MC 4405c6e9 is open), and a full pg_dump
+--     needs a PG17 client and the database password, neither of which the
+--     migration path has. So the migration records exactly what it is about to
+--     change — every EXECUTE grantee and the search_path of every function it
+--     touches — into a table. `services/supabase/rollback/490_rollback.sql` replays it.
+--     Snapshot-at-apply-time beats a list frozen into git at audit time: it
+--     captures whatever production actually holds the moment this runs.
+--     This is NOT a substitute for a backup; it reverses this migration only.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.rpc_grant_snapshot_490 (
+  taken_at    timestamptz NOT NULL DEFAULT now(),
+  kind        text        NOT NULL CHECK (kind IN ('grant', 'search_path')),
+  fn_sig      text        NOT NULL,
+  grantee     text,
+  search_path text,
+  PRIMARY KEY (kind, fn_sig, grantee)
+);
+
+REVOKE ALL ON TABLE public.rpc_grant_snapshot_490 FROM PUBLIC, anon, authenticated;
+
+COMMENT ON TABLE public.rpc_grant_snapshot_490 IS
+  'Pre-migration-490 EXECUTE grants and search_path for every non-extension function in public. Replay with services/supabase/rollback/490_rollback.sql. Keep until 490 is proven in production; dropping it loses the only undo.';
+
+INSERT INTO public.rpc_grant_snapshot_490 (kind, fn_sig, grantee, search_path)
+SELECT 'grant', p.oid::regprocedure::text,
+       coalesce(nullif(a.grantee::regrole::text, '-'), 'PUBLIC'), NULL
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+CROSS JOIN LATERAL aclexplode(p.proacl) a
+WHERE n.nspname = 'public' AND p.prokind = 'f'
+  AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
+  AND a.privilege_type = 'EXECUTE'
+  AND coalesce(nullif(a.grantee::regrole::text, '-'), 'PUBLIC') IN ('PUBLIC', 'anon', 'authenticated')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.rpc_grant_snapshot_490 (kind, fn_sig, grantee, search_path)
+SELECT 'search_path', p.oid::regprocedure::text, '',
+       (SELECT substring(c FROM 13) FROM unnest(p.proconfig) c WHERE c LIKE 'search_path=%')
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public' AND p.prokind = 'f'
+  AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
+ON CONFLICT DO NOTHING;
+
+DO $$
+DECLARE v_g int; v_s int;
+BEGIN
+  SELECT count(*) FILTER (WHERE kind='grant'), count(*) FILTER (WHERE kind='search_path')
+    INTO v_g, v_s FROM public.rpc_grant_snapshot_490;
+  IF v_s = 0 OR v_g = 0 THEN
+    RAISE EXCEPTION 'A0: snapshot is empty (grants=%, search_path=%) — refusing to proceed without an undo', v_g, v_s;
+  END IF;
+  RAISE NOTICE 'A0: snapshot taken — % grant rows, % search_path rows', v_g, v_s;
+END $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- A. Revoke EXECUTE on every function that is ours (extension functions skipped)
 -- ─────────────────────────────────────────────────────────────────────────────
 DO $$
