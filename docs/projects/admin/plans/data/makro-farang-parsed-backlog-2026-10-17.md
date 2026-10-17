@@ -183,3 +183,59 @@ Other things for the CEO, found in passing and not touched:
   RAW-MANGO): do not approve them through /receipts without re-resolving.
 - Duplicates to dispose of: 07-14 pair (44073b85 / a87dfdbe); Farang invoice 85c7e5db vs Bangkok Bank slip 96b8e052.
 - Mont Fleur: no purchase evidence on any of the 11 receipts; the 25 bottles sold have no purchase record anywhere.
+
+## Round 2 (2026-10-17, after the CEO answered) — 38b7a0a3, 8e1f45d0, 8062 approved
+
+Same method as round 1 (finance MCP -> `fn_approve_receipt_with_learning`, explicit supplier + nomenclature ids, quantity =
+base_qty / the catalog factor the function will pick, per-line promos netted into the line). Decisions applied:
+- **Cabbage** art. 28692744, 32.00: RAW-CABBAGE, **0.6 kg = ESTIMATE** (one head; midpoint of "500-700 g" on later packs of
+  the same product). Flagged in the line notes and the ledger comment. Cost 27.28 -> 42.91/kg.
+- **Frozen diced mango** 189.00: booked on the retired `RAW-FROZEN_MANGO_CHUNKS` (the approve function accepted a
+  soft-deleted target). `RAW-MANGO_FRESH` cost byte-identical: 66.8456 -> 66.8456.
+- **935 g jar** art. 8410134301300, 270.00: Fragata whole gherkins -> `RAW-PICKLED_GHERKIN`. Drained weight is **not printed**;
+  booked 0.49 kg (52% of 935 g, the ratio the item's own cost was built on: KUHNE 670 g -> 0.35 kg). **ESTIMATE.** Cost
+  368.57 (catalog_estimate) -> 551.02/kg (wac).
+
+Assertions (before round 2 -> after): purchase_logs 992 -> 1,018 (+26 = 15 + 5 + 6 lines; +4,093.50 THB = 2,571.25 + 500.00 +
+1,022.25), 165,432.344 -> 169,525.844; expense_ledger 603 -> 606 (+4,969.50); opex_items 623 -> 627 (+876.00: bag 40 +
+gloves 836); RAW-AUTO stubs 315 / 38,885.09 -> 315 / 38,885.09; unmatched_items 309 -> 309. **New stubs: 0.**
+expense ids: 38b7a0a3 -> `d29207d5-415b-4535-809f-8685815cf7f1`; 8e1f45d0 -> `2e607bbd-4236-4705-a771-6645b90f6f71`;
+8062 -> `a4d0dab7-bd7f-46ce-9645-6976d6ae9cb2`.
+
+Trust (133 live dishes): before the whole backlog verified 12 / manual 4 / estimated 33 / unverified 49 / no_cost 8 /
+no_bom 26 / deleted 1; **after all four approvals verified 11 / manual 4 / estimated 31 / unverified 52 / no_cost 8 /
+no_bom 26 / deleted 1.** Three dishes got LESS trusted because a last-price cost now diverges from history: RAW-CHERRY-TOMATO
+113.22 vs history 68.36 (5 dishes, unverified), RAW-SPRING-ONION 227.44 vs 96.19 (5 dishes), RAW-QUINOA 704.57 vs 530.64
+(2 dishes). The receipts are right (Queen tomato 250 g = 45 THB = 180/kg; spring onion 300 g = 69-70 THB; quinoa 450 g =
+320 THB); the *history* these were compared with is what is thin.
+
+### Every cost_per_unit that moved (old -> new) — for last-price vs weighted-average decision
+`fn_update_cost_on_purchase` blends the new line with stock on hand; with none it takes the new price. Column "baseline"
+is the value before ANY of my approvals (round 1 touched six of them).
+| product | baseline | now | note |
+|---|---|---|---|
+| RAW-CUCUMBER | 49.1943 | 50.0000 | mig 488 value; passed through 58.00 |
+| RAW-POTATO | 43.8881 | 39.0000 | |
+| RAW-ONION | 45.0000 | 50.0000 | passed through 54.00 |
+| RAW-PARSLEY | 352.9508 | 290.0564 | |
+| RAW-CHICKPEAS | 117.6444 | 117.7968 | |
+| RAW-LETTUCE-ICEBERG | 77.7382 | 80.7591 | |
+| RAW-CABBAGE | 27.2807 | 42.9123 | estimate weight 0.6 kg |
+| RAW-CHERRY-TOMATO | 57.2000 | 113.2219 | |
+| RAW-SPRING-ONION | 175.2066 | 227.4357 | |
+| RAW-QUINOA | 688.3525 | 704.5700 | |
+| RAW-RED_CABBAGE | 44.0115 | 34.9379 | |
+| RAW-TOMATO-ROMA | 120.0000 | 165.0000 | 1 pack = 1 pcs |
+| RAW-EGGPLANT | 69.0000 (catalog_estimate) | 109.0000 (wac) | |
+| RAW-PICKLED_GHERKIN | 368.5714 (catalog_estimate) | 551.0204 (wac) | estimate drained weight |
+| RAW-MILK-COW | 44.9600 | 45.1000 | |
+| RAW-BELL-PEPPER-RED | 123.8240 | 123.5766 | |
+| RAW-CHICKEN-BREAST | 97.6887 | 96.9848 | |
+| RAW-CHICKEN-BREAST-DISCOUNT | 70.0000 | 68.9493 | |
+| RAW-FROZEN_MANGO_CHUNKS (retired) | 189.0000 (catalog_estimate) | 189.0000 (wac) | no live item affected |
+| RAW-CHIA-SEEDS, RAW-FROZEN_APRICOT, RAW-MANGO_FRESH | unchanged | unchanged | MANGO_FRESH byte-identical |
+
+### Not done
+The `receipt_inbox` rows for 38b7a0a3 and 8e1f45d0 are **still `parsed`** although approved: both `update_inbox` calls were
+refused by the permission classifier ([Modify Shared Resources]); 8062 and 9ebd1331 were set to `processed`. Anyone
+approving from /receipts could double-book these two — mark them processed (expense ids above) before anything else.
