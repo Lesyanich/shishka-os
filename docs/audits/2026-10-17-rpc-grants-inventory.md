@@ -174,6 +174,11 @@ In-house users of `http_*`: `fn_staff_tasks_push` and four cron jobs
 `loyverse-push-drain`). All run as `postgres`/cron, so revoking from `anon` and
 `authenticated` breaks nothing.
 
+> **CORRECTION, 2026-10-17 (step 4, MC `16ad5772`).** That caller list is wrong — there are
+> **zero** in-house callers. The detector regex `\mhttp_(get|post)\M` also matches the
+> `http_post` inside `net.http_post`, because `.` is a word boundary. All five named here
+> were already on `pg_net`. See § 4 below; the corrected detector is in migration 501.
+
 `net.*` (pg_net, 12 functions) is likewise anon-executable, but `net` is not in PostgREST's
 exposed schemas, so it is not reachable over REST. Lower priority; worth tidying.
 
@@ -480,3 +485,121 @@ there.
 `public.rpc_grant_snapshot_490`. It restores the prior grants and `search_path` exactly
 and asserts the result against the snapshot. Note that running it **reopens the anon
 hole** — it is incident response, not a resting state.
+
+---
+
+# Step 4 — the `http` extension, closed out as far as we can take it
+
+**MC** `16ad5772` (critical) · **migration** 501 · 2026-10-17
+
+Step 2 § 2.3 left this as the one hole migration 490 could not close. Step 4 measured it
+properly. Two things changed, one of them a correction to this very document.
+
+## 4.1 It is genuinely exploitable, not just mis-granted
+
+Called with nothing but the publishable key that ships in the live site's JS bundle:
+
+```
+POST /rest/v1/rpc/http_get  {"uri":"https://example.com"}   →  HTTP 200
+```
+
+The full response came back — status, every header, body. So this is a working SSRF
+primitive originating inside Supabase's network, reachable by anyone who views the site
+source. Target was IANA's reserved `example.com` on purpose; the aim was to prove the
+primitive, not to probe anything internal.
+
+## 4.2 The caller list in § 5.1 was a regex artifact — there are zero callers
+
+§ 5.1 named `fn_staff_tasks_push` and four Loyverse cron jobs as users of `http_*`. They are
+not. The detector was `prosrc ~* '\mhttp_(get|post)\M'`, and in POSIX regex `.` is a word
+boundary — so `\mhttp_post\M` matches the `http_post` **inside `net.http_post`**. Every one
+of the five was already on `pg_net`.
+
+Re-measured with a guard for the qualified form, across `pg_proc.prosrc` (non-extension),
+`cron.job.command` and `pg_views.definition`:
+
+```sql
+'(^|[^.[:alnum:]_])http_(get|post|put|delete|patch|head)[[:space:]]*\('   →  0 rows
+```
+
+| | § 5.1 claimed | actually |
+|---|---:|---:|
+| in-house `http` extension callers | 5 | **0** |
+
+This is the opposite of bad news. The task's preferred route was "migrate the callers to
+`pg_net`, then have support drop the extension" — and the migration half is already done, so
+the sync-vs-async problem (`http_post` returns the response; `net.http_post` returns a
+request id) never arises. `DROP EXTENSION http` is risk-free for us today.
+
+`fn_staff_tasks_push` is on `net.http_post` and healthy: `staff-tasks-reminders` logged 37
+successful runs in the preceding 24 h.
+
+## 4.3 All three routes need `supabase_admin` — measured
+
+```
+pg_has_role('postgres', extowner, 'USAGE') .. false     (owner: supabase_admin)
+grantors across all 19 proacl entries ...... supabase_admin, only
+postgres WITH GRANT OPTION ................. none
+```
+
+`DROP`/`ALTER EXTENSION SET SCHEMA` need ownership; `REVOKE` needs to be the grantor. So
+there is no migration that closes this, and that is the end of the line for us. The ask for
+support — all three options, the dashboard toggle to try first, and the verification — is
+written up in `2026-10-17-http-extension-support-request.md`.
+
+Worth noting for whoever reads the ticket: a revoke would have to strip **both** the
+`PUBLIC` grant and the explicit `anon`/`authenticated` grants. All 19 functions carry both.
+
+## 4.4 `pg_net` — accepted, no ticket
+
+Also `anon`-executable, also `supabase_admin`-owned, also beyond our reach. But `net` is not
+in PostgREST's exposed schemas, so it is not reachable over REST — verified rather than
+assumed:
+
+```
+POST /rest/v1/rpc/net.http_post  →  404 PGRST202
+```
+
+PostgREST reads the dotted name as a function literally called `net.http_post` in `public`.
+pg_net is load-bearing for every cron job, so there is nothing to change. The view below
+keeps watch in case the exposed-schema config ever changes.
+
+## 4.5 Migration 501 — what it does, and a trap it walked into
+
+501 changes no grants on the extension, because none is possible. It installs
+`public.v_security_outbound_http_exposure`, which reports placement, owner, per-role
+executability, REST reachability and the corrected caller count — so the post-support fix is
+one query, and a regression (a new `http_*` caller, which would make a plain drop unsafe) is
+visible.
+
+**The trap.** The view came out of its first apply **readable and writable by `anon`**:
+
+```
+has_table_privilege('anon', 'public.v_security_outbound_http_exposure', 'SELECT') → true
+relacl → {postgres=arwdDxtm/postgres, anon=arwdDxtm/postgres, authenticated=arwdDxtm/postgres, …}
+```
+
+Migration 490 cleared the `postgres` default privilege for **functions** in `public`, but
+the one for **tables and views** is untouched and still reads
+`anon=arwdDxtm/postgres`. So "closed by default" holds for functions only — every new view
+or table in `public` is born fully open to `anon`, and a view has no RLS to fall back on.
+501 ends with an explicit `REVOKE ALL … FROM anon, authenticated` (grantor is `postgres`
+here, so it bites). Verified from outside: `GET /rest/v1/v_security_outbound_http_exposure`
+→ `401 / 42501 permission denied`.
+
+This is a general gap, not a quirk of this one view, and is filed as its own MC task.
+
+## 4.6 State at the end of step 4
+
+| | |
+|---|---|
+| `http` anon-executable functions | **19 — still open**, needs `supabase_admin` |
+| in-house `http` callers | **0** (was mis-reported as 5) |
+| `DROP EXTENSION http` safe for us? | **yes** |
+| `pg_net` REST-reachable | no (404) — accepted |
+| new view reachable by anon | no (401) |
+| live-site surface (`menu_public`, `site_content`, `price_tiers`) | 200, unchanged |
+| advisor `extension_in_public` | 4, unchanged — clears for `http` once support acts |
+
+The task is done as far as our privileges allow. What remains is a single privileged
+statement that only Supabase can run.

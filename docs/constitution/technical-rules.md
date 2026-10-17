@@ -244,7 +244,7 @@ helper like these without granting EXECUTE and every table whose policy names it
 returning zero rows and starts raising `permission denied for function`. Grant policy
 helpers to `authenticated` in the same migration that introduces the policy.
 
-**Three things that look right and are not:**
+**Four things that look right and are not:**
 
 1. `REVOKE EXECUTE … FROM anon, authenticated` on an existing function usually does
    nothing. Most functions carry a grant to `PUBLIC` (`{=X/…}` in `proacl`) and anon
@@ -256,8 +256,21 @@ helpers to `authenticated` in the same migration that introduces the policy.
    extension upgrades. Filter on `NOT EXISTS (SELECT 1 FROM pg_depend d WHERE
    d.objid = p.oid AND d.deptype = 'e')`.
 3. `postgres` cannot revoke a grant that `supabase_admin` made. It is neither superuser
-   nor a member. Anything owned by `supabase_admin` — the `http` and `pg_net` extensions —
-   is out of reach from a migration and needs Supabase support.
+   nor a member, and holds no `WITH GRANT OPTION`. Anything owned by `supabase_admin` — the
+   `http` and `pg_net` extensions — is out of reach from a migration and needs Supabase
+   support. `DROP EXTENSION` and `ALTER EXTENSION … SET SCHEMA` need *ownership*, `REVOKE`
+   needs to be the *grantor*; all three therefore need `supabase_admin`. Measured
+   2026-10-17, MC `16ad5772`, migration 501 — don't re-derive it, and don't write a
+   migration that pretends otherwise.
+4. **"Closed by default" is true for FUNCTIONS only.** Migration 490 cleared the `postgres`
+   default privilege for functions in `public`; the one for **tables and views** was left
+   alone and still reads `anon=arwdDxtm/postgres`. A new view or table in `public` is
+   therefore born readable *and writable* by `anon` — and a view has no RLS to save it.
+   **Every migration that creates a view in `public` must end with
+   `REVOKE ALL ON public.<view> FROM anon, authenticated;`** unless the live site genuinely
+   needs it, and must then verify with `has_table_privilege` rather than trusting the
+   statement. Found the hard way in 501, whose own monitoring view came out world-readable
+   on first apply.
 
 **Verify by dry run, not by reading.** A grants migration can be run against production
 inside a transaction that rolls back — `BEGIN; <migration body>; SET LOCAL ROLE anon;
