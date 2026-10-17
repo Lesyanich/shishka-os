@@ -8,7 +8,7 @@ import { useSearchParams } from 'react-router-dom'
 export type AvailableFilter = 'yes' | 'no' | 'all'
 export const DEFAULT_AVAILABLE: AvailableFilter = 'yes'
 export type LoyverseFilter = 'synced' | 'unsynced' | null
-export type FlagKey = 'no-photo' | 'no-kbju' | 'no-bom' | 'draft'
+export type FlagKey = 'no-photo' | 'no-kbju' | 'no-bom' | 'draft' | 'diet-check'
 
 export interface MenuFilters {
   categoryIds: string[]
@@ -29,9 +29,11 @@ export interface FilteredItem {
   calories: number | string | null
   price: number | null
   hasBom: boolean
+  /** diet tags awaiting a human (v_dish_diet_check.needs_check); absent for non-SALE rows. */
+  dietNeedsCheck?: boolean
 }
 
-const KNOWN_FLAGS: readonly FlagKey[] = ['no-photo', 'no-kbju', 'no-bom', 'draft']
+const KNOWN_FLAGS: readonly FlagKey[] = ['no-photo', 'no-kbju', 'no-bom', 'draft', 'diet-check']
 
 export function parseFiltersFromParams(params: URLSearchParams): MenuFilters {
   const catRaw = params.get('cat')
@@ -98,6 +100,8 @@ export function applyFilters<T extends FilteredItem>(items: T[], f: MenuFilters)
         // Draft = no price set. `!price` also matches price === 0, which we
         // treat as draft by design (no legitimate ฿0 sale dish at Shishka).
         if (flag === 'draft') return !item.price
+        // Diet-tag review queue (mig 513): dishes whose diet tags a person has yet to confirm.
+        if (flag === 'diet-check') return item.dietNeedsCheck === true
         return false
       })
       if (!matches) return false

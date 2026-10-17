@@ -18,6 +18,7 @@ import { useInlineUpdate } from '../../hooks/useInlineUpdate'
 import { useMenuListEnrichment } from '../../hooks/useMenuListEnrichment'
 import { useChannelMargins } from '../../hooks/useChannelMargins'
 import { useCostTrust } from '../../hooks/useCostTrust'
+import { useDietCheck } from '../../hooks/useDietCheck'
 import { OwnerTable } from './components/OwnerTable'
 import { OwnerGallery } from './components/OwnerGallery'
 import { CustomerPreview } from './components/CustomerPreview'
@@ -74,6 +75,9 @@ export function MenuPage() {
   // Cost provenance per dish (mig 482) — drives the trust badges on the cost
   // figures in the table and in the drawer's Owner tab.
   const { trustByDish, error: costTrustError } = useCostTrust()
+  // Diet-tag review state per dish (mig 513) — drives the "check tags" badge, the
+  // review queue filter and the confirm panel in the drawer.
+  const { checkByDish, error: dietCheckError, refetch: refetchDietCheck } = useDietCheck()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -214,12 +218,16 @@ export function MenuPage() {
   const ownerFilteredItems = useMemo(() => {
     if (view !== 'owner') return typeFilteredItems
     const filtered = applyFilters(
-      typeFilteredItems.map((i) => ({ ...i, hasBom: hasBomById.get(i.id) ?? false })),
+      typeFilteredItems.map((i) => ({
+        ...i,
+        hasBom: hasBomById.get(i.id) ?? false,
+        dietNeedsCheck: checkByDish.get(i.id)?.needs_check ?? false,
+      })),
       filters,
     )
     const q = searchQuery.trim().toLowerCase()
     return q ? filtered.filter((i) => i.name.toLowerCase().includes(q)) : filtered
-  }, [typeFilteredItems, filters, view, hasBomById, searchQuery])
+  }, [typeFilteredItems, filters, view, hasBomById, checkByDish, searchQuery])
 
   // Filtered dishes (SALE only) for OwnerGallery
   const ownerFilteredDishes = useMemo(
@@ -458,6 +466,7 @@ export function MenuPage() {
           grabMargins={grabMargins}
           costTrust={trustByDish}
           costTrustUnavailable={costTrustError != null}
+          dietCheck={checkByDish}
           onPushed={() => refetch()}
         />
       ) : view === 'owner' && ownerLayout === 'gallery' ? (
@@ -515,6 +524,9 @@ export function MenuPage() {
         }
         costTrust={drawerItem ? (trustByDish.get(drawerItem.id) ?? null) : null}
         costTrustUnavailable={costTrustError != null}
+        dietCheck={drawerItem ? (checkByDish.get(drawerItem.id) ?? null) : null}
+        dietCheckUnavailable={dietCheckError != null}
+        onDietCheckChanged={() => refetchDietCheck()}
       />
     </div>
   )

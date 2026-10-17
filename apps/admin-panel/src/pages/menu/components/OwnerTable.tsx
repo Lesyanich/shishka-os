@@ -9,6 +9,8 @@ import { useExpandedRows } from '../../../hooks/useExpandedRows'
 import { useRowKeyboardNav } from '../../../hooks/useRowKeyboardNav'
 import { InlineEditCell } from '../../../components/menu/owner/InlineEditCell'
 import { CostTrustBadge } from '../../../components/menu/shared/CostTrustBadge'
+import { DietCheckBadge } from '../../../components/menu/shared/DietCheckBadge'
+import type { DishDietCheck } from '../../../components/menu/shared/dietCheck'
 import { COST_TRUST_UNAVAILABLE, costTrustPresentation, isCostUntrustworthy } from '../../../components/menu/shared/costTrust'
 import type { DishCostTrust } from '../../../components/menu/shared/costTrust'
 import { DishExpandedCard } from './DishExpandedCard'
@@ -36,6 +38,8 @@ interface OwnerTableProps {
   /** The trust view could not be read, so no row carries a badge. Said once above
    * the table rather than on every row. */
   costTrustUnavailable?: boolean
+  /** Diet-tag review state keyed by nomenclature_id, from v_dish_diet_check (mig 513). */
+  dietCheck?: Map<string, DishDietCheck>
   /** Called after a successful Loyverse push so the parent can refetch
    * (updates pos_status + loyverse_synced_at in the table). */
   onPushed?: () => void
@@ -277,6 +281,7 @@ export function OwnerTable({
   autoExpandId,
   grabMargins,
   costTrust,
+  dietCheck,
   costTrustUnavailable = false,
   onPushed,
 }: OwnerTableProps) {
@@ -701,6 +706,7 @@ export function OwnerTable({
                       className="font-medium text-[color:var(--color-cream)]"
                       isFailed={rowFailed}
                     />
+                    {dish.kind === 'SALE' && <DietCheckBadge row={dietCheck?.get(dish.id) ?? null} />}
                     {!hasNutrition(dish) && (
                       <span className="inline-flex rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-medium text-cream/60">
                         No nutrition

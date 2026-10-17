@@ -107,6 +107,15 @@ describe('applyFilters', () => {
     expect(out.map((i) => i.id)).toEqual(['a'])
   })
 
+  it('flags=diet-check keeps only dishes whose diet tags await a person (mig 513)', () => {
+    const waiting = item({ id: 'a', dietNeedsCheck: true })
+    const done = item({ id: 'b', dietNeedsCheck: false })
+    const unknown = item({ id: 'c' })
+    const f = parseFiltersFromParams(new URLSearchParams('flags=diet-check'))
+    expect(f.flags).toEqual(['diet-check'])
+    expect(applyFilters([waiting, done, unknown], f).map((i) => i.id)).toEqual(['a'])
+  })
+
   it('loyverse=unsynced filters to null loyverse_item_id', () => {
     const items = [item({ id: 'a', loyverse_item_id: 'lv-1' }), item({ id: 'b', loyverse_item_id: null })]
     const out = applyFilters(items, { categoryIds: [], available: 'all', loyverse: 'unsynced', flags: [] })
