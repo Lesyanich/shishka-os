@@ -639,3 +639,129 @@ watch — `anon_ssrf_open` must stay false and `in_house_callers` must stay 0, s
 unnoticed.
 
 MC `16ad5772` closed.
+
+---
+
+# Step 5 — the views/tables default ACL, closed for views
+
+**MC** `5927338d` (high) · **migration** 504 · 2026-10-17
+
+§ 2.6 listed the tables/views default privilege as "worth its own look" and § 4.5 named it
+after migration 501's own monitoring view came out world-readable. This is that look. It was
+worse than § 4.5 implied, and the fix is narrower than it first appeared.
+
+## 5.1 Twenty-three views were answering the publishable key with real data
+
+| | |
+|---|---:|
+| views in `public` | 60 |
+| anon-readable by ACL | 56 |
+| **actually returning data over REST** | **23** |
+| of those, legitimate live-site surface | 3 (+`v_public_menu`, timing out) |
+| **illegitimate leaks** | **20** |
+
+Measured with the key from the live site's JS bundle, `HEAD` + `Prefer: count=exact`:
+
+```
+v_data_health_items_legacy 1112 (HTTP 206)   v_dish_assembly_components  713
+v_dish_modifier_options     479              v_inventory_by_nomenclature  299
+v_stock_reconciliation      275              v_loyverse_sync_status       241
+v_dish_cost_split           241              v_dish_packaging             236
+v_modifier_drift            151              v_stocktake_session_lines    122
+v_stock_latest              122              v_stock_latest_by_location   122
+v_equipment_hourly_cost      76              v_equipment_maintenance_schedule 46
+v_migration_collisions       44              v_stock_status                26
+v_stock_on_hand_by_location  26              v_dangling_bom                10
+v_holiday_credit_balance      4              v_learning_metrics             1
+```
+
+COGS, stock positions, equipment cost and staff holiday balances, readable by anyone who
+viewed the site source. `v_staff_access_last` returned 0 rows but is a DEFINER view over
+staff access data — treated as exposed, not excused.
+
+**Two measurement traps**, both of which hide part of the picture:
+
+1. **HTTP 206 is a success.** PostgREST answers a large result with `206 Partial Content`. A
+   `status == 200` filter hid `v_data_health_items_legacy`, the single biggest leak, and the
+   first pass of this audit under-reported 23 as 22.
+2. **A 500 is not safety.** Four ACL-open views answered 500 — the anon role's 3 s
+   `statement_timeout` (§ gotcha), not a permission. `v_data_health`,
+   `v_station_checklist`, `v_station_replenishment`, and `v_public_menu`. One index or row
+   count away from leaking. Incidentally this means **`v_public_menu` sits close enough to
+   the anon timeout to fail intermittently on the live read path** — pre-existing, unrelated
+   to grants, filed separately.
+
+## 5.2 Why views and not tables — the ACL sits in front of RLS
+
+A table has RLS as a backstop. A view has none, and a view is `SECURITY DEFINER` unless
+created `security_invoker = true`, so it reads its base tables as the owner and bypasses RLS
+by design. **For a view the ACL is the only gate.** That is the whole bug, and it is why the
+view half is fixed outright here.
+
+The table half is a different bug wearing the same clothes. 23 tables also return data to
+anon, but not because of the default ACL acting alone — **31 RLS policies in `public` carry
+`qual = true`** for `anon` or `public`, several written deliberately for surfaces other than
+the website:
+
+```
+kds_anon_read              → production_tasks        (the KDS)
+"TWA anon can view warnings" → warnings              (staff Telegram app)
+staff_tasks_read_anon      → staff_tasks
+shifts_read_anon           → shifts                  (206 rows of staff schedules)
+tmpl_read                  → staff_schedule_templates
+```
+
+The ACL is checked **before** RLS, so revoking a table grant cuts those surfaces off even
+though their policies still permit them. Deciding which policies are vestigial needs each
+consumer exercised. Deliberately **out of scope here and filed as its own task** — stated in
+the migration header rather than left unmentioned, as the hand-off asked.
+
+Same for **writes**: 5 policies grant unconditional INSERT to anon/public —
+`cook_feedback`, `recipe_feedback`, `production_log` (deliberate feedback intake) and
+`haccp_logs`, `waste_entries`, both `roles={public}` with `with_check = true`, which look
+wider than intended. Left alone, filed with the above.
+
+## 5.3 `authenticated` stays on views, deliberately
+
+The admin panel reads **35** of these views (`v_analytics_*`, `v_data_health*`,
+`v_dish_cost_split`, `v_stock_status`, `v_station_checklist`, …) and signs in as
+`authenticated`. Revoking it would take out the panel. Narrowing per screen is separate work.
+
+## 5.4 Deriving the allowlist — two traps that would have caused an outage
+
+From the **deployed** code (`shishka-health` @ `origin/main`; the local checkout sits on a
+stale feature branch) plus `apps/web`, cross-checked against `contracts/menu-contract.json`:
+
+```
+menu_public · menu_modifiers · menu_translations · v_public_menu
+```
+
+1. **`menu_translations` is not in menu-contract.json**, but `useMenu.js:81` reads it and
+   `scripts/aeo-prerender.mjs:298` **throws** on failure — closing it would hard-fail the
+   prerender build, not fall back to English. Contract drift; filed.
+2. **`tags` is load-bearing for the menu and appears in no `.from()` anywhere.**
+   `nomenclature_tags` is selected as `nomenclature_id, tags(slug,…)`; that PostgREST embed
+   needs SELECT on `tags` too. Both are tables, so untouched here — but whoever narrows
+   table grants must not miss it.
+
+## 5.5 Verification
+
+Dry run against production in a transaction that rolled back (per § RULE-RPC-GRANTS),
+asserting the post-state before committing anything, then confirmed the rollback was clean
+(56 views anon-readable again, snapshot table gone, default ACL restored). Then applied.
+
+| check | before | after |
+|---|---:|---:|
+| views returning data to anon | 23 | **4** (the allowlist) |
+| any non-allowlisted view not 401 | — | **none** |
+| views readable by `authenticated` | 59 | 59 |
+| tables returning data to anon | 23 | 23 (out of scope) |
+| `menu_public` / `menu_modifiers` / `menu_translations` / `v_public_menu` | 81 / 436 / 691 / 134 | **identical** |
+| `nomenclature_tags` / `site_content` / `price_tiers` / `tags` | 942 / 4 / 3 / 72 | **identical** |
+| `contract-check.mjs`, both endpoints | green | **green** |
+| default ACL for tables in `public` | `anon=arwdDxtm` | `postgres` + `service_role` only |
+
+Prior ACLs for all 221 tables/views are snapshotted in `public.acl_snapshot_504` for
+rollback without a dump. `supabase_admin`'s parallel default ACL still grants anon and is
+out of reach as `postgres`; it only applies to objects `supabase_admin` itself creates
+(none of ours), so 504 raises a WARNING naming it rather than failing.
