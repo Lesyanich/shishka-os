@@ -48,8 +48,12 @@ never touched, whatever their age — a stuck row is the watchdog's business, no
 | `task_comments` | Not a log — Mission Control discussion history. Raised as a candidate in the MC task; rejected here so the question stays closed. |
 | `stock_movements` | Not a log — the stock ledger. Same. |
 | `chef_feedback_queue` | Empty, and its terminal status vocabulary is unverified. Off until a real row confirms it. |
-| `syrve_sync_log` | **SYRVE is retired.** API-tested and rejected in favour of Loyverse (CEO, 2026-10-17). 0 rows, never written. Being removed — MC `9afb9af2`. |
-| `syrve_sync_queue` | Same. 0 rows, never written. |
+| ~~`syrve_sync_log`~~ | **Gone.** SYRVE was API-tested and rejected in favour of Loyverse (CEO, 2026-10-17); migration 509 (MC `9afb9af2`) dropped the table and removed this registry row the same night. |
+| ~~`syrve_sync_queue`~~ | Same — dropped by 509. |
+
+> **Registry size, as applied:** 18 rows after 496, 19 once 498 added `db_audit_snapshots`, then
+> **17** after migration 509 dropped the two SYRVE tables and their rows on the same night.
+> The counts quoted elsewhere in this document are the state at each migration, not today's.
 
 A log-shaped table **missing** from `log_retention_policy` is the bug the registry exists to
 catch: it means nobody decided. That is why the never-purge tables get rows too, with
