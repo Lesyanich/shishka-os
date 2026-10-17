@@ -1242,3 +1242,68 @@ Gating the PO/receipt cluster to `owner` would **break Mint's actual job** — t
 task_manager-tier screens. So each needs its tier read off the route table, not a blanket
 `owner`. Separately, narrowing the 59 views `authenticated` can read still needs a per-tier
 signed-in verification harness that does not exist.
+
+---
+
+# Step 12 — the public `/stock` sheet was broken, and the anon surface is three repos wide
+
+**migration** 527 · 2026-10-18
+
+Found while classifying the ungated functions for § 11.5: `fn_submit_stock_sheet` showed
+`anon_can_exec = false`, yet `useStockSheet.ts` says in its own header that the page "runs
+on the anon Supabase key". Both halves of the public staff order sheet were 401.
+
+## 12.1 Two causes, and the attribution matters
+
+1. **The read was already broken before today.** `v_stock_sheet_items` carried
+   `security_invoker = true`, so it read its base tables as the *caller* — and anon has no
+   SELECT on `nomenclature`. The REST sweep taken **before** migration 504 recorded it as
+   401, exactly as after. **504 did not cause this**; it revoked a view grant that was
+   already insufficient on its own, so the fix needs that grant back but the root cause was
+   the invoker flag.
+2. **The submit was broken by 490**, which revoked anon EXECUTE on `fn_submit_stock_sheet`.
+
+## 12.2 The fix is mig 253 → 256 all over again
+
+The tempting repair — grant anon SELECT on `nomenclature` — would leak `cost_per_unit`,
+`price`, `markup_pct`, `cost_source`, `loyverse_price` and `default_supplier_id`. Never.
+
+The house rule already covers the shape: **anon-facing views must be `SECURITY DEFINER`**,
+precisely because anon has no grant on `nomenclature`. `menu_public`, `v_public_menu` and
+`menu_modifiers` all are; migration 253 once set `security_invoker` on them and silently
+broke the live site (anon got 42501, `useMenu` swallowed it and rendered MOCK data), and 256
+reverted it. **`v_stock_sheet_items` is a fourth view in that class and nobody had listed
+it.** 527 puts it back to DEFINER, so anon needs nothing on the base tables or on
+`fn_active_menu_ingredient_ids()` — the view owner evaluates both.
+
+## 12.3 The blind spot that produced it — twice
+
+Both 490 and 504 derived the anon surface from the **public-site** repos
+(`shishka-health`, `apps/web`) and treated the admin panel as entirely authenticated.
+490's audit even recorded "no `.rpc(` call in either repo" — true of those two, false of
+`apps/admin-panel`.
+
+My own 504 check compounded it: I grepped `StockSheetPage.tsx` for `.from(` / `.rpc(`, found
+nothing, and concluded the page read no data. **The data access lives in the hook**
+(`useStockSheet.ts`). That is the same mistake shape as the `CookTasksPage` near-miss in
+§ 11's sibling work — judging a file by its own text when the behaviour is one import away.
+
+> **The anon surface is THREE repos wide**: `shishka-health`, `apps/web`, and the public
+> routes of `apps/admin-panel` — today exactly `/login` and `/stock`. Any future narrowing
+> must enumerate routes outside `<ProtectedRoute>`, and must follow hooks, not just pages.
+
+Both objects now carry a `COMMENT` saying so, so the next pass trips over the warning
+rather than the bug.
+
+## 12.4 Verification
+
+| probe (publishable key) | before | after |
+|---|---|---|
+| `GET /v_stock_sheet_items` | `401` | **`200`, real items** |
+| `POST /rpc/fn_submit_stock_sheet` (wrong passcode) | `401` | **`200 {"ok":false,"error":"bad_passcode"}`** — ran, and the passcode still gates it |
+| `GET /nomenclature` | 401 | **401** — no leak |
+| `v_dish_cost_split`, `v_staff_access_last`, `v_data_health` | 401 | 401 — 504 intact |
+| views anon-readable | 4 | 5 (allowlist + this one) |
+
+`fn_submit_stock_sheet` is authenticated by its passcode argument and is therefore
+deliberately **not** role-gated, unlike the payroll RPCs in 523.
