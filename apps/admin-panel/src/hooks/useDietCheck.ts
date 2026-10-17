@@ -26,10 +26,7 @@ export function useDietCheck(): UseDietCheckResult {
     setError(null)
     const { data, error: viewError } = await supabase
       .from('v_dish_diet_check')
-      .select(
-        'dish_id, product_code, needs_check, reason, ready, unconfirmed, soft_deleted, ' +
-          'ingredients, proposed_diets, published_diets, diet_reviewed_at, diet_reviewed_by',
-      )
+      .select('*')
     if (viewError) {
       setError(viewError.message)
       setIsLoading(false)
@@ -51,6 +48,8 @@ export function useDietCheck(): UseDietCheckResult {
         published_diets: (raw.published_diets as string[] | null) ?? [],
         diet_reviewed_at: (raw.diet_reviewed_at as string | null) ?? null,
         diet_reviewed_by: (raw.diet_reviewed_by as string | null) ?? null,
+        // Absent until mig 520 is applied; select('*') keeps the hook working either way.
+        blocked_reason: (raw.blocked_reason as string | null) ?? null,
       })
     }
     setCheckByDish(map)
