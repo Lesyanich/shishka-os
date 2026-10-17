@@ -35,6 +35,7 @@ const FLAG_OPTS: FilterChipOption<FlagKey>[] = [
   { value: 'no-kbju', label: 'No macros' },
   { value: 'no-bom', label: 'No BOM' },
   { value: 'draft', label: 'Draft (no price)' },
+  { value: 'diet-check', label: 'Diet tags to check' },
 ]
 
 export function FilterBar({ filters, categories, categoryCounts, onChange }: FilterBarProps) {

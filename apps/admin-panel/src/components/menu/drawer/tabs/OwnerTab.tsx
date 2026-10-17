@@ -8,6 +8,8 @@ import { useLoyversePushDish } from '../../../../hooks/useLoyversePushDish'
 import { CostTrustBadge } from '../../shared/CostTrustBadge'
 import { COST_TRUST_UNAVAILABLE, costTrustPresentation, isCostUntrustworthy } from '../../shared/costTrust'
 import type { DishCostTrust } from '../../shared/costTrust'
+import type { DishDietCheck } from '../../shared/dietCheck'
+import { DietCheckPanel } from './DietCheckPanel'
 
 interface OwnerTabProps {
   item: MenuItem
@@ -27,6 +29,10 @@ interface OwnerTabProps {
   /** The trust view could not be read. Says so out loud: an unmarked figure must
    * never be mistaken for a checked one. */
   costTrustUnavailable?: boolean
+  /** Diet-tag review state (v_dish_diet_check, mig 513). */
+  dietCheck?: DishDietCheck | null
+  dietCheckUnavailable?: boolean
+  onDietCheckChanged?: () => void
 }
 
 function posStatusBadge(status: string) {
@@ -50,6 +56,9 @@ export function OwnerTab({
   onToggleWeb,
   costTrust,
   costTrustUnavailable = false,
+  dietCheck,
+  dietCheckUnavailable = false,
+  onDietCheckChanged,
 }: OwnerTabProps) {
   const trust = costTrustPresentation(costTrust)
   // Cost missing or invented → the Food Cost % is understated by an unknown
@@ -198,6 +207,15 @@ export function OwnerTab({
           </p>
         )}
       </section>
+
+      {item.kind === 'SALE' && (
+        <DietCheckPanel
+          dishId={item.id}
+          row={dietCheck}
+          unavailable={dietCheckUnavailable}
+          onChanged={onDietCheckChanged}
+        />
+      )}
 
       {/* Modifier options cost/margin (Phase 6) — owner view of per-option economics */}
       {modifiers.length > 0 && (

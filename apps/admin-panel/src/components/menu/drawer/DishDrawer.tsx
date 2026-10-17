@@ -18,6 +18,7 @@ import { L1CookTab } from './tabs/L1CookTab'
 import { L2AssemblerTab, shelfLifeValid } from './tabs/L2AssemblerTab'
 import { OwnerTab } from './tabs/OwnerTab'
 import type { DishCostTrust } from '../shared/costTrust'
+import type { DishDietCheck } from '../shared/dietCheck'
 
 type DrawerTab = 'customer' | 'l1-cook' | 'l2-assembler' | 'owner'
 
@@ -43,6 +44,10 @@ interface DishDrawerProps {
   costTrust?: DishCostTrust | null
   /** The trust view could not be read (see OwnerTab). */
   costTrustUnavailable?: boolean
+  /** Diet-tag review state for this dish (v_dish_diet_check, mig 513). */
+  dietCheck?: DishDietCheck | null
+  dietCheckUnavailable?: boolean
+  onDietCheckChanged?: () => void
 }
 
 export function DishDrawer({
@@ -54,6 +59,9 @@ export function DishDrawer({
   onToggleWeb,
   costTrust,
   costTrustUnavailable,
+  dietCheck,
+  dietCheckUnavailable,
+  onDietCheckChanged,
 }: DishDrawerProps) {
   const open = item != null
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -371,6 +379,9 @@ export function DishDrawer({
                 onToggleWeb={onToggleWeb}
                 costTrust={costTrust}
                 costTrustUnavailable={costTrustUnavailable}
+                dietCheck={dietCheck}
+                dietCheckUnavailable={dietCheckUnavailable}
+                onDietCheckChanged={onDietCheckChanged}
               />
             )}
           </div>

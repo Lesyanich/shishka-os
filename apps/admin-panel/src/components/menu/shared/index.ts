@@ -5,6 +5,9 @@ export { PriceLabel } from './PriceLabel'
 export { CategoryTabs } from './CategoryTabs'
 export { DishPhotoSlot } from './DishPhotoSlot'
 export { CostTrustBadge } from './CostTrustBadge'
+export { DietCheckBadge } from './DietCheckBadge'
+export { dietCheckPresentation } from './dietCheck'
+export type { DishDietCheck } from './dietCheck'
 export { costTrustPresentation, isCostUntrustworthy } from './costTrust'
 export {
   FOOD_COST_THRESHOLDS,
