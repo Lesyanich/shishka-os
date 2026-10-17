@@ -221,7 +221,8 @@ export function MenuPage() {
       typeFilteredItems.map((i) => ({
         ...i,
         hasBom: hasBomById.get(i.id) ?? false,
-        dietNeedsCheck: checkByDish.get(i.id)?.needs_check ?? false,
+        // A never-taggable dish (mig 520) is not a queue item: there is nothing to review.
+        dietNeedsCheck: (checkByDish.get(i.id)?.needs_check ?? false) && checkByDish.get(i.id)?.reason !== 'not_taggable',
       })),
       filters,
     )

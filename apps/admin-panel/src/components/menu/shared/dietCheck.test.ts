@@ -15,6 +15,7 @@ const row = (over: Partial<DishDietCheck>): DishDietCheck => ({
   published_diets: [],
   diet_reviewed_at: null,
   diet_reviewed_by: null,
+  blocked_reason: null,
   ...over,
 })
 
@@ -45,6 +46,15 @@ describe('shared/dietCheck', () => {
     const p = dietCheckPresentation(row({ ready: true, unconfirmed: 0, proposed_diets: ['vegetarian'] }))
     expect(p?.label).toBe('diet: ready')
     expect(p?.detail).toContain('vegetarian')
+  })
+
+  it('says plainly that a build-your-own dish carries no diet tags, whatever its ingredients say', () => {
+    const p = dietCheckPresentation(
+      row({ reason: 'not_taggable', ready: false, blocked_reason: 'Build-your-own: the guest chooses the food.' }),
+    )
+    expect(p?.label).toBe('no diet tags')
+    expect(p?.detail).toContain('by design')
+    expect(p?.detail).toContain('Build-your-own')
   })
 
   it('counts what blocks an unreviewed dish, including retired ingredients', () => {

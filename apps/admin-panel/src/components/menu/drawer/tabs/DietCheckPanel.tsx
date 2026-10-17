@@ -53,10 +53,12 @@ export function DietCheckPanel({ dishId, row, unavailable = false, onChanged }: 
     setLoading(false)
   }, [dishId])
 
+  const blocked = row?.reason === 'not_taggable'
+
   useEffect(() => {
     setMessage(null)
-    void loadItems()
-  }, [loadItems])
+    if (!blocked) void loadItems()
+  }, [loadItems, blocked])
 
   const confirmIngredient = async (item: DietReviewItem) => {
     setBusy(item.id)
@@ -108,9 +110,9 @@ export function DietCheckPanel({ dishId, row, unavailable = false, onChanged }: 
         <p className="text-[10px] leading-relaxed text-amber-watch">{DIET_CHECK_UNAVAILABLE}</p>
       )}
 
-      {loading && <p className="text-[10px] text-cream/40">Loading ingredients…</p>}
+      {loading && !blocked && <p className="text-[10px] text-cream/40">Loading ingredients…</p>}
 
-      {items.length > 0 && (
+      {!blocked && items.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-surface-3">
           <table className="w-full text-xs">
             <thead>
@@ -154,7 +156,7 @@ export function DietCheckPanel({ dishId, row, unavailable = false, onChanged }: 
         </div>
       )}
 
-      {row?.needs_check && (
+      {row?.needs_check && !blocked && (
         <div className="space-y-1 pt-1">
           <button
             type="button"

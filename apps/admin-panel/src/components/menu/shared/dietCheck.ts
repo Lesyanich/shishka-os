@@ -8,7 +8,7 @@
  * from guests (CEO decision) until a person confirms them. Say "hidden", never "invalid".
  */
 
-export type DietCheckReason = 'ok' | 'never_reviewed' | 'composition_changed'
+export type DietCheckReason = 'ok' | 'never_reviewed' | 'composition_changed' | 'not_taggable'
 
 /** Row of v_dish_diet_check (mig 513). */
 export interface DishDietCheck {
@@ -27,6 +27,8 @@ export interface DishDietCheck {
   published_diets: string[]
   diet_reviewed_at: string | null
   diet_reviewed_by: string | null
+  /** Why this dish can never carry diet tags (food chosen by the guest as modifiers); null = taggable. */
+  blocked_reason: string | null
 }
 
 export interface DietCheckPresentation {
@@ -56,6 +58,17 @@ export function dietCheckPresentation(
   row: DishDietCheck | null | undefined,
 ): DietCheckPresentation | null {
   if (!row) return null
+
+  // Never taggable: say so plainly, and never offer a confirm.
+  if (row.reason === 'not_taggable') {
+    const why = row.blocked_reason ?? 'The food is chosen by the guest, so no static diet claim is possible.'
+    return {
+      label: 'no diet tags',
+      title: why,
+      className: badge(TINT.neutral),
+      detail: `This dish carries no diet tags, by design. ${why}`,
+    }
+  }
 
   if (!row.needs_check) {
     return {
