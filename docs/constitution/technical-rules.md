@@ -158,15 +158,32 @@ all three cases, by feeding the hook a real payload:
 | set | exit 0, guard denies | exit 0, guard denies |
 | unset or empty | exit 0, guard denies (relative) | **exit 127, guard silent** |
 
-Changing a hook's wiring governs every future session, so prove it, don't reason
-about it: edit the hook in a worktree, start a session there, and confirm the
-edit takes effect without merging. The cheapest tell is the SessionStart banner —
-it prints the branch of the checkout the hook ran in, so a worktree session that
-still prints `Branch: main` is running the parent's copy.
+### ⚠️ The residual trap — the anchor does NOT buy you worktree testing
+
+**A hook edit takes effect only after it is merged AND the parent checkout
+`/Users/lesianich/code/shishka` is synced.** Measured in a fresh desktop-app
+worktree session whose worktree carried the anchored wiring: its SessionStart
+banner still read `Branch: main` while the worktree sat on its own branch, and
+the **parent's** `.claude/.session-id` held that session's id. So in the desktop
+app's worktree sessions `CLAUDE_PROJECT_DIR` resolves to the **parent checkout**,
+not the worktree — the anchor changes nothing there. It is kept for this rule,
+for the `:-.` safety above, and because it is correct wiring in a plain checkout
+and in a `claude` CLI session, where the variable does follow the session's
+checkout.
+
+So **you still cannot test a hook fix in the worktree that holds it.** Plan for
+it: land the hook change, sync the parent, then verify, and treat the first
+sessions after the sync as the real test. Two cheap tells of which checkout a
+hook ran in — the SessionStart banner's `Branch:` line, and whichever
+`.claude/.session-id` (the parent's or the worktree's) holds your session id.
+A hook change is still governed by prove-it-don't-reason-about-it: it decides
+every future session, and the guard matrix plus a deny message are the proof.
 
 > Origin: 2026-10-17, MC `51fa2d68`, raised by MC `8aafd8eb` (PR #617). The git
 > guard refused every commit made from a worktree, and the fix could not be
-> tested in the worktree that held it.
+> tested in the worktree that held it. Anchoring on `CLAUDE_PROJECT_DIR` (PR
+> #619) turned out **not** to cure that in the desktop app — `51fa2d68` closed
+> not-viable on the CEO's call, with the wiring and this rule kept.
 
 ## RULE-DEPLOY-MAP
 
