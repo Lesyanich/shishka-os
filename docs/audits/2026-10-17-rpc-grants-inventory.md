@@ -543,9 +543,8 @@ postgres WITH GRANT OPTION ................. none
 ```
 
 `DROP`/`ALTER EXTENSION SET SCHEMA` need ownership; `REVOKE` needs to be the grantor. So
-there is no migration that closes this, and that is the end of the line for us. The ask for
-support — all three options, the dashboard toggle to try first, and the verification — is
-written up in `2026-10-17-http-extension-support-request.md`.
+there is no *migration* that closes this. A support ticket was drafted on that basis — and
+then turned out to be unnecessary; see § 4.7.
 
 Worth noting for whoever reads the ticket: a revoke would have to strip **both** the
 `PUBLIC` grant and the explicit `anon`/`authenticated` grants. All 19 functions carry both.
@@ -602,4 +601,41 @@ This is a general gap, not a quirk of this one view, and is filed as its own MC 
 | advisor `extension_in_public` | 4, unchanged — clears for `http` once support acts |
 
 The task is done as far as our privileges allow. What remains is a single privileged
-statement that only Supabase can run.
+statement that only Supabase can run — or so it looked. See § 4.7.
+
+## 4.7 Closed the same day — the Dashboard toggle outranks `postgres`
+
+**Supabase Dashboard → Database → Extensions → `http` → disable.** It worked, and it
+dropped the extension outright rather than merely revoking it. No support ticket was sent;
+the draft has been deleted rather than kept, since it documents an ask that was never
+needed.
+
+**This is the lesson worth carrying.** Everything in § 4.3 is still true — `postgres` is
+not the owner, is not the grantor, holds no grant option, and no migration can touch a
+`supabase_admin`-owned extension. All of that was measured, not assumed, and it was all
+correct. The wrong inference was the next step: that "no SQL route" means "only a support
+ticket". The Dashboard runs above `postgres`. **Before drafting a ticket about an object
+`postgres` cannot touch, spend two minutes on the Dashboard control for it.**
+
+Verified after the drop:
+
+| Check | Result |
+|---|---|
+| `http` row in `pg_extension` | **none** — dropped, not just un-granted |
+| `http_*` functions left in `public` | 0 |
+| anon-executable among them | 0 |
+| the proven exploit, publishable key | `POST /rest/v1/rpc/http_get` → **404 PGRST202** (was 200 with full body) |
+| live menu over REST | 200 |
+| pg_cron after the drop | all jobs succeeded; `loyverse-push-drain` 90/90 in the hour |
+| our 190 functions anon-executable | still 0 — migration 490 holds |
+| extensions left in `public` | `pg_net`, `pg_trgm`, `vector` → advisor `extension_in_public` 4 → 3 |
+
+The zero-caller correction in § 4.2 is what made this safe: a drop, rather than a revoke,
+was the simplest option *and* the safest, and nothing had to be migrated first.
+
+`v_security_outbound_http_exposure` (migration 501) stays. Its job is now regression
+watch — `anon_ssrf_open` must stay false and `in_house_callers` must stay 0, so that a new
+`http_*` caller or a change to PostgREST's exposed schemas surfaces instead of going
+unnoticed.
+
+MC `16ad5772` closed.

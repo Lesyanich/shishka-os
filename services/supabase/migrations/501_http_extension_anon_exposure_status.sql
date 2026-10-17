@@ -14,8 +14,13 @@
 -- REVOKE requires being the grantor. All three routes therefore need `supabase_admin`,
 -- which we do not have and cannot obtain from a migration. Migration 490 already
 -- attempts the revoke and raises a WARNING so the apply log is honest about the gap.
--- The ask for Supabase support is written up in
--- docs/audits/2026-10-17-http-extension-support-request.md.
+--
+-- POSTSCRIPT, same day: the hole was closed from the Supabase Dashboard
+-- (Database > Extensions > http > disable), which runs above `postgres` and dropped the
+-- extension outright. No support ticket was needed. Everything above stays true of SQL;
+-- the wrong inference was that "no SQL route" meant "only support can act". See
+-- docs/audits/2026-10-17-rpc-grants-inventory.md section 4.7. The view below now serves
+-- as regression watch rather than as a pre-fix status report.
 --
 -- WHAT IT DOES DO
 -- ------------------------------------------------------------------------------
