@@ -30,7 +30,7 @@ const SkuManagerPage = lazyWithReload(() => import('./pages/SkuManagerPage').the
 const AnalyticsLayout = lazyWithReload(() => import('./pages/analytics/AnalyticsLayout').then(m => ({ default: m.AnalyticsLayout })))
 const SalesPulseTab = lazyWithReload(() => import('./pages/analytics/SalesPulseTab').then(m => ({ default: m.SalesPulseTab })))
 const PurchasesTab = lazyWithReload(() => import('./pages/analytics/PurchasesTab').then(m => ({ default: m.PurchasesTab })))
-const StockControlTabPlaceholder = lazyWithReload(() => import('./pages/analytics/AnalyticsPlaceholderTab').then(m => ({ default: m.StockControlTabPlaceholder })))
+const StockControlTab = lazyWithReload(() => import('./pages/analytics/StockControlTab').then(m => ({ default: m.StockControlTab })))
 const FinanceLayout = lazyWithReload(() => import('./pages/FinanceLayout').then(m => ({ default: m.FinanceLayout })))
 const FinanceLedger = lazyWithReload(() => import('./pages/FinanceLedger').then(m => ({ default: m.FinanceLedger })))
 const FinanceAnalytics = lazyWithReload(() => import('./pages/FinanceAnalytics').then(m => ({ default: m.FinanceAnalytics })))
@@ -140,8 +140,7 @@ function App() {
                     <Route index element={<Navigate to="sales" replace />} />
                     <Route path="sales" element={<SalesPulseTab />} />
                     <Route path="purchases" element={<PurchasesTab />} />
-                    {/* S4 d8c02f8c — registered now, placeholder until then */}
-                    <Route path="stock" element={<StockControlTabPlaceholder />} />
+                    <Route path="stock" element={<StockControlTab />} />
                   </Route>
                   <Route path="/finance" element={<Suspense fallback={<PageLoader />}><FinanceLayout /></Suspense>}>
                     <Route index element={<Navigate to="dashboard" replace />} />

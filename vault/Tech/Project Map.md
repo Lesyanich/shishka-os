@@ -110,7 +110,7 @@ The owner UI (`apps/admin-panel/`, React + Vite → Vercel at shishka-os.vercel.
 | `StaffSchedulePage` | `apps/admin-panel/src/pages/staff/StaffSchedulePage.tsx` |
 | `StaffTasksPage` | `apps/admin-panel/src/pages/StaffTasksPage.tsx` |
 | `StationCountPage` | `apps/admin-panel/src/pages/StationCountPage.tsx` |
-| `StockControlTabPlaceholder` | `apps/admin-panel/src/pages/analytics/AnalyticsPlaceholderTab.tsx` |
+| `StockControlTab` | `apps/admin-panel/src/pages/analytics/StockControlTab.tsx` |
 | `StocktakeReviewPage` | `apps/admin-panel/src/pages/StocktakeReviewPage.tsx` |
 | `ThawStation` | `apps/admin-panel/src/pages/ThawStation.tsx` |
 | `WasteTracker` | `apps/admin-panel/src/pages/WasteTracker.tsx` |
@@ -188,5 +188,5 @@ There is **no knowledge-graph shortcut** — use **grep + targeted `Read`** (or 
 
 ---
 <!-- AUTO:stamp START -->
-_Auto sections regenerated from the repo at commit `e7632c97`. Re-run: `node scripts/gen-project-map.mjs`._
+_Auto sections regenerated from the repo at commit `27627602`. Re-run: `node scripts/gen-project-map.mjs`._
 <!-- AUTO:stamp END -->
