@@ -26,7 +26,7 @@ import {
    ═══════════════════════════════════════════════════════════ */
 
 export function SalesPulseTab() {
-  const { range, weeks } = useAnalyticsPeriod()
+  const { range } = useAnalyticsPeriod()
   const { sales, items, heat, isLoading, error, refetch } = useAnalyticsSalesPulse(range)
 
   const totals = useMemo(() => sumSales(sales, range.start, range.end), [sales, range])
@@ -67,14 +67,14 @@ export function SalesPulseTab() {
           isLoading={isLoading}
         />
         <KpiCard
-          label={`Receipts · ${weeks}w`}
+          label={`Receipts · ${range.label}`}
           value={String(kpis.receipts)}
           delta={kpis.receiptsDelta}
           goodDirection="up"
           isLoading={isLoading}
         />
         <KpiCard
-          label={`Avg check · ${weeks}w`}
+          label={`Avg check · ${range.label}`}
           value={`฿${formatTHBFull(kpis.avgCheck)}`}
           delta={kpis.avgCheckDelta}
           goodDirection="up"
@@ -82,14 +82,14 @@ export function SalesPulseTab() {
         />
       </div>
 
-      <WeeklyRevenueChart data={weekly} isLoading={isLoading} error={error} />
+      <WeeklyRevenueChart data={weekly} range={range} isLoading={isLoading} error={error} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <TopDishesChart dishes={dishes} categoryColor={categoryColor} isLoading={isLoading} />
         <CategoryMixDonut slices={slices} categoryColor={categoryColor} isLoading={isLoading} />
       </div>
 
-      <HourHeatmap grid={grid} isLoading={isLoading} />
+      <HourHeatmap grid={grid} range={range} isLoading={isLoading} />
     </div>
   )
 }

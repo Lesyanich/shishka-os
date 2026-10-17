@@ -49,7 +49,7 @@ export function PurchaseCoverageStrip({
           <>
             <Fact
               label="Period"
-              value={`${range.weeks}w · ${weekLabel(range.start)} – ${weekLabel(range.end)}`}
+              value={`${range.label} · ${weekLabel(range.start)} – ${weekLabel(range.end)}`}
             />
             <Fact label="Purchased" value={`฿${formatTHBFull(totals.thbTotal)}`} />
             <Fact

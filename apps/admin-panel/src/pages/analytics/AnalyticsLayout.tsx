@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { Activity, PackageSearch, ShoppingBasket } from 'lucide-react'
-import { AnalyticsPeriodProvider, useAnalyticsPeriod } from '../../contexts/AnalyticsPeriodContext'
-import { PERIOD_CHOICES, type PeriodWeeks } from '../../lib/analytics'
+import { AnalyticsPeriodProvider } from '../../contexts/AnalyticsPeriodContext'
+import { PeriodPicker } from '../../components/analytics/PeriodPicker'
 
 /* ═══════════════════════════════════════════════════════════
    AnalyticsLayout — the /analytics shell (spec §5, hub §2).
@@ -18,30 +18,6 @@ const TABS = [
   { to: '/analytics/purchases', icon: ShoppingBasket, label: 'Purchases' },
   { to: '/analytics/stock', icon: PackageSearch, label: 'Stock control' },
 ] as const
-
-function PeriodSelector() {
-  const { weeks, setWeeks } = useAnalyticsPeriod()
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[10px] uppercase tracking-[0.12em] text-cream/60">Period</span>
-      <div className="shk-seg" role="group" aria-label="Analytics period">
-        {PERIOD_CHOICES.map((w: PeriodWeeks) => (
-          <button
-            key={w}
-            type="button"
-            onClick={() => setWeeks(w)}
-            aria-pressed={weeks === w}
-            className="shk-seg-btn"
-            title={`Last ${w} ISO weeks`}
-          >
-            {w}w
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 export function AnalyticsLayout() {
   return (
@@ -65,7 +41,7 @@ export function AnalyticsLayout() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <PeriodSelector />
+            <PeriodPicker />
             <nav className="shk-seg" role="group" aria-label="Analytics view">
               {TABS.map(({ to, icon: Icon, label }) => (
                 <NavLink key={to} to={to} className="shk-seg-btn" title={`${label} view`}>

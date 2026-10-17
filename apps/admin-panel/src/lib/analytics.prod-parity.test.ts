@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest'
 import {
   aggregateDishes,
   categoryMix,
+  customRange,
   heatGrid,
   kpiStrip,
+  pctDelta,
   periodRange,
   sumSales,
   topDishes,
@@ -168,5 +170,97 @@ describe('prod parity — day × hour heatmap', () => {
     // 142 receipts over 50 lit cells = 2.84 per cell, under the threshold of 3.
     expect(grid.avgPerLiveCell).toBeCloseTo(2.84, 2)
     expect(grid.isSparse).toBe(true)
+  })
+})
+
+/* ═══════════════════════════════════════════════════════════════════
+   Custom from–to range vs SQL (CEO request 2026-10-17).
+
+   Window: 1–15 October 2026 — deliberately starting and ending
+   mid-week, which is where the week/day distinction bites. Every
+   expected figure was measured on prod with `day <= 2026-10-16` so it
+   matches this frozen fixture exactly.
+   ═══════════════════════════════════════════════════════════════════ */
+
+describe('prod parity — custom range 1–15 Oct', () => {
+  const range = customRange('2026-10-01', '2026-10-15', TODAY)
+
+  it('reports the chosen days, not the covering weeks', () => {
+    const t = sumSales(SALES, range.start, range.end)
+    expect(t.receipts).toBe(75)
+    expect(t.gross).toBe(24_806)
+  })
+
+  it('compares against the equal-length window SQL measured', () => {
+    const prior = sumSales(SALES, range.prevStart, range.prevEnd)
+    expect([range.prevStart, range.prevEnd]).toEqual(['2026-09-16', '2026-09-30'])
+    expect(prior.receipts).toBe(88)
+    expect(prior.gross).toBe(26_500)
+    // So the owner sees receipts down 14.8 % on the previous fortnight.
+    expect(pctDelta(75, 88)).toBeCloseTo(-14.7727, 4)
+  })
+
+  it('puts the same day-range figures in the KPI strip', () => {
+    const k = kpiStrip(SALES, range)
+    expect(k.receipts).toBe(75)
+    expect(k.receiptsDelta).toBeCloseTo(-14.7727, 4)
+  })
+
+  it('scopes dishes to the chosen days', () => {
+    const dishes = aggregateDishes(ITEMS, range)
+    expect(dishes.reduce((s, d) => s + d.units, 0)).toBe(162)
+    expect(dishes.reduce((s, d) => s + d.revenue, 0)).toBe(24_856)
+    expect(topDishes(dishes, 'units')[0].product_code).toBe('SALE-TOAST_CHICKEN_TAWOOK')
+    expect(topDishes(dishes, 'units')[0].units).toBe(21)
+  })
+
+  it('keeps the category shares summing to 100 over a custom range', () => {
+    const mix = categoryMix(aggregateDishes(ITEMS, range))
+    expect(mix.reduce((s, c) => s + c.pct, 0)).toBeCloseTo(100, 6)
+  })
+
+  it('draws the weekly bars over whole covering weeks — 101, as SQL says', () => {
+    // Days 2026-09-28 … 2026-10-16: 101 receipts / THB 33,767.
+    const series = weeklySeries(SALES, range)
+    expect(series).toHaveLength(3)
+    expect(series.reduce((s, p) => s + p.receipts, 0)).toBe(101)
+    expect(series.reduce((s, p) => s + p.gross, 0)).toBe(33_767)
+  })
+
+  it('ties the heatmap to the weekly bars, both on the covering weeks', () => {
+    const grid = heatGrid(HEAT, range)
+    const weekly = weeklySeries(SALES, range).reduce((s, p) => s + p.receipts, 0)
+    expect(grid.totalReceipts).toBe(101)
+    expect(grid.totalReceipts).toBe(weekly)
+  })
+
+  it('REGRESSION: the old week >= range.start filter must not come back', () => {
+    // That filter answered 74 receipts / THB 24,374 for this range — neither
+    // the day range (75 / 24,806) nor the covering weeks (101 / 33,767),
+    // because a Monday bucket before the chosen start was dropped outright.
+    const weekly = weeklySeries(SALES, range)
+    const receipts = weekly.reduce((s, p) => s + p.receipts, 0)
+    const gross = weekly.reduce((s, p) => s + p.gross, 0)
+    expect(receipts).not.toBe(74)
+    expect(gross).not.toBe(24_374)
+    expect(heatGrid(HEAT, range).totalReceipts).not.toBe(74)
+  })
+
+  it('announces that the week-grain panels are showing more than was asked', () => {
+    expect(range.snappedToWeeks).toBe(true)
+  })
+})
+
+describe('prod parity — presets are untouched by the picker', () => {
+  it('still reproduces September 2026 exactly', () => {
+    const sept = sumSales(SALES, SEPT_START, SEPT_END)
+    expect(sept.receipts).toBe(177)
+    expect(sept.gross).toBe(52_946)
+  })
+
+  it('still reproduces the 4-week preset exactly', () => {
+    const t = sumSales(SALES, periodRange(4, '2026-10-16').start, '2026-10-16')
+    expect(t.receipts).toBe(142)
+    expect(t.gross).toBe(46_026)
   })
 })

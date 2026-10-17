@@ -11,7 +11,13 @@ import {
   YAxis,
 } from 'recharts'
 import { formatTHB, formatTHBFull } from '../finance/helpers'
-import { CHART_COLORS, CHART_TOOLTIP_STYLE, type WeekPoint } from '../../lib/analytics'
+import {
+  CHART_COLORS,
+  CHART_TOOLTIP_STYLE,
+  weekSnapNote,
+  type PeriodRange,
+  type WeekPoint,
+} from '../../lib/analytics'
 
 /* ═══════════════════════════════════════════════════════════
    WeeklyRevenueChart — gross revenue per ISO week with refunds
@@ -23,6 +29,7 @@ import { CHART_COLORS, CHART_TOOLTIP_STYLE, type WeekPoint } from '../../lib/ana
 
 export interface WeeklyRevenueChartProps {
   data: WeekPoint[]
+  range: PeriodRange
   isLoading: boolean
   error: string | null
 }
@@ -33,8 +40,9 @@ const SERIES_LABEL: Record<string, string> = {
   takeawayShare: 'Takeaway share',
 }
 
-export function WeeklyRevenueChart({ data, isLoading, error }: WeeklyRevenueChartProps) {
+export function WeeklyRevenueChart({ data, range, isLoading, error }: WeeklyRevenueChartProps) {
   const hasSales = data.some((p) => p.gross > 0)
+  const snapNote = weekSnapNote(range)
 
   return (
     <div className="flex flex-col shk-panel">
@@ -43,6 +51,7 @@ export function WeeklyRevenueChart({ data, isLoading, error }: WeeklyRevenueChar
         <p className="text-xs text-cream/60">
           Gross per ISO week · refunds stacked on top · takeaway share as a line
         </p>
+        {snapNote && <p className="mt-1 text-[10px] leading-snug text-amber-watch">{snapNote}</p>}
       </div>
 
       <div className="flex-1 px-2 py-4">
