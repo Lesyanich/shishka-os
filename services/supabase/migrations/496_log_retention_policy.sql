@@ -23,6 +23,10 @@
 --     healthy. Registered, disabled, with the reason recorded.
 --   * task_comments and stock_movements were raised as candidates in the MC task. They are
 --     business records, not logs. Registered, disabled, so the question is closed in writing.
+--   * syrve_sync_log and syrve_sync_queue get NO retention. SYRVE was connected over its API as
+--     a test and rejected in favour of Loyverse (CEO, 2026-10-17); both tables have never held a
+--     row. Retention for a table that is being deleted is theatre, so they are registered with
+--     the reason and disabled, and the removal is its own task.
 --
 -- BATCHING, AND ITS HONEST LIMIT. Each DELETE takes at most batch_size rows (default 5,000)
 -- via a ctid sub-select, looping until a short batch or p_max_batches. That is what keeps a
@@ -184,13 +188,13 @@ VALUES
    'LightRAG per-query cost/latency, read by /admin/brain-cost. Same horizon as api_cost_log.'),
   ('public','access_audit_log','created_at',90,NULL,true,
    'Admin access audit trail. 90d: long enough to investigate, short enough not to accumulate.'),
-  ('public','syrve_sync_log','created_at',30,NULL,true,
-   'SYRVE sync attempts. Same class as loyverse_sync_log but left at 30d: the table is empty (the integration lives only in the syrve-poc edge function), so the horizon is theoretical until it actually writes. See MC c0ec41b0.'),
+  ('public','syrve_sync_log',NULL,NULL,NULL,false,
+   'SYRVE IS RETIRED. Connected over its API as a test and rejected in favour of Loyverse (CEO, 2026-10-17). 0 rows, never written. Nothing to retain — the table itself is going away with the rest of the syrve_* objects (MC 9afb9af2).'),
   -- queues: terminal rows only, live work is never touched
   ('public','loyverse_push_queue','requested_at',14,'status IN (''done'',''error'')',true,
    'Loyverse push queue. Only done/error rows are purged after 14d — pending/processing are live work the drain still owns.'),
-  ('public','syrve_sync_queue','created_at',14,'status IN (''done'',''error'')',true,
-   'SYRVE sync queue, terminal rows only, same rule as loyverse_push_queue.'),
+  ('public','syrve_sync_queue',NULL,NULL,NULL,false,
+   'SYRVE IS RETIRED (CEO, 2026-10-17, rejected in favour of Loyverse). 0 rows, never written. Going away with the rest of the syrve_* objects (MC 9afb9af2).'),
   -- registered but OFF, each for a stated reason
   ('public','chef_feedback_queue','created_at',NULL,NULL,false,
    'Queue, currently empty. OFF because its terminal status vocabulary is unverified — enable with a status_filter once a row exists to confirm it.'),
@@ -229,11 +233,11 @@ COMMENT ON TABLE public.brain_query_log IS
 COMMENT ON TABLE public.access_audit_log IS
   'Admin access audit trail. Owner: tech/security. retention: 90 days, cleaned by fn_log_retention';
 COMMENT ON TABLE public.syrve_sync_log IS
-  'SYRVE sync attempt log. Owner: integrations. retention: 30 days, cleaned by fn_log_retention';
+  'SYRVE sync attempt log. RETIRED: SYRVE was API-tested and rejected in favour of Loyverse (CEO 2026-10-17); this table has never held a row. Owner: nobody. retention: none (scheduled for removal), cleaned by nobody';
 COMMENT ON TABLE public.loyverse_push_queue IS
   'Outbound Loyverse push queue; drained by cron #9, rescued by watchdog #10. Owner: integrations. Breaks if disabled: menu/price edits never reach the till. retention: 14 days for done/error rows only, cleaned by fn_log_retention';
 COMMENT ON TABLE public.syrve_sync_queue IS
-  'Outbound SYRVE sync queue. Owner: integrations. retention: 14 days for done/error rows only, cleaned by fn_log_retention';
+  'Outbound SYRVE sync queue. RETIRED: SYRVE was API-tested and rejected in favour of Loyverse (CEO 2026-10-17); this table has never held a row. Owner: nobody. retention: none (scheduled for removal), cleaned by nobody';
 COMMENT ON TABLE public.purchase_logs IS
   'Purchase log entries — input to WAC/COGS. Owner: finance. retention: none (never purge), cleaned by nobody';
 COMMENT ON TABLE public.migration_log IS
@@ -271,7 +275,7 @@ VALUES (
   '496_log_retention_policy.sql',
   'claude-code',
   NULL,
-  'Log retention registry + fn_log_retention + nightly cron 03:10 UTC. 19 tables registered, 7 enabled; first run purges ~17.9k rows (MC 44278890; loyverse_sync_log at 14d per CEO 2026-10-17)'
+  'Log retention registry + fn_log_retention + nightly cron 03:10 UTC. 19 tables registered, 5 enabled; first run purges ~17.9k rows (MC 44278890; loyverse_sync_log at 14d, syrve_* retired, per CEO 2026-10-17)'
 )
 ON CONFLICT DO NOTHING;
 

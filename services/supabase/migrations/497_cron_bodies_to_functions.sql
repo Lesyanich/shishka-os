@@ -8,9 +8,12 @@
 -- 1.2 MB/day, which is the 148 MB of command text that accumulated over four months and
 -- filled the disk on 2026-10-16. Jobs #10, #1, #2 and #3 are the same shape, smaller.
 --
--- After this migration the five bodies are `SELECT public.fn_x(...)` — about 40 bytes each.
--- Projected: #9 goes from ~1.2 MB/day to ~58 kB/day, the five together from ~1.37 MB/day to
--- ~75 kB/day. That is the whole point of the change; the logic is unchanged.
+-- After this migration the five bodies are `SELECT public.fn_x(...)` — 37 to 42 bytes each.
+-- With job #9 also dropping to every 5 minutes (section 5), the arithmetic is exact rather
+-- than approximate: #9 288 runs x 38 B = 10.7 kB/day (it was ~1.2 MB/day), #10 288 x 41 =
+-- 11.5 kB, #1 96 x 42 = 3.9 kB, #2 48 x 40 = 1.9 kB, #3 1 x 37 = 37 B. The five together go
+-- from ~1.37 MB/day to 28.1 kB/day — a factor of 49. That is the whole point of the change;
+-- the logic is unchanged.
 --
 -- BEHAVIOUR IS PRESERVED, deliberately and exactly:
 --   * the drain still claims up to 5 pending rows with FOR UPDATE SKIP LOCKED, marks them
@@ -214,7 +217,7 @@ VALUES
    'Hourly.'),
   ('loyverse-push-drain','Drain loyverse_push_queue: send queued menu/price/modifier edits to the till.','integrations',
    'Menu, price and modifier edits never reach the till; the queue grows unbounded.',
-   'Every minute today. The queue takes 38 rows a month (max 13 in any one hour, 0.05/hour on average), so a minute buys nothing a 5-minute tick would not: see MC 2a0ad979, awaiting the CEO decision. Kept at 1 minute until then so this migration changes size, not timing.'),
+   '5 min (CEO decision 2026-10-17, was every minute). The queue takes 38 rows a month: max 13 in any one hour, 0.05/hour on average, against 1,440 runs a day. */5 is 288 runs a day and at most a 5-minute lag on a till push. Throughput is 60 rows/hour at p_batch = 5; for a bulk push raise the batch rather than the cadence — cron.alter_job(9, command => ''SELECT public.fn_loyverse_push_drain(20)'').'),
   ('loyverse-push-watchdog','Rescue loyverse_push_queue rows stuck in processing.','integrations',
    'A push that dies mid-flight stays processing forever and never retries.',
    '5 min, matched to the 5-minute stuck threshold it enforces.'),
@@ -236,12 +239,27 @@ ON CONFLICT (jobname) DO UPDATE
       interval_rationale = EXCLUDED.interval_rationale;
 
 -- ---------------------------------------------------------------------------
--- 5. Swap the bodies. Schedules are untouched on purpose.
+-- 5. Swap the bodies, and drop job #9 to every 5 minutes (CEO, 2026-10-17).
+--
+-- THE INTERVAL, measured rather than guessed. loyverse_push_queue took 38 rows in 30 days:
+-- max 13 in any single hour, 0.05 rows/hour on average, across 8 active hours. Job #9 was
+-- running 1,440 times a day for about 1.3 queued rows a day. At */5 it runs 288 times a day
+-- (-80%) and a till push waits at most 5 minutes instead of 1.
+--
+-- Throughput, so this is not a surprise later: p_batch is 5, so */5 drains up to 60 rows an
+-- hour against the 300/hour the old cadence allowed. That is still 4.6x the busiest hour ever
+-- recorded, but a genuine bulk push (retiring dozens of till items at once) would now take
+-- longer to clear. The knob for that is the batch size, which is a function parameter
+-- precisely because the body is a function now: cron.alter_job(9, command =>
+-- 'SELECT public.fn_loyverse_push_drain(20)') restores 240 rows/hour without touching cadence.
+--
+-- Job #10 is untouched: its 5-minute stuck threshold is about how long a push may stay in
+-- flight, not about how often the drain runs, so the two do not interact.
 -- ---------------------------------------------------------------------------
 SELECT cron.alter_job(1,  command => 'SELECT public.fn_loyverse_pull(''receipts'')');
 SELECT cron.alter_job(2,  command => 'SELECT public.fn_loyverse_pull(''shifts'')');
 SELECT cron.alter_job(3,  command => 'SELECT public.fn_loyverse_pull(''all'')');
-SELECT cron.alter_job(9,  command => 'SELECT public.fn_loyverse_push_drain()');
+SELECT cron.alter_job(9,  command => 'SELECT public.fn_loyverse_push_drain()', schedule => '*/5 * * * *');
 SELECT cron.alter_job(10, command => 'SELECT public.fn_loyverse_push_watchdog()');
 
 -- ---------------------------------------------------------------------------
@@ -263,7 +281,7 @@ VALUES (
   '497_cron_bodies_to_functions.sql',
   'claude-code',
   NULL,
-  'Cron jobs 1,2,3,9,10 bodies moved into fn_loyverse_pull/fn_loyverse_push_drain/fn_loyverse_push_watchdog; cron_job_catalog documents all 14 jobs. Command text per day: ~1.37 MB -> ~75 kB (MC 2a0ad979)'
+  'Cron jobs 1,2,3,9,10 bodies moved into fn_loyverse_pull/fn_loyverse_push_drain/fn_loyverse_push_watchdog; cron_job_catalog documents all 14 jobs; job #9 cadence 1 min -> 5 min per CEO. Command text per day: ~1.37 MB -> 28.1 kB (MC 2a0ad979)'
 )
 ON CONFLICT DO NOTHING;
 

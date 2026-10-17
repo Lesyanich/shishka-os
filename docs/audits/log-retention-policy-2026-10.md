@@ -27,9 +27,7 @@ copy of it.
 | `api_cost_log` | `ts` | 90d | receipt OCR + brain wrappers | `/admin/api-costs` | 354 | 268 |
 | `brain_query_log` | `ts` | 90d | lightrag-server wrapper | `/admin/brain-cost` | 5 | 5 |
 | `access_audit_log` | `created_at` | 90d | admin auth layer | security review | 0 | 0 |
-| `syrve_sync_log` | `created_at` | 30d | SYRVE sync (`syrve-poc` only) | incident triage | 0 | 0 |
 | `loyverse_push_queue` | `requested_at` | 14d, `status IN ('done','error')` | admin panel / chef MCP | cron #9 drain | 421 (400 done, 21 error) | 396 |
-| `syrve_sync_queue` | `created_at` | 14d, `status IN ('done','error')` | SYRVE sync | SYRVE drain | 0 | 0 |
 | `db_audit_snapshots` | `run_at` | 365d | `fn_db_audit_snapshot` (weekly) | `fn_db_audit_delta` | new in 498 | — |
 
 Only terminal rows are purged from the queues. `pending` and `processing` are live work and are
@@ -50,6 +48,8 @@ never touched, whatever their age — a stuck row is the watchdog's business, no
 | `task_comments` | Not a log — Mission Control discussion history. Raised as a candidate in the MC task; rejected here so the question stays closed. |
 | `stock_movements` | Not a log — the stock ledger. Same. |
 | `chef_feedback_queue` | Empty, and its terminal status vocabulary is unverified. Off until a real row confirms it. |
+| `syrve_sync_log` | **SYRVE is retired.** API-tested and rejected in favour of Loyverse (CEO, 2026-10-17). 0 rows, never written. Being removed — MC `9afb9af2`. |
+| `syrve_sync_queue` | Same. 0 rows, never written. |
 
 A log-shaped table **missing** from `log_retention_policy` is the bug the registry exists to
 catch: it means nobody decided. That is why the never-purge tables get rows too, with
@@ -66,8 +66,8 @@ production against code references in `apps/` and `services/`:
 | `api_cost_log` | 354 | 2026-10-10 | 6 call sites (`apiCostLog.ts`, `telegram-ai`, `receipt-batch-process`) |
 | `brain_query_log` | 5 | **2026-04-10** | LightRAG wrapper — silent six months |
 | `access_audit_log` | **0** | never | **nothing. Zero references in the codebase** |
-| `syrve_sync_log` | **0** | never | `syrve-poc` only |
-| `syrve_sync_queue` | **0** | never | no code |
+| `syrve_sync_log` | **0** | never | nothing — **SYRVE retired** |
+| `syrve_sync_queue` | **0** | never | nothing — **SYRVE retired** |
 | `chef_feedback_queue` | **0** | never | no code |
 
 **Two of the eight enabled rows are live.** `loyverse_sync_log` earns its keep for exactly one
@@ -79,6 +79,14 @@ The other five are empty or frozen, and for them retention is the wrong question
 is drop-or-finish. That is **MC `c0ec41b0`**, deliberately a separate task — dropping a table a
 planned feature expects is a product decision, not cleanup. Registering them here costs nothing
 and means the decision is written down instead of being rediscovered by the next audit.
+
+For two of them the answer arrived immediately. The CEO confirmed on 2026-10-17 that **SYRVE is
+gone** — it was connected over its API as a test and rejected in favour of Loyverse — so
+`syrve_sync_log` and `syrve_sync_queue` are not "frozen pending revival", they are dead. They
+get no retention at all, just a registry row stating why, and their removal along with the rest
+of the `syrve_*` surface is **MC `9afb9af2`**. That correction also reached the constitution,
+which had been naming SYRVE as the System of Record for Inventory, BOM and Sales — false, and
+read by every agent at session start.
 
 ## How the cleaner works
 

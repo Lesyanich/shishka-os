@@ -74,11 +74,44 @@ search_path, security_invoker) — untouched here.
 - [20:08] Answered the liveness question durably in the policy doc (§ Are these even logs we
           need?) so it is not rediscovered next audit — RULE-COMPOUND-ENGINEERING
 
+- [21:50] CEO: "#9 — 5 нормально если сам считаешь так". Set job #9 to */5 in 497 with the
+          measured justification in cron_job_catalog. Recomputed the post-change command-text
+          volume exactly instead of estimating: 28.1 kB/day across the five jobs (job #9 alone
+          10.7 kB/day, down from ~1.2 MB/day) — a factor of 49, not the ~18 I projected at the
+          1-minute cadence. Job #10 untouched: its 5-min stuck threshold is about how long a
+          push may stay in flight, not about drain cadence, so they do not interact. Noted the
+          one real trade-off in the migration: throughput falls 300 -> 60 rows/hour at
+          p_batch = 5, which is still 4.6x the busiest hour ever seen, and the knob for a bulk
+          push is the batch size (a parameter now, because the body is a function)
+- [21:55] CEO: "syrve больше нет — тестово по апи подключали и отказались в пользу лойверс."
+          This was bigger than the two empty tables. Inventory against prod: 5 tables
+          (syrve_config 6 rows, syrve_sales, syrve_sync_log, syrve_sync_queue, syrve_uom_map),
+          3 functions, 6 columns on LIVE tables (nomenclature x2, suppliers, equipment,
+          expense_ledger.syrve_doc_id + syrve_synced), 2 admin panels + a hook + Settings
+          wiring, and the syrve-poc edge function
+- [21:56] Checked syrve_config for credentials WITHOUT printing values: api_login,
+          organization_id, store_id, default_tax_category_id all EMPTY; only base_url and
+          vat_rate=7 set. No exposure, nothing to rotate
+- [21:58] **Corrected the constitution** — operational-rules.md § Systems of Record had SYRVE
+          as "System of Record (SoR) — Inventory, BOM, Sales" and Supabase as merely a System
+          of Engagement. False, and read by every agent at session start. Now Supabase is the
+          SSoT, Loyverse is the System of Record for the till, with an explicit "SYRVE is not
+          in use" note. Also fixed the SYRVE mentions in RULE-UUID-COMPLIANCE and
+          RULE-SOCRATIC-GATE. RULE-COMPOUND-ENGINEERING
+- [22:00] 496: both syrve journals now get NO retention — registry rows stating they are
+          retired, COMMENTs to match. Enabled rows 8 -> 6 of 19. Removal is MC 9afb9af2
+          (created with the full inventory; supersedes the SYRVE half of c0ec41b0)
+- [22:02] Caught myself citing a task id in the docs before the task existed — created it
+          first, then replaced the placeholder with the real 9afb9af2 in both the doc and 496
+- [22:04] Re-verified all four migrations on a clean PG14 fixture: all apply, 6 enabled of 19,
+          both syrve rows disabled with keep_days NULL, drain rationale carries the 5-min
+          decision
+
 ### Session Close: 2026-10-17 (open)
 **Worked on:** 44278890, 2a0ad979, 725371dd, 37f5dcaa
 **Status:** partial — all four built and verified offline, none applied to prod
-**Handoff:** DROP list approved; loyverse_sync_log set to 14d. Still open: job #9 interval
-(1 min → 5 min) — asked twice, unanswered, and it does not block the apply. Trigger set for
+**Handoff:** DROP list approved; loyverse_sync_log at 14d; job #9 at */5; SYRVE retired in
+the registry and the constitution (removal is MC 9afb9af2). Nothing is waiting on the CEO. Trigger set for
 23:07 Phuket to apply 496→499 in order, run `fn_log_retention` and `scripts/db-audit.sh`
 manually, create the Monday 02:00 UTC scheduled task; then verify after 24h that
 `cron.job_run_details` grew < 1 MB. CronCreate is session-only — if the session closes before
