@@ -90,6 +90,10 @@ token.json
 # migration it justifies. Added 2026-10-17 (MC f133850a): `git add docs/audits/`
 # silently dropped the RPC-grant dumps against the blanket *.csv rule above.
 !docs/audits/*.csv
+# ...and one level down, for an audit that gets its own dated folder (MC 9afb9af2:
+# the exception above only covered the top level, so docs/audits/<audit>/*.csv was
+# still silently dropped).
+!docs/audits/**/*.csv
 
 # Non-code folders (Google Drive content, not source code)
 01_Business/

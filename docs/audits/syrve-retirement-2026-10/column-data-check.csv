@@ -1,0 +1,7 @@
+table,column,data_type,total_rows,non_null,distinct_non_default_values,verdict
+nomenclature,syrve_uuid,uuid,1390,0,0,empty
+nomenclature,syrve_tax_category_id,uuid,1390,0,0,empty
+suppliers,syrve_uuid,uuid,106,0,0,empty
+equipment,syrve_uuid,uuid,81,0,0,empty
+expense_ledger,syrve_doc_id,text,602,0,0,empty
+expense_ledger,syrve_synced,boolean,602,602,0,all-false (column DEFAULT false; zero rows TRUE)
