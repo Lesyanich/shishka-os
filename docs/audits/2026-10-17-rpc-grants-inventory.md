@@ -1024,3 +1024,69 @@ The tracker itself (`shifts` 206, `staff_attendance` 349, `shift_clock_events` 1
 new writes since 31 July but is still read from the browser — and **`shifts` is load-bearing
 for payroll** (`fn_calculate_payroll` reads it; 8 periods and 25 payroll lines exist). That
 is why 508 removed only `anon` there and kept `authenticated` behind an explicit policy.
+
+---
+
+# Step 9 — two more staff-id surfaces, and a better fix shape
+
+**MC** `ef80ceed` · **migration** 516 · 2026-10-17
+
+## 9.1 Both vestigial, and again the creating migration said so
+
+`staff_task_assignees.staff_id` (`sta_read`, `{anon,authenticated}`) and
+`staff_schedule_templates.staff_id` (`tmpl_read`, `{public}`) both handed real employee
+UUIDs to the publishable key while `staff` itself stayed closed.
+
+Migration 244h, on the templates table, is explicit:
+
+```sql
+-- RLS mirrors the HR/shifts convention: anon read, authenticated write.
+```
+
+That "convention" is the one migration 069 invented for an open `/kitchen` dashboard — the
+same dead rationale § 7 retired. **The anon read was copied from a pattern that had already
+stopped being true.** 244h's own header names the real consumer: "Powers the /hr/schedule
+'Generate Month' action and the /hr/attendance baseline" — both **owner-tier** pages.
+Migration 317 gives no reason for anon at all; it lists consumers as "admin filters,
+telegram-push, displays", none anonymous.
+
+Worth generalising: **a vestigial policy propagates by imitation.** Once one table had
+"anon read, authenticated write", later migrations copied the phrase. Finding one dead
+policy is a reason to grep for its wording, not just its siblings.
+
+## 9.2 The consumer check that mattered
+
+`staff_task_assignees` has **no app code** reading it — only the `telegram-push` and
+`telegram-webhook` edge functions, and the staff bot is live and used daily. It is safe
+because both import `db` from `_shared/supabase.ts`, which builds the client with
+`SUPABASE_SERVICE_ROLE_KEY`; **service_role bypasses RLS and the table ACL entirely.**
+Verified by reading that module rather than assuming the usual Supabase convention.
+
+## 9.3 `ALTER POLICY … TO authenticated` — better than 508's drop-and-recreate
+
+508 dropped the `{public}` policy and created a replacement, because dropping it outright
+would have left `authenticated` leaning on a sibling whose qual is
+`auth.role() = 'authenticated'` — unverifiable from a migration without a JWT.
+
+`ALTER POLICY … TO authenticated` does it in one statement: it narrows the role list and
+**leaves `qual = true` untouched**, so `authenticated` reads unconditionally before and
+after, with no uncovered window and no dependency on `auth.role()` resolving.
+
+**Prefer `ALTER POLICY … TO <role>` when only the roles are wrong.** Drop-and-recreate is
+for when the predicate itself has to change.
+
+## 9.4 Verification, and the count
+
+| check | before | after |
+|---|---|---|
+| `GET /staff_task_assignees` | 200, rows | `401 / 42501` |
+| `GET /staff_schedule_templates` | 200, rows | `401 / 42501` |
+| both policies | `{anon,authenticated}` / `{public}` | **`{authenticated}`, `qual = true` intact** |
+| `authenticated` ACL on both | yes | **yes** |
+| live-site surface | 200 | 200 |
+
+**Staff-id harvest surfaces: 3 → 1.** Re-measured across every table with a staff FK:
+`staff`, `shifts`, `production_tasks`, `staff_task_assignees`, `staff_schedule_templates`
+are all closed. The one left is **`staff_tasks.assigned_to`** — and unlike the others it is
+genuinely live (3757 rows, written today, the Telegram staff tracker), so it needs its
+consumers exercised rather than a policy edit.
