@@ -56,13 +56,13 @@ export function KitchenRecipesPage() {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev)
-        const st = prev.get('station') === 'l2-assembler' ? 'l2-assembler' : 'l1-cook'
         next.set('type', item.kind)
         const cat = item.section_id ?? item.category_id
         if (cat) next.set('cat', cat); else next.delete('cat')
         next.delete('subcat')
-        if (st === 'l1-cook') next.delete('available')
-        else next.set('available', 'all')
+        // Both stations default to Active-only, so a deep link must widen
+        // availability explicitly or a deactivated dish would not show up.
+        next.set('available', 'all')
         return next
       },
       { replace: true },
