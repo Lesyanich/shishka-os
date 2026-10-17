@@ -365,9 +365,13 @@ one by looking.
 ### Not closed here
 
 * **`check_migrations()` (the MCP tool) is broken for an unrelated reason** — it
-  resolves the migrations directory to `/services/supabase/migrations`, an
-  absolute path, and fails `ENOENT` before reading anything. Its repo-root env
-  var is unset in the launcher. Logged separately; 487 does not touch it.
+  resolves the migrations directory as `resolve(process.cwd(), "services/supabase/
+  migrations")` (`src/tools/check-migrations.ts`), and the running server's cwd is
+  `/`, so it fails `ENOENT` on `/services/supabase/migrations` before reading
+  anything. The fix is to set `MIGRATIONS_DIR` — the override the code already
+  honours — or launch with the repo root as cwd. Logged separately; 487 does not
+  touch it, and until it is fixed the drop from 145 phantom rows to 132 has to be
+  read out of `migration_log` directly.
 * **132 log rows still name no file**, down from 145. Beyond the 44 collision
   groups above these are single (non-duplicate) rows from the same two causes —
   mostly the uncommitted 2026-04 and 2026-06 manual batches and the unmerged
