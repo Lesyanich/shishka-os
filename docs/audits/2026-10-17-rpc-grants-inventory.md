@@ -932,3 +932,95 @@ it now fails, then applied. From outside with the publishable key:
 | `authenticated` SELECT on all three | yes | **yes**, via explicit `_read_auth` |
 | staff UUID harvestable anywhere | yes (`shifts`, 206 rows) | **yes — 4 smaller surfaces** (§ 7.4) |
 | live-site surface, all 7 objects | 200 | 200, unchanged |
+
+---
+
+# Step 8 — `kds_anon_read`: the KDS is dead, so the policy went with it
+
+**MC** `ef80ceed` · **migration** 512 · 2026-10-17
+
+## 8.1 Measured, after the CEO asked "is anyone even using the KDS?"
+
+| | |
+|---|---|
+| `production_tasks` | 82 rows, last created **2026-04-13**, last updated **2026-04-14** |
+| by status | 40 blocked · 39 pending · 3 in_progress · **0 completed, ever** |
+| `production_task_outputs` | 0 rows |
+| `production_log` | 0 rows |
+| `haccp_logs` / `waste_entries` | 0 rows (its sinks, closed in 506) |
+| `/rest/v1/production_tasks` in 24 h of edge_logs | only this session's own `curl` probes |
+
+Not one task ever finished, three stuck `in_progress` since April, every downstream table
+empty. A pilot abandoned mid-use six months ago.
+
+**Checking the user-agent mattered.** The first log query showed 6 requests to
+`production_tasks` in 24 h, which looks like a live consumer. Every one was `curl/8.7.1` —
+this session's own probing. Filter your own traffic out before concluding a surface is in
+use.
+
+## 8.2 Not the same fix shape as 508 — `roles` decides that
+
+508 had to create a replacement `<t>_read_auth` because `shifts_read_anon` was
+`roles = {public}`: dropping it would have taken `authenticated` with it.
+
+`kds_anon_read` is `roles = {anon}`. It never served `authenticated`, so no replacement was
+needed, and adding one would have **widened** `authenticated` from "own tasks or owner"
+(`production_tasks_read_assigned`, `production_tasks_read_owner`) to everything. Copying the
+previous migration's form mechanically would have been a privilege increase disguised as a
+lockdown. **Read `roles` before reusing a fix.**
+
+`authenticated` keeps three independent SELECT policies here and is unaffected.
+
+## 8.3 Noted, not bundled
+
+Two more vestigial policies on the same table:
+
+```
+"Authenticated users can view all tasks"   SELECT roles={public}
+    qual: current_setting('app.tg_user_id', true) IS NOT NULL
+"Cooks can update own or unclaimed tasks"  UPDATE roles={public}   (same setting)
+```
+
+Nothing in either repo sets `app.tg_user_id` — the only mention is a comment in migration
+273. Being `roles = {public}` they would admit anon if it were ever set; anon cannot set it
+(no function grants since 490) and is now blocked at the ACL regardless. Left in place and
+filed, because the scope asked for was `kds_anon_read`.
+
+## 8.4 Verification, and the leak count
+
+| check | before | after |
+|---|---|---|
+| `GET /production_tasks` as anon | 200, 82 rows | `401 / 42501` |
+| `authenticated` SELECT | yes, 3 policies | **unchanged** |
+| live-site surface | 200 | 200 |
+
+**Staff-id harvest surfaces: 4 → 3.** Still open, and still the KDS/TWA cluster:
+
+```
+staff_task_assignees.staff_id   staff_schedule_templates.staff_id   staff_tasks.assigned_to
+```
+
+`staff_tasks` is the live one — 3757 rows, written today, the Telegram staff tracker — so
+it needs the consumer check, not a sweep. The other two are small and look as dormant as
+`shifts` did.
+
+## 8.5 The shift tracker is NOT coupled to the KDS — checked before touching anything
+
+Asked directly, and worth recording because the names invite confusion. Only two FKs join
+the clusters:
+
+| link | direction | reality |
+|---|---|---|
+| `shift_tasks.production_task_id` → `production_tasks` | tracker → KDS | **table is empty** |
+| `production_tasks.schedule_run_id` → `schedule_runs` | KDS → scheduler | KDS points out, not in |
+
+Three similarly named things, only one of them alive:
+
+- **`staff_tasks`** — 3757 rows, written **today**. Staff tasks + Telegram bot. Alive.
+- **`shift_tasks`** — 0 rows. The tracker↔KDS bridge, never used.
+- **`production_tasks`** — KDS. Dead since April.
+
+The tracker itself (`shifts` 206, `staff_attendance` 349, `shift_clock_events` 11) has no
+new writes since 31 July but is still read from the browser — and **`shifts` is load-bearing
+for payroll** (`fn_calculate_payroll` reads it; 8 periods and 25 payroll lines exist). That
+is why 508 removed only `anon` there and kept `authenticated` behind an explicit policy.
