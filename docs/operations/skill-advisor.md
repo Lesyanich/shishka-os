@@ -44,6 +44,9 @@ to narrow — keyword edits stay human-confirmed.
 ### Procurement / sourcing
 - **`/procurement`** — research equipment & suppliers, price comparison, sourcing recommendations.
 
+### Analytics / numbers / "how much did we"
+- **`/analytics`** — reads the `v_analytics_*` layer and answers business questions, builds new analytics surfaces, and hunts insights on a schedule. _e.g. "сколько потратили на продукты за октябрь", "почему вырос food cost"._ Always states what the data can be trusted for **before** quoting a number — see RULE-DATA-TRUST-GATE in `agents/analytics/AGENT.md`. Not for entering receipts (that is `/finance`) or changing recipes (`/chef`).
+
 ### Legal / visas / contracts (Thailand)
 - **`/lawyer`** (`/saul`) — work permits, visas, FDA licensing, leases, labour, tax (VAT/PND), supplier contracts, PDPA, compliance calendar.
 
@@ -124,6 +127,7 @@ specific. The header and separator rows are skipped by the parser.
 | рецепт,блюдо,себестоимост,калькуляц,кбжу,нутри,recipe,dish,nutrition,food cost,menu cost | `/chef` | recipes, BOM, cost & nutrition |
 | распознай накладную,parse invoice,supplier bill,parse the pdf invoice | `shishka-invoice-parser` | parse supplier invoice → BOM/purchase logs |
 | поставщик,закупк,оборудован,купить,sourcing,supplier,procurement,price comparison,equipment | `/procurement` | sourcing & price comparison |
+| сколько продали,сколько потратили,аналитик,выручк,прибыл,food cost,динамик,отчёт за,инсайт,dashboard,analytics,how much did we,revenue,profit,margin,trend,insight | `/analytics` | read the numbers, state what they can be trusted for |
 | виза,work permit,fda,лиценз,контракт,аренд,налог,vat,pnd,юрист,закон,штраф,visa,contract,legal,immigration | `/lawyer` | Thai legal, visas, contracts, tax |
 | миграц,migration,row-level security,execute_sql,supabase sql,db schema,схему бд | `mcp supabase` | DB migrations & SQL (apply_migration) |
 | сделай ревью,проведи ревью,ревью кода,code review,review the diff,review changes,баги в коде | `/code-review` | review diff for correctness bugs |
