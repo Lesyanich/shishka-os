@@ -85,17 +85,6 @@ token.json
 *.csv
 *.mp4
 
-# Audit artifacts are evidence, not data dumps — a before/after state table is the
-# whole point of a security or data audit and has to survive in git next to the
-# migration it justifies. Added 2026-10-17 (MC f133850a): `git add docs/audits/`
-# silently dropped the RPC-grant dumps against the blanket *.csv rule above.
-!docs/audits/*.csv
-# ...and one level down, for an audit that gets its own dated folder. The rule above only
-# covers the top level, so docs/audits/<audit>/*.csv was still silently dropped — which is
-# how the pre-DROP dumps for MC 725371dd nearly went missing. With no managed backups
-# (MC 4405c6e9) that dump is the only undo a DROP migration has.
-!docs/audits/**/*.csv
-
 # Non-code folders (Google Drive content, not source code)
 01_Business/
 01_Source_Data/
