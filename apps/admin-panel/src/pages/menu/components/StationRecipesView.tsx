@@ -9,6 +9,27 @@ import type { useMenuListEnrichment } from '../../../hooks/useMenuListEnrichment
 const TYPE_FILTERS: readonly TypeFilterValue[] = ['all', 'SALE', 'PF', 'MOD']
 
 /**
+ * `?available=` → the station availability tri-state (true = Active,
+ * false = Inactive, null = All).
+ *
+ * Absent or unknown means Active-only on BOTH stations — a cook opening
+ * /kitchen/recipes should see what is actually in production, not the retired
+ * rows we keep for history. 'all' is the explicit opt-in (and the only value
+ * that widens the list); 'yes' is still accepted so older links keep working.
+ */
+export function parseStationAvailable(param: string | null): boolean | null {
+  if (param === 'all') return null
+  if (param === 'no') return false
+  return true
+}
+
+/** Inverse of {@link parseStationAvailable}; the default needs no param. */
+export function serializeStationAvailable(v: boolean | null): string | null {
+  if (v === null) return 'all'
+  return v ? null : 'no'
+}
+
+/**
  * Self-contained L1 Cook / L2 Assembler station experience. OWNS all station
  * filter state (type, search, availability, category, subcategory) via a
  * single `useSearchParams()` and renders {@link RecipeStationPanel}.
@@ -102,31 +123,13 @@ export function StationRecipesView({
     [setSearchParams],
   )
 
-  // availability (?available=) — STATION-CONDITIONAL. L1 absent → All (null).
-  // L2 absent → Active-only (true), so deactivated dishes stay hidden unless
-  // explicitly requested.
-  const availableParam = searchParams.get('available')
-  const availableFilter: boolean | null =
-    station === 'l1-cook'
-      ? availableParam === 'yes'
-        ? true
-        : availableParam === 'no'
-          ? false
-          : null
-      : availableParam === 'all'
-        ? null
-        : availableParam === 'no'
-          ? false
-          : availableParam === 'yes'
-            ? true
-            : true
+  // availability (?available=) — same rule on BOTH stations and on the owner
+  // /menu: absent → Active-only, so retired/deactivated items stay out of the
+  // way until asked for with ?available=all.
+  const availableFilter = parseStationAvailable(searchParams.get('available'))
   const onAvailableFilter = useCallback(
-    (v: boolean | null) =>
-      updateParam({
-        available:
-          v === true ? 'yes' : v === false ? 'no' : station === 'l1-cook' ? null : 'all',
-      }),
-    [updateParam, station],
+    (v: boolean | null) => updateParam({ available: serializeStationAvailable(v) }),
+    [updateParam],
   )
 
   // category (?cat=) — first id only; compatible with useMenuFilters' multi-cat serialization.
