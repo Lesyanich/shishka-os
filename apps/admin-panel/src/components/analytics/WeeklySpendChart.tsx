@@ -8,7 +8,12 @@ import {
   YAxis,
 } from 'recharts'
 import { CATEGORY_COLORS, formatTHB, formatTHBFull } from '../finance/helpers'
-import { CHART_COLORS, CHART_TOOLTIP_STYLE } from '../../lib/analytics'
+import {
+  CHART_COLORS,
+  CHART_TOOLTIP_STYLE,
+  weekSnapNote,
+  type PeriodRange,
+} from '../../lib/analytics'
 import { OTHER_SUPPLIER_NAME, type WeeklySpend } from '../../lib/analyticsPurchases'
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -24,6 +29,7 @@ import { OTHER_SUPPLIER_NAME, type WeeklySpend } from '../../lib/analyticsPurcha
 
 export interface WeeklySpendChartProps {
   spend: WeeklySpend
+  range: PeriodRange
   isLoading: boolean
   error: string | null
 }
@@ -34,8 +40,9 @@ function supplierColor(spend: WeeklySpend, supplier: string): string {
   return CATEGORY_COLORS[(i < 0 ? 0 : i) % CATEGORY_COLORS.length]
 }
 
-export function WeeklySpendChart({ spend, isLoading, error }: WeeklySpendChartProps) {
+export function WeeklySpendChart({ spend, range, isLoading, error }: WeeklySpendChartProps) {
   const hasSpend = spend.grandTotal > 0
+  const snapNote = weekSnapNote(range)
 
   return (
     <div className="flex flex-col shk-panel">
@@ -44,6 +51,7 @@ export function WeeklySpendChart({ spend, isLoading, error }: WeeklySpendChartPr
         <p className="text-xs text-cream/60">
           By supplier · hatched = auto-created stub lines, money we cannot attribute to a recipe
         </p>
+        {snapNote && <p className="mt-1 text-[10px] leading-snug text-amber-watch">{snapNote}</p>}
       </div>
 
       <div className="flex-1 px-2 py-4">

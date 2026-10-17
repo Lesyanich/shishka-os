@@ -9,7 +9,12 @@ import {
   YAxis,
 } from 'recharts'
 import { Info } from 'lucide-react'
-import { CHART_COLORS, CHART_TOOLTIP_STYLE } from '../../lib/analytics'
+import {
+  CHART_COLORS,
+  CHART_TOOLTIP_STYLE,
+  weekSnapNote,
+  type PeriodRange,
+} from '../../lib/analytics'
 import {
   FOOD_COST_BAND,
   RATIO_ROLLING_WEEKS,
@@ -29,6 +34,7 @@ import {
 
 export interface PurchaseRatioChartProps {
   data: RatioWeekPoint[]
+  range: PeriodRange
   isLoading: boolean
   error: string | null
 }
@@ -38,8 +44,9 @@ const SERIES_LABEL: Record<string, string> = {
   rollingPct: `${RATIO_ROLLING_WEEKS}-week mean`,
 }
 
-export function PurchaseRatioChart({ data, isLoading, error }: PurchaseRatioChartProps) {
+export function PurchaseRatioChart({ data, range, isLoading, error }: PurchaseRatioChartProps) {
   const hasData = data.some((p) => p.pctAll !== null)
+  const snapNote = weekSnapNote(range)
   const latestMean = [...data].reverse().find((p) => p.rollingPct !== null)?.rollingPct ?? null
   const inBand =
     latestMean !== null && latestMean >= FOOD_COST_BAND.low && latestMean <= FOOD_COST_BAND.high
@@ -53,6 +60,7 @@ export function PurchaseRatioChart({ data, isLoading, error }: PurchaseRatioChar
             ? `Crude actual food cost · target band ${FOOD_COST_BAND.low}–${FOOD_COST_BAND.high}%`
             : `${RATIO_ROLLING_WEEKS}-week mean ${latestMean.toFixed(1)}% · target band ${FOOD_COST_BAND.low}–${FOOD_COST_BAND.high}% · ${inBand ? 'inside the band' : 'outside the band'}`}
         </p>
+        {snapNote && <p className="mt-1 text-[10px] leading-snug text-amber-watch">{snapNote}</p>}
       </div>
 
       <div className="flex-1 px-2 py-4">

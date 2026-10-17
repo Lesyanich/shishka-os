@@ -137,6 +137,46 @@ describe('SalesPulseTab — rendered figures match prod SQL', () => {
     expect(screen.getByText(/Thin evidence: 2.8 receipts per active hour/)).toBeInTheDocument()
   })
 
+  it('honours a custom from–to range on the day-grain figures', async () => {
+    renderTab()
+    await waitFor(() => expect(screen.getByText('Trading days')).toBeInTheDocument())
+
+    const from = screen.getByLabelText('From date')
+    const to = screen.getByLabelText('To date')
+    await userEvent.clear(from)
+    await userEvent.type(from, '2026-10-01')
+    await userEvent.clear(to)
+    await userEvent.type(to, '2026-10-15')
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    // SQL for 1–15 Oct: 75 receipts, THB 24,806.
+    await waitFor(() => expect(screen.getByText('Receipts · 1 – 15 Oct')).toBeInTheDocument())
+    const card = screen
+      .getAllByText('Receipts · 1 – 15 Oct')
+      .map((el) => el.closest('.shk-kpi'))
+      .find((el): el is HTMLElement => el !== null)!
+    expect(within(card).getByText('75')).toBeInTheDocument()
+    expect(screen.getByText('฿24,806')).toBeInTheDocument()
+  })
+
+  it('discloses that the week-grain panels widened to whole weeks', async () => {
+    renderTab()
+    await waitFor(() => expect(screen.getByText('Trading days')).toBeInTheDocument())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Month to date' }))
+
+    // 1–16 Oct starts mid-week, so the bars and heatmap cover 28 Sep – 18 Oct.
+    await waitFor(() =>
+      expect(screen.getAllByText(/showing whole ISO weeks/).length).toBeGreaterThanOrEqual(2),
+    )
+  })
+
+  it('says nothing about snapping while a preset is active', async () => {
+    renderTab()
+    await waitFor(() => expect(screen.getByText('Trading days')).toBeInTheDocument())
+    expect(screen.queryByText(/showing whole ISO weeks/)).not.toBeInTheDocument()
+  })
+
   it('shows the category mix with wraps leading', async () => {
     renderTab()
     await waitFor(() => expect(screen.getByText('Category mix')).toBeInTheDocument())

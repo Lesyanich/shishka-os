@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
+  SALES_WINDOW_START,
   addDays,
   aggregateDishes,
+  coveringWeekStarts,
+  customRange,
+  rangeLabel,
+  validateRange,
+  weekSnapNote,
   bangkokToday,
   categoryMix,
   daysInclusive,
@@ -430,5 +436,165 @@ describe('heatGrid', () => {
     expect(grid.avgPerLiveCell).toBe(0)
     expect(grid.isSparse).toBe(false)
     expect(grid.hours).toEqual([])
+  })
+})
+
+/* ─── Custom from–to ranges (CEO request 2026-10-17) ─── */
+
+describe('coveringWeekStarts', () => {
+  it('returns every ISO week the day window touches', () => {
+    // 1 Oct is a Thursday, so its week started 28 Sep.
+    expect(coveringWeekStarts('2026-10-01', '2026-10-15')).toEqual([
+      '2026-09-28',
+      '2026-10-05',
+      '2026-10-12',
+    ])
+  })
+
+  it('returns a single week for a range inside one week', () => {
+    expect(coveringWeekStarts('2026-10-13', '2026-10-15')).toEqual(['2026-10-12'])
+  })
+
+  it('handles a single day', () => {
+    expect(coveringWeekStarts('2026-10-15', '2026-10-15')).toEqual(['2026-10-12'])
+  })
+})
+
+describe('customRange', () => {
+  const r = customRange('2026-10-01', '2026-10-15', '2026-10-16')
+
+  it('keeps the chosen days exactly', () => {
+    expect(r.mode).toBe('custom')
+    expect(r.weeks).toBeNull()
+    expect(r.start).toBe('2026-10-01')
+    expect(r.end).toBe('2026-10-15')
+  })
+
+  it('compares against the immediately preceding window of equal length', () => {
+    // 15 days, so 16–30 September.
+    expect(daysInclusive(r.start, r.end)).toBe(15)
+    expect(r.prevStart).toBe('2026-09-16')
+    expect(r.prevEnd).toBe('2026-09-30')
+    expect(daysInclusive(r.prevStart, r.prevEnd)).toBe(15)
+  })
+
+  it('carries the covering whole weeks for week-grain sources', () => {
+    expect(r.weekStarts).toEqual(['2026-09-28', '2026-10-05', '2026-10-12'])
+    expect(r.weekStart).toBe('2026-09-28')
+    expect(r.weekEnd).toBe('2026-10-12')
+  })
+
+  it('declares that the week window is wider than the days picked', () => {
+    expect(r.snappedToWeeks).toBe(true)
+  })
+
+  it('does not claim a snap when the range already is whole weeks', () => {
+    // Monday 28 Sep to Sunday 18 Oct is exactly three ISO weeks.
+    const aligned = customRange('2026-09-28', '2026-10-18', '2026-10-20')
+    expect(aligned.snappedToWeeks).toBe(false)
+  })
+
+  it('tolerates the dates arriving the wrong way round', () => {
+    const flipped = customRange('2026-10-15', '2026-10-01', '2026-10-16')
+    expect([flipped.start, flipped.end]).toEqual(['2026-10-01', '2026-10-15'])
+  })
+
+  it('labels itself for the UI', () => {
+    expect(r.label).toBe('1 – 15 Oct')
+    expect(customRange('2026-09-28', '2026-10-15', '2026-10-16').label).toBe('28 Sep – 15 Oct')
+  })
+})
+
+describe('presets stay unsnapped', () => {
+  it('never asks a week-grain panel to apologise for a preset', () => {
+    // A preset runs Monday → today, and its bars already mean that.
+    for (const w of [4, 8, 13] as const) {
+      expect(periodRange(w, '2026-10-16').snappedToWeeks).toBe(false)
+      expect(periodRange(w, '2026-10-16').label).toBe(`${w}w`)
+    }
+  })
+})
+
+describe('rangeLabel', () => {
+  it('names the month once when both dates share it', () => {
+    expect(rangeLabel('2026-10-01', '2026-10-15')).toBe('1 – 15 Oct')
+  })
+
+  it('names both months when they differ', () => {
+    expect(rangeLabel('2026-09-28', '2026-10-15')).toBe('28 Sep – 15 Oct')
+  })
+})
+
+describe('validateRange', () => {
+  it('accepts a sane range', () => {
+    expect(validateRange('2026-10-01', '2026-10-15', '2026-10-16')).toBeNull()
+  })
+
+  it('rejects a start after the end', () => {
+    expect(validateRange('2026-10-15', '2026-10-01', '2026-10-16')?.field).toBe('from')
+  })
+
+  it('rejects the future', () => {
+    expect(validateRange('2026-10-01', '2026-12-01', '2026-10-16')?.field).toBe('to')
+  })
+
+  it('explains a window before any sales existed instead of drawing an empty tab', () => {
+    const problem = validateRange('2026-01-01', '2026-02-01', '2026-10-16')
+    expect(problem?.field).toBe('to')
+    expect(problem?.message).toContain(SALES_WINDOW_START)
+  })
+
+  it('asks for the missing field', () => {
+    expect(validateRange('', '2026-10-15', '2026-10-16')?.field).toBe('from')
+    expect(validateRange('2026-10-01', '', '2026-10-16')?.field).toBe('to')
+  })
+})
+
+describe('weekSnapNote', () => {
+  it('says nothing for a preset', () => {
+    expect(weekSnapNote(periodRange(8, '2026-10-16'))).toBeNull()
+  })
+
+  it('names the wider week window for a custom range', () => {
+    const note = weekSnapNote(customRange('2026-10-01', '2026-10-15', '2026-10-16'))
+    expect(note).toContain('whole ISO weeks')
+    expect(note).toContain('28 Sep')
+    expect(note).toContain('18 Oct')
+    expect(note).toContain('1 – 15 Oct')
+  })
+})
+
+describe('week-grain widgets under a custom range', () => {
+  const range = customRange('2026-10-01', '2026-10-15', '2026-10-16')
+
+  it('gives weeklySeries one bar per covering week, never a part-week', () => {
+    const series = weeklySeries(
+      [
+        // 28 Sep is inside the covering week but BEFORE the chosen days.
+        sales('2026-09-28', { receipts: 5, gross_revenue: 500 }),
+        // 6 Oct falls in the next covering week.
+        sales('2026-10-06', { receipts: 7, gross_revenue: 700 }),
+      ],
+      range,
+    )
+    expect(series.map((p) => p.week)).toEqual(['2026-09-28', '2026-10-05', '2026-10-12'])
+    // The covering week's bar is whole: dropping 28 Sep would draw a part-week
+    // as though it were a full one, which is the failure this guards.
+    expect(series[0].receipts).toBe(5)
+    expect(series[1].receipts).toBe(7)
+    expect(series.reduce((s, p) => s + p.receipts, 0)).toBe(12)
+  })
+
+  it('keeps heatGrid on the covering weeks, not the chosen days', () => {
+    const grid = heatGrid(
+      [
+        heat('2026-09-28', { receipts: 4 }),
+        heat('2026-10-12', { iso_dow: 2, receipts: 3 }),
+        heat('2026-09-21', { receipts: 99 }), // outside the covering weeks
+      ],
+      range,
+    )
+    // A day-window filter would have dropped the 2026-09-28 bucket entirely.
+    expect(grid.totalReceipts).toBe(7)
   })
 })

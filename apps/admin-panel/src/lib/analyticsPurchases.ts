@@ -114,8 +114,14 @@ export interface FoodCostWeekRow {
   gap_thb: number | null
 }
 
+/**
+ * These rows are bucketed by ISO week, so they are filtered against the WEEK
+ * window. Against the chosen days, a custom range starting mid-week would drop
+ * its own covering week and let later weeks in — neither the day answer nor
+ * the week answer.
+ */
 function inRange(week: string, range: PeriodRange): boolean {
-  return week >= range.start && week <= range.end
+  return week >= range.weekStart && week <= range.weekEnd
 }
 
 /**
@@ -130,8 +136,11 @@ function inRange(week: string, range: PeriodRange): boolean {
  * weeks in, whole weeks compared.
  */
 export function previousWeekWindow(range: PeriodRange): { start: string; end: string } {
-  const start = addWeeks(range.weekStarts[0], -range.weeks)
-  const end = addWeeks(range.weekStarts[0], -1)
+  // Length comes from the covering weeks, not `range.weeks`, so a custom
+  // from–to range compares against as many whole weeks as it spans.
+  const span = range.weekStarts.length
+  const start = addWeeks(range.weekStart, -span)
+  const end = addWeeks(range.weekStart, -1)
   return { start, end }
 }
 
@@ -233,7 +242,7 @@ function sumBySupplier(rows: PurchaseWeekRow[], from: string, to: string) {
  */
 export function supplierTable(rows: PurchaseWeekRow[], range: PeriodRange): SupplierTotal[] {
   const prev = previousWeekWindow(range)
-  const current = sumBySupplier(rows, range.start, range.end)
+  const current = sumBySupplier(rows, range.weekStart, range.weekEnd)
   const previous = sumBySupplier(rows, prev.start, prev.end)
   const total = Array.from(current.values()).reduce((s, e) => s + e.thb, 0)
 

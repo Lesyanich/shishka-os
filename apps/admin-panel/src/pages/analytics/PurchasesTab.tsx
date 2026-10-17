@@ -34,7 +34,7 @@ import {
    ═══════════════════════════════════════════════════════════════════ */
 
 export function PurchasesTab() {
-  const { range, weeks } = useAnalyticsPeriod()
+  const { range } = useAnalyticsPeriod()
   const { purchases, coverage, priceWatch, abcItems, foodCost, isLoading, error, refetch } =
     useAnalyticsPurchases(range)
 
@@ -74,7 +74,7 @@ export function PurchasesTab() {
           what the owner watches, so it keeps the Finance default polarity. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          label={`Purchased · ${weeks}w`}
+          label={`Purchased · ${range.label}`}
           value={`฿${formatTHBFull(totals.thbTotal)}`}
           delta={pctDelta(totals.thbTotal, prevSpend)}
           isLoading={isLoading}
@@ -93,8 +93,8 @@ export function PurchasesTab() {
         <KpiCard label="Suppliers" value={String(suppliers.length)} isLoading={isLoading} />
       </div>
 
-      <WeeklySpendChart spend={spend} isLoading={isLoading} error={error} />
-      <PurchaseRatioChart data={ratio} isLoading={isLoading} error={error} />
+      <WeeklySpendChart spend={spend} range={range} isLoading={isLoading} error={error} />
+      <PurchaseRatioChart data={ratio} range={range} isLoading={isLoading} error={error} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <SupplierTable rows={suppliers} isLoading={isLoading} />

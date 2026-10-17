@@ -1,5 +1,12 @@
 import { AlertTriangle } from 'lucide-react'
-import { CHART_COLORS, DOW_LABELS, HEAT_SPARSE_THRESHOLD, type HeatGrid } from '../../lib/analytics'
+import {
+  CHART_COLORS,
+  DOW_LABELS,
+  HEAT_SPARSE_THRESHOLD,
+  weekSnapNote,
+  type HeatGrid,
+  type PeriodRange,
+} from '../../lib/analytics'
 
 /* ═══════════════════════════════════════════════════════════
    HourHeatmap — receipts per day-of-week × hour (spec §5).
@@ -14,6 +21,7 @@ import { CHART_COLORS, DOW_LABELS, HEAT_SPARSE_THRESHOLD, type HeatGrid } from '
 
 export interface HourHeatmapProps {
   grid: HeatGrid
+  range: PeriodRange
   isLoading: boolean
 }
 
@@ -24,8 +32,9 @@ function cellBackground(intensity: number): string {
   return `rgba(${CHART_COLORS.heat}, ${alpha.toFixed(3)})`
 }
 
-export function HourHeatmap({ grid, isLoading }: HourHeatmapProps) {
+export function HourHeatmap({ grid, range, isLoading }: HourHeatmapProps) {
   const { hours, cells, totalReceipts, liveCells, avgPerLiveCell, busiestCell, isSparse } = grid
+  const snapNote = weekSnapNote(range)
 
   return (
     <div className="flex flex-col shk-panel">
@@ -36,6 +45,7 @@ export function HourHeatmap({ grid, isLoading }: HourHeatmapProps) {
             ? 'Receipts per weekday and hour'
             : `Receipts, not revenue · ${totalReceipts} receipts over ${liveCells} active hours · ${avgPerLiveCell.toFixed(1)} per cell on average`}
         </p>
+        {snapNote && <p className="mt-1 text-[10px] leading-snug text-amber-watch">{snapNote}</p>}
       </div>
 
       <div className="flex-1 overflow-x-auto px-4 py-4">

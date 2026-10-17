@@ -4,14 +4,23 @@ import userEvent from '@testing-library/user-event'
 import { AnalyticsPeriodProvider, useAnalyticsPeriod } from './AnalyticsPeriodContext'
 
 function Probe() {
-  const { weeks, setWeeks, range } = useAnalyticsPeriod()
+  const { weeks, setWeeks, setCustomRange, clearCustomRange, range } = useAnalyticsPeriod()
   return (
     <div>
-      <span data-testid="weeks">{weeks}</span>
+      <span data-testid="weeks">{String(weeks)}</span>
       <span data-testid="start">{range.start}</span>
+      <span data-testid="end">{range.end}</span>
+      <span data-testid="mode">{range.mode}</span>
+      <span data-testid="label">{range.label}</span>
       <span data-testid="span">{range.weekStarts.length}</span>
       <button type="button" onClick={() => setWeeks(13)}>
         go 13
+      </button>
+      <button type="button" onClick={() => setCustomRange('2026-10-01', '2026-10-15')}>
+        go custom
+      </button>
+      <button type="button" onClick={clearCustomRange}>
+        clear
       </button>
     </div>
   )
@@ -52,6 +61,35 @@ describe('AnalyticsPeriodContext', () => {
     )
     const start = new Date(`${screen.getByTestId('start').textContent}T00:00:00Z`)
     expect(start.getUTCDay()).toBe(1)
+  })
+
+  it('switches to a custom range and reports it as such', async () => {
+    render(
+      <AnalyticsPeriodProvider>
+        <Probe />
+      </AnalyticsPeriodProvider>,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'go custom' }))
+
+    expect(screen.getByTestId('mode')).toHaveTextContent('custom')
+    expect(screen.getByTestId('start')).toHaveTextContent('2026-10-01')
+    expect(screen.getByTestId('end')).toHaveTextContent('2026-10-15')
+    expect(screen.getByTestId('label')).toHaveTextContent('1 – 15 Oct')
+    // No preset is active, so there is no week count to report.
+    expect(screen.getByTestId('weeks')).toHaveTextContent('null')
+  })
+
+  it('clears a custom range back to the 8-week preset', async () => {
+    render(
+      <AnalyticsPeriodProvider>
+        <Probe />
+      </AnalyticsPeriodProvider>,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'go custom' }))
+    await userEvent.click(screen.getByRole('button', { name: 'clear' }))
+
+    expect(screen.getByTestId('mode')).toHaveTextContent('preset')
+    expect(screen.getByTestId('weeks')).toHaveTextContent('8')
   })
 
   it('refuses to be used outside its provider instead of returning a default', () => {

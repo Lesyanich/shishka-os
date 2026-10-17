@@ -37,7 +37,7 @@ export function CoverageStrip({ range, totals, isLoading, onRefresh }: CoverageS
         <>
           <Fact
             label="Period"
-            value={`${range.weeks}w · ${weekLabel(range.start)} – ${weekLabel(range.end)}`}
+            value={`${range.label} · ${weekLabel(range.start)} – ${weekLabel(range.end)}`}
           />
           <Fact label="Trading days" value={`${totals.tradingDays} / ${calendarDays}`} />
           <Fact label="Receipts" value={String(totals.receipts)} />

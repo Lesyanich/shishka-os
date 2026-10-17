@@ -22,32 +22,33 @@ vi.mock('recharts', async (importOriginal) => {
 
 const { WeeklyRevenueChart } = await import('./WeeklyRevenueChart')
 
-const DATA = weeklySeries(SALES, periodRange(4, '2026-10-16'))
+const RANGE = periodRange(4, '2026-10-16')
+const DATA = weeklySeries(SALES, RANGE)
 
 describe('WeeklyRevenueChart', () => {
   it('draws bars and the takeaway-share line without a recharts config error', () => {
     const { container } = render(
-      <WeeklyRevenueChart data={DATA} isLoading={false} error={null} />,
+      <WeeklyRevenueChart data={DATA} range={RANGE} isLoading={false} error={null} />,
     )
     expect(container.querySelectorAll('.recharts-bar-rectangle').length).toBeGreaterThan(0)
     expect(container.querySelector('.recharts-line')).toBeTruthy()
   })
 
   it('labels every ISO week in the period on the axis', () => {
-    render(<WeeklyRevenueChart data={DATA} isLoading={false} error={null} />)
+    render(<WeeklyRevenueChart data={DATA} range={RANGE} isLoading={false} error={null} />)
     expect(screen.getByText('21 Sep')).toBeInTheDocument()
     expect(screen.getByText('12 Oct')).toBeInTheDocument()
   })
 
   it('carries a right-hand percentage axis for takeaway share', () => {
-    render(<WeeklyRevenueChart data={DATA} isLoading={false} error={null} />)
+    render(<WeeklyRevenueChart data={DATA} range={RANGE} isLoading={false} error={null} />)
     expect(screen.getByText('100%')).toBeInTheDocument()
   })
 
   it('shows an empty state rather than axes with no bars', () => {
     render(
       <WeeklyRevenueChart
-        data={weeklySeries([], periodRange(4, '2026-10-16'))}
+        data={weeklySeries([], RANGE)} range={RANGE}
         isLoading={false}
         error={null}
       />,
@@ -56,12 +57,12 @@ describe('WeeklyRevenueChart', () => {
   })
 
   it('surfaces an error instead of a blank panel', () => {
-    render(<WeeklyRevenueChart data={[]} isLoading={false} error="permission denied" />)
+    render(<WeeklyRevenueChart data={[]} range={RANGE} isLoading={false} error="permission denied" />)
     expect(screen.getByText('permission denied')).toBeInTheDocument()
   })
 
   it('renders a skeleton while loading', () => {
-    const { container } = render(<WeeklyRevenueChart data={[]} isLoading error={null} />)
+    const { container } = render(<WeeklyRevenueChart data={[]} range={RANGE} isLoading error={null} />)
     expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0)
   })
 })

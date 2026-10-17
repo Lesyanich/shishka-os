@@ -112,22 +112,110 @@ export function daysInclusive(from: string, to: string): number {
 
 /* ─── Period selector ─── */
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 export const PERIOD_CHOICES = [4, 8, 13] as const
 export type PeriodWeeks = (typeof PERIOD_CHOICES)[number]
 
+/** The first day Loyverse sales exist — a range before this can only be empty. */
+export const SALES_WINDOW_START = '2026-05-18'
+
+export type PeriodMode = 'preset' | 'custom'
+
 export interface PeriodRange {
-  weeks: PeriodWeeks
-  /** First day of the period — always a Monday. */
+  mode: PeriodMode
+  /** null for a custom range. */
+  weeks: PeriodWeeks | null
+  /** Short human label: "8w", or "1 – 15 Oct". */
+  label: string
+
+  /* ── The DAY window the owner actually chose ── */
+  /** First day of the period. A Monday for presets, arbitrary when custom. */
   start: string
-  /** Last day of the period — today in Bangkok. */
+  /** Last day of the period. Today in Bangkok for presets. */
   end: string
-  /** Equal-length window ending the day before `start`. */
+  /** Equal-length day window ending the day before `start`. */
   prevStart: string
   prevEnd: string
+
+  /* ── The WEEK window, for sources bucketed by ISO week ── */
   /** Monday of the ISO week still in progress. */
   currentWeekStart: string
-  /** Every ISO week start in the period, ascending (length === weeks). */
+  /** Every ISO week the day window touches, ascending. */
   weekStarts: string[]
+  /** First Monday covered — i.e. `weekStarts[0]`. */
+  weekStart: string
+  /** Last Monday covered — i.e. `weekStarts.at(-1)`. */
+  weekEnd: string
+  /**
+   * True when the week window reaches beyond the chosen days, so a week-grain
+   * widget is showing more than was asked for and must say so.
+   *
+   * Always false for presets: those start on a Monday and run to today, which
+   * is what their own bars already mean.
+   */
+  snappedToWeeks: boolean
+}
+
+/** "1 – 15 Oct", or "28 Sep – 15 Oct" when the months differ. */
+export function rangeLabel(from: string, to: string): string {
+  const a = parseDay(from)
+  const b = parseDay(to)
+  const sameMonth = a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear()
+  return sameMonth
+    ? `${a.getUTCDate()} – ${b.getUTCDate()} ${MONTHS[b.getUTCMonth()]}`
+    : `${a.getUTCDate()} ${MONTHS[a.getUTCMonth()]} – ${b.getUTCDate()} ${MONTHS[b.getUTCMonth()]}`
+}
+
+/** Every ISO week start the day window `from`..`to` touches, ascending. */
+export function coveringWeekStarts(from: string, to: string): string[] {
+  const first = mondayOf(from)
+  const last = mondayOf(to)
+  const out: string[] = []
+  for (let w = first; w <= last; w = addWeeks(w, 1)) out.push(w)
+  return out
+}
+
+function buildRange(args: {
+  mode: PeriodMode
+  weeks: PeriodWeeks | null
+  label: string
+  start: string
+  end: string
+  today: string
+  /** Presets own their part-week by definition, so they never read as snapped. */
+  forceUnsnapped?: boolean
+}): PeriodRange {
+  const { mode, weeks, label, start, end, today, forceUnsnapped } = args
+
+  const span = daysInclusive(start, end)
+  const prevEnd = addDays(start, -1)
+  const prevStart = addDays(prevEnd, -(span - 1))
+
+  const weekStarts = coveringWeekStarts(start, end)
+  const weekStart = weekStarts[0]
+  const weekEnd = weekStarts[weekStarts.length - 1]
+
+  // The week window runs Monday..Sunday; it exceeds the day window whenever the
+  // chosen start is not a Monday or the chosen end is not that week's Sunday.
+  const snappedToWeeks = forceUnsnapped
+    ? false
+    : start !== weekStart || end !== addDays(weekEnd, 6)
+
+  return {
+    mode,
+    weeks,
+    label,
+    start,
+    end,
+    prevStart,
+    prevEnd,
+    currentWeekStart: mondayOf(today),
+    weekStarts,
+    weekStart,
+    weekEnd,
+    snappedToWeeks,
+  }
 }
 
 /**
@@ -139,21 +227,81 @@ export interface PeriodRange {
  */
 export function periodRange(weeks: PeriodWeeks, today: string = bangkokToday()): PeriodRange {
   const currentWeekStart = mondayOf(today)
-  const start = addWeeks(currentWeekStart, -(weeks - 1))
-  const end = today
+  return buildRange({
+    mode: 'preset',
+    weeks,
+    label: `${weeks}w`,
+    start: addWeeks(currentWeekStart, -(weeks - 1)),
+    end: today,
+    today,
+    forceUnsnapped: true,
+  })
+}
 
-  const span = daysInclusive(start, end)
-  const prevEnd = addDays(start, -1)
-  const prevStart = addDays(prevEnd, -(span - 1))
+/**
+ * An arbitrary from–to day range (CEO request 2026-10-17: «выбор диапазона с по»).
+ *
+ * Day-grain surfaces honour these dates exactly. Week-grain surfaces must read
+ * `weekStart`..`weekEnd` instead and, when `snappedToWeeks`, say that they are
+ * showing the covering whole weeks — drawing a partial week as a whole one is
+ * the single way this feature could start lying.
+ */
+export function customRange(from: string, to: string, today: string = bangkokToday()): PeriodRange {
+  const start = from <= to ? from : to
+  const end = from <= to ? to : from
+  return buildRange({
+    mode: 'custom',
+    weeks: null,
+    label: rangeLabel(start, end),
+    start,
+    end,
+    today,
+  })
+}
 
-  const weekStarts: string[] = []
-  for (let i = 0; i < weeks; i++) weekStarts.push(addWeeks(start, i))
+export interface RangeProblem {
+  field: 'from' | 'to'
+  message: string
+}
 
-  return { weeks, start, end, prevStart, prevEnd, currentWeekStart, weekStarts }
+/**
+ * Why a picked range cannot be used, or null when it is fine.
+ *
+ * A range wholly before the first day of sales is rejected rather than drawn
+ * as an empty tab, so the picker explains the emptiness instead of the charts
+ * implying a collapse in trade.
+ */
+export function validateRange(
+  from: string,
+  to: string,
+  today: string = bangkokToday(),
+): RangeProblem | null {
+  if (!from) return { field: 'from', message: 'Pick a start date' }
+  if (!to) return { field: 'to', message: 'Pick an end date' }
+  if (from > to) return { field: 'from', message: 'Start date is after the end date' }
+  if (to > today) return { field: 'to', message: 'That is in the future' }
+  if (to < SALES_WINDOW_START) {
+    return { field: 'to', message: `Sales start on ${SALES_WINDOW_START} — nothing exists before that` }
+  }
+  return null
 }
 
 function inRange(day: string, from: string, to: string): boolean {
   return day >= from && day <= to
+}
+
+/**
+ * What a week-grain panel must say when the chosen day range does not line up
+ * with whole ISO weeks. Returning null means there is nothing to disclose.
+ *
+ * Drawing a part-week bar as though it were a whole one is the single way the
+ * custom date range could start lying, so every week-grain panel carries this.
+ */
+export function weekSnapNote(range: PeriodRange): string | null {
+  if (!range.snappedToWeeks) return null
+  return `Week-grain source: showing whole ISO weeks ${weekLabel(range.weekStart)} – ${weekLabel(
+    addDays(range.weekEnd, 6),
+  )}, which is wider than the ${range.label} you picked.`
 }
 
 /* ─── Sales totals & KPI strip ─── */
@@ -264,7 +412,6 @@ export interface WeekPoint {
   isPartial: boolean
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export function weekLabel(iso: string): string {
   const d = parseDay(iso)
@@ -277,8 +424,12 @@ export function weekLabel(iso: string): string {
  */
 export function weeklySeries(rows: SalesDailyRow[], range: PeriodRange): WeekPoint[] {
   const byWeek = new Map<string, { gross: number; refunds: number; receipts: number; takeaway: number }>()
+  // Bucketed by week, so the bars cover whole weeks: filtering on the chosen
+  // DAYS would silently draw a part-week bar at each end of a custom range.
+  const from = range.weekStart
+  const to = addDays(range.weekEnd, 6)
   for (const r of rows) {
-    if (!inRange(r.day, range.start, range.end)) continue
+    if (!inRange(r.day, from, to)) continue
     const entry = byWeek.get(r.week) ?? { gross: 0, refunds: 0, receipts: 0, takeaway: 0 }
     entry.gross += r.gross_revenue
     entry.refunds += r.refunds_thb
@@ -457,8 +608,11 @@ export function heatGrid(rows: HourlyHeatRow[], range: PeriodRange): HeatGrid {
   let busiestCell = 0
 
   for (const r of rows) {
-    // `week` is a Monday, so the period's own Monday-aligned bounds apply directly.
-    if (r.week < range.start || r.week > range.end) continue
+    // `week` is a Monday, so it must be compared with the WEEK window. Against
+    // the day window a custom range starting mid-week would drop its own
+    // covering week (measured on prod: 81 receipts where the day range holds
+    // 75 and the covering weeks hold 108 — neither answer).
+    if (r.week < range.weekStart || r.week > range.weekEnd) continue
     if (r.receipts <= 0) continue
 
     const key = `${r.iso_dow}-${r.hour_local}`
