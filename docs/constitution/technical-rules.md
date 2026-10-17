@@ -215,6 +215,65 @@ HINT:  Next free number is 487 — ADVISORY, not reserved: another session can t
 
 ---
 
+## RULE-RPC-GRANTS
+
+Functions in `public` are **closed by default**. Migration 490 revoked EXECUTE from
+`PUBLIC`, `anon` and `authenticated` on all 190 of our functions and cleared the default
+privilege that handed EXECUTE to `PUBLIC` on every new one. A function you add is callable
+by `service_role` and `postgres` and by nobody else until you say otherwise.
+
+**Every migration that creates a function in `public` must end with its grant**, or state
+in a comment that none is wanted:
+
+```sql
+GRANT EXECUTE ON FUNCTION public.fn_my_new_rpc(p_id uuid) TO authenticated;
+COMMENT ON FUNCTION public.fn_my_new_rpc(p_id uuid)
+  IS 'rpc: authenticated — <which screen calls it>';
+```
+
+**Grant to `anon` only with a reason in the migration header.** The allowlist is empty
+today: the live site (`shishka-health`) and `apps/web` read views and tables, and neither
+repo contains a `.rpc(` call. An `anon` grant means the publishable key that ships in the
+site's JavaScript can call it, so it needs its own argument, not a default.
+
+**The failure mode that is not obvious.** Four helpers are not RPCs but are evaluated
+*inside RLS policies* — `fn_is_authenticated()`, `fn_get_my_role()`, `fn_is_owner()`,
+`fn_has_app_role()` — and one inside a `security_invoker` view,
+`fn_active_menu_ingredient_ids()`. A policy runs with the **caller's** privileges. Add a
+helper like these without granting EXECUTE and every table whose policy names it stops
+returning zero rows and starts raising `permission denied for function`. Grant policy
+helpers to `authenticated` in the same migration that introduces the policy.
+
+**Three things that look right and are not:**
+
+1. `REVOKE EXECUTE … FROM anon, authenticated` on an existing function usually does
+   nothing. Most functions carry a grant to `PUBLIC` (`{=X/…}` in `proacl`) and anon
+   inherits through it. Revoke from `PUBLIC` too, and check `proacl` afterwards rather
+   than trusting the statement.
+2. `… ON ALL FUNCTIONS IN SCHEMA public` also hits extension-owned functions — pgvector,
+   pg_trgm and http all live in `public` here. Revoking pgvector's or pg_trgm's support
+   functions breaks `%` and `<=>` queries; `ALTER FUNCTION` on one breaks `pg_dump` and
+   extension upgrades. Filter on `NOT EXISTS (SELECT 1 FROM pg_depend d WHERE
+   d.objid = p.oid AND d.deptype = 'e')`.
+3. `postgres` cannot revoke a grant that `supabase_admin` made. It is neither superuser
+   nor a member. Anything owned by `supabase_admin` — the `http` and `pg_net` extensions —
+   is out of reach from a migration and needs Supabase support.
+
+**Verify by dry run, not by reading.** A grants migration can be run against production
+inside a transaction that rolls back — `BEGIN; <migration body>; SET LOCAL ROLE anon;
+<read the live-site surface>; RESET ROLE; … ROLLBACK;` — which exercises the real ACLs and
+the real policies. That is strictly better than a Supabase branch for this kind of change,
+because a branch replays the repo's migration history and this schema is known to drift
+from it. Compare the role-scoped row counts against the same counts taken before the
+change; they should be identical.
+
+> Origin: 2026-10-17, MC `f133850a`, migration 490. The Supabase advisor flagged 109
+> SECURITY DEFINER functions in `public` executable by `anon` (89 with no role check) and
+> 126 with a mutable `search_path`. The task as scoped would have been a no-op — it said
+> revoke from `anon, authenticated`, and the grants were to `PUBLIC`.
+
+---
+
 # PART II — Code Patterns
 
 ## RULE-OLLAMA-MODEL-NAME-NORMALIZATION

@@ -259,3 +259,139 @@ Worth its own task.
 3. `get_advisors(security)` before/after.
 4. Manual `pg_dump` before the prod apply (MC `4405c6e9` is still open — there are no backups).
 5. Prod apply in the quiet hour (after 23:00 Phuket), then repeat the smoke on prod.
+
+---
+
+# Step 2 — migration 490, and what writing it changed
+
+CEO approved the allowlist on 2026-10-17 (anon empty, authenticated 51). Writing the
+migration turned up four things the inventory had not reached. Three changed the SQL; one
+changed the allowlist by four functions.
+
+## 2.1 The prescribed revoke would have done nothing
+
+165 of our 190 functions carry a grant to **PUBLIC** — `{=X/postgres,…}` in `proacl`.
+`anon` and `authenticated` inherit EXECUTE through it, so
+`REVOKE EXECUTE … FROM anon, authenticated` leaves every one of them callable. The revoke
+has to name `PUBLIC`.
+
+The same applies to default privileges. PostgreSQL grants EXECUTE on every new function to
+`PUBLIC` as a built-in default, and that default does not appear in `pg_default_acl` at
+all — so revoking the two named roles there would also have left the hole open for every
+function created afterwards.
+
+## 2.2 Four more functions must keep EXECUTE, or the admin panel dies
+
+These are not RPCs. They are evaluated **inside RLS policies**, under the caller's
+privileges — revoke EXECUTE and the tables stop returning zero rows and start raising
+`permission denied for function`.
+
+| Function | Evaluated by | Policies |
+|---|---|---:|
+| `fn_is_authenticated()` | RLS on ~58 tables | 58 |
+| `fn_get_my_role()` | RLS on 8 HR tables (also a real RPC, already allowlisted) | 21 |
+| `fn_is_owner()` | RLS on 10 tables | 10 |
+| `fn_has_app_role(text[])` | RLS on 6 tables | 9 |
+| `fn_active_menu_ingredient_ids()` | the `security_invoker` view `v_stock_sheet_items` | — |
+
+Allowlist for `authenticated` is therefore **55**: the approved 51 plus these 4
+(`fn_get_my_role` was already among the 51).
+
+**This does not reopen the anon question.** All five are granted to `authenticated` only.
+`price_tiers` is the one base table the live site reads that carries an
+`fn_is_authenticated()` policy, and `EXPLAIN` as `anon` shows a bare `Seq Scan` with no
+filter: the policy is `true OR fn_is_authenticated()`, the planner constant-folds it, and
+the function is never executed. Confirmed again by the dry run below.
+
+## 2.3 The http extension cannot be closed from a migration — measured
+
+`postgres` is not a superuser and `pg_has_role(postgres, supabase_admin, MEMBER)` is
+false. The `http` grants were made by `supabase_admin`, and only the grantor may revoke.
+The dry run left `http_still_open_to_anon = 19`.
+
+Section C of the migration attempts the revoke anyway and raises a WARNING naming the gap,
+so the apply log states plainly that the hole is still open. Escalated as MC `16ad5772`
+(critical) with three routes to close it; the preferred one is moving
+`fn_staff_tasks_push` and the four Loyverse cron jobs onto `pg_net`, then having support
+drop the extension.
+
+## 2.4 Verification — transactional dry run against production
+
+A Supabase branch was considered and rejected: a branch replays the repo's migration
+history, and this schema is known to drift from it, so a branch would not reproduce the
+ACLs the migration acts on. Instead the whole migration ran against **production** inside
+a transaction that rolled back, which exercises the real ACLs and the real policies.
+
+End state inside the transaction:
+
+| Check | Result |
+|---|---|
+| our functions executable by `anon` | **0** |
+| our functions executable by `authenticated` | **55** |
+| our functions that lost `service_role` | **0** |
+| our functions with a mutable `search_path` | **0** |
+| `http` functions still executable by `anon` | **19** (see 2.3) |
+| extension rows touched | **0** |
+
+Role-scoped reads, before the change and after it inside the same transaction:
+
+| Role | Counts | Before | After |
+|---|---|---|---|
+| `anon` | menu_public / menu_modifiers / nomenclature_tags / price_tiers / site_content / v_public_menu | 81 / 436 / 942 / 3 / 4 / 134 | **identical** |
+| `authenticated` | price_tiers / business_tasks / staff / production_tasks / v_stock_sheet_items | 3 / 0 / 0 / 0 / 25 | **identical** |
+
+The zeros are pre-existing: `SET LOCAL ROLE` carries no JWT, so `auth.uid()` is null and
+the policies correctly return nothing. What matters is that they return nothing rather
+than raising `permission denied for function` — that is the regression 2.2 guards against,
+and it does not occur.
+
+`search_path` edge cases came out right: `fn_provision_cook_auth` →
+`public, auth, pg_temp`, `rls_auto_enable` → `pg_catalog, pg_temp`. The unused 2-arg
+`fn_create_batches_from_task` overload is left ungranted; only the 3-arg form the app
+calls is granted.
+
+The migration carries the same checks as in-transaction assertions (section G), so a prod
+apply that does not reach this end state rolls itself back.
+
+## 2.5 Expected advisor delta
+
+Baseline taken 2026-10-17 before any change:
+
+| Lint | Level | Before | Expected after |
+|---|---|---:|---:|
+| `function_search_path_mutable` | WARN | 126 | **0** |
+| `anon_security_definer_function_executable` | WARN | 109 | **0** |
+| `authenticated_security_definer_function_executable` | WARN | 121 | **46** |
+| `security_definer_view` | ERROR | 34 | 34 (untouched — separate concern) |
+| `extension_in_public` | WARN | 4 | 4 (needs MC `16ad5772`) |
+| `rls_enabled_no_policy` | INFO | 21 | 21 |
+| `auth_leaked_password_protection` | WARN | 1 | 1 |
+
+46 is the count of allowlisted functions that are also SECURITY DEFINER (the other 9 of
+the 55 are INVOKER). It cannot go lower without changing function bodies, which this task
+forbids.
+
+## 2.6 Still open after this migration
+
+- **`http` extension** — MC `16ad5772`, critical.
+- **Flat `authenticated` tier** — any signed-in cook can still call `fn_calculate_payroll`,
+  `fn_approve_payroll` or `fn_staff_pin_reveal`. Role separation lives in the UI
+  `RoleGuard`, not the database. Closing it needs `fn_has_app_role` guards inside ~20
+  bodies; forbidden here by the "no body changes" rule.
+- **Table-level default privileges** — `pg_default_acl` grants `anon` full
+  `arwdDxtm` on every new *table* in `public`. RLS is the only thing standing between anon
+  and those tables. Out of scope for a functions migration, worth its own look.
+- **`net.*`** (pg_net, 12 functions) is anon-executable but `net` is not a PostgREST-exposed
+  schema, so it is not reachable over REST. Folded into MC `16ad5772`.
+
+## 2.7 Prod apply checklist
+
+1. Manual `pg_dump` first — MC `4405c6e9` is still open, there are no backups.
+2. Apply in the quiet hour, after 23:00 Phuket.
+3. Watch the apply log for the section C WARNING (http) and the section B WARNING
+   (supabase_admin default privileges) — both are expected, neither aborts.
+4. Re-dump after-state, diff against `2026-10-17-rpc-grants-after.csv` (which was produced
+   from the dry run and should match exactly).
+5. `get_advisors(security)` and compare against 2.5.
+6. Smoke with real keys, not SQL: the live site with the **publishable** key, the admin
+   panel with a real user JWT, and the Loyverse edge functions under `service_role`.

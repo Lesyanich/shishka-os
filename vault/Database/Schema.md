@@ -592,6 +592,64 @@ rows for. Listed here so the migration's full footprint is greppable:
 | `fn_staff_login_status()` | RPC | Owner-only (zero rows otherwise): `(staff_id, login_email, last_sign_in_at, is_blocked, has_pin)` for every staff row with a login. Feeds the Access block on `/hr/staff`; `auth.users` is not readable from the client | 454, 455 |
 | `fn_staff_retire_expired()` | RPC | Per-row `UPDATE staff SET is_active=false` for active rows with `fire_date < fn_bkk_today()`, each in its own exception block so one refused row (last-owner guard) does not stop the rest. Run by pg_cron `staff-fire-date-expiry` at `5 17 * * *` UTC = 00:05 Bangkok | 454 |
 
+## Function EXECUTE Grants (Migration 490)
+
+Before mig 490 every function in `public` was callable by anyone holding the publishable
+key: 109 SECURITY DEFINER functions were executable by `anon`, 89 of them with no role
+check inside. Migrations 382/456/457 had closed individual functions one at a time; 490
+inverted the default for the whole schema.
+
+**The model now:** closed by default, opened by name.
+
+| Role | EXECUTE on `public` functions |
+|---|---|
+| `anon` | **none** — the live site and `apps/web` read views and tables only; neither repo contains a `.rpc(` call |
+| `authenticated` | **55** — 51 RPCs the admin panel / KDS / staff TWA call, plus 4 helpers evaluated internally (below) |
+| `service_role` | all 190 — every one of our functions carries an explicit `service_role=X` grant, untouched by 490 |
+| `postgres` | all 190 — explicit, untouched |
+
+**The 4 non-RPC grants.** These are not called over REST. They are evaluated under the
+*caller's* privileges, so without EXECUTE the dependent objects raise
+`permission denied for function` rather than returning zero rows:
+
+| Function | Evaluated by |
+|---|---|
+| `fn_is_authenticated()` | RLS policies on ~58 tables |
+| `fn_get_my_role()` | RLS policies on 8 HR tables (also a real RPC) |
+| `fn_is_owner()` | RLS policies on 10 tables |
+| `fn_has_app_role(TEXT[])` | RLS policies on 6 tables |
+| `fn_active_menu_ingredient_ids()` | the `security_invoker` view `v_stock_sheet_items` |
+
+**Two traps 490 had to route around, both measured against prod:**
+
+1. **`REVOKE ... FROM anon, authenticated` is a no-op here.** 165 of our 190 functions
+   carry a grant to PUBLIC (`{=X/postgres,…}` in `proacl`); anon inherits EXECUTE through
+   it. The revoke has to name `PUBLIC`. Same for default privileges — PostgreSQL's
+   built-in "grant EXECUTE to PUBLIC on every new function" default does not appear in
+   `pg_default_acl` at all.
+2. **Not "ALL FUNCTIONS IN SCHEMA public".** 164 of the 354 functions there belong to
+   extensions — pgvector (114), pg_trgm (31), http (19). Revoking pgvector's and
+   pg_trgm's support functions breaks `%` / `<=>` queries, and `ALTER FUNCTION` on an
+   extension-owned function breaks `pg_dump` and extension upgrades. 490 walks `pg_proc`
+   and skips anything with `pg_depend.deptype = 'e'`.
+
+**`search_path`:** all 190 of our functions now pin it (`public, pg_temp`; two keep an
+extra schema — `fn_provision_cook_auth` → `public, auth, pg_temp`, `rls_auto_enable` →
+`pg_catalog, pg_temp`). Extension functions are left alone.
+
+**Still open after 490 — `http` extension.** Its 19 functions in `public` are executable
+by `anon` and 490 cannot revoke them: the extension is owned by `supabase_admin`, and
+`postgres` is neither a superuser nor a member, so only the grantor can revoke. Section C
+of the migration attempts it and raises a WARNING naming the gap. MC `16ad5772`.
+
+**Adding a function after 490:** it is created closed. Any new RPC needs an explicit
+`GRANT EXECUTE … TO authenticated`, and so does any new RLS helper — forgetting the
+latter makes its policies raise `permission denied for function`. See
+`docs/constitution/technical-rules.md` § RULE-RPC-GRANTS.
+
+Audit artifacts: `docs/audits/2026-10-17-rpc-grants-{before,after}.csv`,
+`2026-10-17-rpc-grants.diff`, `2026-10-17-rpc-grants-inventory.md`. MC `f133850a`.
+
 ## Views
 
 | View | Source | Purpose | Migration |
